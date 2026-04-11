@@ -2,7 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView } from '../types/game';
 
-const HUB_URL = 'http://localhost:5000/gamehub';
+// Same-origin path — Vite dev server proxies /gamehub to the gameserver
+// container, so this works from the host browser and from inside the e2e
+// playwright container alike.
+const HUB_URL = '/gamehub';
 const MAX_MESSAGES = 200;
 const STORAGE_KEY = 'firstmud_player';
 
@@ -84,6 +87,11 @@ export function useGameConnection(): GameConnectionResult {
       setWorldState(snapshot);
     });
 
+    // Server pushes this after Authenticate so the status panel populates
+    connection.on('WorldState', (snapshot: WorldStateSnapshot) => {
+      setWorldState(snapshot);
+    });
+
     connection.on('GameMessage', (msg: GameMessage) => {
       appendMessage(msg);
     });
@@ -96,7 +104,9 @@ export function useGameConnection(): GameConnectionResult {
       });
     });
 
-    connection.on('QuestAccepted', (questId: string) => {
+    connection.on('QuestAccepted', (payload: { questId?: string } | string) => {
+      // Server broadcasts { PlayerId, QuestId } — pick out the id.
+      const questId = typeof payload === 'string' ? payload : payload?.questId ?? 'unknown';
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'quest',
@@ -203,16 +213,28 @@ export function useGameConnection(): GameConnectionResult {
       });
     });
 
+    let cancelled = false;
+
     setConnectionState('connecting');
     connection
       .start()
       .then(() => {
+        if (cancelled) return;
         setConnectionState('connected');
         return connection.invoke('Authenticate', playerId);
       })
-      // Server auto-enqueues GetAvailableQuests + EnterZone in Authenticate,
-      // so no further client-side kickoff is needed here.
+      // Server auto-enqueues GetAvailableQuests + EnterZone in Authenticate
+      // and also pushes a WorldState snapshot, so no further client-side
+      // kickoff is needed here.
       .catch((err: unknown) => {
+        // React StrictMode dev-mode double-mount aborts the first start()
+        // mid-negotiation — that's benign and should not surface as a
+        // user-visible error.
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/stopped during negotiation|abort/i.test(msg)) {
+          return;
+        }
         console.error('Connection failed:', err);
         setConnectionState('error');
         appendMessage({
@@ -223,7 +245,10 @@ export function useGameConnection(): GameConnectionResult {
       });
 
     return () => {
-      connection.stop();
+      cancelled = true;
+      connection.stop().catch(() => {
+        /* ignore stop errors during unmount */
+      });
     };
   }, [appendMessage, needsPlayerCreation, playerId]);
 

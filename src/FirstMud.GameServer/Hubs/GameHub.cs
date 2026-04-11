@@ -36,6 +36,17 @@ public class GameHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, playerId.ToString());
         await Clients.Caller.SendAsync("Authenticated", playerId);
 
+        // Push initial world-state snapshot so the status panel populates immediately
+        try
+        {
+            var snapshot = await _worldStateService.GetSnapshotAsync(playerId, Context.ConnectionAborted);
+            await Clients.Caller.SendAsync("WorldState", snapshot);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+
         // Immediately seed the client with available quests and current zone view
         _gameLoop.EnqueueCommand(new GetAvailableQuestsCommand(playerId));
         _gameLoop.EnqueueCommand(new EnterZoneCommand(playerId, 0, Guid.Empty));

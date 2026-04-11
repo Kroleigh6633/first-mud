@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 
 const STORAGE_KEY = 'firstmud_player';
-const API_BASE = 'http://localhost:5000';
+// Same-origin — Vite dev server proxies /api to the gameserver container.
+const API_BASE = '';
 
 interface Props {
   onCreated: (playerId: string) => void;

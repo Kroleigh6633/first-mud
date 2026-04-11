@@ -32,7 +32,14 @@ export default function WorldMap({ worldState, zoneTiles }: Props) {
 
   // Initialise rot.js display once
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    // React StrictMode double-mounts effects in dev. Clear any canvas
+    // left over from a prior mount so we don't end up with ghost @s.
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
 
     const display = new ROT.Display({
       width: MAP_WIDTH,
@@ -44,7 +51,8 @@ export default function WorldMap({ worldState, zoneTiles }: Props) {
     });
 
     displayRef.current = display;
-    containerRef.current.appendChild(display.getContainer()!);
+    const canvas = display.getContainer();
+    if (canvas) container.appendChild(canvas);
 
     // Blink timer for player @
     blinkTimerRef.current = setInterval(() => {
@@ -53,9 +61,8 @@ export default function WorldMap({ worldState, zoneTiles }: Props) {
 
     return () => {
       if (blinkTimerRef.current) clearInterval(blinkTimerRef.current);
-      if (containerRef.current && display.getContainer()) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        containerRef.current.removeChild(display.getContainer()!);
+      if (canvas && canvas.parentNode === container) {
+        container.removeChild(canvas);
       }
       displayRef.current = null;
     };

@@ -90,6 +90,27 @@ services:
       # Anonymous volume preserves node_modules installed inside the image
       - /app/node_modules
 
+  e2e:
+    # On-demand Playwright test runner. Not started by `up` — run with:
+    #   docker compose -f docker/docker-compose.yml run --rm e2e
+    # Uses the official MS Playwright image which has Chromium pre-installed.
+    image: mcr.microsoft.com/playwright:v1.55.0-noble
+    profiles: ["e2e"]
+    container_name: firstmud-e2e
+    depends_on:
+      - client
+      - gameserver
+    working_dir: /e2e
+    environment:
+      BASE_URL: "http://client:5173"
+      CI: "true"
+    volumes:
+      - ../tests/FirstMud.E2E:/e2e
+      # Anonymous volume preserves node_modules installed inside the
+      # container so host (Windows) paths don't shadow them.
+      - /e2e/node_modules
+    command: sh -c "npm install --no-audit --no-fund && npx playwright test"
+
 volumes:
   sqlserver_data:
   neo4j_data:
