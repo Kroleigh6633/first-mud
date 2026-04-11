@@ -96,7 +96,7 @@ export default function StatusPanel({ player }: Props) {
         <span style={{ color: '#888888' }}>World: </span>
         <span>{player.world}</span>
       </div>
-      <div style={{ marginBottom: '2px' }}>
+      <div style={{ marginBottom: '2px' }} data-testid="player-pos">
         <span style={{ color: '#888888' }}>Pos: </span>
         <span>{player.x},{player.y}</span>
       </div>

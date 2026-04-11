@@ -6,6 +6,8 @@ export type KeyAction =
   | { type: 'inventory' }
   | { type: 'character' }
   | { type: 'quest' }
+  | { type: 'help' }
+  | { type: 'escape' }
   | { type: 'pass' }
   | null;
 
@@ -59,6 +61,14 @@ export function useKeyboard(): KeyAction {
         case ' ':
           next = { type: 'pass' };
           e.preventDefault();
+          break;
+        case '?':
+        case 'h':
+        case 'H':
+          next = { type: 'help' };
+          break;
+        case 'Escape':
+          next = { type: 'escape' };
           break;
         default:
           return;

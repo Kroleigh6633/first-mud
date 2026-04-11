@@ -9,6 +9,33 @@ const HUB_URL = '/gamehub';
 const MAX_MESSAGES = 200;
 const STORAGE_KEY = 'firstmud_player';
 
+/**
+ * Custom SignalR logger that silently drops the two benign "connection
+ * was stopped during negotiation" / AbortError messages that the library
+ * writes directly to console.error when React StrictMode dev-mode
+ * double-mounts the effect. All other SignalR messages route normally.
+ */
+const quietSignalRLogger: signalR.ILogger = {
+  log(logLevel: signalR.LogLevel, message: string) {
+    if (logLevel < signalR.LogLevel.Warning) return;
+
+    const benign = /stopped during negotiation|abort(?:ed|error)/i.test(message);
+    if (benign) return;
+
+    switch (logLevel) {
+      case signalR.LogLevel.Critical:
+      case signalR.LogLevel.Error:
+        console.error(`[SignalR] ${message}`);
+        break;
+      case signalR.LogLevel.Warning:
+        console.warn(`[SignalR] ${message}`);
+        break;
+      default:
+        console.log(`[SignalR] ${message}`);
+    }
+  },
+};
+
 interface StoredPlayer {
   id: string;
   name: string;
@@ -63,6 +90,7 @@ export function useGameConnection(): GameConnectionResult {
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(HUB_URL)
       .withAutomaticReconnect()
+      .configureLogging(quietSignalRLogger)
       .build();
 
     connectionRef.current = connection;
@@ -129,7 +157,9 @@ export function useGameConnection(): GameConnectionResult {
       }
     });
 
-    connection.on('ReputationChanged', (factionId: string, newTier: string) => {
+    connection.on('ReputationChanged', (payload: { playerId?: string; factionTiers?: Record<string, string> }) => {
+      // Server broadcasts { PlayerId, FactionTiers: { [factionId]: tier } }
+      if (!payload?.factionTiers) return;
       setWorldState(prev => {
         if (!prev) return prev;
         return {
@@ -138,22 +168,24 @@ export function useGameConnection(): GameConnectionResult {
             ...prev.player,
             factionTiers: {
               ...prev.player.factionTiers,
-              [factionId]: newTier as import('../types/game').ReputationTier,
+              ...(payload.factionTiers as Record<string, import('../types/game').ReputationTier>),
             },
           },
         };
       });
     });
 
-    connection.on('PlayerMoved', (x: number, y: number) => {
+    connection.on('PlayerMoved', (payload: { x: number; y: number; zoneId?: string; world?: string }) => {
+      // Server broadcasts { Id, X, Y, ZoneId, World }.
+      if (!payload || typeof payload.x !== 'number' || typeof payload.y !== 'number') return;
       setWorldState(prev => {
         if (!prev) return prev;
         return {
           ...prev,
           player: {
             ...prev.player,
-            x,
-            y,
+            x: payload.x,
+            y: payload.y,
           },
         };
       });

@@ -49,13 +49,8 @@ test.describe('FirstMud browser client — smoke', () => {
     const body = await page.textContent('body');
     expect(body ?? '').not.toContain('Failed to connect to game server');
 
-    // Filter out known-benign dev noise (React StrictMode aborts, HMR, etc.)
-    const meaningfulErrors = consoleErrors.filter(e =>
-      !/stopped during negotiation/i.test(e) &&
-      !/ResizeObserver/i.test(e) &&
-      !/AbortError/i.test(e) &&
-      !/\[vite\]/i.test(e),
-    );
+    // Only Vite HMR banners are allowed; everything else must be gone.
+    const meaningfulErrors = consoleErrors.filter(e => !/\[vite\]/i.test(e));
     expect(meaningfulErrors, `unexpected console errors:\n${meaningfulErrors.join('\n')}`).toEqual([]);
   });
 

@@ -6,6 +6,7 @@ import MessageLog from './MessageLog';
 import ConnectionStatus from './ConnectionStatus';
 import QuestLog from './QuestLog';
 import PlayerCreation from './PlayerCreation';
+import HelpOverlay from './HelpOverlay';
 import { useKeyboard } from '../hooks/useKeyboard';
 
 interface Props {
@@ -32,21 +33,28 @@ export default function GameTerminal({
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     if (!keyAction) return;
     switch (keyAction.type) {
       case 'move':
-        sendCommand('move', { dx: keyAction.dx, dy: keyAction.dy });
+        // Server-side MoveCommand expects `deltaX`/`deltaY`, not dx/dy.
+        sendCommand('move', { deltaX: keyAction.dx, deltaY: keyAction.dy });
         break;
       case 'interact':
-        sendCommand('interact');
+        // Server-side InteractCommand expects an `objectId` — send a nil
+        // guid for "interact with whatever is under me" until we have
+        // real objects to click on.
+        sendCommand('interact', { objectId: '00000000-0000-0000-0000-000000000000' });
         break;
       case 'inventory':
-        sendCommand('inventory');
+        // Server hub parses "openinventory", not "inventory".
+        sendCommand('openinventory');
         break;
       case 'character':
-        sendCommand('character');
+        // No server-side CharacterCommand yet — silently ignore so we
+        // don't flood the console with "Unknown command" errors.
         break;
       case 'quest':
         setShowQuestLog(prev => {
@@ -55,8 +63,15 @@ export default function GameTerminal({
           return next;
         });
         break;
+      case 'help':
+        setShowHelp(prev => !prev);
+        break;
+      case 'escape':
+        setShowHelp(false);
+        setShowQuestLog(false);
+        break;
       case 'pass':
-        sendCommand('pass');
+        // No server-side PassCommand yet — silently ignore.
         break;
     }
   }, [keyAction, sendCommand, fetchAvailableQuests]);
@@ -66,7 +81,8 @@ export default function GameTerminal({
   };
 
   const handleCompleteQuest = (questId: string, outcome: string) => {
-    sendCommand('completequest', { questId, outcome });
+    // Server parses `chosenOutcome`, not `outcome`.
+    sendCommand('completequest', { questId, chosenOutcome: outcome });
   };
 
   return (
@@ -115,6 +131,22 @@ export default function GameTerminal({
         <MessageLog messages={messages} />
       </div>
 
+      {/* Help hint — bottom-right corner */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '186px',
+          right: '10px',
+          color: '#666666',
+          fontSize: '11px',
+          letterSpacing: '0.05em',
+          pointerEvents: 'none',
+          fontFamily: 'monospace',
+        }}
+      >
+        press [?] for help
+      </div>
+
       {/* Modals */}
       {needsPlayerCreation && (
         <PlayerCreation onCreated={() => { /* reload handled inside PlayerCreation */ }} />
@@ -127,6 +159,7 @@ export default function GameTerminal({
           onClose={() => setShowQuestLog(false)}
         />
       )}
+      {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
