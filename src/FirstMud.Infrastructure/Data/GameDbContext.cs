@@ -1,0 +1,25 @@
+using FirstMud.Domain.Entities;
+using FirstMud.Infrastructure.Data.Configurations;
+using Microsoft.EntityFrameworkCore;
+
+namespace FirstMud.Infrastructure.Data;
+
+public class GameDbContext : DbContext
+{
+    public GameDbContext(DbContextOptions<GameDbContext> options) : base(options) { }
+
+    public DbSet<Player> Players => Set<Player>();
+    public DbSet<Companion> Companions => Set<Companion>();
+    public DbSet<Item> Items => Set<Item>();
+    public DbSet<PlayerFactionReputation> PlayerFactionReputations => Set<PlayerFactionReputation>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ApplyConfiguration(new PlayerConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanionConfiguration());
+        modelBuilder.ApplyConfiguration(new ItemConfiguration());
+        modelBuilder.ApplyConfiguration(new PlayerFactionReputationConfiguration());
+    }
+}

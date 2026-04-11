@@ -1,10 +1,22 @@
 using Microsoft.AspNetCore.SignalR;
+using FirstMud.GameServer.Commands;
+using FirstMud.GameServer.Services;
+using FirstMud.Domain.Enums;
 
 namespace FirstMud.GameServer.Hubs;
 
 public class GameHub : Hub
 {
     private static readonly Dictionary<string, Guid> ConnectionPlayerMap = new();
+
+    private readonly GameLoopService _gameLoop;
+    private readonly WorldStateService _worldStateService;
+
+    public GameHub(GameLoopService gameLoop, WorldStateService worldStateService)
+    {
+        _gameLoop = gameLoop;
+        _worldStateService = worldStateService;
+    }
 
     public override async Task OnConnectedAsync()
     {
@@ -33,7 +45,14 @@ public class GameHub : Hub
             return;
         }
 
-        // Commands are dispatched to the game loop — stub for now
+        var cmd = ParseCommand(command, playerId, payload);
+        if (cmd is null)
+        {
+            await Clients.Caller.SendAsync("Error", $"Unknown command: {command}");
+            return;
+        }
+
+        _gameLoop.EnqueueCommand(cmd);
         await Clients.Caller.SendAsync("CommandReceived", new { command, playerId });
     }
 
@@ -45,7 +64,129 @@ public class GameHub : Hub
             return;
         }
 
-        // World state snapshot dispatched from game loop
-        await Clients.Caller.SendAsync("WorldStateRequested", playerId);
+        try
+        {
+            var snapshot = await _worldStateService.GetSnapshotAsync(playerId, Context.ConnectionAborted);
+            await Clients.Caller.SendAsync("WorldState", snapshot);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Parses a command name and optional payload object into a typed IGameCommand.
+    /// The payload object is expected to be a Dictionary&lt;string, object&gt; (as SignalR passes anonymous objects).
+    /// </summary>
+    private static IGameCommand? ParseCommand(string command, Guid playerId, object? payload)
+    {
+        // Helper to safely read payload values
+        var data = payload as System.Text.Json.JsonElement? ?? default;
+
+        return command.ToLowerInvariant() switch
+        {
+            "move" => new MoveCommand(
+                playerId,
+                TryGetInt(payload, "deltaX"),
+                TryGetInt(payload, "deltaY")),
+
+            "attack" => new AttackCommand(
+                playerId,
+                TryGetGuid(payload, "targetId")),
+
+            "useskill" => new UseSkillCommand(
+                playerId,
+                TryGetString(payload, "skillId") ?? string.Empty,
+                TryGetNullableGuid(payload, "targetId")),
+
+            "interact" => new InteractCommand(
+                playerId,
+                TryGetGuid(payload, "objectId")),
+
+            "pickupitem" => new PickupItemCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
+            "openinventory" => new OpenInventoryCommand(playerId),
+
+            "craft" => new CraftCommand(
+                playerId,
+                TryGetString(payload, "recipeId") ?? string.Empty,
+                TryGetGuidList(payload, "componentIds"),
+                TryGetNullableGuid(payload, "taperId")),
+
+            "acceptquest" => new AcceptQuestCommand(
+                playerId,
+                TryGetString(payload, "questId") ?? string.Empty),
+
+            "completequest" => new CompleteQuestCommand(
+                playerId,
+                TryGetString(payload, "questId") ?? string.Empty,
+                TryGetString(payload, "chosenOutcome") ?? string.Empty),
+
+            "useportal" when Enum.TryParse<WorldId>(TryGetString(payload, "destinationWorld"), out var world)
+                => new UsePortalCommand(playerId, world),
+
+            "managebaseasset" => new ManageBaseAssetCommand(
+                playerId,
+                TryGetString(payload, "action") ?? string.Empty,
+                TryGetNullableGuid(payload, "assetId")),
+
+            _ => null
+        };
+    }
+
+    private static int TryGetInt(object? payload, string key)
+    {
+        if (payload is System.Text.Json.JsonElement el
+            && el.ValueKind == System.Text.Json.JsonValueKind.Object
+            && el.TryGetProperty(key, out var prop)
+            && prop.TryGetInt32(out var val))
+            return val;
+        return 0;
+    }
+
+    private static Guid TryGetGuid(object? payload, string key)
+        => TryGetNullableGuid(payload, key) ?? Guid.Empty;
+
+    private static Guid? TryGetNullableGuid(object? payload, string key)
+    {
+        if (payload is System.Text.Json.JsonElement el
+            && el.ValueKind == System.Text.Json.JsonValueKind.Object
+            && el.TryGetProperty(key, out var prop)
+            && prop.ValueKind == System.Text.Json.JsonValueKind.String
+            && Guid.TryParse(prop.GetString(), out var guid))
+            return guid;
+        return null;
+    }
+
+    private static string? TryGetString(object? payload, string key)
+    {
+        if (payload is System.Text.Json.JsonElement el
+            && el.ValueKind == System.Text.Json.JsonValueKind.Object
+            && el.TryGetProperty(key, out var prop)
+            && prop.ValueKind == System.Text.Json.JsonValueKind.String)
+            return prop.GetString();
+        return null;
+    }
+
+    private static List<Guid> TryGetGuidList(object? payload, string key)
+    {
+        var result = new List<Guid>();
+        if (payload is not System.Text.Json.JsonElement el
+            || el.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !el.TryGetProperty(key, out var prop)
+            || prop.ValueKind != System.Text.Json.JsonValueKind.Array)
+            return result;
+
+        foreach (var item in prop.EnumerateArray())
+        {
+            if (item.ValueKind == System.Text.Json.JsonValueKind.String
+                && Guid.TryParse(item.GetString(), out var guid))
+                result.Add(guid);
+        }
+
+        return result;
     }
 }

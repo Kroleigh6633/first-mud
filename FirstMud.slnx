@@ -5,4 +5,7 @@
     <Project Path="src/FirstMud.GameServer/FirstMud.GameServer.csproj" />
     <Project Path="src/FirstMud.Infrastructure/FirstMud.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FirstMud.Tests/FirstMud.Tests.csproj" />
+  </Folder>
 </Solution>

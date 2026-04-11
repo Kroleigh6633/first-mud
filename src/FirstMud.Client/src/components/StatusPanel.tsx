@@ -1,0 +1,134 @@
+import type { PlayerState, WeaveState, ReputationTier } from '../types/game';
+
+interface Props {
+  player: PlayerState | null;
+}
+
+function makeBar(current: number, max: number, width: number, fillChar = '█', emptyChar = '░'): string {
+  const filled = Math.round((current / Math.max(max, 1)) * width);
+  return fillChar.repeat(filled) + emptyChar.repeat(width - filled);
+}
+
+function weaveColor(state: WeaveState): string {
+  switch (state) {
+    case 'Full':      return '#00ff41';
+    case 'Steady':    return '#00cc33';
+    case 'Strained':  return '#ffcc00';
+    case 'Critical':  return '#ff8800';
+    case 'Depleted':  return '#ff4444';
+  }
+}
+
+function reputationColor(tier: ReputationTier): string {
+  switch (tier) {
+    case 'Hostile':  return '#ff4444';
+    case 'Wary':     return '#ff8800';
+    case 'Unknown':  return '#888888';
+    case 'Known':    return '#aaaaaa';
+    case 'Trusted':  return '#00ccff';
+    case 'Honored':  return '#00ff41';
+    case 'Bound':    return '#cc88ff';
+  }
+}
+
+const FACTIONS = [
+  'House Caervorn',
+  'Thornwood Covens',
+  'The Compact',
+  'Gravenguard',
+  'Fairgean',
+  'Golvari',
+  'Ashen Court',
+];
+
+export default function StatusPanel({ player }: Props) {
+  const panelStyle: React.CSSProperties = {
+    padding: '8px 10px',
+    fontFamily: 'monospace',
+    fontSize: '13px',
+    color: '#00ff41',
+    background: '#0d0d0d',
+    overflowY: 'auto',
+    height: '100%',
+    boxSizing: 'border-box',
+  };
+
+  const sectionHeaderStyle: React.CSSProperties = {
+    color: '#888888',
+    borderBottom: '1px solid #1a1a1a',
+    marginBottom: '4px',
+    marginTop: '10px',
+    paddingBottom: '2px',
+    fontSize: '11px',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+  };
+
+  if (!player) {
+    return (
+      <div style={panelStyle}>
+        <div style={sectionHeaderStyle}>Status</div>
+        <div style={{ color: '#888888' }}>Awaiting connection...</div>
+      </div>
+    );
+  }
+
+  const hpBar = makeBar(player.currentHp, player.maxHp, 10);
+  const weaveBar = makeBar(player.weavePercent, 100, 10);
+
+  return (
+    <div style={panelStyle}>
+      <div style={sectionHeaderStyle}>Player</div>
+      <div style={{ marginBottom: '4px' }}>
+        [{player.name}] Lv.{player.level} Rider
+      </div>
+      <div style={{ marginBottom: '2px' }}>
+        <span style={{ color: '#888888' }}>HP: </span>
+        <span style={{ color: '#ff4444' }}>{hpBar}</span>
+        <span style={{ color: '#888888' }}> {player.currentHp}/{player.maxHp}</span>
+      </div>
+      <div style={{ marginBottom: '2px' }}>
+        <span style={{ color: '#888888' }}>Weave: </span>
+        <span style={{ color: weaveColor(player.weaveState) }}>{weaveBar}</span>
+        <span style={{ color: '#888888' }}> {player.weavePercent}%</span>
+      </div>
+      <div style={{ marginBottom: '2px' }}>
+        <span style={{ color: '#888888' }}>World: </span>
+        <span>{player.world}</span>
+      </div>
+      <div style={{ marginBottom: '2px' }}>
+        <span style={{ color: '#888888' }}>Pos: </span>
+        <span>{player.x},{player.y}</span>
+      </div>
+
+      <div style={sectionHeaderStyle}>Factions</div>
+      {FACTIONS.map(faction => {
+        const tier: ReputationTier = (player.factionTiers[faction] as ReputationTier) ?? 'Unknown';
+        return (
+          <div key={faction} style={{ marginBottom: '2px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#aaaaaa', fontSize: '11px' }}>{faction}</span>
+            <span style={{ color: reputationColor(tier), fontSize: '11px' }}>{tier}</span>
+          </div>
+        );
+      })}
+
+      <div style={sectionHeaderStyle}>Companions</div>
+      {player.activeCompanionIds.length === 0 ? (
+        <div style={{ color: '#888888', fontSize: '11px' }}>None</div>
+      ) : (
+        player.activeCompanionIds.map(id => (
+          <div key={id} style={{ color: '#00ccff', fontSize: '11px' }}>{id}</div>
+        ))
+      )}
+
+      <div style={sectionHeaderStyle}>Portals</div>
+      {player.unlockedPortals.length === 0 ? (
+        <div style={{ color: '#888888', fontSize: '11px' }}>None unlocked</div>
+      ) : (
+        player.unlockedPortals.map(portal => (
+          <div key={portal} style={{ color: '#cc88ff', fontSize: '11px' }}>{portal}</div>
+        ))
+      )}
+    </div>
+  );
+}
