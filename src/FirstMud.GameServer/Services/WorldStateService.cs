@@ -18,7 +18,8 @@ public record PlayerStateDto(
     WorldId World,
     Dictionary<string, string> FactionTiers,
     List<string> ActiveCompanionIds,
-    List<string> UnlockedPortals);
+    List<string> UnlockedPortals,
+    List<string> CurrentQuestIds);
 
 public record WorldStateSnapshot(
     PlayerStateDto Player,
@@ -28,6 +29,7 @@ public record WorldStateSnapshot(
 public class WorldStateService
 {
     private readonly IPlayerRepository _playerRepository;
+    private readonly IQuestGraphRepository _questGraphRepository;
     private readonly AiPlayerService _aiPlayerService;
 
     private static readonly Dictionary<WorldId, string> WorldNames = new()
@@ -40,9 +42,13 @@ public class WorldStateService
         [WorldId.TheDream]       = "The Dream",
     };
 
-    public WorldStateService(IPlayerRepository playerRepository, AiPlayerService aiPlayerService)
+    public WorldStateService(
+        IPlayerRepository playerRepository,
+        IQuestGraphRepository questGraphRepository,
+        AiPlayerService aiPlayerService)
     {
         _playerRepository = playerRepository;
+        _questGraphRepository = questGraphRepository;
         _aiPlayerService = aiPlayerService;
     }
 
@@ -63,6 +69,13 @@ public class WorldStateService
             .Select(w => w.ToString())
             .ToList();
 
+        // Fetch quests currently in progress for this player
+        var availableQuests = await _questGraphRepository.GetAvailableQuestsAsync(playerId, null, ct);
+        var currentQuestIds = availableQuests
+            .Where(q => q.IsTaken)
+            .Select(q => q.QuestId)
+            .ToList();
+
         var playerDto = new PlayerStateDto(
             player.Id,
             player.Name,
@@ -76,7 +89,8 @@ public class WorldStateService
             player.Position.World,
             factionTiers,
             activeCompanionIds,
-            unlockedPortals);
+            unlockedPortals,
+            currentQuestIds);
 
         var aiStates = _aiPlayerService.GetAiStates().ToList();
 
@@ -85,5 +99,10 @@ public class WorldStateService
             : player.Position.World.ToString();
 
         return new WorldStateSnapshot(playerDto, aiStates, worldName);
+    }
+
+    public async Task<IReadOnlyList<QuestNode>> GetAvailableQuestsAsync(Guid playerId, CancellationToken ct = default)
+    {
+        return await _questGraphRepository.GetAvailableQuestsAsync(playerId, null, ct);
     }
 }

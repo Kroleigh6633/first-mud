@@ -18,6 +18,27 @@ export interface PlayerState {
   factionTiers: Record<string, ReputationTier>;
   activeCompanionIds: string[];
   unlockedPortals: WorldId[];
+  currentQuestIds?: string[];
+}
+
+export interface QuestNode {
+  questId: string;
+  title: string;
+  description: string;
+  factionId: number;
+  requiredTier: number;
+  reputationReward: number;
+  possibleOutcomes: string[];
+  isWyrdQuest: boolean;
+  isTaken: boolean;
+}
+
+export interface QuestCompleteResult {
+  success: boolean;
+  message: string;
+  reputationGained: number;
+  unlockedQuests: QuestNode[];
+  wyrdSettled: boolean;
 }
 
 export interface AiPlayerState {

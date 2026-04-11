@@ -21,6 +21,9 @@ public static class ServiceExtensions
         services.AddScoped<IPlayerRepository, PlayerRepository>();
         services.AddScoped<ICompanionRepository, CompanionRepository>();
         services.AddScoped<IItemRepository, ItemRepository>();
+        services.AddScoped<IZoneRepository, ZoneRepository>();
+        services.AddScoped<IRecipeRepository, RecipeRepository>();
+        services.AddScoped<IBaseAssetRepository, BaseAssetRepository>();
 
         return services;
     }

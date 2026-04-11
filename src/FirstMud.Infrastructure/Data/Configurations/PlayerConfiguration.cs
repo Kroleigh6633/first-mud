@@ -1,6 +1,7 @@
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FirstMud.Infrastructure.Data.Configurations;
@@ -76,7 +77,11 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
             .HasConversion(
                 v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
                 v => (IReadOnlyList<Guid>)System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(v, (System.Text.Json.JsonSerializerOptions?)null)!)
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("nvarchar(max)")
+            .Metadata.SetValueComparer(new ValueComparer<IReadOnlyList<Guid>>(
+                (a, b) => a != null && b != null && a.SequenceEqual(b),
+                v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
+                v => v.ToList()));
 
         // UnlockedPortals stored as JSON
         builder.Property(p => p.UnlockedPortals)
@@ -85,7 +90,11 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
                 v => System.Text.Json.JsonSerializer.Serialize(v.Select(x => (int)x).ToList(), (System.Text.Json.JsonSerializerOptions?)null),
                 v => (IReadOnlyCollection<WorldId>)System.Text.Json.JsonSerializer.Deserialize<List<int>>(v, (System.Text.Json.JsonSerializerOptions?)null)!
                          .Select(x => (WorldId)x).ToHashSet())
-            .HasColumnType("nvarchar(max)");
+            .HasColumnType("nvarchar(max)")
+            .Metadata.SetValueComparer(new ValueComparer<IReadOnlyCollection<WorldId>>(
+                (a, b) => a != null && b != null && a.OrderBy(x => x).SequenceEqual(b.OrderBy(x => x)),
+                v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
+                v => v.ToHashSet()));
 
         // Shadow property for last seen timestamp
         builder.Property<DateTime>("LastSeenAt")

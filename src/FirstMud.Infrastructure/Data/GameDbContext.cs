@@ -12,6 +12,9 @@ public class GameDbContext : DbContext
     public DbSet<Companion> Companions => Set<Companion>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<PlayerFactionReputation> PlayerFactionReputations => Set<PlayerFactionReputation>();
+    public DbSet<Zone> Zones => Set<Zone>();
+    public DbSet<Recipe> Recipes => Set<Recipe>();
+    public DbSet<BaseAsset> BaseAssets => Set<BaseAsset>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,5 +24,8 @@ public class GameDbContext : DbContext
         modelBuilder.ApplyConfiguration(new CompanionConfiguration());
         modelBuilder.ApplyConfiguration(new ItemConfiguration());
         modelBuilder.ApplyConfiguration(new PlayerFactionReputationConfiguration());
+        modelBuilder.ApplyConfiguration(new ZoneConfiguration());
+        modelBuilder.ApplyConfiguration(new RecipeConfiguration());
+        modelBuilder.ApplyConfiguration(new BaseAssetConfiguration());
     }
 }

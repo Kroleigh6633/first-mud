@@ -1,20 +1,35 @@
-import type { WorldStateSnapshot, GameMessage, ConnectionState } from '../types/game';
+import { useState, useEffect } from 'react';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
 import ConnectionStatus from './ConnectionStatus';
+import QuestLog from './QuestLog';
+import PlayerCreation from './PlayerCreation';
 import { useKeyboard } from '../hooks/useKeyboard';
-import { useEffect } from 'react';
 
 interface Props {
   connectionState: ConnectionState;
   sendCommand: (command: string, payload?: unknown) => void;
   worldState: WorldStateSnapshot | null;
   messages: GameMessage[];
+  availableQuests: QuestNode[];
+  fetchAvailableQuests: () => void;
+  needsPlayerCreation: boolean;
+  playerId: string | null;
 }
 
-export default function GameTerminal({ connectionState, sendCommand, worldState, messages }: Props) {
+export default function GameTerminal({
+  connectionState,
+  sendCommand,
+  worldState,
+  messages,
+  availableQuests,
+  fetchAvailableQuests,
+  needsPlayerCreation,
+}: Props) {
   const keyAction = useKeyboard();
+  const [showQuestLog, setShowQuestLog] = useState(false);
 
   useEffect(() => {
     if (!keyAction) return;
@@ -32,13 +47,25 @@ export default function GameTerminal({ connectionState, sendCommand, worldState,
         sendCommand('character');
         break;
       case 'quest':
-        sendCommand('quest');
+        setShowQuestLog(prev => {
+          const next = !prev;
+          if (next) fetchAvailableQuests();
+          return next;
+        });
         break;
       case 'pass':
         sendCommand('pass');
         break;
     }
-  }, [keyAction, sendCommand]);
+  }, [keyAction, sendCommand, fetchAvailableQuests]);
+
+  const handleAcceptQuest = (questId: string) => {
+    sendCommand('acceptquest', { questId });
+  };
+
+  const handleCompleteQuest = (questId: string, outcome: string) => {
+    sendCommand('completequest', { questId, outcome });
+  };
 
   return (
     <div style={{
@@ -85,6 +112,19 @@ export default function GameTerminal({ connectionState, sendCommand, worldState,
       <div style={{ overflow: 'hidden' }}>
         <MessageLog messages={messages} />
       </div>
+
+      {/* Modals */}
+      {needsPlayerCreation && (
+        <PlayerCreation onCreated={() => { /* reload handled inside PlayerCreation */ }} />
+      )}
+      {!needsPlayerCreation && showQuestLog && (
+        <QuestLog
+          quests={availableQuests}
+          onAccept={handleAcceptQuest}
+          onComplete={handleCompleteQuest}
+          onClose={() => setShowQuestLog(false)}
+        />
+      )}
     </div>
   );
 }

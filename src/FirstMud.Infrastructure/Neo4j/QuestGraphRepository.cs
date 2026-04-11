@@ -269,6 +269,31 @@ public sealed class QuestGraphRepository : IQuestGraphRepository
     }
 
     // -------------------------------------------------------------------------
+    // MarkQuestInProgressAsync
+    // -------------------------------------------------------------------------
+
+    public async Task MarkQuestInProgressAsync(
+        Guid playerId,
+        string questId,
+        bool takenByAi = false,
+        CancellationToken ct = default)
+    {
+        var playerIdStr = playerId.ToString();
+
+        await _driver.ExecuteWriteAsync(async tx =>
+        {
+            await tx.RunAsync(
+                """
+                MERGE (p:Player {playerId: $playerId})
+                MERGE (q:Quest {questId: $questId})
+                MERGE (p)-[r:IN_PROGRESS]->(q)
+                SET r.takenByAi = $takenByAi, r.startedAt = datetime()
+                """,
+                new { playerId = playerIdStr, questId, takenByAi });
+        }, ct);
+    }
+
+    // -------------------------------------------------------------------------
     // Mapping helper
     // -------------------------------------------------------------------------
 
