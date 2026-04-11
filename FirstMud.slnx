@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FirstMud.Application/FirstMud.Application.csproj" />
+    <Project Path="src/FirstMud.Domain/FirstMud.Domain.csproj" />
+    <Project Path="src/FirstMud.GameServer/FirstMud.GameServer.csproj" />
+    <Project Path="src/FirstMud.Infrastructure/FirstMud.Infrastructure.csproj" />
+  </Folder>
+</Solution>
