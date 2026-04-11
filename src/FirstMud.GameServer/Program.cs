@@ -85,6 +85,19 @@ app.MapPost("/api/players", async (CreatePlayerRequest req, GameDbContext db) =>
     return Results.Created($"/api/players/{player.Id}", new { player.Id, player.Name });
 });
 
+// Dev-only: teleport a player back to the Starting Road. Used by
+// Playwright tests (beforeEach) so gameplay state is deterministic.
+app.MapPost("/api/players/{id:guid}/reset-position", async (Guid id, GameDbContext db) =>
+{
+    var player = await db.Players.FindAsync(id);
+    if (player is null) return Results.NotFound();
+    var (x, y) = FirstMud.GameServer.Services.ZoneGridLayout.StartingRoad;
+    player.Move(new FirstMud.Domain.ValueObjects.Position(
+        player.Position.World, player.Position.ZoneId, x, y));
+    await db.SaveChangesAsync();
+    return Results.Ok(new { player.Id, X = x, Y = y });
+});
+
 app.Run();
 
 record CreatePlayerRequest(string Name, int? CraftingSeed);

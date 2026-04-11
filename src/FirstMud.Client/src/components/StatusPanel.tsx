@@ -1,7 +1,8 @@
-import type { PlayerState, WeaveState, ReputationTier } from '../types/game';
+import type { PlayerState, WeaveState, ReputationTier, ZoneTile } from '../types/game';
 
 interface Props {
   player: PlayerState | null;
+  currentTile: ZoneTile | null;
 }
 
 function makeBar(current: number, max: number, width: number, fillChar = '█', emptyChar = '░'): string {
@@ -41,7 +42,13 @@ const FACTIONS = [
   'Ashen Court',
 ];
 
-export default function StatusPanel({ player }: Props) {
+function dangerColor(level: number): string {
+  if (level <= 3) return '#00bb33';
+  if (level <= 6) return '#ccaa00';
+  return '#cc2200';
+}
+
+export default function StatusPanel({ player, currentTile }: Props) {
   const panelStyle: React.CSSProperties = {
     padding: '8px 10px',
     fontFamily: 'monospace',
@@ -100,6 +107,33 @@ export default function StatusPanel({ player }: Props) {
         <span style={{ color: '#888888' }}>Pos: </span>
         <span>{player.x},{player.y}</span>
       </div>
+
+      <div style={sectionHeaderStyle}>Location</div>
+      {currentTile ? (
+        <div data-testid="current-tile">
+          <div style={{ marginBottom: '2px' }}>
+            <span style={{ color: '#00ff41', fontWeight: 'bold' }}>{currentTile.name}</span>
+            {' '}
+            <span style={{ color: '#888888' }}>[{currentTile.asciiSymbol}]</span>
+          </div>
+          <div style={{ marginBottom: '2px' }}>
+            <span style={{ color: '#888888' }}>Danger: </span>
+            <span style={{ color: dangerColor(currentTile.dangerLevel) }}>
+              {currentTile.dangerLevel}/10
+            </span>
+            {currentTile.isPortalZone && (
+              <span style={{ color: '#cc88ff', marginLeft: '8px' }}>◈ portal</span>
+            )}
+          </div>
+          <div style={{ color: '#aaaaaa', fontSize: '11px', marginTop: '4px', lineHeight: '1.35' }}>
+            {currentTile.description}
+          </div>
+        </div>
+      ) : (
+        <div data-testid="current-tile-empty" style={{ color: '#666666', fontStyle: 'italic' }}>
+          Open country. Nothing of note here.
+        </div>
+      )}
 
       <div style={sectionHeaderStyle}>Factions</div>
       {FACTIONS.map(faction => {

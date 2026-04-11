@@ -1,6 +1,7 @@
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
+using FirstMud.Domain.ValueObjects;
 using FirstMud.Infrastructure.Data;
 using FirstMud.Infrastructure.Neo4j;
 using Microsoft.EntityFrameworkCore;
@@ -29,16 +30,36 @@ public class StartupSeeder(
 
     private async Task SeedDevPlayerAsync(CancellationToken ct)
     {
-        if (await db.Players.AnyAsync(ct))
+        if (!await db.Players.AnyAsync(ct))
+        {
+            var player = Player.Create("Kira Ashwood", craftingSeed: 42);
+            await db.Players.AddAsync(player, ct);
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Dev player seeded: Id={PlayerId} Name={Name}", player.Id, player.Name);
+        }
+        else
         {
             logger.LogInformation("Players table already has data — skipping dev player seed.");
-            return;
         }
 
-        var player = Player.Create("Kira Ashwood", craftingSeed: 42);
-        await db.Players.AddAsync(player, ct);
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Dev player seeded: Id={PlayerId} Name={Name}", player.Id, player.Name);
+        // Dev convenience: teleport any player sitting off the Starting
+        // Road back onto it so tile feedback works immediately on first
+        // load. Harmless in dev since the seeder runs on every boot.
+        var (startX, startY) = ZoneGridLayout.StartingRoad;
+        var strays = await db.Players
+            .Where(p => p.Position.X != startX || p.Position.Y != startY)
+            .ToListAsync(ct);
+        foreach (var p in strays)
+        {
+            p.Move(new Position(p.Position.World, p.Position.ZoneId, startX, startY));
+        }
+        if (strays.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation(
+                "Repositioned {Count} dev player(s) to Starting Road ({X},{Y}).",
+                strays.Count, startX, startY);
+        }
     }
 
     // -------------------------------------------------------------------------

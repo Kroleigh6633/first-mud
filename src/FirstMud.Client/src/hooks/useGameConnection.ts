@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -56,9 +56,11 @@ export interface GameConnectionResult {
   sendCommand: (command: string, payload?: unknown) => void;
   worldState: WorldStateSnapshot | null;
   messages: GameMessage[];
+  appendMessage: (msg: GameMessage) => void;
   availableQuests: QuestNode[];
   fetchAvailableQuests: () => void;
   zoneTiles: ZoneTile[];
+  inventory: InventorySnapshot | null;
   needsPlayerCreation: boolean;
   playerId: string | null;
 }
@@ -72,6 +74,7 @@ export function useGameConnection(): GameConnectionResult {
   const [messages, setMessages] = useState<GameMessage[]>([]);
   const [availableQuests, setAvailableQuests] = useState<QuestNode[]>([]);
   const [zoneTiles, setZoneTiles] = useState<ZoneTile[]>([]);
+  const [inventory, setInventory] = useState<InventorySnapshot | null>(null);
   const [needsPlayerCreation, setNeedsPlayerCreation] = useState<boolean>(resolvedPlayerId === null);
   const [playerId] = useState<string | null>(resolvedPlayerId);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
@@ -215,6 +218,10 @@ export function useGameConnection(): GameConnectionResult {
       setZoneTiles(view.tiles ?? []);
     });
 
+    connection.on('Inventory', (snapshot: InventorySnapshot) => {
+      setInventory(snapshot);
+    });
+
     connection.onreconnecting(() => {
       setConnectionState('connecting');
       appendMessage({
@@ -311,9 +318,11 @@ export function useGameConnection(): GameConnectionResult {
     sendCommand,
     worldState,
     messages,
+    appendMessage,
     availableQuests,
     fetchAvailableQuests,
     zoneTiles,
+    inventory,
     needsPlayerCreation,
     playerId,
   };

@@ -68,6 +68,7 @@ export interface ZoneTile {
   worldId: string;
   zoneId: number;
   name: string;
+  description: string;
   asciiSymbol: string;
   dangerLevel: number;
   isPortalZone: boolean;
@@ -77,4 +78,19 @@ export interface ZoneTile {
 
 export interface ZoneView {
   tiles: ZoneTile[];
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  description: string;
+  workmanship: number;
+}
+
+export interface InventorySnapshot {
+  playerId: string;
+  name: string;
+  craftingSkill: number;
+  salvageSkill: number;
+  items: InventoryItem[];
 }

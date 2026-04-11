@@ -17,6 +17,7 @@ public record ZoneTileDto(
     string WorldId,
     int ZoneId,
     string Name,
+    string Description,
     string AsciiSymbol,
     int DangerLevel,
     bool IsPortalZone,
@@ -185,19 +186,22 @@ public class CommandDispatcher
 
         var payload = new
         {
-            player.Id,
+            PlayerId = player.Id,
             player.Name,
             ActiveCompanionIds = player.ActiveCompanionIds.Select(id => id.ToString()).ToList(),
             CraftingSkill = player.CraftingSkill,
             SalvageSkill = player.SalvageSkill,
             Items = items.Select(i => new
             {
-                i.Id,
+                Id = i.Id.ToString(),
                 i.Name,
                 i.Description,
                 Workmanship = i.Workmanship.Value
             }).ToList()
         };
+
+        // Broadcast so the client can open an Inventory panel.
+        await _notificationService.SendEventAsync(cmd.PlayerId, "Inventory", payload, ct);
 
         return new CommandResult(true, "Inventory opened.", payload);
     }
@@ -341,11 +345,13 @@ public class CommandDispatcher
 
         var tiles = zones.Select(z =>
         {
-            var (x, y) = ZoneGridLayout.GetPosition(z.Id);
+            var known = ZoneGridLayout.GetKnownPosition(z.WorldId, z.ZoneId);
+            var (x, y) = known ?? ZoneGridLayout.GetPosition(z.Id);
             return new ZoneTileDto(
                 z.WorldId.ToString(),
                 z.ZoneId,
                 z.Name,
+                z.Description,
                 z.AsciiSymbol,
                 z.DangerLevel,
                 z.IsPortalZone,

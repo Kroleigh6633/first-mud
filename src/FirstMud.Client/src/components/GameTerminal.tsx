@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile } from '../types/game';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
@@ -7,6 +7,7 @@ import ConnectionStatus from './ConnectionStatus';
 import QuestLog from './QuestLog';
 import PlayerCreation from './PlayerCreation';
 import HelpOverlay from './HelpOverlay';
+import InventoryPanel from './InventoryPanel';
 import { useKeyboard } from '../hooks/useKeyboard';
 
 interface Props {
@@ -14,11 +15,17 @@ interface Props {
   sendCommand: (command: string, payload?: unknown) => void;
   worldState: WorldStateSnapshot | null;
   messages: GameMessage[];
+  appendMessage: (msg: GameMessage) => void;
   availableQuests: QuestNode[];
   fetchAvailableQuests: () => void;
   zoneTiles: ZoneTile[];
+  inventory: InventorySnapshot | null;
   needsPlayerCreation: boolean;
   playerId: string | null;
+}
+
+function findTileAt(tiles: ZoneTile[], x: number, y: number): ZoneTile | null {
+  return tiles.find(t => t.x === x && t.y === y) ?? null;
 }
 
 export default function GameTerminal({
@@ -26,14 +33,49 @@ export default function GameTerminal({
   sendCommand,
   worldState,
   messages,
+  appendMessage,
   availableQuests,
   fetchAvailableQuests,
   zoneTiles,
+  inventory,
   needsPlayerCreation,
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showInventory, setShowInventory] = useState(false);
+
+  // Compute the zone tile the player is currently standing on, if any
+  const currentTile = useMemo(() => {
+    if (!worldState?.player) return null;
+    return findTileAt(zoneTiles, worldState.player.x, worldState.player.y);
+  }, [worldState?.player, zoneTiles]);
+
+  // When the player arrives at a new zone tile (or leaves one), narrate it
+  // into the message log so the user knows what they're walking on.
+  const lastZoneIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    const currentZoneId = currentTile?.zoneId ?? null;
+    if (lastZoneIdRef.current === currentZoneId) return;
+    // Skip the very first transition (initial page load), which would log
+    // a false "You arrive at Open country."
+    if (lastZoneIdRef.current !== null) {
+      if (currentTile) {
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: `You arrive at ${currentTile.name}. ${currentTile.description}`,
+        });
+      } else {
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: 'You leave the marked paths. Open country stretches ahead.',
+        });
+      }
+    }
+    lastZoneIdRef.current = currentZoneId;
+  }, [currentTile, appendMessage]);
 
   useEffect(() => {
     if (!keyAction) return;
@@ -43,18 +85,30 @@ export default function GameTerminal({
         sendCommand('move', { deltaX: keyAction.dx, deltaY: keyAction.dy });
         break;
       case 'interact':
-        // Server-side InteractCommand expects an `objectId` — send a nil
-        // guid for "interact with whatever is under me" until we have
-        // real objects to click on.
-        sendCommand('interact', { objectId: '00000000-0000-0000-0000-000000000000' });
+        // Describe what's at the player's feet. The server-side
+        // InteractCommand doesn't broadcast anything back yet, so do the
+        // feedback entirely on the client for now.
+        if (currentTile) {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'npc',
+            text: `You take stock of ${currentTile.name}. ${currentTile.description}`,
+          });
+        } else {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'There is nothing here to interact with. Keep riding.',
+          });
+        }
         break;
       case 'inventory':
-        // Server hub parses "openinventory", not "inventory".
+        // Ask the server for the latest inventory and open the panel.
         sendCommand('openinventory');
+        setShowInventory(prev => !prev);
         break;
       case 'character':
-        // No server-side CharacterCommand yet — silently ignore so we
-        // don't flood the console with "Unknown command" errors.
+        // No server-side CharacterCommand yet — silently ignore.
         break;
       case 'quest':
         setShowQuestLog(prev => {
@@ -69,12 +123,13 @@ export default function GameTerminal({
       case 'escape':
         setShowHelp(false);
         setShowQuestLog(false);
+        setShowInventory(false);
         break;
       case 'pass':
         // No server-side PassCommand yet — silently ignore.
         break;
     }
-  }, [keyAction, sendCommand, fetchAvailableQuests]);
+  }, [keyAction, sendCommand, fetchAvailableQuests, currentTile, appendMessage]);
 
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
@@ -122,7 +177,7 @@ export default function GameTerminal({
 
         {/* Status panel */}
         <div style={{ overflow: 'hidden' }}>
-          <StatusPanel player={worldState?.player ?? null} />
+          <StatusPanel player={worldState?.player ?? null} currentTile={currentTile} />
         </div>
       </div>
 
@@ -158,6 +213,9 @@ export default function GameTerminal({
           onComplete={handleCompleteQuest}
           onClose={() => setShowQuestLog(false)}
         />
+      )}
+      {showInventory && (
+        <InventoryPanel snapshot={inventory} onClose={() => setShowInventory(false)} />
       )}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
     </div>
