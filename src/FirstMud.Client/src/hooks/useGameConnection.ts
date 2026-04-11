@@ -210,12 +210,8 @@ export function useGameConnection(): GameConnectionResult {
         setConnectionState('connected');
         return connection.invoke('Authenticate', playerId);
       })
-      .then(() => {
-        // Explicitly request quests so the log populates immediately
-        connection.invoke('SendCommand', 'getquests').catch((err: unknown) => {
-          console.error('getquests on connect failed:', err);
-        });
-      })
+      // Server auto-enqueues GetAvailableQuests + EnterZone in Authenticate,
+      // so no further client-side kickoff is needed here.
       .catch((err: unknown) => {
         console.error('Connection failed:', err);
         setConnectionState('error');
