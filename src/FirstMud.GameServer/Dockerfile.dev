@@ -14,6 +14,9 @@ EXPOSE 5000
 
 # The source tree is mounted at /src via docker-compose volume. We run
 # dotnet watch from the GameServer project so edits anywhere in the solution
-# trigger a rebuild+restart.
+# trigger a rebuild+restart. --non-interactive + rude hot-reload prompts
+# mean non-hot-reloadable changes trigger an automatic restart instead of
+# blocking on an interactive (y/n/a/v) prompt.
+ENV DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
 WORKDIR /src/src/FirstMud.GameServer
-CMD ["dotnet", "watch", "run", "--no-launch-profile"]
+CMD ["dotnet", "watch", "run", "--no-launch-profile", "--non-interactive"]

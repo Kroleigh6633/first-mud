@@ -230,7 +230,9 @@ export function useGameConnection(): GameConnectionResult {
   const sendCommand = useCallback((command: string, payload?: unknown) => {
     const connection = connectionRef.current;
     if (connection && connection.state === signalR.HubConnectionState.Connected) {
-      connection.invoke('SendCommand', command, payload).catch((err: unknown) => {
+      // SignalR hub-method binding does NOT respect C# optional parameters,
+      // so always pass an explicit value for payload (null if none).
+      connection.invoke('SendCommand', command, payload ?? null).catch((err: unknown) => {
         console.error('SendCommand failed:', err);
       });
     }

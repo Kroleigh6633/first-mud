@@ -77,6 +77,12 @@ services:
     container_name: firstmud-client
     depends_on:
       - gameserver
+    environment:
+      # Docker volume mounts on Windows don't emit inotify events — force
+      # Vite/chokidar to poll so file edits trigger HMR.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "500"
+      WATCHPACK_POLLING: "true"
     ports:
       - "5173:5173"
     volumes:

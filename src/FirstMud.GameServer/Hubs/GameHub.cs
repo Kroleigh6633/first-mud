@@ -41,7 +41,7 @@ public class GameHub : Hub
         _gameLoop.EnqueueCommand(new EnterZoneCommand(playerId, 0, Guid.Empty));
     }
 
-    public async Task SendCommand(string command, object? payload = null)
+    public async Task SendCommand(string command, object? payload)
     {
         if (!ConnectionPlayerMap.TryGetValue(Context.ConnectionId, out var playerId))
         {
