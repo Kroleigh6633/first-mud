@@ -6,6 +6,7 @@
     <Project Path="src/FirstMud.Infrastructure/FirstMud.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FirstMud.IntegrationTests/FirstMud.IntegrationTests.csproj" />
     <Project Path="tests/FirstMud.Tests/FirstMud.Tests.csproj" />
   </Folder>
 </Solution>

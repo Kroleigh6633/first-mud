@@ -12,6 +12,7 @@ public static class ServiceExtensions
         services.AddScoped<ReputationService>();
         services.AddScoped<QuestService>();
         services.AddScoped<AutomationService>();
+        services.AddSingleton<CombatService>();
         return services;
     }
 }

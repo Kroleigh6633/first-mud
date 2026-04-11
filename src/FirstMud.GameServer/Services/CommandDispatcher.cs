@@ -1,8 +1,11 @@
+using FirstMud.Application;
 using FirstMud.Application.Services;
+using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
 using FirstMud.Domain.Interfaces;
 using FirstMud.Domain.ValueObjects;
 using FirstMud.GameServer.Commands;
+using FirstMud.GameServer.Dtos;
 using FirstMud.GameServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
@@ -10,12 +13,28 @@ namespace FirstMud.GameServer.Services;
 
 public record CommandResult(bool Success, string Message, object? Payload = null);
 
+public record ZoneTileDto(
+    string WorldId,
+    int ZoneId,
+    string Name,
+    string AsciiSymbol,
+    int DangerLevel,
+    bool IsPortalZone,
+    int X,
+    int Y);
+
+public record ZoneViewDto(List<ZoneTileDto> Tiles);
+
 public class CommandDispatcher
 {
     private readonly IPlayerRepository _playerRepository;
     private readonly IItemRepository _itemRepository;
     private readonly IQuestGraphRepository _questGraphRepository;
+    private readonly IZoneRepository _zoneRepository;
     private readonly QuestService _questService;
+    private readonly CombatService _combatService;
+    private readonly WorldStateService _worldStateService;
+    private readonly GameNotificationService _notificationService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly ILogger<CommandDispatcher> _logger;
 
@@ -25,30 +44,43 @@ public class CommandDispatcher
         IPlayerRepository playerRepository,
         IItemRepository itemRepository,
         IQuestGraphRepository questGraphRepository,
+        IZoneRepository zoneRepository,
         QuestService questService,
+        CombatService combatService,
+        WorldStateService worldStateService,
+        GameNotificationService notificationService,
         IHubContext<GameHub> hubContext,
         ILogger<CommandDispatcher> logger)
     {
         _playerRepository = playerRepository;
         _itemRepository = itemRepository;
         _questGraphRepository = questGraphRepository;
+        _zoneRepository = zoneRepository;
         _questService = questService;
+        _combatService = combatService;
+        _worldStateService = worldStateService;
+        _notificationService = notificationService;
         _hubContext = hubContext;
         _logger = logger;
 
         _handlers = new Dictionary<Type, Func<IGameCommand, CancellationToken, Task<CommandResult>>>
         {
-            [typeof(MoveCommand)]            = (cmd, ct) => HandleMoveAsync((MoveCommand)cmd, ct),
-            [typeof(InteractCommand)]        = (cmd, ct) => HandleInteractAsync((InteractCommand)cmd, ct),
-            [typeof(OpenInventoryCommand)]   = (cmd, ct) => HandleOpenInventoryAsync((OpenInventoryCommand)cmd, ct),
-            [typeof(AcceptQuestCommand)]     = (cmd, ct) => HandleAcceptQuestAsync((AcceptQuestCommand)cmd, ct),
-            [typeof(CompleteQuestCommand)]   = (cmd, ct) => HandleCompleteQuestAsync((CompleteQuestCommand)cmd, ct),
-            [typeof(AttackCommand)]          = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
-            [typeof(UseSkillCommand)]        = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
-            [typeof(PickupItemCommand)]      = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
-            [typeof(CraftCommand)]           = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
-            [typeof(UsePortalCommand)]       = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
-            [typeof(ManageBaseAssetCommand)] = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(MoveCommand)]               = (cmd, ct) => HandleMoveAsync((MoveCommand)cmd, ct),
+            [typeof(InteractCommand)]           = (cmd, ct) => HandleInteractAsync((InteractCommand)cmd, ct),
+            [typeof(OpenInventoryCommand)]      = (cmd, ct) => HandleOpenInventoryAsync((OpenInventoryCommand)cmd, ct),
+            [typeof(AcceptQuestCommand)]        = (cmd, ct) => HandleAcceptQuestAsync((AcceptQuestCommand)cmd, ct),
+            [typeof(CompleteQuestCommand)]      = (cmd, ct) => HandleCompleteQuestAsync((CompleteQuestCommand)cmd, ct),
+            [typeof(GetAvailableQuestsCommand)] = (cmd, ct) => HandleGetAvailableQuestsAsync((GetAvailableQuestsCommand)cmd, ct),
+            [typeof(EnterZoneCommand)]          = (cmd, ct) => HandleEnterZoneAsync((EnterZoneCommand)cmd, ct),
+            [typeof(AttackCommand)]             = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(UseSkillCommand)]           = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(PickupItemCommand)]         = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(CraftCommand)]              = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(UsePortalCommand)]          = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(ManageBaseAssetCommand)]    = (cmd, _)  => Task.FromResult(new CommandResult(true, "Command queued.")),
+            [typeof(StartCombatCommand)]        = (cmd, ct) => HandleStartCombatAsync((StartCombatCommand)cmd, ct),
+            [typeof(UseCombatAbilityCommand)]   = (cmd, ct) => HandleUseCombatAbilityAsync((UseCombatAbilityCommand)cmd, ct),
+            [typeof(FleeCombatCommand)]         = (cmd, ct) => HandleFleeCombatAsync((FleeCombatCommand)cmd, ct),
         };
     }
 
@@ -266,5 +298,200 @@ public class CommandDispatcher
         }
 
         return new CommandResult(true, result.Message, questCompletedPayload);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetAvailableQuestsCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleGetAvailableQuestsAsync(GetAvailableQuestsCommand cmd, CancellationToken ct)
+    {
+        var quests = await _worldStateService.GetAvailableQuestsAsync(cmd.PlayerId, ct);
+
+        var questPayload = quests.Select(q => new
+        {
+            q.QuestId,
+            q.Title,
+            q.Description,
+            FactionId = (int)q.FactionId,
+            RequiredTier = (int)q.RequiredTier,
+            q.ReputationReward,
+            q.PossibleOutcomes,
+            q.IsWyrdQuest,
+            q.IsTaken,
+        }).ToList();
+
+        await _notificationService.SendEventAsync(cmd.PlayerId, "AvailableQuests", questPayload, ct);
+
+        return new CommandResult(true, $"Fetched {quests.Count} available quests.", questPayload);
+    }
+
+    // -------------------------------------------------------------------------
+    // EnterZoneCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleEnterZoneAsync(EnterZoneCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        var worldId = player.Position.World;
+        var zones = await _zoneRepository.GetByWorldAsync(worldId, ct);
+
+        var tiles = zones.Select(z =>
+        {
+            var (x, y) = ZoneGridLayout.GetPosition(z.Id);
+            return new ZoneTileDto(
+                z.WorldId.ToString(),
+                z.ZoneId,
+                z.Name,
+                z.AsciiSymbol,
+                z.DangerLevel,
+                z.IsPortalZone,
+                x,
+                y);
+        }).ToList();
+
+        var viewDto = new ZoneViewDto(tiles);
+
+        await _notificationService.SendEventAsync(cmd.PlayerId, "ZoneView", viewDto, ct);
+
+        return new CommandResult(true, $"Zone view sent with {tiles.Count} tiles.", viewDto);
+    }
+
+    // -------------------------------------------------------------------------
+    // StartCombatCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleStartCombatAsync(StartCombatCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        // Derive a simple danger level from the zone id (deterministic, no DB lookup)
+        var dangerLevel = (int)(cmd.ZoneId.GetHashCode() & 0x7FFFFFFF) % 3 + 1;
+        var monsters = BuildMonsterPack(dangerLevel);
+
+        var encounter = await _combatService.StartEncounterAsync(
+            cmd.PlayerId, cmd.ZoneId, player, [], monsters, ct);
+
+        var dto = BuildCombatUpdateDto(encounter);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("CombatUpdate", dto, ct);
+
+        return new CommandResult(true, "Combat started.", dto);
+    }
+
+    // -------------------------------------------------------------------------
+    // UseCombatAbilityCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleUseCombatAbilityAsync(UseCombatAbilityCommand cmd, CancellationToken ct)
+    {
+        // Resolve the actor id — find the player-side combatant that belongs to this player
+        var encounter = _combatService.GetEncounter(cmd.EncounterId);
+        if (encounter is null)
+            return new CommandResult(false, "Encounter not found.");
+
+        // The actor whose turn it is must belong to this player
+        var currentActor = encounter.CurrentActor;
+        if (currentActor is null)
+            return new CommandResult(false, "No current actor.");
+
+        var (success, message, updated) = await _combatService.ExecuteActionAsync(
+            cmd.EncounterId, currentActor.Id, cmd.AbilityName, cmd.TargetId, ct);
+
+        if (!success || updated is null)
+            return new CommandResult(false, message);
+
+        var dto = BuildCombatUpdateDto(updated);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("CombatUpdate", dto, ct);
+
+        return new CommandResult(true, message, dto);
+    }
+
+    // -------------------------------------------------------------------------
+    // FleeCombatCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleFleeCombatAsync(FleeCombatCommand cmd, CancellationToken ct)
+    {
+        var (success, message, updated) = await _combatService.FleeAsync(cmd.EncounterId, ct);
+
+        if (!success || updated is null)
+            return new CommandResult(false, message);
+
+        var dto = BuildCombatUpdateDto(updated);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("CombatUpdate", dto, ct);
+
+        return new CommandResult(true, message, dto);
+    }
+
+    // -------------------------------------------------------------------------
+    // Combat helpers
+    // -------------------------------------------------------------------------
+
+    private static List<MonsterTemplate> BuildMonsterPack(int dangerLevel)
+    {
+        var basicSlash = new CombatAbility("Claw", 10, 0, MagicElement.Earth,
+            AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        var fireBreath = new CombatAbility("Fire Breath", 20, 0, MagicElement.Fire,
+            AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        var waterJet = new CombatAbility("Water Jet", 18, 0, MagicElement.Water,
+            AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+
+        return dangerLevel switch
+        {
+            1 => new List<MonsterTemplate>
+            {
+                new("Cave Rat", 40, 7, 1, MagicElement.Earth, new[] { basicSlash }),
+            },
+            2 => new List<MonsterTemplate>
+            {
+                new("Fire Imp", 60, 9, 2, MagicElement.Fire, new[] { fireBreath }),
+                new("Cave Rat", 40, 7, 1, MagicElement.Earth, new[] { basicSlash }),
+            },
+            _ => new List<MonsterTemplate>
+            {
+                new("Fire Drake", 90, 11, 4, MagicElement.Fire, new[] { fireBreath }),
+                new("Tide Serpent", 80, 10, 3, MagicElement.Water, new[] { waterJet }),
+                new("Cave Golem", 70, 6, 3, MagicElement.Earth, new[] { basicSlash }),
+            }
+        };
+    }
+
+    private static CombatUpdateDto BuildCombatUpdateDto(Domain.Entities.Encounter encounter)
+    {
+        var combatantDtos = encounter.Combatants
+            .Select(c => new CombatantDto(
+                c.Id,
+                c.Name,
+                c.CombatantType.ToString(),
+                c.CurrentHp,
+                c.MaxHp,
+                c.Speed,
+                c.Element.ToString(),
+                c.IsPlayerSide,
+                c.IsDefeated))
+            .ToList();
+
+        var currentActorId = encounter.CurrentActor?.Id ?? Guid.Empty;
+
+        return new CombatUpdateDto(
+            encounter.Id,
+            encounter.State.ToString(),
+            combatantDtos,
+            currentActorId,
+            encounter.RoundNumber);
     }
 }

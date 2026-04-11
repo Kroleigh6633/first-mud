@@ -35,6 +35,10 @@ public class GameHub : Hub
         ConnectionPlayerMap[Context.ConnectionId] = playerId;
         await Groups.AddToGroupAsync(Context.ConnectionId, playerId.ToString());
         await Clients.Caller.SendAsync("Authenticated", playerId);
+
+        // Immediately seed the client with available quests and current zone view
+        _gameLoop.EnqueueCommand(new GetAvailableQuestsCommand(playerId));
+        _gameLoop.EnqueueCommand(new EnterZoneCommand(playerId, 0, Guid.Empty));
     }
 
     public async Task SendCommand(string command, object? payload = null)
@@ -81,9 +85,6 @@ public class GameHub : Hub
     /// </summary>
     private static IGameCommand? ParseCommand(string command, Guid playerId, object? payload)
     {
-        // Helper to safely read payload values
-        var data = payload as System.Text.Json.JsonElement? ?? default;
-
         return command.ToLowerInvariant() switch
         {
             "move" => new MoveCommand(
@@ -132,6 +133,27 @@ public class GameHub : Hub
                 playerId,
                 TryGetString(payload, "action") ?? string.Empty,
                 TryGetNullableGuid(payload, "assetId")),
+
+            "combat start" => new StartCombatCommand(
+                playerId,
+                TryGetGuid(payload, "zoneId")),
+
+            "combat use" => new UseCombatAbilityCommand(
+                playerId,
+                TryGetGuid(payload, "encounterId"),
+                TryGetString(payload, "abilityName") ?? string.Empty,
+                TryGetNullableGuid(payload, "targetId")),
+
+            "combat flee" => new FleeCombatCommand(
+                playerId,
+                TryGetGuid(payload, "encounterId")),
+
+            "getquests" => new GetAvailableQuestsCommand(playerId),
+
+            "enterzone" => new EnterZoneCommand(
+                playerId,
+                TryGetInt(payload, "worldId"),
+                TryGetGuid(payload, "zoneId")),
 
             _ => null
         };

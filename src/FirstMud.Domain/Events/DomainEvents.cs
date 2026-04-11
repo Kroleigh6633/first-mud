@@ -33,10 +33,14 @@ public record MonsterEvolvedEvent(Guid CompanionId, Guid OwnerId, int NewEvoluti
 public record CraftingSucceededEvent(Guid PlayerId, Guid ItemId, string ItemName, bool IsDiscovery) : DomainEvent;
 public record CraftingFailedEvent(Guid PlayerId, string RecipeName, CraftingFailureType FailureType) : DomainEvent;
 
-// Combat events
+// Combat events (legacy)
 public record CombatStartedEvent(Guid PlayerId, Guid EncounterId) : DomainEvent;
-public record CombatEndedEvent(Guid PlayerId, Guid EncounterId, bool PlayerVictory) : DomainEvent;
+public record CombatEndedEvent(Guid EncounterId, Guid PlayerId, EncounterState Outcome) : DomainEvent;
 public record PlayerDiedEvent(Guid PlayerId, Position LastPosition) : DomainEvent;
+
+// Turn-based combat events
+public record CombatTurnAdvancedEvent(Guid EncounterId, Guid ActingCombatantId, int RoundNumber) : DomainEvent;
+public record CombatDamageDealtEvent(Guid EncounterId, Guid AttackerId, Guid TargetId, int Damage, float ElementMultiplier) : DomainEvent;
 
 public enum CraftingFailureType
 {

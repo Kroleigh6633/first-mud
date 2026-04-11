@@ -63,3 +63,18 @@ export interface GameMessage {
 }
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface ZoneTile {
+  worldId: string;
+  zoneId: number;
+  name: string;
+  asciiSymbol: string;
+  dangerLevel: number;
+  isPortalZone: boolean;
+  x: number;
+  y: number;
+}
+
+export interface ZoneView {
+  tiles: ZoneTile[];
+}

@@ -15,3 +15,8 @@ public record AcceptQuestCommand(Guid PlayerId, string QuestId) : IGameCommand;
 public record CompleteQuestCommand(Guid PlayerId, string QuestId, string ChosenOutcome) : IGameCommand;
 public record UsePortalCommand(Guid PlayerId, WorldId DestinationWorld) : IGameCommand;
 public record ManageBaseAssetCommand(Guid PlayerId, string Action, Guid? AssetId) : IGameCommand;
+public record StartCombatCommand(Guid PlayerId, Guid ZoneId) : IGameCommand;
+public record UseCombatAbilityCommand(Guid PlayerId, Guid EncounterId, string AbilityName, Guid? TargetId) : IGameCommand;
+public record FleeCombatCommand(Guid PlayerId, Guid EncounterId) : IGameCommand;
+public record GetAvailableQuestsCommand(Guid PlayerId) : IGameCommand;
+public record EnterZoneCommand(Guid PlayerId, int WorldId, Guid ZoneId) : IGameCommand;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
@@ -15,6 +15,7 @@ interface Props {
   messages: GameMessage[];
   availableQuests: QuestNode[];
   fetchAvailableQuests: () => void;
+  zoneTiles: ZoneTile[];
   needsPlayerCreation: boolean;
   playerId: string | null;
 }
@@ -26,6 +27,7 @@ export default function GameTerminal({
   messages,
   availableQuests,
   fetchAvailableQuests,
+  zoneTiles,
   needsPlayerCreation,
 }: Props) {
   const keyAction = useKeyboard();
@@ -99,7 +101,7 @@ export default function GameTerminal({
           padding: '4px',
           boxSizing: 'border-box',
         }}>
-          <WorldMap worldState={worldState} />
+          <WorldMap worldState={worldState} zoneTiles={zoneTiles} />
         </div>
 
         {/* Status panel */}

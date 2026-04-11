@@ -69,17 +69,8 @@ public class ReputationService
         if (player is null)
             throw new InvalidOperationException($"Player {playerId} not found.");
 
-        // Apply main reward
+        // Apply main reward — Player.AdjustReputation already applies faction tension penalties internally
         player.AdjustReputation(primaryFaction, reputationReward);
-
-        // Apply tension penalties to opposing factions
-        foreach (var ((sourceFaction, affectedFaction), multiplier) in TensionPairs)
-        {
-            if (sourceFaction != primaryFaction) continue;
-            var penaltyDelta = (int)(reputationReward * multiplier);
-            if (penaltyDelta == 0) continue;
-            player.AdjustReputation(affectedFaction, penaltyDelta);
-        }
 
         await _players.UpdateAsync(player, ct);
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView } from '../types/game';
 
 const HUB_URL = 'http://localhost:5000/gamehub';
 const MAX_MESSAGES = 200;
@@ -28,6 +28,7 @@ export interface GameConnectionResult {
   messages: GameMessage[];
   availableQuests: QuestNode[];
   fetchAvailableQuests: () => void;
+  zoneTiles: ZoneTile[];
   needsPlayerCreation: boolean;
   playerId: string | null;
 }
@@ -40,6 +41,7 @@ export function useGameConnection(): GameConnectionResult {
   const [worldState, setWorldState] = useState<WorldStateSnapshot | null>(null);
   const [messages, setMessages] = useState<GameMessage[]>([]);
   const [availableQuests, setAvailableQuests] = useState<QuestNode[]>([]);
+  const [zoneTiles, setZoneTiles] = useState<ZoneTile[]>([]);
   const [needsPlayerCreation, setNeedsPlayerCreation] = useState<boolean>(resolvedPlayerId === null);
   const [playerId] = useState<string | null>(resolvedPlayerId);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
@@ -167,6 +169,10 @@ export function useGameConnection(): GameConnectionResult {
       setAvailableQuests(quests);
     });
 
+    connection.on('ZoneView', (view: ZoneView) => {
+      setZoneTiles(view.tiles ?? []);
+    });
+
     connection.onreconnecting(() => {
       setConnectionState('connecting');
       appendMessage({
@@ -203,6 +209,12 @@ export function useGameConnection(): GameConnectionResult {
       .then(() => {
         setConnectionState('connected');
         return connection.invoke('Authenticate', playerId);
+      })
+      .then(() => {
+        // Explicitly request quests so the log populates immediately
+        connection.invoke('SendCommand', 'getquests').catch((err: unknown) => {
+          console.error('getquests on connect failed:', err);
+        });
       })
       .catch((err: unknown) => {
         console.error('Connection failed:', err);
@@ -246,6 +258,7 @@ export function useGameConnection(): GameConnectionResult {
     messages,
     availableQuests,
     fetchAvailableQuests,
+    zoneTiles,
     needsPlayerCreation,
     playerId,
   };
