@@ -1,0 +1,19 @@
+# Dev image for FirstMud.GameServer — source is volume-mounted, dotnet watch
+# gives hot reload on file changes.
+FROM mcr.microsoft.com/dotnet/sdk:9.0
+
+WORKDIR /src
+
+# ASP.NET Core listens on 0.0.0.0:5000 inside the container so it's reachable
+# via the host port mapping in docker-compose.
+ENV ASPNETCORE_URLS=http://+:5000
+ENV ASPNETCORE_ENVIRONMENT=Development
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+
+EXPOSE 5000
+
+# The source tree is mounted at /src via docker-compose volume. We run
+# dotnet watch from the GameServer project so edits anywhere in the solution
+# trigger a rebuild+restart.
+WORKDIR /src/src/FirstMud.GameServer
+CMD ["dotnet", "watch", "run", "--no-launch-profile"]

@@ -35,6 +35,55 @@ services:
       timeout: 5s
       retries: 5
 
+  gameserver:
+    build:
+      context: ..
+      dockerfile: src/FirstMud.GameServer/Dockerfile.dev
+    container_name: firstmud-gameserver
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:5000"
+      ConnectionStrings__GameDb: "Server=sqlserver,1433;Database=FirstMud;User Id=sa;Password=REDACTED_DEV_SA_PASSWORD;TrustServerCertificate=True;"
+      Neo4j__Uri: "bolt://neo4j:7687"
+      Neo4j__Username: "neo4j"
+      Neo4j__Password: "REDACTED_DEV_NEO4J_PASSWORD"
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount the whole solution so dotnet watch sees file edits on the host
+      - ..:/src
+      # Keep bin/obj inside the container (anonymous volumes) so Windows
+      # host files don't clash with Linux build output
+      - /src/src/FirstMud.GameServer/bin
+      - /src/src/FirstMud.GameServer/obj
+      - /src/src/FirstMud.Infrastructure/bin
+      - /src/src/FirstMud.Infrastructure/obj
+      - /src/src/FirstMud.Application/bin
+      - /src/src/FirstMud.Application/obj
+      - /src/src/FirstMud.Domain/bin
+      - /src/src/FirstMud.Domain/obj
+      - /src/tests/FirstMud.Tests/bin
+      - /src/tests/FirstMud.Tests/obj
+
+  client:
+    build:
+      context: ../src/FirstMud.Client
+      dockerfile: Dockerfile.dev
+    container_name: firstmud-client
+    depends_on:
+      - gameserver
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../src/FirstMud.Client:/app
+      # Anonymous volume preserves node_modules installed inside the image
+      - /app/node_modules
+
 volumes:
   sqlserver_data:
   neo4j_data:
