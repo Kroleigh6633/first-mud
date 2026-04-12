@@ -932,16 +932,67 @@ public class FarmingOrchestrator(
                             }, farmCt);
 
                         if (lootResult.Item is not null && !lootResult.AutoSalvaged)
+                        {
+                            var droppedItem = lootResult.Item;
+
+                            // Auto-equip: if the slot is empty, equip immediately (same logic as TryRollLootAsync)
+                            if (droppedItem.Slot != Domain.Enums.EquipmentSlot.None)
+                            {
+                                var equipPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
+                                if (equipPlayer is not null)
+                                {
+                                    var itemSlot = droppedItem.Slot;
+                                    var currentEquippedId = equipPlayer.GetEquipped(itemSlot);
+
+                                    if (currentEquippedId is null)
+                                    {
+                                        // Slot is empty — auto-equip
+                                        equipPlayer.Equip(itemSlot, droppedItem.Id);
+                                        await playerRepo.UpdateAsync(equipPlayer, farmCt);
+                                        await hubContext.Clients
+                                            .Group(playerId.ToString())
+                                            .SendAsync("GameMessage", new
+                                            {
+                                                timestamp = DateTime.UtcNow.ToString("O"),
+                                                category  = farmMsgCategory,
+                                                text      = $"[Auto-farm] You equip the {droppedItem.Name}."
+                                            }, farmCt);
+                                    }
+                                    else
+                                    {
+                                        // Compare workmanship — swap if new item is strictly better and old is unlocked
+                                        var currentEquipped = await itemRepo.GetByIdAsync(currentEquippedId.Value, farmCt);
+                                        if (currentEquipped is not null
+                                            && droppedItem.Workmanship.Value > currentEquipped.Workmanship.Value
+                                            && !currentEquipped.IsLocked)
+                                        {
+                                            equipPlayer.Equip(itemSlot, droppedItem.Id);
+                                            await playerRepo.UpdateAsync(equipPlayer, farmCt);
+                                            await hubContext.Clients
+                                                .Group(playerId.ToString())
+                                                .SendAsync("GameMessage", new
+                                                {
+                                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                                    category  = farmMsgCategory,
+                                                    text      = $"[Auto-farm] You swap your {currentEquipped.Name} W{currentEquipped.Workmanship.Value} for {droppedItem.Name} W{droppedItem.Workmanship.Value}. Much better."
+                                                }, farmCt);
+                                        }
+                                    }
+                                }
+                            }
+
                             await hubContext.Clients
                                 .Group(playerId.ToString())
                                 .SendAsync("LootDropped", new
                                 {
-                                    lootResult.Item.Id,
-                                    lootResult.Item.Name,
-                                    lootResult.Item.Description,
-                                    Workmanship = lootResult.Item.Workmanship.Value,
-                                    Category = lootResult.Item.Category.ToString()
+                                    droppedItem.Id,
+                                    droppedItem.Name,
+                                    droppedItem.Description,
+                                    Workmanship = droppedItem.Workmanship.Value,
+                                    Category = droppedItem.Category.ToString(),
+                                    Slot = droppedItem.Slot.ToString()
                                 }, farmCt);
+                        }
                     }
 
                     // --- REST between fights ---

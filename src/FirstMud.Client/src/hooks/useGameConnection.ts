@@ -341,7 +341,7 @@ export function useGameConnection(): GameConnectionResult {
       // Signal that storage changed — GameTerminal will re-fetch if panel is open
     });
 
-    connection.on('LootDropped', (loot: { id: string; name: string; description: string; workmanship: number; category: string }) => {
+    connection.on('LootDropped', (loot: { id: string; name: string; description: string; workmanship: number; category: string; slot?: string }) => {
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'loot',
