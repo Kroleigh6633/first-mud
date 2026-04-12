@@ -36,6 +36,11 @@ const closeBtnStyle: React.CSSProperties = {
   fontFamily: 'monospace', fontSize: '12px', padding: '2px 10px', cursor: 'pointer',
 };
 
+const hintStyle: React.CSSProperties = {
+  padding: '1px 14px 6px', color: '#555', fontSize: '10px', lineHeight: '1.4',
+  fontStyle: 'italic',
+};
+
 export default function CharacterSheet({ player, onClose }: Props) {
   if (!player) return null;
 
@@ -68,24 +73,43 @@ export default function CharacterSheet({ player, onClose }: Props) {
           <span style={{ color: '#aaa' }}>Level</span>
           <span style={{ color: '#00ff41' }}>{player.level}</span>
         </div>
+        <div style={hintStyle}>
+          Next level at {player.level * player.level * 100} XP. Levels increase all stats.
+        </div>
         <div style={rowStyle}>
           <span style={{ color: '#aaa' }}>HP</span>
           <span style={{ color: '#ff4444' }}>{player.currentHp} / {player.maxHp}</span>
+        </div>
+        <div style={hintStyle}>
+          Health. Heals +10/s at your homestead [P to portal home]. Armor adds bonus HP in combat.
         </div>
         <div style={rowStyle}>
           <span style={{ color: '#aaa' }}>Weave (mana)</span>
           <span style={{ color: '#00ccff' }}>{player.weavePercent}% — {player.weaveState}</span>
         </div>
+        <div style={hintStyle}>
+          Magical energy. Regenerates +1 every 10s while exploring, +5/s at homestead.
+          Powers "Weave Bolt" in combat (costs 10 Weave, deals {30} damage).
+        </div>
         <div style={rowStyle}>
           <span style={{ color: '#aaa' }}>Action Points</span>
           <span style={{ color: '#ccaa00' }}>{player.actionPoints ?? '?'} / {player.maxActionPoints ?? '?'}</span>
         </div>
+        <div style={hintStyle}>
+          Stamina reserve. Will be consumed by special actions in future updates.
+        </div>
         <div style={rowStyle}>
           <span style={{ color: '#aaa' }}>Experience</span>
-          <span style={{ color: '#aaa' }}>{player.experience ?? 0}</span>
+          <span style={{ color: '#aaa' }}>{player.experience ?? 0} / {player.level * player.level * 100}</span>
+        </div>
+        <div style={hintStyle}>
+          Earned from combat (+20 per enemy level), quests, and harvesting [E] (+5 each).
         </div>
 
         <div style={sectionStyle}>Attributes</div>
+        <div style={hintStyle}>
+          All attributes increase by +1 per level up. Affect combat calculations.
+        </div>
         {stats.map(([name, val]) => (
           <div key={name as string} style={rowStyle}>
             <span style={{ color: '#aaa' }}>{name}</span>
@@ -94,6 +118,9 @@ export default function CharacterSheet({ player, onClose }: Props) {
         ))}
 
         <div style={sectionStyle}>Skills</div>
+        <div style={hintStyle}>
+          Crafting improves with each successful craft. Salvage improves with salvaging.
+        </div>
         {skills.map(([name, val]) => (
           <div key={name as string} style={rowStyle}>
             <span style={{ color: '#aaa' }}>{name}</span>
@@ -102,6 +129,10 @@ export default function CharacterSheet({ player, onClose }: Props) {
         ))}
 
         <div style={sectionStyle}>Magic</div>
+        <div style={hintStyle}>
+          Your element and polarity are hidden until revealed through quests or magical events.
+          Five elements: Fire, Water, Earth, Air, Aether. Polarity: Shaping or Unmaking.
+        </div>
         <div style={rowStyle}>
           <span style={{ color: '#aaa' }}>Element</span>
           <span style={{ color: player.elementRevealed ? '#00ff41' : '#555' }}>
