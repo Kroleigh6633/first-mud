@@ -14,6 +14,7 @@ export type KeyAction =
   | { type: 'autofarm' }
   | { type: 'storage' }
   | { type: 'companions' }
+  | { type: 'crafting' }
   | null;
 
 export function useKeyboard(): KeyAction {
@@ -91,6 +92,10 @@ export function useKeyboard(): KeyAction {
         case 'b':
         case 'B':
           next = { type: 'companions' };
+          break;
+        case 'r':
+        case 'R':
+          next = { type: 'crafting' };
           break;
         case 'Escape':
           next = { type: 'escape' };

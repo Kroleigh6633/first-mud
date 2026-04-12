@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent } from '../types/game';
 import WorldMap from './WorldMap';
 import { getBiome } from '../utils/biome';
 import StatusPanel from './StatusPanel';
@@ -13,6 +13,7 @@ import StoragePanel from './StoragePanel';
 import CharacterSheet from './CharacterSheet';
 import CombatPanel from './CombatPanel';
 import CompanionPanel from './CompanionPanel';
+import CraftingPanel from './CraftingPanel';
 import { useKeyboard } from '../hooks/useKeyboard';
 
 interface Props {
@@ -35,6 +36,8 @@ interface Props {
   capturedCompanions?: unknown[];
   wanderingNpcs?: WanderingNpc[];
   companionRoster?: CompanionState[];
+  recipes?: RecipeInfo[];
+  lastCraftResult?: CraftingCompleteEvent | null;
 }
 
 /**
@@ -76,6 +79,8 @@ export default function GameTerminal({
   equipment,
   wanderingNpcs = [],
   companionRoster = [],
+  recipes = [],
+  lastCraftResult = null,
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
@@ -84,6 +89,7 @@ export default function GameTerminal({
   const [showCharSheet, setShowCharSheet] = useState(false);
   const [showStorage, setShowStorage] = useState(false);
   const [showCompanions, setShowCompanions] = useState(false);
+  const [showCrafting, setShowCrafting] = useState(false);
   const [statusCollapsed, setStatusCollapsed] = useState(false);
 
   // Use refs for values that the key handler reads but should NOT
@@ -202,6 +208,10 @@ export default function GameTerminal({
         sendCommand('viewcompanions', null);
         setShowCompanions(prev => !prev);
         break;
+      case 'crafting':
+        sendCommand('viewrecipes', null);
+        setShowCrafting(prev => !prev);
+        break;
       case 'escape':
         setShowHelp(false);
         setShowQuestLog(false);
@@ -209,6 +219,7 @@ export default function GameTerminal({
         setShowCharSheet(false);
         setShowStorage(false);
         setShowCompanions(false);
+        setShowCrafting(false);
         break;
       case 'pass':
         appendMessage({
@@ -454,6 +465,18 @@ export default function GameTerminal({
           onDeactivate={(id) => sendCommand('deactivatecompanion', { companionId: id })}
           onClose={() => setShowCompanions(false)}
           sendCommand={sendCommand}
+        />
+      )}
+      {showCrafting && (
+        <CraftingPanel
+          recipes={recipes}
+          inventoryItems={inventory?.items ?? []}
+          craftingSkill={inventory?.craftingSkill ?? worldState?.player?.craftingSkill ?? 1}
+          lastCraftResult={lastCraftResult ?? null}
+          onCraft={(recipeId, componentIds, taperId) =>
+            sendCommand('craft', { recipeId, componentIds, taperId })}
+          onRequestRecipes={() => sendCommand('viewrecipes', null)}
+          onClose={() => setShowCrafting(false)}
         />
       )}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
