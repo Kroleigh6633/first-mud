@@ -106,7 +106,27 @@ public class HarvestCommandHandler(
             await itemRepository.AddAsync(resourceItem, ct);
         }
 
-        var message = $"You harvested {actual} unit(s) of {resourceName}.";
+        var biomeLabel = biome switch
+        {
+            "forest" or "denseForest" => "the dense forest",
+            "mountain" or "snowMountain" => "the mountain slopes",
+            "water" => "the shoreline",
+            "sand" or "desert" => "the arid wastes",
+            "swamp" => "the boggy marsh",
+            "grassland" or "plains" => "the open meadow",
+            "path" => "the roadside gravel",
+            "wyrd" => "the wyrd-touched ground",
+            _ => "the wilderness",
+        };
+        var verb = harvestType switch
+        {
+            ResourceType.Wood => "cut",
+            ResourceType.Stone or ResourceType.Metal => "collected",
+            ResourceType.Sand => "scooped",
+            ResourceType.Herbs => "gathered",
+            _ => "harvested",
+        };
+        var message = $"You {verb} {actual} {resourceName} from {biomeLabel}.";
         await notificationService.SendMessageAsync(cmd.PlayerId, "loot", message, ct);
 
         await hubContext.Clients
@@ -116,7 +136,7 @@ public class HarvestCommandHandler(
                 ItemId = resourceItem.Id,
                 resourceItem.Name,
                 Amount = actual,
-                ResourceType = node.ResourceType.ToString()
+                ResourceType = harvestType.ToString()
             }, ct);
 
         player.GainExperience(5);

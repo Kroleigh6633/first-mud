@@ -6,18 +6,26 @@ interface Props {
 }
 
 const CATEGORY_COLORS: Record<GameMessage['category'], string> = {
-  system:           '#888888',
-  combat:           '#cc4444',   // fallback red for untagged combat messages
-  'combat-trivial': '#666666',   // grey — trivial, barely worth mentioning
-  'combat-easy':    '#44aa44',   // green — easy fight
-  'combat-normal':  '#cccc44',   // yellow — fair fight
-  'combat-hard':    '#cc8844',   // orange — challenging
-  'combat-deadly':  '#cc4444',   // red — dangerous
-  quest:            '#ffcc00',
-  loot:             '#00ccff',
-  npc:              '#ffffff',
-  wyrd:             '#cc88ff',
-  error:            '#ff0000',
+  system:             '#888888',
+  combat:             '#cc4444',   // fallback red for untagged combat messages
+  'combat-trivial':   '#666666',   // grey — trivial, barely worth mentioning
+  'combat-easy':      '#44aa44',   // green — easy fight
+  'combat-normal':    '#cccc44',   // yellow — fair fight
+  'combat-hard':      '#cc8844',   // orange — challenging
+  'combat-deadly':    '#cc4444',   // red — dangerous
+  quest:              '#ffcc00',
+  loot:               '#cccc44',   // fallback yellow (untagged loot)
+  'loot-common':      '#999999',   // grey — junk
+  'loot-uncommon':    '#44cc44',   // green — decent
+  'loot-rare':        '#4488ff',   // blue — solid
+  'loot-epic':        '#aa44cc',   // purple — exciting
+  'loot-legendary':   '#ffaa00',   // gold — jackpot
+  'salvage-common':   '#888888',
+  'salvage-uncommon': '#44aa88',
+  'salvage-rare':     '#4488cc',
+  npc:                '#ffffff',
+  wyrd:               '#cc88ff',
+  error:              '#ff0000',
 };
 
 function formatTimestamp(iso: string): string {

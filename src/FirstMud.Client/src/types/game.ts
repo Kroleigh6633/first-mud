@@ -82,7 +82,27 @@ export interface WorldStateSnapshot {
 
 export interface GameMessage {
   timestamp: string;
-  category: 'system' | 'combat' | 'combat-trivial' | 'combat-easy' | 'combat-normal' | 'combat-hard' | 'combat-deadly' | 'quest' | 'loot' | 'npc' | 'wyrd' | 'error';
+  category:
+    | 'system'
+    | 'combat'
+    | 'combat-trivial'
+    | 'combat-easy'
+    | 'combat-normal'
+    | 'combat-hard'
+    | 'combat-deadly'
+    | 'quest'
+    | 'loot'
+    | 'loot-common'
+    | 'loot-uncommon'
+    | 'loot-rare'
+    | 'loot-epic'
+    | 'loot-legendary'
+    | 'salvage-common'
+    | 'salvage-uncommon'
+    | 'salvage-rare'
+    | 'npc'
+    | 'wyrd'
+    | 'error';
   text: string;
 }
 

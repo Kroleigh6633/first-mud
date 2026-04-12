@@ -459,15 +459,15 @@ public class StartupSeeder(
         {
             var (type1, type2) = zone.Name switch
             {
-                "Caervorn Highlands"   => (ResourceType.Stone, ResourceType.Herbs),
-                "The Thornwood"        => (ResourceType.Wood, ResourceType.Herbs),
-                "Portmere (Compact)"   => (ResourceType.Metal, ResourceType.Sand),
-                "Gravenmarsh"          => (ResourceType.Herbs, ResourceType.Stone),
-                "The Drowned Coast"    => (ResourceType.Sand, ResourceType.Stone),
-                "The Ashen Reach"      => (ResourceType.Metal, ResourceType.Stone),
-                "Starting Road"        => (ResourceType.Wood, ResourceType.Herbs),
-                "Gravenhold"           => (ResourceType.Metal, ResourceType.Stone),
-                "The Maw Borderlands"  => (ResourceType.Metal, ResourceType.Herbs),
+                "Caervorn Highlands"   => (ResourceType.Stone, ResourceType.Metal),   // highlands = rock + ore
+                "The Thornwood"        => (ResourceType.Wood, ResourceType.Herbs),    // forest = wood + herbs
+                "Portmere (Compact)"   => (ResourceType.Metal, ResourceType.Herbs),   // trade city = metal + herbs
+                "Gravenmarsh"          => (ResourceType.Herbs, ResourceType.Wood),    // swamp = herbs + damp wood
+                "The Drowned Coast"    => (ResourceType.Sand, ResourceType.Stone),    // coast = sand + sea-smoothed stone
+                "The Ashen Reach"      => (ResourceType.Sand, ResourceType.Metal),    // ashen wastes = sand + scorched metal
+                "Starting Road"        => (ResourceType.Wood, ResourceType.Stone),    // roadside = wood + stone
+                "Gravenhold"           => (ResourceType.Metal, ResourceType.Stone),   // fortress = metal + stone
+                "The Maw Borderlands"  => (ResourceType.Herbs, ResourceType.Stone),   // wyrd = strange herbs + reality-stone
                 _                      => (ResourceType.Wood, ResourceType.Stone),
             };
 
