@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FirstMud.Application.Services;
 
-public record LootDropResult(bool Dropped, Item? Item, string Message);
+public record LootDropResult(bool Dropped, Item? Item, string Message, bool AutoSalvaged = false);
 
 public class LootService
 {
@@ -130,7 +130,7 @@ public class LootService
             {
                 _logger.LogInformation("Auto-salvaged loot for player {PlayerId}: {ItemName} W{Workmanship}",
                     ownerId, item.Name, workValue);
-                return new LootDropResult(true, item, autoSalvageMessage);
+                return new LootDropResult(true, item, autoSalvageMessage, AutoSalvaged: true);
             }
         }
 

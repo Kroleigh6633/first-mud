@@ -170,21 +170,30 @@ public class AutoFarmCommandHandler(
                     var currentItems = await itemRepo.GetByOwnerAsync(playerId, farmCt);
                     var lootResult = await lootSvc.RollLootDropAsync(
                         dangerLevel, playerId, player.Position.World,
-                        currentItems.Count, player.MaxInventorySlots, farmCt);
+                        currentItems.Count, player.MaxInventorySlots, farmCt,
+                        player);
 
                     if (lootResult.Dropped)
                     {
-                        autoFarmService.RecordItem(playerId);
+                        if (lootResult.AutoSalvaged)
+                        {
+                            autoFarmService.RecordAutoSalvage(playerId);
+                        }
+                        else
+                        {
+                            autoFarmService.RecordItem(playerId);
+                        }
+
                         await hubContext.Clients
                             .Group(playerId.ToString())
                             .SendAsync("GameMessage", new
                             {
                                 timestamp = DateTime.UtcNow.ToString("O"),
-                                category = "loot",
+                                category = lootResult.AutoSalvaged ? "salvage" : "loot",
                                 text = $"[Auto-farm] {lootResult.Message}"
                             }, farmCt);
 
-                        if (lootResult.Item is not null)
+                        if (lootResult.Item is not null && !lootResult.AutoSalvaged)
                             await hubContext.Clients
                                 .Group(playerId.ToString())
                                 .SendAsync("LootDropped", new
@@ -196,6 +205,21 @@ public class AutoFarmCommandHandler(
                                     Category = lootResult.Item.Category.ToString()
                                 }, farmCt);
                     }
+
+                    // Running summary after each fight
+                    var currentSession = autoFarmService.GetSession(playerId);
+                    var kills    = currentSession?.Kills             ?? session.Kills;
+                    var kept     = currentSession?.ItemsFound        ?? session.ItemsFound;
+                    var salvaged = currentSession?.ItemsAutoSalvaged ?? 0;
+
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("GameMessage", new
+                        {
+                            timestamp = DateTime.UtcNow.ToString("O"),
+                            category = "system",
+                            text = $"Auto-farm: {kills} kill(s), {kept} item(s) kept, {salvaged} auto-salvaged."
+                        }, farmCt);
                 }
             }
         }
@@ -210,8 +234,9 @@ public class AutoFarmCommandHandler(
         finally
         {
             var finalSession = autoFarmService.GetSession(playerId);
-            var kills = finalSession?.Kills ?? session.Kills;
-            var items = finalSession?.ItemsFound ?? session.ItemsFound;
+            var kills    = finalSession?.Kills             ?? session.Kills;
+            var items    = finalSession?.ItemsFound        ?? session.ItemsFound;
+            var salvaged = finalSession?.ItemsAutoSalvaged ?? 0;
             autoFarmService.EndSession(playerId);
 
             await hubContext.Clients
@@ -220,12 +245,12 @@ public class AutoFarmCommandHandler(
                 {
                     timestamp = DateTime.UtcNow.ToString("O"),
                     category = "system",
-                    text = $"Auto-farm complete: {kills} kill(s), {items} item(s) found."
+                    text = $"Auto-farm complete: {kills} kill(s), {items} item(s) kept, {salvaged} auto-salvaged."
                 }, serverCt);
 
             await hubContext.Clients
                 .Group(playerId.ToString())
-                .SendAsync("AutoFarmStatus", new { active = false, kills, items }, serverCt);
+                .SendAsync("AutoFarmStatus", new { active = false, kills, items, salvaged }, serverCt);
         }
     }
 }

@@ -10,6 +10,7 @@ public record AutoFarmSession(
 {
     public int Kills { get; set; }
     public int ItemsFound { get; set; }
+    public int ItemsAutoSalvaged { get; set; }
 }
 
 /// <summary>
@@ -54,6 +55,10 @@ public class AutoFarmService
     public void RecordItem(Guid playerId) =>
         _sessions.GetValueOrDefault(playerId)
             ?.Let(s => s.ItemsFound++);
+
+    public void RecordAutoSalvage(Guid playerId) =>
+        _sessions.GetValueOrDefault(playerId)
+            ?.Let(s => s.ItemsAutoSalvaged++);
 }
 
 internal static class AutoFarmExtensions
