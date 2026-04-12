@@ -18,6 +18,20 @@ function Bar({ current, max, width, color }: { current: number; max: number; wid
   );
 }
 
+function HpBar({ currentHp, baseMaxHp, effectiveMaxHp, width }: { currentHp: number; baseMaxHp: number; effectiveMaxHp: number; width: number }) {
+  const totalMax = Math.max(effectiveMaxHp, 1);
+  const solidFilled = Math.round((Math.min(currentHp, baseMaxHp) / totalMax) * width);
+  const gearZone = Math.round(((effectiveMaxHp - baseMaxHp) / totalMax) * width);
+  const emptyZone = width - solidFilled - gearZone;
+  return (
+    <>
+      <span style={{ color: '#ff4444' }}>{'\u2588'.repeat(solidFilled)}</span>
+      <span style={{ color: '#222' }}>{'\u2588'.repeat(Math.max(emptyZone, 0))}</span>
+      <span style={{ color: '#442222' }}>{'\u2588'.repeat(gearZone)}</span>
+    </>
+  );
+}
+
 function weaveColor(state: WeaveState): string {
   switch (state) {
     case 'Full':      return '#00ff41';
@@ -152,12 +166,20 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>HP: </span>
-        <Bar current={player.currentHp} max={player.effectiveMaxHp ?? player.maxHp} width={10} color="#ff4444" />
-        <span style={{ color: '#888888' }}> {player.currentHp}/</span>
-        <span style={{ color: '#888888' }}>{player.maxHp}</span>
-        {player.effectiveMaxHp !== undefined && player.effectiveMaxHp !== player.maxHp && (
-          <span style={{ color: '#ff7777' }}> ({player.effectiveMaxHp} w/gear)</span>
-        )}
+        {(() => {
+          const base = player.maxHp;
+          const effective = player.effectiveMaxHp ?? base;
+          const gearBonus = effective - base;
+          return (
+            <>
+              <HpBar currentHp={player.currentHp} baseMaxHp={base} effectiveMaxHp={effective} width={10} />
+              <span style={{ color: '#888888' }}> {player.currentHp}/{base}</span>
+              {gearBonus > 0 && (
+                <span style={{ color: '#aa4444' }}> (+{gearBonus} gear)</span>
+              )}
+            </>
+          );
+        })()}
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>Weave </span>
