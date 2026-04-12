@@ -97,15 +97,29 @@ function zoneSaturatedColor(tile: ZoneTile): TerrainColors {
   return { top: '#4a3a2a', left: '#2c221a', right: '#3a2e22' };
 }
 
-/** Difficulty border color based on (zoneLevel - playerLevel) */
+/** Difficulty border color based on (tileDanger - playerLevel), relative scale */
 function difficultyBorderColor(zoneDanger: number, playerLevel: number): string {
   const diff = zoneDanger - playerLevel;
-  if (diff <= -4) return '#00ff88'; // trivial — bright green
-  if (diff <= -2) return '#44cc44'; // easy
-  if (diff <=  0) return '#ddcc00'; // appropriate
-  if (diff <=  2) return '#ff8800'; // challenging
-  if (diff <=  4) return '#ee2200'; // dangerous
-  return '#880000';                  // deadly
+  if (diff <= -3) return '#44aa44'; // trivial — bright green
+  if (diff === -2) return '#66bb44'; // easy
+  if (diff === -1) return '#88cc44'; // comfortable — yellow-green
+  if (diff ===  0) return '#cccc44'; // even match — yellow
+  if (diff ===  1) return '#ddaa33'; // slightly challenging — gold
+  if (diff ===  2) return '#dd7722'; // challenging — orange
+  if (diff ===  3) return '#cc4422'; // dangerous — red-orange
+  if (diff ===  4) return '#cc2222'; // very dangerous — red
+  if (diff ===  5) return '#881111'; // deadly — dark red
+  return '#440808';                  // DO NOT ENTER — near-black red
+}
+
+/** Border thickness (px multiplier) based on (tileDanger - playerLevel) */
+function difficultyBorderWidth(zoneDanger: number, playerLevel: number): number {
+  const diff = zoneDanger - playerLevel;
+  if (diff <= -3) return 1.0; // trivial
+  if (diff <=  0) return 1.4; // easy / even
+  if (diff <=  2) return 2.0; // challenging
+  if (diff <=  4) return 2.6; // dangerous / very dangerous
+  return 3.2;                  // deadly / death zone
 }
 
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
@@ -606,14 +620,17 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       }
 
       // ── Difficulty border (zone 3×3 halo including centre) ─────────────────
-      // Only drawn on visited tiles, not on unvisited fog
       const diffZone = zoneDiffMap.get(key);
-      if (diffZone && (isVisited || isVisible)) {
-        // Unvisited zone = black border, visited = difficulty color
-        const borderColor = isVisited || isVisible
-          ? difficultyBorderColor(diffZone.dangerLevel, playerLevel)
-          : '#000000';
-        strokeIsoDiamond(ctx, sx, sy, tileW, tileH, borderColor, 1.8 * dpr);
+      if (diffZone) {
+        if (isVisible || isVisited) {
+          // Visited / visible: show relative-difficulty color with scaled thickness
+          const borderColor = difficultyBorderColor(diffZone.dangerLevel, playerLevel);
+          const borderWidth = difficultyBorderWidth(diffZone.dangerLevel, playerLevel);
+          strokeIsoDiamond(ctx, sx, sy, tileW, tileH, borderColor, borderWidth * dpr);
+        } else {
+          // Unvisited: thin dark border — zone is unknown, not threatening
+          strokeIsoDiamond(ctx, sx, sy, tileW, tileH, '#222222', 0.8 * dpr);
+        }
       }
 
       // ── Fog overlay for unvisited tiles ────────────────────────────────────
