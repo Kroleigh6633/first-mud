@@ -4,5 +4,8 @@ public enum AbilityCategory
 {
     Attack,
     Heal,
-    Buff
+    Buff,
+    Debuff,
+    Lifesteal,
+    Revive
 }

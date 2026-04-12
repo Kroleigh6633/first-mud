@@ -1,5 +1,6 @@
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
+using FirstMud.GameServer.Handlers;
 
 namespace FirstMud.GameServer.Services;
 
@@ -34,7 +35,16 @@ public record PlayerStateDto(
     Dictionary<string, string> FactionTiers,
     List<string> ActiveCompanionIds,
     List<string> UnlockedPortals,
-    List<string> CurrentQuestIds);
+    List<string> CurrentQuestIds,
+    int EffectiveStrength,
+    int EffectiveAgility,
+    int EffectiveIntellect,
+    int EffectiveFortitude,
+    int EffectiveSpeed,
+    int EffectiveMaxHp,
+    int BonusStrikeDamage,
+    int BonusSpellDamage,
+    List<CompanionDto> ActiveCompanions);
 
 public record WorldStateSnapshot(
     PlayerStateDto Player,
@@ -46,6 +56,8 @@ public class WorldStateService
     private readonly IPlayerRepository _playerRepository;
     private readonly IQuestGraphRepository _questGraphRepository;
     private readonly AiPlayerService _aiPlayerService;
+    private readonly IItemRepository _itemRepository;
+    private readonly ICompanionRepository _companionRepository;
 
     private static readonly Dictionary<WorldId, string> WorldNames = new()
     {
@@ -60,11 +72,15 @@ public class WorldStateService
     public WorldStateService(
         IPlayerRepository playerRepository,
         IQuestGraphRepository questGraphRepository,
-        AiPlayerService aiPlayerService)
+        AiPlayerService aiPlayerService,
+        IItemRepository itemRepository,
+        ICompanionRepository companionRepository)
     {
         _playerRepository = playerRepository;
         _questGraphRepository = questGraphRepository;
         _aiPlayerService = aiPlayerService;
+        _itemRepository = itemRepository;
+        _companionRepository = companionRepository;
     }
 
     public async Task<WorldStateSnapshot> GetSnapshotAsync(Guid playerId, CancellationToken ct = default)
@@ -89,6 +105,54 @@ public class WorldStateService
         var currentQuestIds = availableQuests
             .Where(q => q.IsTaken)
             .Select(q => q.QuestId)
+            .ToList();
+
+        // Load equipped items to compute effective stats
+        var equippedItemIds = player.EquippedItems.Values.Distinct().ToList();
+        var equippedItemsList = equippedItemIds.Count > 0
+            ? await _itemRepository.GetByIdsAsync(equippedItemIds, ct)
+            : Array.Empty<Domain.Entities.Item>();
+        var equippedItemsById = equippedItemsList.ToDictionary(i => i.Id);
+
+        // Build slot → Item lookup
+        var equippedBySlot = player.EquippedItems
+            .Where(kv => equippedItemsById.ContainsKey(kv.Value))
+            .ToDictionary(kv => kv.Key, kv => equippedItemsById[kv.Value]);
+
+        static int SlotW(IReadOnlyDictionary<EquipmentSlot, Domain.Entities.Item> slots, EquipmentSlot slot)
+            => slots.TryGetValue(slot, out var item) ? item.Workmanship.Value : 0;
+
+        int meleeBonus  = SlotW(equippedBySlot, EquipmentSlot.MeleeWeapon)  * 3;
+        int rangedBonus = SlotW(equippedBySlot, EquipmentSlot.RangedWeapon) * 2;
+        int focusBonus  = SlotW(equippedBySlot, EquipmentSlot.Focus)        * 4;
+        int headBonus   = SlotW(equippedBySlot, EquipmentSlot.Head)         * 3;
+        int chestBonus  = SlotW(equippedBySlot, EquipmentSlot.Chest)        * 5;
+        int legsBonus   = SlotW(equippedBySlot, EquipmentSlot.Legs)         * 3;
+        int handsBonus  = SlotW(equippedBySlot, EquipmentSlot.Hands)        * 2;
+        int feetBonus   = SlotW(equippedBySlot, EquipmentSlot.Feet)         * 1;
+        int accBonus    = SlotW(equippedBySlot, EquipmentSlot.Accessory)    * 2;
+
+        int statStrikeBonus = player.Strength  / 5;
+        int statSpellBonus  = player.Intellect / 5;
+        int statFortBonus   = player.Fortitude / 2;
+
+        int effectiveStrength   = player.Strength   + meleeBonus + handsBonus;
+        int effectiveAgility    = player.Agility    + rangedBonus;
+        int effectiveIntellect  = player.Intellect  + focusBonus;
+        int effectiveFortitude  = player.Fortitude  + headBonus + chestBonus + legsBonus + accBonus;
+        int effectiveSpeed      = player.Speed      + feetBonus;
+        int effectiveMaxHp      = player.MaxHp      + headBonus + chestBonus + legsBonus + accBonus + statFortBonus;
+        int bonusStrikeDamage   = meleeBonus + rangedBonus + handsBonus + statStrikeBonus;
+        int bonusSpellDamage    = focusBonus + statSpellBonus;
+
+        // Load active companions with full detail for the status panel
+        var allCompanions = await _companionRepository.GetByOwnerAsync(playerId, ct);
+        var activeCompanionDetails = allCompanions
+            .Where(c => c.IsActive && !c.IsPermanentlyGone)
+            .Select(c => new CompanionDto(
+                c.Id, c.Name, c.Type.ToString(), c.Element.ToString(),
+                c.Level, c.CurrentLayer, c.UsageCounter, c.DriftAccumulator,
+                c.IsActive, c.RelationshipDepth))
             .ToList();
 
         var playerDto = new PlayerStateDto(
@@ -120,7 +184,16 @@ public class WorldStateService
             factionTiers,
             activeCompanionIds,
             unlockedPortals,
-            currentQuestIds);
+            currentQuestIds,
+            effectiveStrength,
+            effectiveAgility,
+            effectiveIntellect,
+            effectiveFortitude,
+            effectiveSpeed,
+            effectiveMaxHp,
+            bonusStrikeDamage,
+            bonusSpellDamage,
+            activeCompanionDetails);
 
         var aiStates = _aiPlayerService.GetAiStates().ToList();
 

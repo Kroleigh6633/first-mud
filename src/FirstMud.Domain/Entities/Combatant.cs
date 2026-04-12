@@ -19,6 +19,7 @@ public class Combatant
     public int MaxHp { get; private set; }
     public int CurrentHp { get; private set; }
     public int Speed { get; private set; }
+    public int Agility { get; private set; }
     public MagicElement Element { get; private set; }
     public bool IsPlayerSide { get; private set; }
     public int Level { get; private set; }
@@ -39,7 +40,8 @@ public class Combatant
         MagicElement element,
         bool isPlayerSide,
         int level,
-        IEnumerable<CombatAbility> abilities)
+        IEnumerable<CombatAbility> abilities,
+        int agility = 10)
     {
         var combatant = new Combatant
         {
@@ -50,6 +52,7 @@ public class Combatant
             MaxHp = maxHp,
             CurrentHp = maxHp,
             Speed = speed,
+            Agility = agility,
             Element = element,
             IsPlayerSide = isPlayerSide,
             Level = level

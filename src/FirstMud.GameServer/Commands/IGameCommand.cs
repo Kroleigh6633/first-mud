@@ -33,3 +33,7 @@ public record SalvageCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record SalvageAllCommand(Guid PlayerId, string Category) : IGameCommand;
 public record SetAutoSalvageCommand(Guid PlayerId, string Category, int MaxWorkmanship) : IGameCommand;
 public record LockItemCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
+public record ViewCompanionsCommand(Guid PlayerId) : IGameCommand;
+public record ActivateCompanionCommand(Guid PlayerId, Guid CompanionId) : IGameCommand;
+public record DeactivateCompanionCommand(Guid PlayerId, Guid CompanionId) : IGameCommand;
+public record ImbueCommand(Guid PlayerId, Guid ItemId, Guid TaperId) : IGameCommand;

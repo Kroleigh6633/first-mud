@@ -70,6 +70,10 @@ builder.Services.AddScoped<ICommandHandler<SalvageCommand>, SalvageCommandHandle
 builder.Services.AddScoped<ICommandHandler<SalvageAllCommand>, SalvageAllCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SetAutoSalvageCommand>, SetAutoSalvageCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<LockItemCommand>, LockItemCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ViewCompanionsCommand>, ViewCompanionsCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ActivateCompanionCommand>, ActivateCompanionCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<DeactivateCompanionCommand>, DeactivateCompanionCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ImbueCommand>, ImbueCommandHandler>();
 
 var app = builder.Build();
 

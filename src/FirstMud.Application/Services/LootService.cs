@@ -72,9 +72,21 @@ public class LootService
         new("Beast Hide",           "Thick hide stripped from a slain creature.",                                ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Sinew",                "Dried sinew — useful in bowstrings and bindings.",                          ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Thornwood Herb",       "A bitter medicinal herb found only in the Thornwood.",                      ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 1, MaxWork: 3),
-        new("Dravenite Dust",       "Fine crystalline powder with latent magical resonance.",                    ItemCategory.Component, EquipmentSlot.None,         MinWork: 2, MaxWork: 4),
+        new("Dravenite Dust",       "Fine crystalline powder with latent magical resonance. Used in restoration imbuing.", ItemCategory.Reagent, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
         new("Bone Fragment",        "A large bone fragment — useful as a crafting material.",                    ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Wyrd Shard",           "A jagged shard of crystallised Wyrd-energy. Handle with care.",             ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 3, MaxWork: 7),
+
+    ];
+
+    // Taper templates — rolled separately at ~15% chance after the main loot roll
+    private static readonly LootTemplate[] TaperTemplates =
+    [
+        new("Fire Shaping Taper",   "A taper that burns with a constant crimson flame. Used to imbue fire resonance.", ItemCategory.Reagent, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
+        new("Water Shaping Taper",  "A cool, blue-green taper that hums with tidal energy.",                     ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 1, MaxWork: 3),
+        new("Earth Shaping Taper",  "A heavy amber taper infused with stone and root essence.",                  ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 1, MaxWork: 3),
+        new("Air Shaping Taper",    "A nearly weightless taper that drifts if not held firm.",                   ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 1, MaxWork: 3),
+        new("Fortitude Taper",      "A dense, dark taper that reinforces whatever it imbues.",                   ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 2, MaxWork: 4),
+        new("Warding Taper",        "A pale silver taper woven with a protective sigil.",                        ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 2, MaxWork: 4),
     ];
 
     public LootService(IItemRepository itemRepository, SalvageService salvageService, ILogger<LootService> logger)
@@ -106,6 +118,32 @@ public class LootService
 
         // Drop chance: 40% at danger 1, up to 80% at danger 10
         var dropChance = 40 + dangerLevel * 4;
+
+        // Separate taper drop: 15% flat chance (independent of main drop)
+        if (Random.Shared.Next(100) < 15)
+        {
+            var taperTemplate = TaperTemplates[Random.Shared.Next(TaperTemplates.Length)];
+            var taperWork = Workmanship.Of(Math.Clamp(
+                taperTemplate.MinWork + Random.Shared.Next(taperTemplate.MaxWork - taperTemplate.MinWork + 1),
+                1, 10));
+            var taperItem = Item.Create(taperTemplate.Name, taperTemplate.Description,
+                taperTemplate.Category, taperWork, originWorld, slot: taperTemplate.Slot);
+            taperItem.SetOwner(ownerId);
+
+            var existingTaper = await _itemRepository.GetByOwnerAndNameAsync(ownerId, taperTemplate.Name, taperTemplate.Category, ct);
+            if (existingTaper is not null)
+            {
+                existingTaper.AddQuantity(1);
+                await _itemRepository.UpdateAsync(existingTaper, ct);
+                _logger.LogInformation("Taper stack merge for player {PlayerId}: {Name}", ownerId, taperTemplate.Name);
+            }
+            else
+            {
+                await _itemRepository.AddAsync(taperItem, ct);
+                _logger.LogInformation("Taper drop for player {PlayerId}: {Name}", ownerId, taperTemplate.Name);
+            }
+        }
+
         if (Random.Shared.Next(100) >= dropChance)
             return new LootDropResult(false, null, string.Empty);
 

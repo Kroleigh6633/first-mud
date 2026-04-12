@@ -8,4 +8,6 @@ public sealed record CombatAbility(
     int WeaveCost,
     MagicElement Element,
     AbilityTargetType TargetType,
-    AbilityCategory Category);
+    AbilityCategory Category,
+    float LifestealPower = 0f,
+    float WyrdProcChance = 0f);

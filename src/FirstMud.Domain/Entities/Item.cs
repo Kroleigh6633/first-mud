@@ -37,6 +37,25 @@ public class Item
     public int Quantity { get; private set; } = 1;
     public bool IsStackable => Category == ItemCategory.Component || Category == ItemCategory.Reagent;
 
+    // Imbuing — applied imbues stored as JSON column
+    private readonly List<AppliedImbue> _imbues = [];
+    public IReadOnlyList<AppliedImbue> Imbues => _imbues.AsReadOnly();
+
+    public bool IsUnstable { get; private set; }
+
+    /// <summary>Maximum imbue slots based on Workmanship tier.</summary>
+    public int MaxImbueSlots => Workmanship.Value switch
+    {
+        <= 2 => 1,
+        <= 4 => 2,
+        <= 6 => 3,
+        <= 8 => 4,
+        _    => 5
+    };
+
+    /// <summary>True when more imbues have been applied than the item's MaxImbueSlots.</summary>
+    public bool IsOverimbued => _imbues.Count > MaxImbueSlots;
+
     private Item() { }
 
     public static Item Create(
@@ -110,6 +129,45 @@ public class Item
     }
 
     public bool IsBroken => Durability == 0;
+
+    /// <summary>
+    /// Fortifying imbue: raise Workmanship by <paramref name="amount"/> points (capped at 10).
+    /// </summary>
+    public void BoostWorkmanship(int amount)
+    {
+        var newValue = Math.Clamp(Workmanship.Value + amount, 1, 10);
+        Workmanship = ValueObjects.Workmanship.Of(newValue);
+    }
+
+    /// <summary>
+    /// Applies an imbue to this item.
+    /// Marks IsWyrdTouched = true and sets IsUnstable if overimbued after this application.
+    /// </summary>
+    public void ApplyImbue(ImbueType type, float power)
+    {
+        _imbues.Add(new AppliedImbue(type, power));
+        IsWyrdTouched = true;
+        if (IsOverimbued)
+            IsUnstable = true;
+    }
+
+    /// <summary>Removes a random imbue — used on catastrophic failure / instability decay.</summary>
+    public void RemoveRandomImbue()
+    {
+        if (_imbues.Count == 0) return;
+        var index = Random.Shared.Next(_imbues.Count);
+        _imbues.RemoveAt(index);
+        // Re-evaluate stability: no longer overimbued → stable again
+        if (!IsOverimbued)
+            IsUnstable = false;
+    }
+
+    /// <summary>Reduces Workmanship by 1 (min 1) — used on catastrophic imbue failure.</summary>
+    public void DegradeWorkmanship()
+    {
+        var newValue = Math.Max(1, Workmanship.Value - 1);
+        Workmanship = ValueObjects.Workmanship.Of(newValue);
+    }
 }
 
 public enum ItemCategory

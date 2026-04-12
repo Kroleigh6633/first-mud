@@ -44,7 +44,14 @@ public class OpenInventoryCommandHandler(
                 Slot = i.Slot.ToString(),
                 i.Quantity,
                 i.IsStackable,
-                i.IsLocked
+                i.IsLocked,
+                i.IsUnstable,
+                MaxImbueSlots = i.MaxImbueSlots,
+                Imbues = i.Imbues.Select(imbue => new
+                {
+                    Type = imbue.Type.ToString(),
+                    imbue.Power
+                }).ToList()
             }).ToList()
         };
 
@@ -137,7 +144,14 @@ public class LockItemCommandHandler(
                 Slot = i.Slot.ToString(),
                 i.Quantity,
                 i.IsStackable,
-                i.IsLocked
+                i.IsLocked,
+                i.IsUnstable,
+                MaxImbueSlots = i.MaxImbueSlots,
+                Imbues = i.Imbues.Select(imbue => new
+                {
+                    Type = imbue.Type.ToString(),
+                    imbue.Power
+                }).ToList()
             }).ToList()
         };
 

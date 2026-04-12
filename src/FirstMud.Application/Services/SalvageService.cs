@@ -84,6 +84,9 @@ public class SalvageService
 
         var yields = BuildYields(item.Category, yieldBonus + skillBonus);
 
+        // Recover imbue taper materials before deleting
+        var recoveredTapers = await RecoverImbueResiduesAsync(player, item, ct);
+
         // Delete original item first
         await _items.DeleteAsync(itemId, ct);
 
@@ -118,7 +121,11 @@ public class SalvageService
             "Player {PlayerId} salvaged {ItemName} yielding {YieldCount} material type(s)",
             playerId, item.Name, yields.Count);
 
-        return new SalvageResult(true, BuildSuccessMessage(item.Name, yields), yields);
+        var successMsg = BuildSuccessMessage(item.Name, yields);
+        if (recoveredTapers.Count > 0)
+            successMsg += $" Recovered imbue residue: {string.Join(", ", recoveredTapers)}.";
+
+        return new SalvageResult(true, successMsg, yields);
     }
 
     /// <summary>
@@ -239,6 +246,68 @@ public class SalvageService
     }
 
     // ─── private helpers ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// For each imbue on the item, rolls a skill-based chance to recover the matching taper material.
+    /// Returns the names of any recovered tapers (for message building).
+    /// </summary>
+    private async Task<List<string>> RecoverImbueResiduesAsync(
+        Player player,
+        Item item,
+        CancellationToken ct)
+    {
+        var recovered = new List<string>();
+        if (item.Imbues.Count == 0)
+            return recovered;
+
+        // Recovery chance: SalvageSkill * 3 + 25 (capped at 80%)
+        var baseChance = Math.Min(80, player.SalvageSkill * 3 + 25);
+
+        foreach (var imbue in item.Imbues)
+        {
+            if (Random.Shared.Next(100) >= baseChance)
+                continue;
+
+            var taperName = ImbueTypeToTaperName(imbue.Type);
+            if (taperName is null)
+                continue;
+
+            var existing = await _items.GetByOwnerAndNameAsync(player.Id, taperName, ItemCategory.Reagent, ct);
+            if (existing is not null)
+            {
+                existing.AddQuantity(1);
+                await _items.UpdateAsync(existing, ct);
+            }
+            else
+            {
+                var taperItem = Item.Create(
+                    taperName,
+                    $"A residue recovered from salvaging an imbued item.",
+                    ItemCategory.Reagent,
+                    Workmanship.Of(1),
+                    item.OriginWorld);
+                taperItem.SetOwner(player.Id);
+                await _items.AddAsync(taperItem, ct);
+            }
+
+            recovered.Add(taperName);
+        }
+
+        return recovered;
+    }
+
+    private static string? ImbueTypeToTaperName(Domain.Enums.ImbueType type) => type switch
+    {
+        Domain.Enums.ImbueType.Fire        => "Fire Shaping Taper",
+        Domain.Enums.ImbueType.Water       => "Water Shaping Taper",
+        Domain.Enums.ImbueType.Earth       => "Earth Shaping Taper",
+        Domain.Enums.ImbueType.Air         => "Air Shaping Taper",
+        Domain.Enums.ImbueType.Fortifying  => "Fortitude Taper",
+        Domain.Enums.ImbueType.Protective  => "Warding Taper",
+        Domain.Enums.ImbueType.Wyrd        => "Wyrd Shard",
+        Domain.Enums.ImbueType.Restoration => "Dravenite Dust",
+        _                                  => null
+    };
 
     private static IReadOnlyList<SalvageYield> BuildYields(ItemCategory category, int bonus)
     {

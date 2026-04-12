@@ -22,9 +22,11 @@ public class WorldStateServiceTests
 
     private static WorldStateService BuildService(IQuestGraphRepository questRepo)
     {
-        var playerRepo = Substitute.For<IPlayerRepository>();
+        var playerRepo      = Substitute.For<IPlayerRepository>();
+        var itemRepo        = Substitute.For<IItemRepository>();
+        var companionRepo   = Substitute.For<ICompanionRepository>();
         // AiPlayerService is not called by GetAvailableQuestsAsync; pass null safely
-        return new WorldStateService(playerRepo, questRepo, null!);
+        return new WorldStateService(playerRepo, questRepo, null!, itemRepo, companionRepo);
     }
 
     [Fact]

@@ -303,6 +303,11 @@ public class Player
         SalvageSkill = Math.Max(1, SalvageSkill + amount);
     }
 
+    public void GainCraftingSkillXp(int amount)
+    {
+        CraftingSkill = Math.Max(1, CraftingSkill + amount);
+    }
+
     /// <summary>
     /// Sets the auto-salvage threshold for the given category (weapon or armor).
     /// A maxWorkmanship of 0 disables auto-salvage for that category.

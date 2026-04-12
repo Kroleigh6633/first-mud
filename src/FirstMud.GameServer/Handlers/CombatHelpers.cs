@@ -4,6 +4,7 @@ using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
 using FirstMud.Domain.Interfaces;
+using FirstMud.Domain.Services;
 using FirstMud.Domain.ValueObjects;
 using FirstMud.GameServer.Dtos;
 using FirstMud.GameServer.Hubs;
@@ -32,21 +33,117 @@ public class CombatHelpers(
     // Enemy auto-turn processing
     // -------------------------------------------------------------------------
 
+    // Tracks which companion IDs have already used their one-time buff this encounter.
+    // Key = encounterId, Value = set of companionSourceEntityIds that have buffed.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, HashSet<Guid>> _companionBuffUsed = new();
+
     /// <summary>
-    /// Automatically runs any pending enemy turns until a player-side combatant
-    /// is next or the encounter ends. Narrates each enemy action.
+    /// Automatically runs any pending enemy AND companion turns until the human player
+    /// is next or the encounter ends.
+    /// Enemies attack randomly. Companions use smart AI: heal low-HP allies first,
+    /// then buff once per encounter, then use their strongest attack.
     /// </summary>
     public async Task ProcessEnemyTurnsAsync(Guid playerId, Encounter encounter, CancellationToken ct)
     {
+        var buffUsed = _companionBuffUsed.GetOrAdd(encounter.Id, _ => []);
+
         var safety = 0;
-        while (encounter.State == EncounterState.InProgress && safety++ < 20)
+        while (encounter.State == EncounterState.InProgress && safety++ < 30)
         {
             var actor = encounter.CurrentActor;
-            if (actor is null || actor.IsPlayerSide) break;
+            if (actor is null) break;
 
-            var abilities = actor.Abilities.Where(a => a.Category == AbilityCategory.Attack).ToList();
-            if (abilities.Count == 0) break;
-            var ability = abilities[Random.Shared.Next(abilities.Count)];
+            // Stop when it's the human player's turn
+            if (actor.IsPlayerSide && actor.CombatantType == CombatantType.Player) break;
+
+            // ---- COMPANION TURN (auto-AI) ----
+            if (actor.IsPlayerSide && actor.CombatantType == CombatantType.Companion)
+            {
+                var companionSnapshot = encounter.Combatants
+                    .Select(c => (c.Id, c.CurrentHp, c.MaxHp, c.IsPlayerSide))
+                    .ToList();
+
+                var hasBuffed = buffUsed.Contains(actor.SourceEntityId);
+                var (chosenAbility, targetAlly) = CompanionAbilityFactory.SelectBestAction(
+                    actor.Abilities, companionSnapshot, hasBuffed);
+
+                if (chosenAbility is null)
+                {
+                    // No valid ability — skip turn gracefully
+                    var (_, _, _) = await combatService.ExecuteActionAsync(
+                        encounter.Id, actor.Id,
+                        actor.Abilities.FirstOrDefault()?.Name ?? "Strike",
+                        null, ct);
+                    continue;
+                }
+
+                if (chosenAbility.Category == AbilityCategory.Buff)
+                    buffUsed.Add(actor.SourceEntityId);
+
+                Guid? targetId = null;
+                string targetName;
+
+                if (targetAlly)
+                {
+                    // Pick the most damaged ally (lowest HP%)
+                    var ally = encounter.Combatants
+                        .Where(c => c.IsPlayerSide && !c.IsDefeated)
+                        .OrderBy(c => (float)c.CurrentHp / Math.Max(c.MaxHp, 1))
+                        .FirstOrDefault();
+
+                    targetId = ally?.Id;
+                    targetName = ally?.Name ?? "ally";
+                }
+                else
+                {
+                    // Pick first living enemy
+                    var enemy = encounter.Combatants
+                        .Where(c => !c.IsPlayerSide && !c.IsDefeated)
+                        .FirstOrDefault();
+
+                    targetId = enemy?.Id;
+                    targetName = enemy?.Name ?? "enemy";
+                }
+
+                var (cSuccess, _, _) = await combatService.ExecuteActionAsync(
+                    encounter.Id, actor.Id, chosenAbility.Name, targetId, ct);
+                if (!cSuccess) break;
+
+                string narrative;
+                if (chosenAbility.Category is AbilityCategory.Heal or AbilityCategory.Revive)
+                {
+                    int heal = chosenAbility.BasePower + actor.Level * 2;
+                    narrative = $"{actor.Name} uses {chosenAbility.Name} on {targetName}, restoring {heal} HP.";
+                }
+                else if (chosenAbility.Category == AbilityCategory.Buff)
+                {
+                    narrative = $"{actor.Name} uses {chosenAbility.Name}! The party is bolstered.";
+                }
+                else if (chosenAbility.Category == AbilityCategory.Debuff)
+                {
+                    narrative = $"{actor.Name} uses {chosenAbility.Name} on {targetName}! They falter.";
+                }
+                else
+                {
+                    int rawPower = chosenAbility.BasePower + actor.Level * 2;
+                    // Get target element for multiplier display
+                    var targetCombatant = encounter.Combatants.FirstOrDefault(c => c.Id == targetId);
+                    float mult = targetCombatant is not null
+                        ? ElementMatchup.GetMultiplier(chosenAbility.Element, targetCombatant.Element)
+                        : 1f;
+                    int dmg = (int)(rawPower * mult);
+                    var multLabel = mult > 1f ? " (super effective!)" : mult < 1f ? " (resisted)" : "";
+                    narrative = $"{actor.Name} uses {chosenAbility.Name} on {targetName} for {dmg} damage{multLabel}.";
+                }
+
+                await notificationService.SendMessageAsync(playerId, "combat", narrative, ct);
+                continue;
+            }
+
+            // ---- ENEMY TURN ----
+            var enemyAbilities = actor.Abilities.Where(a => a.Category == AbilityCategory.Attack).ToList();
+            if (enemyAbilities.Count == 0) break;
+            var enemyAbility = enemyAbilities[Random.Shared.Next(enemyAbilities.Count)];
 
             var targets = encounter.Combatants
                 .Where(c => c.IsPlayerSide && !c.IsDefeated)
@@ -54,21 +151,25 @@ public class CombatHelpers(
             if (targets.Count == 0) break;
             var target = targets[Random.Shared.Next(targets.Count)];
 
-            var (success, _, _) = await combatService.ExecuteActionAsync(
-                encounter.Id, actor.Id, ability.Name, target.Id, ct);
-            if (!success) break;
+            var (eSuccess, _, _) = await combatService.ExecuteActionAsync(
+                encounter.Id, actor.Id, enemyAbility.Name, target.Id, ct);
+            if (!eSuccess) break;
 
-            int rawPower = ability.BasePower + actor.Level * 2;
-            float mult = ElementMatchup.GetMultiplier(ability.Element, target.Element);
-            int dmg = (int)(rawPower * mult);
-            var multLabel = mult > 1f ? " (super effective!)" : mult < 1f ? " (resisted)" : "";
+            int ePower = enemyAbility.BasePower + actor.Level * 2;
+            float eMult = ElementMatchup.GetMultiplier(enemyAbility.Element, target.Element);
+            int eDmg = (int)(ePower * eMult);
+            var eMultLabel = eMult > 1f ? " (super effective!)" : eMult < 1f ? " (resisted)" : "";
 
             await notificationService.SendMessageAsync(
                 playerId,
                 "combat",
-                $"{actor.Name} uses {ability.Name} on {target.Name} for {dmg} damage{multLabel}.",
+                $"{actor.Name} uses {enemyAbility.Name} on {target.Name} for {eDmg} damage{eMultLabel}.",
                 ct);
         }
+
+        // Clean up buff tracking when encounter ends
+        if (encounter.State != EncounterState.InProgress)
+            _companionBuffUsed.TryRemove(encounter.Id, out _);
     }
 
     // -------------------------------------------------------------------------
@@ -240,33 +341,71 @@ public class CombatHelpers(
         foreach (var enemy in defeatedEnemies)
         {
             if (Random.Shared.Next(100) >= 15) continue;
-            if (player.ActiveCompanionIds.Count >= 3) break;
+
+            // Generate a flavourful name for the captured creature
+            var companionName = GenerateCapturedName(enemy.Element);
 
             var companion = Companion.Create(
                 playerId,
-                enemy.Name,
+                companionName,
                 CompanionType.CapturedMonster,
                 enemy.Element);
 
+            // Captured monsters always start at Layer 1
             await companionRepository.AddAsync(companion, ct);
 
-            player.TryAddActiveCompanion(companion.Id);
-            companion.SetActive(true);
-            await companionRepository.UpdateAsync(companion, ct);
+            // Auto-activate if there's a free slot; otherwise just add to roster
+            var activated = player.TryAddActiveCompanion(companion.Id);
+            if (activated)
+            {
+                companion.SetActive(true);
+                await companionRepository.UpdateAsync(companion, ct);
+            }
             await playerRepository.UpdateAsync(player, ct);
 
-            await notificationService.SendMessageAsync(playerId, "system", $"You captured a {enemy.Name}!", ct);
+            var slotNote = activated
+                ? "It has joined your active party."
+                : "Your party is full — it waits in your roster. Press [B] to manage companions.";
+
+            await notificationService.SendMessageAsync(playerId, "system",
+                $"You captured a {enemy.Name}! Named it '{companionName}'. " +
+                $"[Layer 1 {enemy.Element} CapturedMonster] {slotNote}", ct);
 
             await hubContext.Clients
                 .Group(playerId.ToString())
                 .SendAsync("CompanionCaptured", new
                 {
                     CompanionId = companion.Id,
-                    companion.Name,
+                    Name = companionName,
+                    OriginalMonsterName = enemy.Name,
                     Element = companion.Element.ToString(),
-                    Type = companion.Type.ToString()
+                    Type = companion.Type.ToString(),
+                    Layer = companion.CurrentLayer,
+                    IsActive = companion.IsActive
                 }, ct);
         }
+    }
+
+    /// <summary>
+    /// Generates a flavourful name for a newly captured monster using element-themed syllables.
+    /// </summary>
+    private static string GenerateCapturedName(MagicElement element)
+    {
+        var prefixes = element switch
+        {
+            MagicElement.Fire   => new[] { "Blaze", "Cinder", "Ash", "Ember", "Scorch", "Smolder", "Char" },
+            MagicElement.Water  => new[] { "Tide", "Mist", "Foam", "Eddy", "Brook", "Ripple", "Surge" },
+            MagicElement.Earth  => new[] { "Stone", "Grit", "Dust", "Slab", "Mire", "Shale", "Pebble" },
+            MagicElement.Air    => new[] { "Gust", "Drift", "Breeze", "Squall", "Wisp", "Zephyr", "Gale" },
+            MagicElement.Aether => new[] { "Echo", "Shade", "Pale", "Veil", "Rune", "Omen", "Wyrd" },
+            _                   => new[] { "Wild", "Feral", "Roam", "Stray", "Lost", "Spare", "Odd" },
+        };
+
+        var suffixes = new[] { "claw", "fang", "hide", "mane", "spike", "eye", "paw", "scale", "tail", "thorn" };
+
+        var prefix = prefixes[Random.Shared.Next(prefixes.Length)];
+        var suffix = suffixes[Random.Shared.Next(suffixes.Length)];
+        return prefix + suffix;
     }
 
     // -------------------------------------------------------------------------

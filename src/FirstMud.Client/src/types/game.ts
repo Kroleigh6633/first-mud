@@ -34,6 +34,15 @@ export interface PlayerState {
   activeCompanionIds: string[];
   unlockedPortals: WorldId[];
   currentQuestIds?: string[];
+  effectiveStrength?: number;
+  effectiveAgility?: number;
+  effectiveIntellect?: number;
+  effectiveFortitude?: number;
+  effectiveSpeed?: number;
+  effectiveMaxHp?: number;
+  bonusStrikeDamage?: number;
+  bonusSpellDamage?: number;
+  activeCompanions?: CompanionState[];
 }
 
 export interface QuestNode {
@@ -180,11 +189,29 @@ export interface InventorySnapshot {
   equippedAccessoryId?: string;
 }
 
+export type CompanionType = 'Wildfolk' | 'CapturedMonster' | 'ArdweldConstruct' | 'HiredHero' | 'BoundShade';
+
+export interface CompanionState {
+  id: string;
+  name: string;
+  type: CompanionType;
+  element: MagicElement;
+  level: number;
+  currentLayer: number;
+  usageCounter: number;
+  driftAccumulator: number;
+  isActive: boolean;
+  relationshipDepth: number;
+}
+
 export interface CompanionCapturedEvent {
   companionId: string;
   name: string;
+  originalMonsterName?: string;
   element: string;
   type: string;
+  layer?: number;
+  isActive?: boolean;
 }
 
 export interface StorageItem {

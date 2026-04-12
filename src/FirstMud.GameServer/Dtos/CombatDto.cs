@@ -24,4 +24,5 @@ public sealed record CombatUpdateDto(
     string State,
     List<CombatantDto> Combatants,
     Guid CurrentActorId,
-    int Round);
+    int Round,
+    string? LastActionText = null);

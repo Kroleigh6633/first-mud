@@ -61,12 +61,44 @@ export default function CharacterSheet({ player, equipment, onClose }: Props) {
   const intBonus = Math.floor((player.intellect ?? 0) / 5);
   const fortBonus = Math.floor((player.fortitude ?? 0) / 2);
 
-  const stats: Array<[string, number | undefined, string]> = [
-    ['Strength', player.strength, `+${strBonus} melee damage`],
-    ['Agility', player.agility, 'dodge (future)'],
-    ['Intellect', player.intellect, `+${intBonus} spell damage`],
-    ['Fortitude', player.fortitude, `+${fortBonus} bonus HP`],
-    ['Speed', player.speed, 'turn order priority'],
+  // Build hint that mentions the gear bonus when present
+  function gearHint(base: number, effective: number | undefined, baseHint: string): string {
+    if (!effective || effective === base) return baseHint;
+    const gearDelta = effective - base;
+    return `${baseHint}  (+${gearDelta} from gear)`;
+  }
+
+  const stats: Array<{ name: string; base: number | undefined; effective: number | undefined; hint: string }> = [
+    {
+      name: 'Strength',
+      base: player.strength,
+      effective: player.effectiveStrength,
+      hint: gearHint(player.strength ?? 0, player.effectiveStrength, `+${strBonus} melee damage`),
+    },
+    {
+      name: 'Agility',
+      base: player.agility,
+      effective: player.effectiveAgility,
+      hint: gearHint(player.agility ?? 0, player.effectiveAgility, 'dodge (future)'),
+    },
+    {
+      name: 'Intellect',
+      base: player.intellect,
+      effective: player.effectiveIntellect,
+      hint: gearHint(player.intellect ?? 0, player.effectiveIntellect, `+${intBonus} spell damage`),
+    },
+    {
+      name: 'Fortitude',
+      base: player.fortitude,
+      effective: player.effectiveFortitude,
+      hint: gearHint(player.fortitude ?? 0, player.effectiveFortitude, `+${fortBonus} bonus HP`),
+    },
+    {
+      name: 'Speed',
+      base: player.speed,
+      effective: player.effectiveSpeed,
+      hint: gearHint(player.speed ?? 0, player.effectiveSpeed, 'turn order priority'),
+    },
   ];
 
   const skills = [
@@ -95,7 +127,16 @@ export default function CharacterSheet({ player, equipment, onClose }: Props) {
         </div>
         <div style={rowStyle}>
           <span style={{ color: '#aaa' }}>HP</span>
-          <span style={{ color: '#ff4444' }}>{player.currentHp} / {player.maxHp}</span>
+          <span>
+            <span style={{ color: '#ff4444' }}>{player.currentHp} / {player.maxHp}</span>
+            {player.effectiveMaxHp !== undefined && player.effectiveMaxHp !== player.maxHp && (
+              <>
+                <span style={{ color: '#555' }}> (</span>
+                <span style={{ color: '#ff7777' }}>{player.effectiveMaxHp}</span>
+                <span style={{ color: '#555' }}> in combat)</span>
+              </>
+            )}
+          </span>
         </div>
         <div style={hintStyle}>
           Health. Heals +10/s at your homestead [P to portal home]. Armor adds bonus HP in combat.
@@ -127,15 +168,27 @@ export default function CharacterSheet({ player, equipment, onClose }: Props) {
         <div style={hintStyle}>
           Attributes increase per level based on your element archetype. Each stat affects combat.
         </div>
-        {stats.map(([name, val, hint]) => (
-          <React.Fragment key={name as string}>
-            <div style={rowStyle}>
-              <span style={{ color: '#aaa' }}>{name as string}</span>
-              <span style={{ color: '#00ff41' }}>{(val as number | undefined) ?? '?'}</span>
-            </div>
-            <div style={hintStyle}>{hint as string}</div>
-          </React.Fragment>
-        ))}
+        {stats.map(({ name, base, effective, hint }) => {
+          const hasBonus = effective !== undefined && effective !== base;
+          return (
+            <React.Fragment key={name}>
+              <div style={rowStyle}>
+                <span style={{ color: '#aaa' }}>{name}</span>
+                <span>
+                  <span style={{ color: '#00ff41' }}>{base ?? '?'}</span>
+                  {hasBonus && (
+                    <>
+                      <span style={{ color: '#555' }}> (</span>
+                      <span style={{ color: '#44ff88' }}>{effective}</span>
+                      <span style={{ color: '#555' }}>)</span>
+                    </>
+                  )}
+                </span>
+              </div>
+              <div style={hintStyle}>{hint}</div>
+            </React.Fragment>
+          );
+        })}
 
         <div style={sectionStyle}>Skills</div>
         <div style={hintStyle}>

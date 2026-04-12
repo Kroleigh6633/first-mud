@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, WanderingNpc } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -70,6 +70,7 @@ export interface GameConnectionResult {
   equipment: EquipmentSlots;
   capturedCompanions: CompanionCapturedEvent[];
   wanderingNpcs: WanderingNpc[];
+  companionRoster: CompanionState[];
 }
 
 export function useGameConnection(): GameConnectionResult {
@@ -91,6 +92,7 @@ export function useGameConnection(): GameConnectionResult {
   const [equipment, setEquipment] = useState<EquipmentSlots>({});
   const [capturedCompanions, setCapturedCompanions] = useState<CompanionCapturedEvent[]>([]);
   const [wanderingNpcs, setWanderingNpcs] = useState<WanderingNpc[]>([]);
+  const [companionRoster, setCompanionRoster] = useState<CompanionState[]>([]);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
@@ -366,8 +368,12 @@ export function useGameConnection(): GameConnectionResult {
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'system',
-        text: `You captured ${captured.name}! (${captured.element} ${captured.type})`,
+        text: `You captured ${captured.originalMonsterName ?? captured.name}! Named it '${captured.name}'. (${captured.element} ${captured.type})`,
       });
+    });
+
+    connection.on('CompanionList', (companions: CompanionState[]) => {
+      setCompanionRoster(companions ?? []);
     });
 
     connection.on('PlayerHealed', (payload: { id: string; currentHp: number; maxHp: number; weavePercent?: number; weaveState?: string }) => {
@@ -541,5 +547,6 @@ export function useGameConnection(): GameConnectionResult {
     equipment,
     capturedCompanions,
     wanderingNpcs,
+    companionRoster,
   };
 }

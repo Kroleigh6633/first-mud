@@ -96,8 +96,12 @@ export default function StatusPanel({ player, currentTile, equipment }: Props) {
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>HP: </span>
-        <Bar current={player.currentHp} max={player.maxHp} width={10} color="#ff4444" />
-        <span style={{ color: '#888888' }}> {player.currentHp}/{player.maxHp}</span>
+        <Bar current={player.currentHp} max={player.effectiveMaxHp ?? player.maxHp} width={10} color="#ff4444" />
+        <span style={{ color: '#888888' }}> {player.currentHp}/</span>
+        <span style={{ color: '#888888' }}>{player.maxHp}</span>
+        {player.effectiveMaxHp !== undefined && player.effectiveMaxHp !== player.maxHp && (
+          <span style={{ color: '#ff7777' }}> ({player.effectiveMaxHp} w/gear)</span>
+        )}
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>Weave </span>

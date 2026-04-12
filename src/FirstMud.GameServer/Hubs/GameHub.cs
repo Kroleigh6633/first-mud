@@ -211,6 +211,21 @@ public class GameHub : Hub
                 playerId,
                 TryGetGuid(payload, "itemId")),
 
+            "viewcompanions" => new ViewCompanionsCommand(playerId),
+
+            "activatecompanion" => new ActivateCompanionCommand(
+                playerId,
+                TryGetGuid(payload, "companionId")),
+
+            "deactivatecompanion" => new DeactivateCompanionCommand(
+                playerId,
+                TryGetGuid(payload, "companionId")),
+
+            "imbue" => new ImbueCommand(
+                playerId,
+                TryGetGuid(payload, "itemId"),
+                TryGetGuid(payload, "taperId")),
+
             _ => null
         };
     }
