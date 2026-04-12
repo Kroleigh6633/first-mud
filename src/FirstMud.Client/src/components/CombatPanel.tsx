@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { CombatUpdate, CombatantState } from '../types/game';
 
 interface Props {
@@ -27,17 +27,34 @@ function elementColor(element: string): string {
   }
 }
 
-function CombatantRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: boolean }) {
-  const nameColor = c.isPlayerSide ? '#00ff41' : '#ff4444';
-  const border = isCurrentActor ? '1px solid #ccaa00' : '1px solid transparent';
+function EnemyRow({
+  c,
+  isCurrentActor,
+  isTarget,
+  onSelect,
+}: {
+  c: CombatantState;
+  isCurrentActor: boolean;
+  isTarget: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '4px 10px', border, opacity: c.isDefeated ? 0.35 : 1,
-      marginBottom: '2px', background: isCurrentActor ? '#1a1a00' : 'transparent',
-    }}>
+    <div
+      onClick={c.isDefeated ? undefined : onSelect}
+      style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '4px 10px',
+        border: isTarget ? '1px solid #ccaa00' : isCurrentActor ? '1px dashed #ff6600' : '1px solid transparent',
+        background: isTarget ? '#1a1a00' : isCurrentActor ? '#1a0800' : 'transparent',
+        opacity: c.isDefeated ? 0.35 : 1,
+        marginBottom: '2px',
+        cursor: c.isDefeated ? 'default' : 'pointer',
+      }}
+    >
       <div>
-        <span style={{ color: nameColor, fontWeight: isCurrentActor ? 'bold' : 'normal' }}>
+        {isTarget && <span style={{ color: '#ccaa00', marginRight: '4px' }}>▸</span>}
+        {isCurrentActor && !isTarget && <span style={{ color: '#ff6600', marginRight: '4px' }}>⚔</span>}
+        <span style={{ color: '#ff4444', fontWeight: isCurrentActor ? 'bold' : 'normal' }}>
           {c.name}
         </span>
         <span style={{ color: elementColor(c.element), fontSize: '10px', marginLeft: '6px' }}>
@@ -46,26 +63,69 @@ function CombatantRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor
         {c.isDefeated && <span style={{ color: '#555', marginLeft: '6px' }}>DEFEATED</span>}
       </div>
       <div style={{ fontSize: '12px' }}>
-        <HpBar current={c.currentHp} max={c.maxHp} color={c.isPlayerSide ? '#ff4444' : '#cc4444'} />
+        <HpBar current={c.currentHp} max={c.maxHp} color="#cc4444" />
         <span style={{ color: '#888', marginLeft: '4px' }}>{c.currentHp}/{c.maxHp}</span>
       </div>
     </div>
   );
 }
 
-const ABILITIES = ['Claw', 'Fire Breath', 'Water Jet', 'Strike'];
+function PartyRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '4px 10px',
+      border: isCurrentActor ? '1px solid #00ff41' : '1px solid transparent',
+      background: isCurrentActor ? '#001a00' : 'transparent',
+      opacity: c.isDefeated ? 0.35 : 1,
+      marginBottom: '2px',
+    }}>
+      <div>
+        {isCurrentActor && <span style={{ color: '#00ff41', marginRight: '4px' }}>▸</span>}
+        <span style={{ color: '#00ff41', fontWeight: isCurrentActor ? 'bold' : 'normal' }}>
+          {c.name}
+        </span>
+        <span style={{ color: elementColor(c.element), fontSize: '10px', marginLeft: '6px' }}>
+          [{c.element}]
+        </span>
+        {c.isDefeated && <span style={{ color: '#555', marginLeft: '6px' }}>DEFEATED</span>}
+      </div>
+      <div style={{ fontSize: '12px' }}>
+        <HpBar current={c.currentHp} max={c.maxHp} color="#ff4444" />
+        <span style={{ color: '#888', marginLeft: '4px' }}>{c.currentHp}/{c.maxHp}</span>
+      </div>
+    </div>
+  );
+}
+
+const ABILITIES = [
+  { name: 'Strike', desc: 'Basic attack' },
+  { name: 'Claw', desc: 'Earth melee' },
+  { name: 'Fire Breath', desc: 'Fire ranged' },
+  { name: 'Water Jet', desc: 'Water ranged' },
+];
 
 export default function CombatPanel({ combat, sendCommand }: Props) {
   const isOver = combat.state === 'Victory' || combat.state === 'Defeat' || combat.state === 'Fled';
   const playerSide = combat.combatants.filter(c => c.isPlayerSide);
   const enemySide = combat.combatants.filter(c => !c.isPlayerSide);
-  const firstEnemy = enemySide.find(c => !c.isDefeated);
+
+  const currentActor = combat.combatants.find(c => c.id === combat.currentActorId);
+  const isPlayerTurn = currentActor?.isPlayerSide === true;
+
+  // Default target: first living enemy
+  const firstLivingEnemy = enemySide.find(c => !c.isDefeated);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const targetId = selectedTargetId && enemySide.some(c => c.id === selectedTargetId && !c.isDefeated)
+    ? selectedTargetId
+    : firstLivingEnemy?.id ?? null;
+  const targetName = enemySide.find(c => c.id === targetId)?.name ?? '???';
 
   const handleAbility = (abilityName: string) => {
     sendCommand('combat use', {
       encounterId: combat.encounterId,
       abilityName,
-      targetId: firstEnemy?.id ?? null,
+      targetId,
     });
   };
 
@@ -80,7 +140,7 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
     }} data-testid="combat-panel">
       <div style={{
         background: '#0d0d0d', border: '1px solid #ff4444', fontFamily: 'monospace',
-        fontSize: '13px', color: '#00ff41', width: '600px', maxHeight: '90vh',
+        fontSize: '13px', color: '#00ff41', width: '620px', maxHeight: '90vh',
         overflowY: 'auto', boxShadow: '0 0 60px rgba(255,68,68,0.3)',
       }}>
         {/* Header */}
@@ -89,24 +149,48 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           letterSpacing: '0.12em',
         }}>
-          <span style={{ color: '#ff4444' }}>
-            COMBAT — Round {combat.round}
-          </span>
-          <span style={{ color: isOver ? '#ccaa00' : '#888', fontSize: '11px' }}>
-            {combat.state}
-          </span>
+          <span style={{ color: '#ff4444' }}>COMBAT — Round {combat.round}</span>
+          <span style={{ color: isOver ? '#ccaa00' : '#888', fontSize: '11px' }}>{combat.state}</span>
         </div>
 
-        {/* Enemies */}
+        {/* Turn banner */}
+        {!isOver && currentActor && (
+          <div style={{
+            padding: '8px 14px',
+            background: isPlayerTurn ? '#001a00' : '#1a0800',
+            borderBottom: isPlayerTurn ? '2px solid #00ff41' : '2px solid #ff6600',
+            textAlign: 'center', fontSize: '14px', letterSpacing: '0.15em',
+          }}>
+            {isPlayerTurn ? (
+              <span style={{ color: '#00ff41' }}>
+                ▸ YOUR TURN — {currentActor.name} — attacking <span style={{ color: '#ccaa00' }}>{targetName}</span>
+              </span>
+            ) : (
+              <span style={{ color: '#ff6600' }}>
+                ⚔ ENEMY TURN — {currentActor.name} is acting...
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Enemies — clickable for target selection */}
         <div style={{ padding: '4px 0' }}>
           <div style={{
             color: '#888', fontSize: '10px', letterSpacing: '0.14em',
             textTransform: 'uppercase', padding: '6px 14px',
+            display: 'flex', justifyContent: 'space-between',
           }}>
-            Enemies
+            <span>Enemies</span>
+            {isPlayerTurn && <span style={{ color: '#555' }}>click to target</span>}
           </div>
           {enemySide.map(c => (
-            <CombatantRow key={c.id} c={c} isCurrentActor={c.id === combat.currentActorId} />
+            <EnemyRow
+              key={c.id}
+              c={c}
+              isCurrentActor={c.id === combat.currentActorId}
+              isTarget={c.id === targetId}
+              onSelect={() => setSelectedTargetId(c.id)}
+            />
           ))}
         </div>
 
@@ -119,47 +203,61 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
             Your party
           </div>
           {playerSide.map(c => (
-            <CombatantRow key={c.id} c={c} isCurrentActor={c.id === combat.currentActorId} />
+            <PartyRow key={c.id} c={c} isCurrentActor={c.id === combat.currentActorId} />
           ))}
         </div>
 
-        {/* Actions */}
-        {!isOver && (
+        {/* Actions — only when it's your turn */}
+        {!isOver && isPlayerTurn && (
           <div style={{
-            padding: '10px 14px', borderTop: '1px solid #1a1a1a',
-            display: 'flex', flexWrap: 'wrap', gap: '8px',
+            padding: '10px 14px', borderTop: '1px solid #1a3a1a',
           }}>
-            {ABILITIES.map(a => (
+            <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px' }}>
+              Choose an ability to use against <span style={{ color: '#ccaa00' }}>{targetName}</span>:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {ABILITIES.map(a => (
+                <button
+                  key={a.name}
+                  onClick={() => handleAbility(a.name)}
+                  title={a.desc}
+                  style={{
+                    background: 'none', border: '1px solid #00ff41', color: '#00ff41',
+                    fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {a.name}
+                </button>
+              ))}
               <button
-                key={a}
-                onClick={() => handleAbility(a)}
+                onClick={handleFlee}
                 style={{
-                  background: 'none', border: '1px solid #00ff41', color: '#00ff41',
+                  background: 'none', border: '1px solid #ccaa00', color: '#ccaa00',
                   fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
-                  cursor: 'pointer',
+                  cursor: 'pointer', marginLeft: 'auto',
                 }}
               >
-                {a}
+                Flee
               </button>
-            ))}
-            <button
-              onClick={handleFlee}
-              style={{
-                background: 'none', border: '1px solid #ccaa00', color: '#ccaa00',
-                fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
-                cursor: 'pointer', marginLeft: 'auto',
-              }}
-            >
-              Flee
-            </button>
+            </div>
+          </div>
+        )}
+
+        {/* Enemy turn — no actions available, just a wait message */}
+        {!isOver && !isPlayerTurn && (
+          <div style={{
+            padding: '10px 14px', borderTop: '1px solid #1a1a1a',
+            textAlign: 'center', color: '#ff6600', fontSize: '11px',
+          }}>
+            ⚔ Waiting for {currentActor?.name ?? 'enemy'} to act...
           </div>
         )}
 
         {/* Outcome */}
         {isOver && (
           <div style={{
-            padding: '16px 14px', borderTop: '1px solid #1a1a1a',
-            textAlign: 'center',
+            padding: '16px 14px', borderTop: '1px solid #1a1a1a', textAlign: 'center',
           }}>
             <div style={{
               fontSize: '16px', letterSpacing: '0.2em',
