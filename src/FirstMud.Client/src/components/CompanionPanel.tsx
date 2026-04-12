@@ -158,7 +158,63 @@ function UsageBar({ type, layer, usage }: { type: CompanionType; layer: number; 
   );
 }
 
-// ---- Duty assignment sub-panel ---------------------------------------------
+// ---- Deactivate picker — shown inline after clicking Deactivate on an active companion ----
+
+function DeactivateChoicePicker({
+  companion,
+  onRest,
+  onQuickAssign,
+  onCancel,
+}: {
+  companion: CompanionState;
+  onRest: () => void;
+  onQuickAssign: (duty: HomesteadDuty) => void;
+  onCancel: () => void;
+}) {
+  const aptitude = APTITUDE[companion.type] ?? APTITUDE.HiredHero;
+
+  return (
+    <div style={deactivatePickerStyle}>
+      <div style={{ color: '#ff8800', fontSize: '11px', marginBottom: '6px' }}>
+        What should <span style={{ color: '#ffffff' }}>{companion.name}</span> do?
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+        <button
+          type="button"
+          style={restBtnStyle}
+          onClick={onRest}
+          title="Deactivate — companion idles at homestead (assign duty later)"
+        >
+          Rest (idle)
+        </button>
+        {ALL_DUTIES.map(duty => {
+          const apt = aptitude[duty] ?? 1;
+          return (
+            <button
+              key={duty}
+              type="button"
+              style={quickAssignBtnStyle}
+              onClick={() => onQuickAssign(duty)}
+              title={`Deactivate and immediately assign to ${duty} duty`}
+            >
+              {duty} <AptitudeStars count={apt} />
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          style={cancelPickerBtnStyle}
+          onClick={onCancel}
+          aria-label="cancel deactivate"
+        >
+          cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Duty assignment sub-panel (for inactive companions) -------------------
 
 function HomesteadAssignPanel({
   companion,
@@ -199,25 +255,39 @@ function HomesteadAssignPanel({
     );
   }
 
+  // Idle (inactive, no duty) — show duty picker prominently
   return (
-    <div style={dutyPanelStyle}>
-      <div style={{ color: '#888888', fontSize: '11px', marginBottom: '6px' }}>
-        Assign to Homestead Duty:
+    <div style={{ ...dutyPanelStyle, borderColor: '#005533' }}>
+      <div style={{ color: '#00cc88', fontSize: '11px', marginBottom: '8px', fontWeight: 'bold' }}>
+        Assign Homestead Duty:
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '8px' }}>
         {ALL_DUTIES.map(duty => {
           const apt = aptitude[duty] ?? 1;
+          const isSelected = selectedDuty === duty;
           return (
-            <label key={duty} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '11px' }}>
+            <label
+              key={duty}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                padding: '3px 6px',
+                background: isSelected ? '#001a0d' : 'transparent',
+                border: isSelected ? '1px solid #00cc88' : '1px solid transparent',
+              }}
+            >
               <input
                 type="radio"
                 name={`duty-${companion.id}`}
                 value={duty}
-                checked={selectedDuty === duty}
+                checked={isSelected}
                 onChange={() => setSelectedDuty(duty)}
-                style={{ accentColor: '#00ccff' }}
+                style={{ accentColor: '#00cc88' }}
               />
-              <span style={{ color: selectedDuty === duty ? '#00ccff' : '#aaaaaa', minWidth: '70px' }}>{duty}</span>
+              <span style={{ color: isSelected ? '#00cc88' : '#aaaaaa', minWidth: '70px' }}>{duty}</span>
               <AptitudeStars count={apt} />
               <span style={{ color: '#555555', fontSize: '10px' }}>
                 {duty === 'Harvester' && '(auto-gather resources)'}
@@ -235,8 +305,191 @@ function HomesteadAssignPanel({
         onClick={() => onAssign(selectedDuty)}
         aria-label={`assign ${companion.name} to homestead`}
       >
-        Assign to homestead
+        Assign to Homestead
       </button>
+    </div>
+  );
+}
+
+// ---- Companion card ---------------------------------------------------------
+
+function CompanionCard({
+  companion,
+  activeCount,
+  onActivate,
+  onDeactivate,
+  onAssign,
+  onRecall,
+  onQuickAssign,
+}: {
+  companion: CompanionState;
+  activeCount: number;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onAssign: (duty: HomesteadDuty) => void;
+  onRecall: () => void;
+  onQuickAssign: (duty: HomesteadDuty) => void;
+}) {
+  const [showDeactivatePicker, setShowDeactivatePicker] = useState(false);
+
+  const drift = driftLabel(companion.driftAccumulator);
+  const abilitiesForType = ABILITY_LABELS[companion.type] ?? ABILITY_LABELS.Wildfolk;
+  const unlockedAbilities = abilitiesForType.slice(0, companion.currentLayer);
+  const isOnDuty = !!companion.assignedDuty && !companion.isActive;
+  const isIdleInactive = !companion.isActive && !companion.assignedDuty;
+
+  const handleDeactivateClick = () => {
+    setShowDeactivatePicker(true);
+  };
+
+  const handleRest = () => {
+    onDeactivate();
+    setShowDeactivatePicker(false);
+  };
+
+  const handleQuickAssign = (duty: HomesteadDuty) => {
+    onQuickAssign(duty);
+    setShowDeactivatePicker(false);
+  };
+
+  return (
+    <div style={cardStyle(companion.isActive, isOnDuty)}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+        <div>
+          <span style={{ color: elementColor(companion.element), fontWeight: 'bold', marginRight: '6px' }}>
+            [{typeIcon(companion.type)}]
+          </span>
+          <span style={{ color: companion.isActive ? '#00ccff' : isOnDuty ? '#ccaa44' : '#cccccc', fontWeight: 'bold' }}>
+            {companion.name}
+          </span>
+          {companion.isActive && (
+            <span style={{ color: '#00ccff', fontSize: '10px', marginLeft: '8px' }}>ACTIVE</span>
+          )}
+          {isOnDuty && (
+            <span style={{ color: '#ccaa44', fontSize: '10px', marginLeft: '8px' }}>
+              HOMESTEAD: {companion.assignedDuty?.toUpperCase()}
+            </span>
+          )}
+          {isIdleInactive && (
+            <span style={{ color: '#555555', fontSize: '10px', marginLeft: '8px' }}>IDLE</span>
+          )}
+          {drift && !isOnDuty && (
+            <span style={{ color: driftColor(companion.driftAccumulator), fontSize: '10px', marginLeft: '8px' }}>
+              ⚠ {drift}
+            </span>
+          )}
+        </div>
+        <div>
+          {companion.isActive ? (
+            <button
+              type="button"
+              style={actionBtnStyle(showDeactivatePicker ? '#ff4444' : '#ff8800')}
+              onClick={handleDeactivateClick}
+              title="Choose what this companion does after leaving the party"
+            >
+              {showDeactivatePicker ? 'Deactivating...' : 'Deactivate'}
+            </button>
+          ) : isOnDuty ? (
+            <button
+              type="button"
+              style={actionBtnStyle('#ccaa44')}
+              onClick={onRecall}
+              title="Recall from homestead duty and return to party pool"
+            >
+              Recall
+            </button>
+          ) : (
+            <button
+              type="button"
+              style={actionBtnStyle(activeCount < 3 ? '#00ccff' : '#555555')}
+              onClick={() => activeCount < 3 && onActivate()}
+              disabled={activeCount >= 3}
+              title={activeCount >= 3 ? 'Active party full (max 3)' : 'Add to active party'}
+            >
+              Activate
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Stat row */}
+      <div style={{ fontSize: '11px', color: '#888888', marginBottom: '4px' }}>
+        <span style={{ color: elementColor(companion.element) }}>{companion.element}</span>
+        {' '}
+        <span style={{ color: '#aaaaaa' }}>{companion.type}</span>
+        {'  '}
+        Lv.{companion.level}
+        {'  '}
+        <LayerStars layer={companion.currentLayer} />
+        {' '}Layer {companion.currentLayer}
+      </div>
+
+      {/* Layer progress bar */}
+      <div style={{ marginBottom: '4px' }}>
+        <span style={{ color: '#666666', fontSize: '10px', marginRight: '4px' }}>Progress:</span>
+        <UsageBar type={companion.type} layer={companion.currentLayer} usage={companion.usageCounter} />
+      </div>
+
+      {/* Drift bar — only for adventuring companions */}
+      {!isOnDuty && (
+        <div style={{ marginBottom: '4px', fontSize: '10px' }}>
+          <span style={{ color: '#666666', marginRight: '4px' }}>Drift:</span>
+          <span style={{ color: driftColor(companion.driftAccumulator) }}>
+            {companion.driftAccumulator.toFixed(1)}/50.0
+          </span>
+          {!companion.isActive && (
+            <span style={{ color: '#555555', marginLeft: '6px' }}>(idle companions drift — assign duty to pause drift)</span>
+          )}
+        </div>
+      )}
+
+      {/* Unlocked abilities — shown for active and idle companions */}
+      {!isOnDuty && (
+        <div style={{ fontSize: '10px', color: '#555555', marginTop: '4px' }}>
+          {unlockedAbilities.map((ability, i) => (
+            <div key={i} style={{ color: '#666666' }}>
+              <span style={{ color: '#ffcc00' }}>✓</span> {ability}
+            </div>
+          ))}
+          {companion.currentLayer < 6 && (
+            <div style={{ color: '#333333', marginTop: '2px' }}>
+              <span style={{ color: '#444444' }}>○</span> {abilitiesForType[companion.currentLayer]} [locked]
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Deactivate choice picker — inline prompt after clicking Deactivate */}
+      {companion.isActive && showDeactivatePicker && (
+        <DeactivateChoicePicker
+          companion={companion}
+          onRest={handleRest}
+          onQuickAssign={handleQuickAssign}
+          onCancel={() => setShowDeactivatePicker(false)}
+        />
+      )}
+
+      {/* Homestead assignment panel — shown for all inactive companions */}
+      {!companion.isActive && (
+        <HomesteadAssignPanel
+          companion={companion}
+          onAssign={onAssign}
+          onRecall={onRecall}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---- Section header ---------------------------------------------------------
+
+function SectionHeader({ label, count, note }: { label: string; count: number; note?: string }) {
+  return (
+    <div style={sectionHeaderStyle}>
+      <span style={{ color: '#00ff41', letterSpacing: '0.15em' }}>{label}</span>
+      <span style={{ color: '#555555', marginLeft: '8px' }}>({count})</span>
+      {note && <span style={{ color: '#444444', marginLeft: '12px', fontSize: '10px' }}>{note}</span>}
     </div>
   );
 }
@@ -285,9 +538,9 @@ const closeBtnStyle: React.CSSProperties = {
 };
 
 const cardStyle = (isActive: boolean, isOnDuty: boolean): React.CSSProperties => ({
-  margin: '8px 12px',
+  margin: '6px 12px',
   padding: '8px 10px',
-  border: `1px solid ${isOnDuty ? '#ccaa44' : isActive ? '#00ccff' : '#1a2a1a'}`,
+  border: `1px solid ${isOnDuty ? '#ccaa44' : isActive ? '#00ccff' : '#1a3a1a'}`,
   background: isOnDuty ? '#0a0d00' : isActive ? '#0a1520' : '#0a0a0a',
   position: 'relative',
 });
@@ -307,17 +560,17 @@ const dutyPanelStyle: React.CSSProperties = {
   background: '#0a0800',
   border: '1px solid #443300',
   padding: '8px 10px',
-  marginTop: '6px',
+  marginTop: '8px',
   fontSize: '11px',
 };
 
 const assignBtnStyle: React.CSSProperties = {
   background: 'none',
-  border: '1px solid #ccaa44',
-  color: '#ccaa44',
+  border: '1px solid #00cc88',
+  color: '#00cc88',
   fontFamily: 'monospace',
   fontSize: '11px',
-  padding: '2px 10px',
+  padding: '3px 12px',
   cursor: 'pointer',
 };
 
@@ -331,9 +584,57 @@ const recallBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '6px 14px 4px',
+  fontSize: '11px',
+  borderTop: '1px solid #1a1a1a',
+  marginTop: '4px',
+};
+
+const deactivatePickerStyle: React.CSSProperties = {
+  background: '#100800',
+  border: '1px solid #ff8800',
+  padding: '8px 10px',
+  marginTop: '8px',
+  fontSize: '11px',
+};
+
+const restBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #666666',
+  color: '#aaaaaa',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '3px 10px',
+  cursor: 'pointer',
+};
+
+const quickAssignBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #ccaa44',
+  color: '#ccaa44',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '3px 8px',
+  cursor: 'pointer',
+};
+
+const cancelPickerBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #333333',
+  color: '#555555',
+  fontFamily: 'monospace',
+  fontSize: '10px',
+  padding: '2px 6px',
+  cursor: 'pointer',
+  marginLeft: '4px',
+};
+
 export default function CompanionPanel({ companions, onActivate, onDeactivate, onClose, sendCommand }: Props) {
-  const activeCount = companions.filter(c => c.isActive).length;
-  const homesteadCompanions = companions.filter(c => !!c.assignedDuty && !c.isActive);
+  const activeCompanions    = companions.filter(c => c.isActive);
+  const dutyCompanions      = companions.filter(c => !c.isActive && !!c.assignedDuty);
+  const idleCompanions      = companions.filter(c => !c.isActive && !c.assignedDuty);
+  const activeCount         = activeCompanions.length;
 
   const handleAssign = (companionId: string, duty: HomesteadDuty) => {
     sendCommand('assigncompanionduty', { companionId, duty });
@@ -342,6 +643,27 @@ export default function CompanionPanel({ companions, onActivate, onDeactivate, o
   const handleRecall = (companionId: string) => {
     sendCommand('recallcompanion', { companionId });
   };
+
+  // One-click: deactivate then assign duty in sequence
+  const handleQuickAssign = (companionId: string, duty: HomesteadDuty) => {
+    onDeactivate(companionId);
+    setTimeout(() => {
+      sendCommand('assigncompanionduty', { companionId, duty });
+    }, 300);
+  };
+
+  const renderCard = (companion: CompanionState) => (
+    <CompanionCard
+      key={companion.id}
+      companion={companion}
+      activeCount={activeCount}
+      onActivate={() => onActivate(companion.id)}
+      onDeactivate={() => onDeactivate(companion.id)}
+      onAssign={(duty) => handleAssign(companion.id, duty)}
+      onRecall={() => handleRecall(companion.id)}
+      onQuickAssign={(duty) => handleQuickAssign(companion.id, duty)}
+    />
+  );
 
   return (
     <div
@@ -353,9 +675,9 @@ export default function CompanionPanel({ companions, onActivate, onDeactivate, o
         <div style={headerStyle}>
           <span>
             COMPANIONS — {activeCount}/3 adventuring
-            {homesteadCompanions.length > 0 && (
+            {dutyCompanions.length > 0 && (
               <span style={{ color: '#ccaa44', marginLeft: '12px' }}>
-                {homesteadCompanions.length} on homestead duty
+                {dutyCompanions.length} on homestead duty
               </span>
             )}
           </span>
@@ -370,137 +692,57 @@ export default function CompanionPanel({ companions, onActivate, onDeactivate, o
           Higher layers = stronger combat abilities. Use-or-lose: idle companions drift and lose layers.
         </div>
 
-        {/* Homestead indicator */}
-        {homesteadCompanions.length > 0 && (
-          <div style={{ padding: '6px 14px', fontSize: '11px', color: '#ccaa44', borderBottom: '1px solid #1a1a1a' }}>
-            Homestead: {homesteadCompanions.map(c => `${c.name} (${c.assignedDuty})`).join(', ')}
-          </div>
-        )}
-
         {companions.length === 0 && (
           <div style={{ padding: '14px', color: '#888888' }}>
             You have no companions yet. Defeat monsters in combat — some can be captured!
           </div>
         )}
 
-        {companions.map(companion => {
-          const drift = driftLabel(companion.driftAccumulator);
-          const abilitiesForType = ABILITY_LABELS[companion.type] ?? ABILITY_LABELS.Wildfolk;
-          const unlockedAbilities = abilitiesForType.slice(0, companion.currentLayer);
-          const isOnDuty = !!companion.assignedDuty && !companion.isActive;
-          const canShowDutyPanel = !companion.isActive;
-
-          return (
-            <div key={companion.id} style={cardStyle(companion.isActive, isOnDuty)}>
-              {/* Header row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <div>
-                  <span style={{ color: elementColor(companion.element), fontWeight: 'bold', marginRight: '6px' }}>
-                    [{typeIcon(companion.type)}]
-                  </span>
-                  <span style={{ color: companion.isActive ? '#00ccff' : isOnDuty ? '#ccaa44' : '#cccccc', fontWeight: 'bold' }}>
-                    {companion.name}
-                  </span>
-                  {companion.isActive && (
-                    <span style={{ color: '#00ccff', fontSize: '10px', marginLeft: '8px' }}>ACTIVE</span>
-                  )}
-                  {isOnDuty && (
-                    <span style={{ color: '#ccaa44', fontSize: '10px', marginLeft: '8px' }}>
-                      HOMESTEAD: {companion.assignedDuty?.toUpperCase()}
-                    </span>
-                  )}
-                  {drift && !isOnDuty && (
-                    <span style={{ color: driftColor(companion.driftAccumulator), fontSize: '10px', marginLeft: '8px' }}>
-                      ⚠ {drift}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  {companion.isActive ? (
-                    <button type="button" style={actionBtnStyle('#ff8800')} onClick={() => onDeactivate(companion.id)}>
-                      Deactivate
-                    </button>
-                  ) : isOnDuty ? (
-                    <button
-                      type="button"
-                      style={actionBtnStyle('#ccaa44')}
-                      onClick={() => handleRecall(companion.id)}
-                      title="Recall from homestead duty"
-                    >
-                      Recall
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      style={actionBtnStyle(activeCount < 3 ? '#00ccff' : '#555555')}
-                      onClick={() => activeCount < 3 && onActivate(companion.id)}
-                      disabled={activeCount >= 3}
-                      title={activeCount >= 3 ? 'Active party full (max 3)' : 'Add to active party'}
-                    >
-                      Activate
-                    </button>
-                  )}
-                </div>
+        {/* ---- ADVENTURING section ---- */}
+        {companions.length > 0 && (
+          <>
+            <SectionHeader
+              label="ADVENTURING"
+              count={activeCount}
+              note={activeCount === 3 ? 'party full' : `${3 - activeCount} slot${3 - activeCount !== 1 ? 's' : ''} open`}
+            />
+            {activeCompanions.length === 0 ? (
+              <div style={{ padding: '6px 14px 10px', color: '#444444', fontSize: '11px' }}>
+                (no active companions — activate one below)
               </div>
+            ) : (
+              activeCompanions.map(renderCard)
+            )}
 
-              {/* Stat row */}
-              <div style={{ fontSize: '11px', color: '#888888', marginBottom: '4px' }}>
-                <span style={{ color: elementColor(companion.element) }}>{companion.element}</span>
-                {' '}
-                <span style={{ color: '#aaaaaa' }}>{companion.type}</span>
-                {'  '}
-                Lv.{companion.level}
-                {'  '}
-                <LayerStars layer={companion.currentLayer} />
-                {' '}Layer {companion.currentLayer}
+            {/* ---- HOMESTEAD DUTY section ---- */}
+            <SectionHeader
+              label="HOMESTEAD DUTY"
+              count={dutyCompanions.length}
+              note={dutyCompanions.length === 0 ? 'deactivate a companion to assign duty' : undefined}
+            />
+            {dutyCompanions.length === 0 ? (
+              <div style={{ padding: '6px 14px 10px', color: '#444444', fontSize: '11px' }}>
+                (none assigned)
               </div>
+            ) : (
+              dutyCompanions.map(renderCard)
+            )}
 
-              {/* Layer progress bar */}
-              <div style={{ marginBottom: '4px' }}>
-                <span style={{ color: '#666666', fontSize: '10px', marginRight: '4px' }}>Progress:</span>
-                <UsageBar type={companion.type} layer={companion.currentLayer} usage={companion.usageCounter} />
+            {/* ---- IDLE section ---- */}
+            <SectionHeader
+              label="IDLE"
+              count={idleCompanions.length}
+              note={idleCompanions.length > 0 ? 'drifting — assign duty to pause drift' : undefined}
+            />
+            {idleCompanions.length === 0 ? (
+              <div style={{ padding: '6px 14px 10px', color: '#444444', fontSize: '11px' }}>
+                (none)
               </div>
-
-              {/* Drift bar — only for adventuring companions */}
-              {!isOnDuty && (
-                <div style={{ marginBottom: '4px', fontSize: '10px' }}>
-                  <span style={{ color: '#666666', marginRight: '4px' }}>Drift:</span>
-                  <span style={{ color: driftColor(companion.driftAccumulator) }}>
-                    {companion.driftAccumulator.toFixed(1)}/50.0
-                  </span>
-                  {!companion.isActive && (
-                    <span style={{ color: '#555555', marginLeft: '6px' }}>(inactive companions drift faster)</span>
-                  )}
-                </div>
-              )}
-
-              {/* Unlocked abilities */}
-              {!isOnDuty && (
-                <div style={{ fontSize: '10px', color: '#555555', marginTop: '4px' }}>
-                  {unlockedAbilities.map((ability, i) => (
-                    <div key={i} style={{ color: '#666666' }}>
-                      <span style={{ color: '#ffcc00' }}>✓</span> {ability}
-                    </div>
-                  ))}
-                  {companion.currentLayer < 6 && (
-                    <div style={{ color: '#333333', marginTop: '2px' }}>
-                      <span style={{ color: '#444444' }}>○</span> {abilitiesForType[companion.currentLayer]} [locked]
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Homestead assignment panel — shown for inactive companions */}
-              {canShowDutyPanel && (
-                <HomesteadAssignPanel
-                  companion={companion}
-                  onAssign={(duty) => handleAssign(companion.id, duty)}
-                  onRecall={() => handleRecall(companion.id)}
-                />
-              )}
-            </div>
-          );
-        })}
+            ) : (
+              idleCompanions.map(renderCard)
+            )}
+          </>
+        )}
 
         <div style={{ padding: '8px 14px', borderTop: '1px solid #1a1a1a', fontSize: '11px', color: '#888888' }}>
           [B] to close · Homestead duty: Harvester, Salvager, Guard, Crafter
