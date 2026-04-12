@@ -67,45 +67,48 @@ interface TerrainColors {
 }
 
 function grassColor(wx: number, wy: number): string {
-  const h = terrainHash(wx * 3 + 7, wy * 5 + 11) & 0x1f; // 0–31 variation
-  const base = 0x2d + (h - 16); // center on 0x2d
-  const g = Math.max(0x18, Math.min(0x3f, base));
-  return `rgb(${0x18},${g},${0x10})`;
+  // ±15% variation around base #4a8a2a — warm lush green
+  const h = terrainHash(wx * 3 + 7, wy * 5 + 11) & 0x1f; // 0–31
+  const shift = h - 16; // -16 to +15
+  const r = Math.max(0x30, Math.min(0x70, 0x4a + Math.round(shift * 0.3)));
+  const g = Math.max(0x60, Math.min(0xaa, 0x8a + Math.round(shift * 0.8)));
+  const b = Math.max(0x15, Math.min(0x45, 0x2a + Math.round(shift * 0.2)));
+  return `rgb(${r},${g},${b})`;
 }
 
 function getTerrainColors(kind: TerrainKind, wx: number, wy: number): TerrainColors {
   switch (kind) {
     case 'grass':
-      return { top: grassColor(wx, wy), left: '#1a3a0e', right: '#223015' };
+      return { top: grassColor(wx, wy), left: '#2e5a18', right: '#3a6e20' };
     case 'tree':
-      return { top: '#1a4010', left: '#0e2808', right: '#152e0c' };
+      return { top: '#2a6a1a', left: '#1a4010', right: '#226018' };
     case 'water':
-      return { top: '#1a3a5a', left: '#0e2438', right: '#152e48' };
+      return { top: '#2266aa', left: '#14447a', right: '#1c558e' };
     case 'mountain':
-      return { top: '#4a4a4a', left: '#2a2a2a', right: '#383838' };
+      return { top: '#7a7a6a', left: '#4e4e42', right: '#626256' };
     case 'sand':
-      return { top: '#8a7a3a', left: '#5a4e22', right: '#6e6030' };
+      return { top: '#c4a84a', left: '#8a7230', right: '#a68d3c' };
     case 'rock':
-      return { top: '#3a3a3a', left: '#222222', right: '#2e2e2e' };
+      return { top: '#6a6a5a', left: '#444438', right: '#565648' };
     case 'path':
     default:
-      return { top: '#2a2a1a', left: '#1a1a0e', right: '#222210' };
+      return { top: '#8a7a5a', left: '#5a503c', right: '#6e6248' };
   }
 }
 
 // ─── Zone colors ─────────────────────────────────────────────────────────────
 function zoneGlowColor(tile: ZoneTile): string {
-  if (tile.isPortalZone) return '#aa44aa';
-  if (tile.dangerLevel <= 3) return '#00aa33';
-  if (tile.dangerLevel <= 6) return '#aaaa00';
-  return '#aa2200';
+  if (tile.isPortalZone) return '#cc44ff';
+  if (tile.dangerLevel <= 3) return '#66dd44';
+  if (tile.dangerLevel <= 6) return '#ffbb22';
+  return '#ff3311';
 }
 
 function zoneSaturatedColor(tile: ZoneTile): TerrainColors {
-  if (tile.isPortalZone)     return { top: '#7a2a7a', left: '#4a1a4a', right: '#5e225e' };
-  if (tile.dangerLevel <= 3) return { top: '#1a6030', left: '#0e3a1e', right: '#154e26' };
-  if (tile.dangerLevel <= 6) return { top: '#6a6010', left: '#3a3408', right: '#4e480e' };
-  return { top: '#6a1a0a', left: '#3a0e06', right: '#4e1408' };
+  if (tile.isPortalZone)     return { top: '#6a4a7a', left: '#3e2c4a', right: '#523a60' };
+  if (tile.dangerLevel <= 3) return { top: '#8a7a5a', left: '#5a503c', right: '#6e6248' };
+  if (tile.dangerLevel <= 6) return { top: '#7a6a4a', left: '#4e4430', right: '#60523a' };
+  return { top: '#4a3a2a', left: '#2c221a', right: '#3a2e22' };
 }
 
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
@@ -116,7 +119,7 @@ function drawIsoDiamond(
   tileW: number,
   tileH: number,
   topColor: string,
-  strokeColor = 'rgba(0,0,0,0.15)',
+  strokeColor = 'rgba(0,0,0,0.18)',
 ) {
   ctx.beginPath();
   ctx.moveTo(sx,              sy - tileH / 2);  // top
@@ -131,33 +134,113 @@ function drawIsoDiamond(
   ctx.stroke();
 }
 
+// Rounded canopy tree — multiple overlapping circles + a dark trunk
 function drawTreeDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
-  // Small triangle "tree" on top of the diamond
+  const baseY = sy - TILE_H / 2;
+
+  // Trunk
   ctx.beginPath();
-  ctx.moveTo(sx,              sy - TILE_H / 2 - 10);
-  ctx.lineTo(sx + 8,          sy - TILE_H / 2 + 2);
-  ctx.lineTo(sx - 8,          sy - TILE_H / 2 + 2);
-  ctx.closePath();
-  ctx.fillStyle = '#0e2a08';
+  ctx.rect(sx - 2, baseY - 2, 4, 8);
+  ctx.fillStyle = '#3a2a1a';
   ctx.fill();
+
+  // Three overlapping circles for a round canopy
+  const canopyColor = '#2a6a1a';
+  const canopyData: [number, number, number][] = [
+    [sx,      baseY - 14, 8],
+    [sx - 6,  baseY - 9,  6],
+    [sx + 6,  baseY - 9,  6],
+  ];
+  for (const [cx, cy, r] of canopyData) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = canopyColor;
+    ctx.fill();
+  }
 }
 
 function drawMountainDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
+  // Main grey mountain body
   ctx.beginPath();
-  ctx.moveTo(sx,              sy - TILE_H / 2 - 12);
-  ctx.lineTo(sx + 10,         sy - TILE_H / 2 + 2);
-  ctx.lineTo(sx - 10,         sy - TILE_H / 2 + 2);
+  ctx.moveTo(sx,              sy - TILE_H / 2 - 14);
+  ctx.lineTo(sx + 11,         sy - TILE_H / 2 + 2);
+  ctx.lineTo(sx - 11,         sy - TILE_H / 2 + 2);
   ctx.closePath();
-  ctx.fillStyle = '#8a8a8a';
+  ctx.fillStyle = '#7a7a6a';
   ctx.fill();
-  // Snow cap
+
+  // Snow cap — white triangle at peak
   ctx.beginPath();
-  ctx.moveTo(sx,              sy - TILE_H / 2 - 12);
-  ctx.lineTo(sx + 4,          sy - TILE_H / 2 - 5);
-  ctx.lineTo(sx - 4,          sy - TILE_H / 2 - 5);
+  ctx.moveTo(sx,              sy - TILE_H / 2 - 14);
+  ctx.lineTo(sx + 4,          sy - TILE_H / 2 - 6);
+  ctx.lineTo(sx - 4,          sy - TILE_H / 2 - 6);
   ctx.closePath();
-  ctx.fillStyle = '#dde';
+  ctx.fillStyle = '#ddddcc';
   ctx.fill();
+}
+
+// Small building silhouette drawn on top of zone center diamonds
+function drawZoneBuilding(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  wallColor: string,
+  roofColor: string,
+) {
+  const baseY = sy - TILE_H / 2;
+  // Wall rectangle
+  ctx.fillStyle = wallColor;
+  ctx.fillRect(sx - 6, baseY - 8, 12, 8);
+  // Roof triangle
+  ctx.beginPath();
+  ctx.moveTo(sx,       baseY - 8);
+  ctx.lineTo(sx + 8,   baseY - 2);
+  ctx.lineTo(sx - 8,   baseY - 2);
+  ctx.closePath();
+  ctx.fillStyle = roofColor;
+  ctx.fill();
+}
+
+// Subtle wave lines across water diamonds
+function drawWaterWaves(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  tileW: number,
+  tileH: number,
+  waterFrame: number,
+) {
+  ctx.save();
+  // Clip to diamond shape
+  ctx.beginPath();
+  ctx.moveTo(sx,              sy - tileH / 2);
+  ctx.lineTo(sx + tileW / 2, sy);
+  ctx.lineTo(sx,              sy + tileH / 2);
+  ctx.lineTo(sx - tileW / 2, sy);
+  ctx.closePath();
+  ctx.clip();
+
+  // Draw two horizontal ripple lines with sinusoidal offset
+  const rippleColor = '#3388cc';
+  ctx.strokeStyle = rippleColor;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.45;
+
+  for (let i = 0; i < 2; i++) {
+    const yOff = (i === 0 ? -tileH * 0.12 : tileH * 0.12);
+    const phase = waterFrame * 0.06 + i * Math.PI;
+    ctx.beginPath();
+    const steps = 12;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const wx = sx - tileW / 2 + t * tileW;
+      const wy = sy + yOff + Math.sin(phase + t * Math.PI * 2) * 1.5;
+      if (s === 0) ctx.moveTo(wx, wy);
+      else ctx.lineTo(wx, wy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // ─── NPC helpers ─────────────────────────────────────────────────────────────
@@ -175,14 +258,22 @@ function npcGlyph(role: string): string {
 
 function npcColor(role: string): string {
   switch (role) {
-    case 'Merchant': return '#ffcc44';
-    case 'Wanderer': return '#aaaaff';
-    case 'Scout':    return '#44ffaa';
-    case 'Hermit':   return '#cc88ff';
-    case 'Refugee':  return '#ff8844';
-    case 'Bard':     return '#ff44cc';
-    default:         return '#cccccc';
+    case 'Merchant': return '#ddaa33';
+    case 'Wanderer': return '#6688bb';
+    case 'Scout':    return '#44aa66';
+    case 'Hermit':   return '#9966bb';
+    case 'Refugee':  return '#cc8844';
+    case 'Bard':     return '#cc6699';
+    default:         return '#aaaaaa';
   }
+}
+
+// ─── Zone building style helpers ─────────────────────────────────────────────
+function zoneBuildingColors(tile: ZoneTile): { wall: string; roof: string } {
+  if (tile.isPortalZone)     return { wall: '#5a3a6a', roof: '#7a4a8a' };
+  if (tile.dangerLevel <= 3) return { wall: '#6a5a4a', roof: '#8a7a5a' };
+  if (tile.dangerLevel <= 6) return { wall: '#5a4a34', roof: '#7a6a44' };
+  return { wall: '#2a1a12', roof: '#4a2a1a' };
 }
 
 // ─── Minimap constants ────────────────────────────────────────────────────────
@@ -323,13 +414,14 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       npcMap.get(key)!.push(npc);
     }
 
-    // Clear
+    // Clear — dark warm parchment background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#0a0a0a';
+    ctx.fillStyle = '#1a1510';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const hover = hoverRef.current;
-    const waterShift = (Math.sin(waterFrameRef.current * 0.04) * 0.1); // subtle hue shift
+    const waterFrame = waterFrameRef.current;
+    const waterShift = (Math.sin(waterFrame * 0.04) * 0.1); // subtle hue shift
 
     // ── Draw terrain + zone tiles ──────────────────────────────────────────────
     for (const entry of entries) {
@@ -343,7 +435,7 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       const kind = getTerrainKind(gx, gy);
 
       if (centerTile) {
-        // Zone center tile — saturated color
+        // Zone center tile — saturated warm stone color
         const colors = zoneSaturatedColor(centerTile);
         const glow   = zoneGlowColor(centerTile);
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top, glow);
@@ -353,10 +445,12 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         const glow   = zoneGlowColor(haloTile) + '66';
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top, glow);
       } else if (kind === 'water') {
-        // Animated water
-        const base = 0x1a + Math.round(waterShift * 16);
-        const col  = `rgb(${base},${0x3a},${0x5a})`;
+        // Animated water — warm river blue
+        const blueBase = 0x22 + Math.round(waterShift * 16);
+        const greenVal = Math.round(0x66 + waterShift * 20);
+        const col  = `rgb(${blueBase},${greenVal},${0xaa})`;
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, col);
+        drawWaterWaves(ctx, sx, sy, tileW, tileH, waterFrame);
       } else {
         const colors = getTerrainColors(kind, gx, gy);
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top);
@@ -370,7 +464,7 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         ctx.lineTo(sx,              sy + tileH / 2);
         ctx.lineTo(sx - tileW / 2, sy);
         ctx.closePath();
-        ctx.strokeStyle = 'rgba(255,255,200,0.55)';
+        ctx.strokeStyle = 'rgba(255,240,160,0.65)';
         ctx.lineWidth = 1.5 * dpr;
         ctx.stroke();
       }
@@ -381,15 +475,18 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         if (kind === 'mountain') drawMountainDecal(ctx, sx, sy);
       }
 
-      // Zone center symbol
+      // Zone center — small building + glowing symbol
       if (centerTile) {
+        const bldColors = zoneBuildingColors(centerTile);
+        drawZoneBuilding(ctx, sx, sy, bldColors.wall, bldColors.roof);
+
         const glow = zoneGlowColor(centerTile);
         ctx.font = `bold ${10 * dpr}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = glow;
         ctx.shadowColor = glow;
-        ctx.shadowBlur = 6 * dpr;
+        ctx.shadowBlur = 8 * dpr;
         ctx.fillText(centerTile.asciiSymbol, sx, sy);
         ctx.shadowBlur = 0;
       }
@@ -418,10 +515,10 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         }
       }
 
-      // Player
+      // Player — bright gold body, white head, pops against terrain
       if (gx === playerX && gy === playerY) {
-        const headColor = blinkRef.current ? '#ffffff' : '#cccccc';
-        const bodyColor = blinkRef.current ? '#dddddd' : '#aaaaaa';
+        const headColor = '#ffffff';
+        const bodyColor = blinkRef.current ? '#ffcc33' : '#e6b820';
 
         // Body (triangle)
         const bx = sx;
@@ -432,7 +529,11 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         ctx.lineTo(bx - 5 * dpr, by + 10 * dpr);
         ctx.closePath();
         ctx.fillStyle = bodyColor;
+        // Gold glow
+        ctx.shadowColor = '#ffcc33';
+        ctx.shadowBlur = 6 * dpr;
         ctx.fill();
+        ctx.shadowBlur = 0;
 
         // Head (circle)
         ctx.beginPath();
@@ -449,10 +550,12 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
     const mmY      = mmPad;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    // Dark parchment background
+    ctx.fillStyle = '#2a2218';
     ctx.fillRect(mmX, mmY, mmSize, mmSize);
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth   = 1;
+    // Warm border
+    ctx.strokeStyle = '#6a5a3a';
+    ctx.lineWidth   = 1.5 * dpr;
     ctx.strokeRect(mmX, mmY, mmSize, mmSize);
 
     if (zoneTilesRef.current.length > 0) {
@@ -467,19 +570,39 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       const rangeX = Math.max(maxX - minX, 1);
       const rangeY = Math.max(maxY - minY, 1);
 
+      // Draw zone dots as small gems (circles with inner highlight)
       for (const t of zoneTilesRef.current) {
-        const mx = mmX + ((t.x - minX) / rangeX) * (mmSize - MINI_DOT * dpr);
-        const my = mmY + ((t.y - minY) / rangeY) * (mmSize - MINI_DOT * dpr);
+        const mx = mmX + ((t.x - minX) / rangeX) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
+        const my = mmY + ((t.y - minY) / rangeY) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
+        const r = MINI_DOT * dpr * 0.75;
+        // Gem body
+        ctx.beginPath();
+        ctx.arc(mx, my, r, 0, Math.PI * 2);
         ctx.fillStyle = zoneGlowColor(t);
-        ctx.fillRect(mx, my, MINI_DOT * dpr, MINI_DOT * dpr);
+        ctx.fill();
+        // Gem highlight
+        ctx.beginPath();
+        ctx.arc(mx - r * 0.3, my - r * 0.3, r * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fill();
       }
 
-      // Player dot (blinking)
-      const px = mmX + ((playerX - minX) / rangeX) * (mmSize - MINI_DOT * dpr);
-      const py = mmY + ((playerY - minY) / rangeY) * (mmSize - MINI_DOT * dpr);
+      // Player dot (blinking white gem)
+      const px = mmX + ((playerX - minX) / rangeX) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
+      const py = mmY + ((playerY - minY) / rangeY) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
       if (blinkRef.current) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(px - dpr, py - dpr, (MINI_DOT + 2) * dpr, (MINI_DOT + 2) * dpr);
+        ctx.beginPath();
+        ctx.arc(px, py, (MINI_DOT + 1) * dpr * 0.75, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffcc33';
+        ctx.shadowColor = '#ffcc33';
+        ctx.shadowBlur = 4 * dpr;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.beginPath();
+        ctx.arc(px, py, MINI_DOT * dpr * 0.75, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffcc33';
+        ctx.fill();
       }
     }
 
@@ -551,7 +674,7 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       style={{
         width: '100%',
         height: '100%',
-        background: '#0a0a0a',
+        background: '#1a1510',
         overflow: 'hidden',
         userSelect: 'none',
         position: 'relative',
