@@ -14,9 +14,15 @@ public class SalvageCommandHandler(
 {
     public async Task<CommandResult> HandleAsync(SalvageCommand cmd, CancellationToken ct)
     {
+        // Capture workmanship before salvage destroys the item
+        var preItem = await itemRepository.GetByIdAsync(cmd.ItemId, ct);
+        var itemWorkmanship = preItem?.Workmanship.Value ?? 1;
+
         var result = await salvageService.SalvageAsync(cmd.PlayerId, cmd.ItemId, ct);
 
-        var category = result.Success ? "loot" : "system";
+        var category = result.Success
+            ? CombatHelpers.GetSalvageCategory(itemWorkmanship)
+            : "system";
         await notificationService.SendMessageAsync(cmd.PlayerId, category, result.Message, ct);
 
         if (!result.Success)
@@ -72,9 +78,15 @@ public class SalvageAllCommandHandler(
 {
     public async Task<CommandResult> HandleAsync(SalvageAllCommand cmd, CancellationToken ct)
     {
+        // Capture max workmanship of eligible items before salvage destroys them
+        var preItems = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        var maxW = preItems.Count > 0 ? preItems.Max(i => i.Workmanship.Value) : 1;
+
         var result = await salvageService.SalvageAllAsync(cmd.PlayerId, cmd.Category, ct);
 
-        var category = result.Success ? "loot" : "system";
+        var category = result.Success
+            ? CombatHelpers.GetSalvageCategory(maxW)
+            : "system";
         await notificationService.SendMessageAsync(cmd.PlayerId, category, result.Message, ct);
 
         if (!result.Success)

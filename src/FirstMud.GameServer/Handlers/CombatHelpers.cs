@@ -174,6 +174,12 @@ public class CombatHelpers(
 
         if (defeatedEnemies.Count == 0) return;
 
+        // Determine difficulty category from avg enemy level vs player level
+        var avgMonsterLevel = defeatedEnemies.Count > 0
+            ? (int)Math.Round(defeatedEnemies.Average(e => (double)e.Level))
+            : 1;
+        var combatCategory = GetCombatDifficultyCategory(avgMonsterLevel, player.Level);
+
         var breakdown = new List<string>();
         var totalXp = 0;
 
@@ -216,7 +222,7 @@ public class CombatHelpers(
 
         var detail = string.Join(", ", breakdown);
         await notificationService.SendMessageAsync(
-            playerId, "combat",
+            playerId, combatCategory,
             $"You gained {totalXp} experience{autoFarmSuffix}! ({detail})",
             ct);
 
@@ -241,6 +247,43 @@ public class CombatHelpers(
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Loot rarity helpers
+    // -------------------------------------------------------------------------
+
+    public static string GetLootCategory(Item item)
+    {
+        var category = item.Workmanship.Value switch
+        {
+            <= 2 => "loot-common",
+            <= 3 => "loot-uncommon",
+            <= 5 => "loot-rare",
+            <= 7 => "loot-epic",
+            _    => "loot-legendary"
+        };
+
+        if (item.Imbues.Count > 0)
+            category = BumpLootRarity(category);
+
+        return category;
+    }
+
+    private static string BumpLootRarity(string category) => category switch
+    {
+        "loot-common"    => "loot-uncommon",
+        "loot-uncommon"  => "loot-rare",
+        "loot-rare"      => "loot-epic",
+        "loot-epic"      => "loot-legendary",
+        _                => category
+    };
+
+    public static string GetSalvageCategory(int workmanship) => workmanship switch
+    {
+        <= 2 => "salvage-common",
+        <= 4 => "salvage-uncommon",
+        _    => "salvage-rare"
+    };
 
     // -------------------------------------------------------------------------
     // Loot rolling
@@ -276,7 +319,8 @@ public class CombatHelpers(
         }
 
         var item = result.Item!;
-        await notificationService.SendMessageAsync(playerId, "loot", result.Message, ct);
+        var lootCategory = GetLootCategory(item);
+        await notificationService.SendMessageAsync(playerId, lootCategory, result.Message, ct);
 
         // Auto-equip logic: only for items with a real slot
         if (item.Slot != Domain.Enums.EquipmentSlot.None)
@@ -289,7 +333,7 @@ public class CombatHelpers(
                 // Slot is empty — auto-equip
                 player.Equip(slot, item.Id);
                 await playerRepository.UpdateAsync(player, ct);
-                await notificationService.SendMessageAsync(playerId, "loot", $"You equip the {item.Name}.", ct);
+                await notificationService.SendMessageAsync(playerId, lootCategory, $"You equip the {item.Name}.", ct);
             }
             else
             {
@@ -302,7 +346,7 @@ public class CombatHelpers(
                     // Swap: new item is better and old item is not locked
                     player.Equip(slot, item.Id);
                     await playerRepository.UpdateAsync(player, ct);
-                    await notificationService.SendMessageAsync(playerId, "loot",
+                    await notificationService.SendMessageAsync(playerId, lootCategory,
                         $"You swap your {currentEquipped.Name} W{currentEquipped.Workmanship.Value} for {item.Name} W{item.Workmanship.Value}. Much better.", ct);
                 }
             }
@@ -510,6 +554,20 @@ public class CombatHelpers(
         "wyrd"     => $"Reality tears open. A {monsterNames} steps through!",
         _          => $"Hostile creatures emerge! You face: {monsterNames}.",
     };
+
+    /// <summary>
+    /// Returns a message category string based on how hard the encounter is
+    /// relative to the player. Used to colour combat messages in the client.
+    /// </summary>
+    public static string GetCombatDifficultyCategory(int averageMonsterLevel, int playerLevel) =>
+        (averageMonsterLevel - playerLevel) switch
+        {
+            <= -4 => "combat-trivial",   // grey mob
+            <= -2 => "combat-easy",      // green
+            <= 0  => "combat-normal",    // yellow
+            <= 2  => "combat-hard",      // orange
+            _     => "combat-deadly",    // red
+        };
 
     // -------------------------------------------------------------------------
     // Monster pack builder

@@ -127,11 +127,13 @@ public class MoveCommandHandler(
         var encounter = await combatService.StartEncounterAsync(
             playerId, Guid.NewGuid(), player, [], monsters, ct: ct);
 
+        var combatCategory = CombatHelpers.GetCombatDifficultyCategory(avgMonsterLevel, player.Level);
+
         var monsterNames = string.Join(", ", monsters.Select(m => m.Name));
         var narration = CombatHelpers.GetBiomeNarration(biome, monsterNames);
         await notificationService.SendMessageAsync(
             playerId,
-            "combat",
+            combatCategory,
             narration,
             ct);
 

@@ -6,13 +6,18 @@ interface Props {
 }
 
 const CATEGORY_COLORS: Record<GameMessage['category'], string> = {
-  system:  '#888888',
-  combat:  '#ff4444',
-  quest:   '#ffcc00',
-  loot:    '#00ccff',
-  npc:     '#ffffff',
-  wyrd:    '#cc88ff',
-  error:   '#ff0000',
+  system:           '#888888',
+  combat:           '#cc4444',   // fallback red for untagged combat messages
+  'combat-trivial': '#666666',   // grey — trivial, barely worth mentioning
+  'combat-easy':    '#44aa44',   // green — easy fight
+  'combat-normal':  '#cccc44',   // yellow — fair fight
+  'combat-hard':    '#cc8844',   // orange — challenging
+  'combat-deadly':  '#cc4444',   // red — dangerous
+  quest:            '#ffcc00',
+  loot:             '#00ccff',
+  npc:              '#ffffff',
+  wyrd:             '#cc88ff',
+  error:            '#ff0000',
 };
 
 function formatTimestamp(iso: string): string {

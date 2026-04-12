@@ -612,7 +612,7 @@ public class AutoFarmCommandHandler(
                                         .SendAsync("GameMessage", new
                                         {
                                             timestamp = DateTime.UtcNow.ToString("O"),
-                                            category = "loot",
+                                            category = "loot-common",
                                             text = $"[Auto-farm] Harvested {actual}x {itemName}. (+1 harvest XP)"
                                         }, farmCt);
                                 }
@@ -708,12 +708,13 @@ public class AutoFarmCommandHandler(
                 var encounter = await combatSvc.StartEncounterAsync(
                     playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, [], monsters, ct: farmCt);
 
+                var encounterCategory = CombatHelpers.GetCombatDifficultyCategory(avgMonsterLevel, freshPlayer.Level);
                 await hubContext.Clients
                     .Group(playerId.ToString())
                     .SendAsync("GameMessage", new
                     {
                         timestamp = DateTime.UtcNow.ToString("O"),
-                        category = "combat",
+                        category = encounterCategory,
                         text = $"[Auto-farm] Encounter! {string.Join(", ", monsters.Select(m => m.Name))}."
                     }, farmCt);
 
@@ -780,7 +781,7 @@ public class AutoFarmCommandHandler(
                         .SendAsync("GameMessage", new
                         {
                             timestamp = DateTime.UtcNow.ToString("O"),
-                            category = "combat",
+                            category = encounterCategory,
                             text = "Auto-farm ended: you were defeated. You wake at your homestead..."
                         }, serverCt);
                     await hubContext.Clients
@@ -808,7 +809,7 @@ public class AutoFarmCommandHandler(
                         .SendAsync("GameMessage", new
                         {
                             timestamp = DateTime.UtcNow.ToString("O"),
-                            category  = "combat",
+                            category  = encounterCategory,
                             text      = $"Auto-farm: fled encounter (Danger {dangerLevel}). Safe cap now {newCap}."
                         }, farmCt);
                 }
@@ -933,12 +934,18 @@ public class AutoFarmCommandHandler(
                             session.ItemsFound = autoFarmService.GetSession(playerId)?.ItemsFound ?? session.ItemsFound;
                         }
 
+                        var farmMsgCategory = lootResult.AutoSalvaged
+                            ? CombatHelpers.GetSalvageCategory(lootResult.Item?.Workmanship.Value ?? 1)
+                            : (lootResult.Item is not null
+                                ? CombatHelpers.GetLootCategory(lootResult.Item)
+                                : "loot");
+
                         await hubContext.Clients
                             .Group(playerId.ToString())
                             .SendAsync("GameMessage", new
                             {
                                 timestamp = DateTime.UtcNow.ToString("O"),
-                                category = lootResult.AutoSalvaged ? "salvage" : "loot",
+                                category = farmMsgCategory,
                                 text = $"[Auto-farm] {lootResult.Message}"
                             }, farmCt);
 

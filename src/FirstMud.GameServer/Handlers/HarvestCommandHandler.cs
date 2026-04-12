@@ -31,12 +31,35 @@ public class HarvestCommandHandler(
             return new CommandResult(false, "There is nothing to harvest here.");
 
         var nodes = await resourceNodeRepository.GetByZoneIdAsync(nearbyZone.Id, ct);
-        if (nodes.Count == 0)
-            return new CommandResult(false, "No resource nodes in this area.");
+
+        ResourceType harvestType;
+        int harvestAmount;
+        string biome;
 
         var node = nodes.FirstOrDefault(n => n.RemainingYield > 0);
         if (node is null)
-            return new CommandResult(false, "The resources here are depleted. Return later.");
+        {
+            // Fall back to wilderness biome harvesting when no seeded nodes are available
+            biome = CombatHelpers.GetBiomeForPosition(nearbyZone, player.Position.X, player.Position.Y);
+            harvestType = biome switch
+            {
+                "forest" or "denseForest" => ResourceType.Wood,
+                "mountain" or "snowMountain" => ResourceType.Stone,
+                "water" => Random.Shared.Next(2) == 0 ? ResourceType.Sand : ResourceType.Herbs,
+                "sand" or "desert" => ResourceType.Sand,
+                "swamp" => ResourceType.Herbs,
+                "grassland" or "plains" => ResourceType.Herbs,
+                "path" => ResourceType.Stone,
+                _ => ResourceType.Wood,
+            };
+            harvestAmount = Random.Shared.Next(1, 3); // wilderness yields 1-2
+        }
+        else
+        {
+            biome = CombatHelpers.GetBiomeForPosition(nearbyZone, player.Position.X, player.Position.Y);
+            harvestType = node.ResourceType;
+            harvestAmount = Random.Shared.Next(1, 4); // named zone nodes yield 1-3
+        }
 
         var currentItems = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
         if (!player.CanCarryMore(currentItems.Count))
@@ -45,11 +68,18 @@ public class HarvestCommandHandler(
             return new CommandResult(false, "Inventory full.");
         }
 
-        var harvestAmount = Random.Shared.Next(1, 4);
-        var actual = node.Harvest(harvestAmount);
-        await resourceNodeRepository.UpdateAsync(node, ct);
+        int actual;
+        if (node is not null)
+        {
+            actual = node.Harvest(harvestAmount);
+            await resourceNodeRepository.UpdateAsync(node, ct);
+        }
+        else
+        {
+            actual = harvestAmount;
+        }
 
-        var resourceName = node.ResourceType.ToString();
+        var resourceName = harvestType.ToString();
         var itemName = resourceName; // e.g. "Wood", "Stone", "Metal"
 
         // Check for an existing stack and merge, otherwise create new

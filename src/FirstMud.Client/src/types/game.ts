@@ -82,7 +82,7 @@ export interface WorldStateSnapshot {
 
 export interface GameMessage {
   timestamp: string;
-  category: 'system' | 'combat' | 'quest' | 'loot' | 'npc' | 'wyrd' | 'error';
+  category: 'system' | 'combat' | 'combat-trivial' | 'combat-easy' | 'combat-normal' | 'combat-hard' | 'combat-deadly' | 'quest' | 'loot' | 'npc' | 'wyrd' | 'error';
   text: string;
 }
 
