@@ -18,6 +18,11 @@ body {
   padding: 0;
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

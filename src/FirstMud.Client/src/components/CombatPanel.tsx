@@ -116,6 +116,80 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
     : firstLivingEnemy?.id ?? null;
   const targetName = enemySide.find(c => c.id === targetId)?.name ?? '???';
 
+  const [autoCombat, setAutoCombat] = useState(false);
+  // Track whether the auto-combat effect has already fired for the current turn
+  const autoFiredRef = useRef<string | null>(null);
+
+  // Auto-combat: fire when it's the player's turn and autoCombat is on
+  useEffect(() => {
+    if (!autoCombat || !isPlayerTurn || isOver) return;
+    // Prevent double-firing for the same actor turn
+    if (autoFiredRef.current === combat.currentActorId) return;
+
+    if (!firstLivingEnemy) {
+      // No valid targets — stop auto-combat
+      setAutoCombat(false);
+      return;
+    }
+
+    autoFiredRef.current = combat.currentActorId;
+
+    const abilities = currentActor?.abilities ?? [];
+    const hpPct = currentActor
+      ? currentActor.currentHp / Math.max(currentActor.maxHp, 1)
+      : 1;
+
+    const restoreAbility = abilities.find(a => a.category === 'Heal');
+    const strikeAbility = abilities.find(a => a.category === 'Attack');
+
+    const chosenAbility = hpPct < 0.3 && restoreAbility ? restoreAbility : (strikeAbility ?? abilities[0]);
+
+    if (!chosenAbility) return;
+
+    const timer = setTimeout(() => {
+      // For heals, target self (player); for attacks, target first living enemy
+      const chosenTargetId = chosenAbility.category === 'Heal'
+        ? (currentActor?.id ?? targetId)
+        : (firstLivingEnemy?.id ?? targetId);
+
+      sendCommand('combat use', {
+        encounterId: combat.encounterId,
+        abilityName: chosenAbility.name,
+        targetId: chosenTargetId,
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [autoCombat, combat.currentActorId, isPlayerTurn, isOver]);
+
+  // Stop auto-combat when encounter ends
+  useEffect(() => {
+    if (isOver && autoCombat) {
+      setAutoCombat(false);
+    }
+  }, [isOver]);
+
+  // Reset the fired-ref when the actor changes so the next turn can fire
+  useEffect(() => {
+    if (!isPlayerTurn) {
+      autoFiredRef.current = null;
+    }
+  }, [combat.currentActorId, isPlayerTurn]);
+
+  // Keyboard shortcut 'a' to toggle auto-combat during combat
+  useEffect(() => {
+    if (isOver) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        e.stopPropagation();
+        setAutoCombat(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKey, true); // capture phase — fires before global hook
+    return () => window.removeEventListener('keydown', handleKey, true);
+  }, [isOver]);
+
   const handleAbility = (abilityName: string) => {
     sendCommand('combat use', {
       encounterId: combat.encounterId,
@@ -159,10 +233,21 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
             {isPlayerTurn ? (
               <span style={{ color: '#00ff41' }}>
                 ▸ YOUR TURN — {currentActor.name} — attacking <span style={{ color: '#ccaa00' }}>{targetName}</span>
+                {autoCombat && (
+                  <span style={{
+                    color: '#ffcc00',
+                    marginLeft: '10px',
+                    fontWeight: 'bold',
+                    animation: 'pulse 1s ease-in-out infinite',
+                  }}>AUTO</span>
+                )}
               </span>
             ) : (
               <span style={{ color: '#ff6600' }}>
                 ⚔ ENEMY TURN — {currentActor.name} is acting...
+                {autoCombat && (
+                  <span style={{ color: '#ffcc00', marginLeft: '10px', fontWeight: 'bold' }}>AUTO</span>
+                )}
               </span>
             )}
           </div>
@@ -257,6 +342,21 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
                 }}
               >
                 Flee
+              </button>
+              <button
+                onClick={() => setAutoCombat(prev => !prev)}
+                title="Toggle auto-combat (press 'a')"
+                style={{
+                  background: autoCombat ? 'rgba(255,204,0,0.08)' : 'none',
+                  border: autoCombat ? '1px solid #ffcc00' : '1px solid #336600',
+                  color: autoCombat ? '#ffcc00' : '#336600',
+                  fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
+                  cursor: 'pointer',
+                  boxShadow: autoCombat ? '0 0 6px rgba(255,204,0,0.4)' : 'none',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {autoCombat ? 'Auto ●' : 'Auto'}
               </button>
             </div>
           </div>
