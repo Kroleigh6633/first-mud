@@ -283,6 +283,8 @@ public class FarmingOrchestrator(
         int originX = 0, originY = 0;
         bool originSet = false;
         int stepCount = 0;
+        int navDetourSteps = 0;   // counts detour steps taken while navigating to target zone
+        bool navAborted = false;  // true when we gave up on reaching the target zone safely
 
         var spiralEnumerator = SpiralSteps().GetEnumerator();
 
@@ -312,51 +314,211 @@ public class FarmingOrchestrator(
                     originY = player.Position.Y;
                     originSet = true;
 
-                    // If the player specified a target zone, navigate there first
-                    if (session.TargetX.HasValue && session.TargetY.HasValue)
+                    // If the player specified a target zone, do a pre-check before navigating
+                    if (session.TargetX.HasValue && session.TargetY.HasValue && !navAborted)
                     {
-                        await hubContext.Clients
-                            .Group(playerId.ToString())
-                            .SendAsync("GameMessage", new
-                            {
-                                timestamp = DateTime.UtcNow.ToString("O"),
-                                category  = "system",
-                                text      = $"Auto-farm: heading to target zone ({session.TargetX}, {session.TargetY})..."
-                            }, farmCt);
+                        int preCheckSafeCap = autoFarmService.GetSafeDangerCap(playerId, player.Level);
+                        var preCheckZones   = await zoneRepo.GetByWorldAsync(player.Position.World, farmCt);
+
+                        int PreCheckDangerAt(int cx, int cy)
+                        {
+                            var z = ZoneProximity.FindNearby(preCheckZones, cx, cy);
+                            return z?.DangerLevel
+                                ?? BiomeService.GetWildernessDanger(cx, cy,
+                                    BiomeService.GuessWildernessBiome(cx, cy));
+                        }
+
+                        // Sample 6 evenly-spaced points along the straight-line path
+                        int tx = session.TargetX.Value, ty = session.TargetY.Value;
+                        int maxSampledDanger = 0;
+                        const int sampleCount = 6;
+                        for (int s = 1; s <= sampleCount; s++)
+                        {
+                            int sx = player.Position.X + (tx - player.Position.X) * s / sampleCount;
+                            int sy = player.Position.Y + (ty - player.Position.Y) * s / sampleCount;
+                            int sd = PreCheckDangerAt(sx, sy);
+                            if (sd > maxSampledDanger) maxSampledDanger = sd;
+                        }
+
+                        if (maxSampledDanger >= preCheckSafeCap + 4)
+                        {
+                            // Path is extremely dangerous — refuse to navigate at all
+                            navAborted = true;
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = $"Auto-farm: route to ({tx}, {ty}) is blocked by danger {maxSampledDanger} territory (your safe limit: {preCheckSafeCap}). Farming current area instead."
+                                }, farmCt);
+                        }
+                        else if (maxSampledDanger > preCheckSafeCap + 2)
+                        {
+                            // Warn but still attempt (detour logic will handle impassable tiles)
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = $"Auto-farm: route to ({tx}, {ty}) passes through dangerous territory (danger {maxSampledDanger}, your safe limit: {preCheckSafeCap}). Will try to detour around it."
+                                }, farmCt);
+                        }
+                        else
+                        {
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = $"Auto-farm: heading to target zone ({tx}, {ty})..."
+                                }, farmCt);
+                        }
                     }
                 }
 
-                // --- TARGET ZONE NAVIGATION: step toward target until within 2 tiles ---
-                if (session.TargetX.HasValue && session.TargetY.HasValue)
+                // --- TARGET ZONE NAVIGATION: danger-aware step toward target until within 2 tiles ---
+                if (session.TargetX.HasValue && session.TargetY.HasValue && !navAborted)
                 {
                     int distX = Math.Abs(session.TargetX.Value - player.Position.X);
                     int distY = Math.Abs(session.TargetY.Value - player.Position.Y);
                     if (distX > 2 || distY > 2)
                     {
-                        // Walk directly toward target, ignoring spiral
+                        int navSafeCap   = autoFarmService.GetSafeDangerCap(playerId, player.Level);
+                        var navZones     = await zoneRepo.GetByWorldAsync(player.Position.World, farmCt);
+                        int directDist   = distX + distY; // Manhattan distance to target
+
+                        int NavDangerAt(int cx, int cy)
+                        {
+                            var z = ZoneProximity.FindNearby(navZones, cx, cy);
+                            return z?.DangerLevel
+                                ?? BiomeService.GetWildernessDanger(cx, cy,
+                                    BiomeService.GuessWildernessBiome(cx, cy));
+                        }
+
+                        // Maximum detour: 3× the direct distance
+                        int maxDetourSteps = directDist * 3;
+
                         int tdx = Math.Sign(session.TargetX.Value - player.Position.X);
                         int tdy = Math.Sign(session.TargetY.Value - player.Position.Y);
-                        var targetPos = new Position(
+
+                        // Build candidate steps: direct diagonal first, then axis-aligned
+                        // components, then perpendiculars
+                        var navCandidates = new List<(int dx, int dy)>();
+
+                        // Direct diagonal (or axis) step toward target
+                        if (tdx != 0 && tdy != 0)
+                        {
+                            navCandidates.Add((tdx, tdy));   // diagonal
+                            navCandidates.Add((tdx, 0));     // horizontal component
+                            navCandidates.Add((0, tdy));     // vertical component
+                        }
+                        else if (tdx != 0)
+                        {
+                            navCandidates.Add((tdx, 0));
+                            navCandidates.Add((tdx, 1));
+                            navCandidates.Add((tdx, -1));
+                        }
+                        else
+                        {
+                            navCandidates.Add((0, tdy));
+                            navCandidates.Add((1, tdy));
+                            navCandidates.Add((-1, tdy));
+                        }
+
+                        // Check detour limit before taking any step
+                        if (navDetourSteps > maxDetourSteps)
+                        {
+                            navAborted = true;
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = $"Auto-farm: route too long — no safe path to ({session.TargetX}, {session.TargetY}). Farming current area instead."
+                                }, farmCt);
+                            // Fall through to spiral farming
+                            goto spiralFarm;
+                        }
+
+                        // Evaluate each candidate step
+                        (int dx, int dy) chosenNavStep = default;
+                        bool isDetour = false;
+                        int chosenNavDanger = int.MaxValue;
+
+                        foreach (var (cdx, cdy) in navCandidates)
+                        {
+                            int nx = player.Position.X + cdx;
+                            int ny = player.Position.Y + cdy;
+                            int nd = NavDangerAt(nx, ny);
+                            if (nd <= navSafeCap)
+                            {
+                                // Prefer the first (most direct) safe step
+                                chosenNavStep  = (cdx, cdy);
+                                chosenNavDanger = nd;
+                                isDetour = (cdx, cdy) != navCandidates[0];
+                                break;
+                            }
+                        }
+
+                        if (chosenNavStep == default)
+                        {
+                            // All candidates are dangerous — abort
+                            int blockedDanger = NavDangerAt(
+                                player.Position.X + navCandidates[0].dx,
+                                player.Position.Y + navCandidates[0].dy);
+                            navAborted = true;
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = $"Auto-farm: no safe route to ({session.TargetX}, {session.TargetY}). Path blocked by danger {blockedDanger} territory (your safe limit: {navSafeCap}). Farming current area instead."
+                                }, farmCt);
+                            // Fall through to spiral farming
+                            goto spiralFarm;
+                        }
+
+                        if (isDetour)
+                        {
+                            navDetourSteps++;
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = "Auto-farm: detouring around dangerous terrain..."
+                                }, farmCt);
+                        }
+
+                        var navPos = new Position(
                             player.Position.World,
                             player.Position.ZoneId,
-                            player.Position.X + tdx,
-                            player.Position.Y + tdy);
-                        player.Move(targetPos);
+                            player.Position.X + chosenNavStep.dx,
+                            player.Position.Y + chosenNavStep.dy);
+                        player.Move(navPos);
                         await playerRepo.UpdateAsync(player, farmCt);
                         await hubContext.Clients
                             .Group(playerId.ToString())
                             .SendAsync("PlayerMoved", new
                             {
                                 player.Id,
-                                X = targetPos.X,
-                                Y = targetPos.Y,
-                                ZoneId = targetPos.ZoneId,
-                                World = targetPos.World.ToString()
+                                X = navPos.X,
+                                Y = navPos.Y,
+                                ZoneId = navPos.ZoneId,
+                                World = navPos.World.ToString()
                             }, farmCt);
-                        await BroadcastStatusAsync(playerId, session, "walking", "path", 0, farmCt);
+                        await BroadcastStatusAsync(playerId, session, "walking", "path", chosenNavDanger, farmCt);
                         continue;
                     }
                 }
+
+                spiralFarm:
 
                 // --- WALK ONE STEP in the spiral (adaptive danger-aware) ---
                 autoFarmService.SetState(playerId, "walking");
