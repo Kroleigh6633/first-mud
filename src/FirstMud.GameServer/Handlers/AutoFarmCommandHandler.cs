@@ -191,7 +191,8 @@ public class AutoFarmCommandHandler(
                     var lootResult = await lootSvc.RollLootDropAsync(
                         dangerLevel, playerId, player.Position.World,
                         currentItems.Count, player.MaxInventorySlots, farmCt,
-                        player);
+                        player,
+                        nearbyZone?.Name);
 
                     if (lootResult.Dropped)
                     {

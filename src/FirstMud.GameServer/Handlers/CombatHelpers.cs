@@ -257,7 +257,8 @@ public class CombatHelpers(
             ownedItems.Count,
             player.MaxInventorySlots,
             ct,
-            player);
+            player,
+            zone?.Name);
 
         if (!result.Dropped)
         {

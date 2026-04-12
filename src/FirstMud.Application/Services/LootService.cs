@@ -67,7 +67,7 @@ public class LootService
         new("Silver Amulet",        "A small silver disc on a chain, engraved with a warding sigil.",             ItemCategory.Accessory, EquipmentSlot.Accessory,    MinWork: 2, MaxWork: 5),
         new("Wyrd Charm",           "A knotted cord strung with crystalline fragments. Unsettling to hold.",      ItemCategory.Accessory, EquipmentSlot.Accessory,    MinWork: 3, MaxWork: 7),
 
-        // Materials / Reagents (no slot — go straight to inventory)
+            // Materials / Reagents (no slot — go straight to inventory)
         new("Iron Ore",             "Rough lumps of iron ore, ready for the smelter.",                           ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Beast Hide",           "Thick hide stripped from a slain creature.",                                ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Sinew",                "Dried sinew — useful in bowstrings and bindings.",                          ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
@@ -77,6 +77,82 @@ public class LootService
         new("Wyrd Shard",           "A jagged shard of crystallised Wyrd-energy. Handle with care.",             ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 3, MaxWork: 7),
 
     ];
+
+    // -------------------------------------------------------------------------
+    // Common materials — dropped in every biome
+    // -------------------------------------------------------------------------
+    private static readonly LootTemplate[] CommonMaterials =
+    [
+        new("Iron Ore",             "Rough lumps of iron ore, ready for the smelter.",                           ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Stone",                "A chunk of rough stone. Basic building and crafting material.",              ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Wood",                 "A length of raw timber, cut and dried for crafting.",                       ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Leather",              "Tanned hide suitable for armor and bindings.",                               ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Sinew",                "Dried sinew — useful in bowstrings and bindings.",                          ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Bone Fragment",        "A large bone fragment — useful as a crafting material.",                    ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+    ];
+
+    // -------------------------------------------------------------------------
+    // Biome-specific material pools
+    // -------------------------------------------------------------------------
+    private static readonly Dictionary<string, LootTemplate[]> BiomeMaterialTemplates = new()
+    {
+        ["mountain"] =
+        [
+            new("Mithril Ore",          "A rare, lightweight ore with a silver-blue sheen. Prized by armorers.",     ItemCategory.Component, EquipmentSlot.None, MinWork: 4, MaxWork: 7),
+            new("Diamond Shard",        "A faceted shard of raw diamond. Used in advanced enchanting.",               ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 5, MaxWork: 8),
+            new("Mountain Herb",        "A hardy alpine herb with potent healing properties.",                        ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Granite Block",        "A heavy block of dense grey granite. Durable construction material.",        ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
+            new("Eagle Feather",        "A large primary feather from a mountain eagle. Prized for fletching.",       ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+        ],
+        ["forest"] =
+        [
+            new("Thornwood Heartwood",  "Dense heartwood from a thornwood tree. Superior to common timber.",          ItemCategory.Component, EquipmentSlot.None, MinWork: 3, MaxWork: 5),
+            new("Beast Leather",        "Thick, supple leather stripped from a large forest creature.",               ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
+            new("Amber Resin",          "Golden tree resin with mild magical adhesive properties.",                   ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Moonbloom Petal",      "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", ItemCategory.Reagent, EquipmentSlot.None, MinWork: 4, MaxWork: 6),
+            new("Spider Silk",          "Fine, strong thread spun by giant forest spiders. Used in light armor.",     ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+        ],
+        ["desert"] =
+        [
+            new("Obsidian Shard",       "A razor-sharp shard of volcanic glass. Holds an edge better than iron.",     ItemCategory.Component, EquipmentSlot.None, MinWork: 3, MaxWork: 5),
+            new("Fire Crystal",         "A deep-red crystal radiating concentrated fire magic.",                      ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 4, MaxWork: 7),
+            new("Scorched Bone",        "Bone bleached and hardened by desert heat. Still serviceable.",              ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
+            new("Cactus Fiber",         "Coarse fiber stripped from desert cactus. Basic but plentiful.",             ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Ashite Dust",          "Fine grey powder imbued with residual magic from the Ardweld collapse.",     ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 5, MaxWork: 7),
+        ],
+        ["water"] =
+        [
+            new("Sea Scale",            "A large iridescent scale from an aquatic creature.",                         ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
+            new("Coral Fragment",       "A rough chunk of sea coral. Used in underwater-themed crafting.",             ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Deep Ink",             "Thick black ink harvested from a deep-sea cephalopod. Used for scrollwork.", ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Pearl",                "A lustrous pearl from a coastal mollusk. Valuable and magically receptive.", ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 4, MaxWork: 7),
+            new("Driftwood",            "Salt-treated wood washed ashore. Rot-resistant and light.",                  ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        ],
+        ["swamp"] =
+        [
+            new("Bog Iron",             "Iron ore smelted from swamp deposits. Crude but plentiful.",                 ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
+            new("Toad Venom",           "A vial of milky toxin harvested from a marsh toad. Potent poison reagent.",  ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Peat Moss",            "Dark, spongy peat harvested from the bog. Used as fuel and insulation.",     ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Marsh Gas Crystal",    "A fragile crystal formed around a pocket of volatile marsh gas.",             ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 4, MaxWork: 6),
+            new("Leech Extract",        "A thick, dark fluid drained from marsh leeches. Prized by healers.",         ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+        ],
+        ["plains"] =
+        [
+            new("Cotton Fiber",         "Soft white fiber from plains cotton plants. Basic cloth material.",          ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Horse Hair",           "Coarse hair from a plains horse. Used in bowstrings and rope.",              ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Flint",                "A piece of flint knapped to a sharp edge. Essential for tool making.",       ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Wheat Sheaf",          "A bundle of harvested wheat. Ingredient in future food crafting.",           ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Copper Nugget",        "A small nugget of soft copper ore. Used in basic metalworking.",             ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+        ],
+        ["wyrd"] =
+        [
+            new("Wyrd Shard",           "A jagged shard of crystallised fate-energy. Handle with extreme care.",      ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 5, MaxWork: 8),
+            new("Void Essence",         "A swirling mote of energy drawn from a tear in reality. Extremely rare.",   ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 6, MaxWork: 9),
+            new("Dravenite Dust",       "Fine crystalline powder with latent magical resonance. Used in imbuing.",    ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 4, MaxWork: 7),
+            new("Tear Fragment",        "A sliver of broken reality. Hums faintly and distorts nearby shadows.",      ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 5, MaxWork: 7),
+            new("Phase Thread",         "A gossamer thread that phases between planes. Used to weave enchantments.",  ItemCategory.Component, EquipmentSlot.None, MinWork: 3, MaxWork: 5),
+        ],
+    };
 
     // Taper templates — rolled separately at ~15% chance after the main loot roll
     private static readonly LootTemplate[] TaperTemplates =
@@ -110,7 +186,8 @@ public class LootService
         int currentInventoryCount,
         int maxInventorySlots,
         CancellationToken ct = default,
-        Player? player = null)
+        Player? player = null,
+        string? zoneName = null)
     {
         // Inventory full check
         if (currentInventoryCount >= maxInventorySlots)
@@ -150,6 +227,12 @@ public class LootService
         // Select a template — higher danger skews toward later (better) templates
         var maxTemplateIndex = Math.Min(Templates.Length - 1, 4 + dangerLevel);
         var template = Templates[Random.Shared.Next(0, maxTemplateIndex + 1)];
+
+        // For material categories, replace with a biome-appropriate material
+        if (template.Category is ItemCategory.Component or ItemCategory.Reagent)
+        {
+            template = PickBiomeMaterial(zoneName, dangerLevel);
+        }
 
         // Workmanship: template range + danger bonus
         var workValue = template.MinWork + (int)(Random.Shared.NextDouble() * (template.MaxWork - template.MinWork + 1));
@@ -192,6 +275,67 @@ public class LootService
         _logger.LogInformation("Loot drop for player {PlayerId}: {ItemName} W{Workmanship}", ownerId, item.Name, workValue);
 
         return new LootDropResult(true, item, message);
+    }
+
+    // -------------------------------------------------------------------------
+    // Biome helpers
+    // -------------------------------------------------------------------------
+
+    private static string GetBiome(string? zoneName) => zoneName switch
+    {
+        "Caervorn Highlands" or "Gravenhold" => "mountain",
+        "The Thornwood"                       => "forest",
+        "Portmere (Compact)" or "Starting Road" => "plains",
+        "Gravenmarsh"                         => "swamp",
+        "The Drowned Coast"                   => "water",
+        "The Ashen Reach"                     => "desert",
+        "The Maw Borderlands"                 => "wyrd",
+        _                                     => "plains",
+    };
+
+    /// <summary>
+    /// Picks a material from the biome pool.
+    /// 70% chance: biome-specific material (filtered by danger level for min workmanship).
+    /// 30% chance: common material.
+    /// </summary>
+    private static LootTemplate PickBiomeMaterial(string? zoneName, int dangerLevel)
+    {
+        var biome = GetBiome(zoneName);
+
+        // 30% chance: common material regardless of biome
+        if (Random.Shared.Next(100) < 30)
+            return CommonMaterials[Random.Shared.Next(CommonMaterials.Length)];
+
+        if (!BiomeMaterialTemplates.TryGetValue(biome, out var pool))
+            pool = BiomeMaterialTemplates["plains"];
+
+        // Higher danger gives access to rarer (higher MinWork) materials
+        // Danger 1-3: all materials accessible; danger 4-6: rarer items more likely; 7+: rarest accessible
+        var maxMinWork = 1 + dangerLevel;  // danger 1 → max MinWork 2; danger 9 → max MinWork 10
+        var eligible = pool.Where(t => t.MinWork <= maxMinWork).ToArray();
+        if (eligible.Length == 0) eligible = pool;
+
+        // Weight toward rarer items at higher danger: use weighted selection
+        // Weight = dangerLevel bonus for items with higher MinWork
+        var totalWeight = 0;
+        var weights = new int[eligible.Length];
+        for (var i = 0; i < eligible.Length; i++)
+        {
+            // Base weight 10; rarer items get +2*dangerLevel bonus per point of MinWork above 1
+            weights[i] = 10 + (eligible[i].MinWork - 1) * dangerLevel;
+            totalWeight += weights[i];
+        }
+
+        var roll = Random.Shared.Next(totalWeight);
+        var cumulative = 0;
+        for (var i = 0; i < eligible.Length; i++)
+        {
+            cumulative += weights[i];
+            if (roll < cumulative)
+                return eligible[i];
+        }
+
+        return eligible[^1];
     }
 
     private sealed record LootTemplate(
