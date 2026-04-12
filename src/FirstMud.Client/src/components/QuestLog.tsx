@@ -18,10 +18,20 @@ function getQuestType(title: string): 'kill' | 'gather' | 'deliver' | 'explore' 
   return 'explore';
 }
 
+function questDistance(quest: QuestNode, playerX?: number, playerY?: number): number | null {
+  // QuestNode doesn't carry coordinates directly; distance is only available
+  // when a waypoint is active. Return null when unknown.
+  void quest; void playerX; void playerY;
+  return null;
+}
+
 interface Props {
   quests: QuestNode[];
   questProgress: QuestProgressMap;
+  playerX?: number;
+  playerY?: number;
   onAccept: (questId: string) => void;
+  onAcceptAll: () => void;
   onComplete: (questId: string, outcome: string) => void;
   onNavigate: (questId: string) => void;
   onClose: () => void;
@@ -61,6 +71,15 @@ const headerStyle: React.CSSProperties = {
   letterSpacing: '0.1em',
 };
 
+const subHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '6px 12px',
+  borderBottom: '1px solid #1a3a1a',
+  background: '#070f07',
+};
+
 const questListStyle: React.CSSProperties = {
   overflowY: 'auto',
   flex: 1,
@@ -85,6 +104,31 @@ const btnStyle: React.CSSProperties = {
   marginTop: '4px',
 };
 
+const acceptBtnStyle: React.CSSProperties = {
+  background: '#1a1200',
+  border: '2px solid #ffcc00',
+  color: '#ffcc00',
+  fontFamily: 'monospace',
+  fontSize: '12px',
+  fontWeight: 'bold',
+  padding: '4px 14px',
+  cursor: 'pointer',
+  marginRight: '6px',
+  marginTop: '4px',
+  letterSpacing: '0.05em',
+};
+
+const acceptAllBtnStyle: React.CSSProperties = {
+  background: '#1a1200',
+  border: '1px solid #ffcc00',
+  color: '#ffcc00',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '2px 10px',
+  cursor: 'pointer',
+  letterSpacing: '0.04em',
+};
+
 const closeBtnStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
@@ -95,14 +139,51 @@ const closeBtnStyle: React.CSSProperties = {
   padding: '0',
 };
 
-export default function QuestLog({ quests, questProgress, onAccept, onComplete, onNavigate, onClose }: Props) {
+export default function QuestLog({ quests, questProgress, playerX, playerY, onAccept, onAcceptAll, onComplete, onNavigate, onClose }: Props) {
+  // Sort: accepted/in-progress first, then available by rep reward desc
+  const sortedQuests = [...quests].sort((a, b) => {
+    if (a.isTaken && !b.isTaken) return -1;
+    if (!a.isTaken && b.isTaken) return 1;
+    // Both available: sort by rep reward descending
+    return b.reputationReward - a.reputationReward;
+  });
+
+  const availableCount = quests.filter(q => !q.isTaken).length;
+  const inProgressCount = quests.filter(q => q.isTaken).length;
+
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={panelStyle} onClick={e => e.stopPropagation()}>
         <div style={headerStyle}>
-          <span>QUEST LOG</span>
-          <button style={closeBtnStyle} onClick={onClose}>[Q]</button>
+          <span>
+            QUEST LOG
+            {inProgressCount > 0 && (
+              <span style={{ color: '#aaffcc', fontSize: '11px', marginLeft: '10px', fontWeight: 'normal' }}>
+                {inProgressCount} active
+              </span>
+            )}
+            {availableCount > 0 && (
+              <span style={{ color: '#888888', fontSize: '11px', marginLeft: '8px', fontWeight: 'normal' }}>
+                {availableCount} available
+              </span>
+            )}
+          </span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button style={closeBtnStyle} onClick={onClose}>[Q]</button>
+          </div>
         </div>
+
+        {/* Accept All toolbar */}
+        {availableCount > 0 && (
+          <div style={subHeaderStyle}>
+            <span style={{ color: '#888888', fontSize: '11px' }}>
+              {availableCount} quest{availableCount !== 1 ? 's' : ''} available to accept
+            </span>
+            <button style={acceptAllBtnStyle} onClick={onAcceptAll}>
+              [Accept All {availableCount}]
+            </button>
+          </div>
+        )}
 
         <div style={questListStyle}>
           {quests.length === 0 ? (
@@ -110,27 +191,50 @@ export default function QuestLog({ quests, questProgress, onAccept, onComplete, 
               (no quests available)
             </div>
           ) : (
-            quests.map(quest => {
+            sortedQuests.map(quest => {
               const progress = questProgress[quest.questId];
               const questType = getQuestType(quest.title);
               const isKillQuest = questType === 'kill';
               const killsDone = progress?.kills ?? 0;
               const killsRequired = progress?.required ?? 0;
               const killsComplete = isKillQuest && killsRequired > 0 && killsDone >= killsRequired;
+              const dist = questDistance(quest, playerX, playerY);
 
               return (
-                <div key={quest.questId} style={questItemStyle}>
-                  <div style={{ marginBottom: '4px' }}>
-                    <span style={{ color: '#00ff41', marginRight: '6px' }}>▶</span>
-                    <span style={{ color: '#ffffff' }}>{quest.title}</span>
+                <div
+                  key={quest.questId}
+                  style={{
+                    ...questItemStyle,
+                    background: quest.isTaken ? '#070f07' : 'transparent',
+                    borderLeft: quest.isTaken ? '3px solid #00aa33' : '3px solid #1a1a00',
+                  }}
+                >
+                  <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: quest.isTaken ? '#00ff41' : '#888888' }}>
+                      {quest.isTaken ? '▶' : '○'}
+                    </span>
+                    <span style={{ color: '#ffffff', flex: 1 }}>{quest.title}</span>
                     {quest.isWyrdQuest && (
-                      <span style={{ color: '#cc88ff', marginLeft: '6px' }}>✦</span>
+                      <span style={{ color: '#cc88ff' }}>✦</span>
+                    )}
+                    {quest.isTaken && (
+                      <span style={{ color: '#00aa33', fontSize: '10px', letterSpacing: '0.08em' }}>
+                        IN PROGRESS
+                      </span>
+                    )}
+                    {!quest.isTaken && (
+                      <span style={{ color: '#555555', fontSize: '10px', letterSpacing: '0.08em' }}>
+                        AVAILABLE
+                      </span>
                     )}
                   </div>
                   <div style={{ color: '#888888', fontSize: '11px', marginBottom: '2px' }}>
                     {FACTION_NAMES[quest.factionId] ?? `Faction ${quest.factionId}`}
                     {' · '}
                     {quest.requiredTier === 0 ? 'Unknown' : `Tier ${quest.requiredTier}`}
+                    {dist !== null && (
+                      <span style={{ color: '#556655' }}> · ~{dist} tiles away</span>
+                    )}
                   </div>
                   <div style={{ color: '#ffcc00', fontSize: '11px', marginBottom: '6px' }}>
                     Reward: {quest.reputationReward} rep
@@ -170,14 +274,17 @@ export default function QuestLog({ quests, questProgress, onAccept, onComplete, 
                   )}
 
                   <div>
+                    {/* AVAILABLE: prominent Accept button, no Navigate/Complete */}
                     {!quest.isTaken && (
                       <button
-                        style={btnStyle}
+                        style={acceptBtnStyle}
                         onClick={() => onAccept(quest.questId)}
                       >
-                        Accept
+                        [Accept]
                       </button>
                     )}
+
+                    {/* IN PROGRESS: Navigate and Complete buttons */}
                     {quest.isTaken && (
                       <button
                         style={btnStyle}
@@ -186,7 +293,6 @@ export default function QuestLog({ quests, questProgress, onAccept, onComplete, 
                         Navigate [N]
                       </button>
                     )}
-                    {/* Manual complete fallback — visible but only works when objectives are done */}
                     {quest.isTaken && quest.possibleOutcomes.map(outcome => (
                       <button
                         key={outcome}

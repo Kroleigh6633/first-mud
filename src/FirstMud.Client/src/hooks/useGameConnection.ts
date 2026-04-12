@@ -261,11 +261,12 @@ export function useGameConnection(): GameConnectionResult {
       });
     });
 
-    connection.on('PlayerLeveledUp', (newLevel: number) => {
+    connection.on('PlayerLeveledUp', (payload: { newLevel?: number; playerId?: string; message?: string } | number) => {
+      const level = typeof payload === 'number' ? payload : payload?.newLevel ?? '?';
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'system',
-        text: `You have reached level ${newLevel}!`,
+        text: `You have reached level ${level}!`,
       });
     });
 

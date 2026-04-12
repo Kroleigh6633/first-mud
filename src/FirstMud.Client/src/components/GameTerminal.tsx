@@ -135,6 +135,10 @@ export default function GameTerminal({
   const [showAutoFarmPicker, setShowAutoFarmPicker] = useState(false);
   const [statusCollapsed, setStatusCollapsed] = useState(false);
   const [autoNavigating, setAutoNavigating] = useState(false);
+  const [autoQuestActive, setAutoQuestActive] = useState(false);
+  const [autoQuestIndex, setAutoQuestIndex] = useState(0);
+  const [_autoQuestTotal, setAutoQuestTotal] = useState(0);
+  const [_autoQuestTitle, setAutoQuestTitle] = useState('');
 
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
@@ -160,6 +164,12 @@ export default function GameTerminal({
   worldStateRef.current = worldState;
   const questProgressRef = useRef(questProgress);
   questProgressRef.current = questProgress;
+  const availableQuestsRef = useRef(availableQuests);
+  availableQuestsRef.current = availableQuests;
+  const autoQuestActiveRef = useRef(autoQuestActive);
+  autoQuestActiveRef.current = autoQuestActive;
+  const autoQuestIndexRef = useRef(autoQuestIndex);
+  autoQuestIndexRef.current = autoQuestIndex;
 
   // When the player arrives at a new zone tile (or leaves one), narrate it
   // into the message log so the user knows what they're walking on.
@@ -338,11 +348,23 @@ export default function GameTerminal({
       case 'navigate': {
         const wp = questWaypointRef.current;
         if (!wp) {
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'system',
-            text: 'No active quest waypoint. Accept a quest first.',
-          });
+          // Try to auto-accept the first available quest then navigate
+          const quests = availableQuestsRef.current;
+          const first = quests.find(q => !q.isTaken) ?? quests[0];
+          if (first && !first.isTaken) {
+            sendCommand('acceptquest', { questId: first.questId });
+            appendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'quest',
+              text: `Accepted "${first.title}". Waiting for waypoint — press [N] again to navigate.`,
+            });
+          } else {
+            appendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'system',
+              text: 'No active quest waypoint. Open the quest log [Q] to accept a quest.',
+            });
+          }
           break;
         }
         if (autoNavigatingRef.current) {
@@ -362,8 +384,47 @@ export default function GameTerminal({
         }
         break;
       }
+      case 'autoquest': {
+        if (autoQuestActiveRef.current) {
+          // Stop auto-quest run
+          setAutoQuestActive(false);
+          setAutoNavigating(false);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: 'Quest auto-run stopped.',
+          });
+        } else {
+          const quests = availableQuestsRef.current;
+          if (quests.length === 0) {
+            appendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'system',
+              text: 'No quests available. Press [Q] to open the quest log.',
+            });
+            break;
+          }
+          // Sort same as QuestLog: taken first, then by rep reward desc
+          const ordered = [...quests].sort((a, b) => {
+            if (a.isTaken && !b.isTaken) return -1;
+            if (!a.isTaken && b.isTaken) return 1;
+            return b.reputationReward - a.reputationReward;
+          });
+          setAutoQuestActive(true);
+          setAutoQuestIndex(0);
+          setAutoQuestTotal(ordered.length);
+          setAutoQuestTitle(ordered[0]?.title ?? '');
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: `Quest auto-run started — ${ordered.length} quest${ordered.length !== 1 ? 's' : ''} queued. Press [L] to stop.`,
+          });
+        }
+        break;
+      }
       case 'escape':
         setAutoNavigating(false);
+        setAutoQuestActive(false);
         setShowHelp(false);
         setShowQuestLog(false);
         setShowInventory(false);
@@ -396,8 +457,81 @@ export default function GameTerminal({
     });
   };
 
+  // Auto-quest orchestration: when autoQuestActive, walk through unfinished quests
+  // in rep-reward order, accepting each and auto-navigating.
+  useEffect(() => {
+    if (!autoQuestActive) return;
+
+    const quests = availableQuestsRef.current;
+    // Sort by rep reward descending; taken quests first
+    const ordered = [...quests].sort((a, b) => {
+      if (a.isTaken && !b.isTaken) return -1;
+      if (!a.isTaken && b.isTaken) return 1;
+      return b.reputationReward - a.reputationReward;
+    });
+
+    const nextQuest = ordered[autoQuestIndexRef.current];
+
+    if (!nextQuest) {
+      // All done
+      setAutoQuestActive(false);
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'quest',
+        text: 'All quests completed! Quest auto-run finished.',
+      });
+      return;
+    }
+
+    setAutoQuestTitle(nextQuest.title);
+
+    // Accept if not taken
+    if (!nextQuest.isTaken) {
+      sendCommand('acceptquest', { questId: nextQuest.questId });
+    }
+
+    // Start auto-navigate toward this quest's waypoint
+    const wp = questWaypointRef.current;
+    if (wp && wp.questId === nextQuest.questId) {
+      setAutoNavigating(true);
+    } else {
+      // Waypoint may arrive shortly after acceptquest; start navigating on next
+      // interval once questWaypoint is set
+    }
+  }, [autoQuestActive, autoQuestIndex, sendCommand, appendMessage]);
+
+  // When auto-quest is running and we arrive (autoNavigating stops), advance to next quest
+  useEffect(() => {
+    if (!autoQuestActiveRef.current) return;
+    if (autoNavigating) return; // still walking
+    // We just stopped navigating — assume current quest was handled, move on
+    // Small delay so server processes completion before we start next quest
+    const timer = setTimeout(() => {
+      if (!autoQuestActiveRef.current) return;
+      setAutoQuestIndex(prev => prev + 1);
+    }, 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoNavigating]);
+
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
+  };
+
+  const handleAcceptAll = () => {
+    const unaccepted = availableQuests.filter(q => !q.isTaken);
+    unaccepted.forEach((q, i) => {
+      setTimeout(() => {
+        sendCommand('acceptquest', { questId: q.questId });
+      }, i * 120);
+    });
+    if (unaccepted.length > 0) {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'quest',
+        text: `Accepting ${unaccepted.length} quest${unaccepted.length !== 1 ? 's' : ''}...`,
+      });
+    }
   };
 
   const handleCompleteQuest = (questId: string, outcome: string) => {
@@ -604,6 +738,34 @@ export default function GameTerminal({
         </div>
       )}
 
+      {/* Quest auto-run status bar */}
+      {autoQuestActive && (
+        <div
+          style={{
+            position: 'absolute',
+            top: autoFarmStatus?.active ? '52px' : '28px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#120d1a',
+            border: '1px solid #cc88ff',
+            color: '#cc88ff',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            padding: '3px 14px',
+            letterSpacing: '0.08em',
+            pointerEvents: 'none',
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ color: '#ee88ff', fontWeight: 'bold' }}>QUEST AUTO-RUN</span>
+          <span>{autoQuestIndex + 1}/{_autoQuestTotal}</span>
+          {_autoQuestTitle ? <span style={{ color: '#ddaaff' }}>— {_autoQuestTitle}</span> : null}
+          <span style={{ color: '#666' }}>· [L] stop</span>
+        </div>
+      )}
+
       {/* Auto-navigate status bar */}
       {autoNavigating && questWaypoint && (
         <div
@@ -640,12 +802,23 @@ export default function GameTerminal({
         <QuestLog
           quests={availableQuests}
           questProgress={questProgress}
+          playerX={worldState?.player?.x}
+          playerY={worldState?.player?.y}
           onAccept={handleAcceptQuest}
+          onAcceptAll={handleAcceptAll}
           onComplete={handleCompleteQuest}
           onNavigate={(questId) => {
             setShowQuestLog(false);
-            // Find the active waypoint for this quest and start auto-navigate
-            if (questWaypoint?.questId === questId) {
+            const quest = availableQuests.find(q => q.questId === questId);
+            // Auto-accept if not yet taken, then navigate
+            if (quest && !quest.isTaken) {
+              sendCommand('acceptquest', { questId });
+              appendMessage({
+                timestamp: new Date().toISOString(),
+                category: 'quest',
+                text: `Accepted "${quest.title}". Waypoint set — press [N] to begin navigating.`,
+              });
+            } else if (questWaypoint?.questId === questId) {
               setAutoNavigating(true);
               appendMessage({
                 timestamp: new Date().toISOString(),
@@ -656,7 +829,7 @@ export default function GameTerminal({
               appendMessage({
                 timestamp: new Date().toISOString(),
                 category: 'quest',
-                text: 'Accept the quest first to set a waypoint, then press [N] to navigate.',
+                text: 'Waypoint not yet set. Press [N] to navigate once the quest is accepted.',
               });
             }
           }}
