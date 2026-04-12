@@ -1,4 +1,5 @@
 using FirstMud.Domain.Entities;
+using FirstMud.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -25,6 +26,10 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
 
         builder.Property(i => i.Category)
             .HasConversion<int>();
+
+        builder.Property(i => i.Slot)
+            .HasConversion<int>()
+            .HasDefaultValue(EquipmentSlot.None);
 
         // Workmanship owned type — stored as single int column
         builder.OwnsOne(i => i.Workmanship, w =>

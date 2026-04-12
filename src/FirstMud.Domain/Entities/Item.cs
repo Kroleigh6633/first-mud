@@ -27,6 +27,9 @@ public class Item
     // Ownership — null means world loot / homestead storage
     public Guid? OwnerId { get; private set; }
 
+    // Equipment slot — which slot this item occupies when equipped (None for non-equipment)
+    public EquipmentSlot Slot { get; private set; }
+
     // Lock — prevents the item from being auto-salvaged or bulk-salvaged
     public bool IsLocked { get; private set; }
 
@@ -42,7 +45,8 @@ public class Item
         ItemCategory category,
         Workmanship workmanship,
         WorldId originWorld,
-        bool isArdweldOrigin = false)
+        bool isArdweldOrigin = false,
+        EquipmentSlot slot = EquipmentSlot.None)
     {
         var maxDurability = workmanship.Value * 10;
         return new Item
@@ -56,9 +60,13 @@ public class Item
             IsArdweldOrigin = isArdweldOrigin,
             IsSalvageable = true,
             MaxDurability = maxDurability,
-            Durability = maxDurability
+            Durability = maxDurability,
+            Slot = slot
         };
     }
+
+    /// <summary>Sets the equipment slot directly (used during data migration/seeding).</summary>
+    public void SetSlot(EquipmentSlot slot) => Slot = slot;
 
     public void ApplyTaperImbue(TaperType taperType, TaperQuality quality, MagicElement element, MagicPolarity polarity)
     {

@@ -191,10 +191,9 @@ function maxSalvageableWorkmanship(skill: number): number {
   return 10;
 }
 
-function isEquippable(category?: string): boolean {
-  if (!category) return false;
-  const c = category.toLowerCase();
-  return c === 'weapon' || c === 'armor';
+function isEquippable(slot?: string): boolean {
+  if (!slot) return false;
+  return slot !== 'None';
 }
 
 function isSalvageable(category?: string): boolean {
@@ -204,14 +203,18 @@ function isSalvageable(category?: string): boolean {
 }
 
 function isEquipped(itemId: string, equipment: EquipmentSlots): boolean {
+  if (equipment.equippedItems) {
+    return Object.values(equipment.equippedItems).includes(itemId);
+  }
+  // Legacy fallback
   return equipment.weaponId === itemId
     || equipment.armorId === itemId
     || equipment.accessoryId === itemId;
 }
 
 export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand, atHomestead = false }: Props) {
-  const handleEquip = (itemId: string) => {
-    sendCommand('equip', { itemId });
+  const handleEquip = (itemId: string, slot?: string) => {
+    sendCommand('equip', { itemId, slot });
   };
 
   const handleSalvage = (itemId: string) => {
@@ -367,10 +370,12 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                     {item.isStackable && (item.quantity ?? 1) > 1 && (
                       <span style={quantityTagStyle}>x{item.quantity}</span>
                     )}
-                    <span style={equippedTagStyle}>equipped</span>
+                    <span style={equippedTagStyle}>
+                      {item.slot && item.slot !== 'None' ? item.slot : 'equipped'}
+                    </span>
                   </span>
                   <span style={{ color: '#888888', fontSize: '11px' }}>
-                    {item.category ?? ''} W{item.workmanship}
+                    W{item.workmanship}
                   </span>
                 </div>
                 {item.description && <div style={itemDescStyle}>{item.description}</div>}
@@ -425,12 +430,13 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                   >
                     ★
                   </button>
-                  {isEquippable(item.category) && (
+                  {isEquippable(item.slot) && (
                     <button
                       type="button"
                       style={equipBtnStyle}
-                      onClick={() => handleEquip(item.id)}
+                      onClick={() => handleEquip(item.id, item.slot)}
                       aria-label={`equip ${item.name}`}
+                      title={item.slot ? `Equip to ${item.slot} slot` : undefined}
                     >
                       equip
                     </button>

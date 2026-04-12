@@ -18,6 +18,7 @@ public class CombatService
 
     /// <summary>
     /// Builds and stores a new Encounter from the player, their active companions, and enemy templates.
+    /// equippedItems: all items currently equipped by the player, keyed by slot.
     /// Returns the created Encounter.
     /// </summary>
     public Task<Encounter> StartEncounterAsync(
@@ -26,22 +27,33 @@ public class CombatService
         Player player,
         IReadOnlyList<Companion> activeCompanions,
         IReadOnlyList<MonsterTemplate> enemies,
-        Item? equippedWeapon = null,
-        Item? equippedArmor = null,
+        IReadOnlyDictionary<EquipmentSlot, Item>? equippedItems = null,
         CancellationToken ct = default)
     {
+        equippedItems ??= new Dictionary<EquipmentSlot, Item>();
         var element = player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement;
 
-        // Equipment bonuses: weapon adds to Strike power, armor adds bonus HP
-        int weaponBonus = equippedWeapon is not null ? equippedWeapon.Workmanship.Value * 3 : 0;
-        int armorBonusHp = equippedArmor is not null ? equippedArmor.Workmanship.Value * 5 : 0;
-        int combatMaxHp = player.MaxHp + armorBonusHp;
+        // Equipment bonuses per slot
+        int meleeBonus    = equippedItems.TryGetValue(EquipmentSlot.MeleeWeapon,  out var mw) ? mw.Workmanship.Value * 3 : 0;
+        int rangedBonus   = equippedItems.TryGetValue(EquipmentSlot.RangedWeapon, out var rw) ? rw.Workmanship.Value * 2 : 0;
+        int focusBonus    = equippedItems.TryGetValue(EquipmentSlot.Focus,        out var fc) ? fc.Workmanship.Value * 4 : 0;
+        int headBonusHp   = equippedItems.TryGetValue(EquipmentSlot.Head,         out var hd) ? hd.Workmanship.Value * 3 : 0;
+        int chestBonusHp  = equippedItems.TryGetValue(EquipmentSlot.Chest,        out var ch) ? ch.Workmanship.Value * 5 : 0;
+        int legsBonusHp   = equippedItems.TryGetValue(EquipmentSlot.Legs,         out var lg) ? lg.Workmanship.Value * 3 : 0;
+        int handsBonus    = equippedItems.TryGetValue(EquipmentSlot.Hands,        out var ha) ? ha.Workmanship.Value * 2 : 0;
+        int feetBonus     = equippedItems.TryGetValue(EquipmentSlot.Feet,         out var ft) ? ft.Workmanship.Value * 1 : 0;
+        int accBonusHp    = equippedItems.TryGetValue(EquipmentSlot.Accessory,    out var ac) ? ac.Workmanship.Value * 2 : 0;
+
+        int strikeBonus   = meleeBonus + rangedBonus + handsBonus;
+        int weaveBoltBonus= focusBonus;
+        int combatMaxHp   = player.MaxHp + headBonusHp + chestBonusHp + legsBonusHp + accBonusHp;
+        int combatSpeed   = player.Speed + feetBonus;
 
         var playerAbilities = new List<CombatAbility>
         {
-            new("Strike", 18 + weaponBonus, 0, element,
+            new("Strike", 18 + strikeBonus, 0, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
-            new("Weave Bolt", 30, 10, element,
+            new("Weave Bolt", 30 + weaveBoltBonus, 10, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
             new("Restore", 30, 5, MagicElement.Aether,
                 AbilityTargetType.Self, AbilityCategory.Heal)
@@ -52,7 +64,7 @@ public class CombatService
             CombatantType.Player,
             player.Id,
             combatMaxHp,
-            player.Speed,
+            combatSpeed,
             player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement,
             isPlayerSide: true,
             player.Level,

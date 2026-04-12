@@ -1,8 +1,9 @@
 import React from 'react';
-import type { PlayerState } from '../types/game';
+import type { PlayerState, EquipmentSlots } from '../types/game';
 
 interface Props {
   player: PlayerState | null;
+  equipment?: EquipmentSlots;
   onClose: () => void;
 }
 
@@ -41,7 +42,19 @@ const hintStyle: React.CSSProperties = {
   fontStyle: 'italic',
 };
 
-export default function CharacterSheet({ player, onClose }: Props) {
+const EQUIPMENT_SLOTS: Array<[string, keyof EquipmentSlots]> = [
+  ['Melee Weapon',  'meleeWeaponName'],
+  ['Ranged Weapon', 'rangedWeaponName'],
+  ['Focus',         'focusName'],
+  ['Head',          'headName'],
+  ['Chest',         'chestName'],
+  ['Legs',          'legsName'],
+  ['Hands',         'handsName'],
+  ['Feet',          'feetName'],
+  ['Accessory',     'accessoryName'],
+];
+
+export default function CharacterSheet({ player, equipment, onClose }: Props) {
   if (!player) return null;
 
   const stats = [
@@ -151,6 +164,23 @@ export default function CharacterSheet({ player, onClose }: Props) {
             {player.wyrdTangle ?? 0}
           </span>
         </div>
+
+        <div style={sectionStyle}>Equipment</div>
+        <div style={hintStyle}>
+          Each slot provides stat bonuses in combat. Melee/Ranged/Hands boost Strike damage.
+          Focus boosts Weave Bolt. Armor slots (Head/Chest/Legs/Acc) add bonus HP. Feet add Speed.
+        </div>
+        {EQUIPMENT_SLOTS.map(([label, key]) => {
+          const name = equipment?.[key] as string | undefined;
+          return (
+            <div key={label} style={rowStyle}>
+              <span style={{ color: '#aaa' }}>{label}</span>
+              <span style={{ color: name ? '#ffcc00' : '#444444' }}>
+                {name ?? '—'}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

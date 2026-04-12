@@ -101,18 +101,40 @@ export interface InventoryItem {
   description: string;
   workmanship: number;
   category?: string;
+  slot?: string;
   quantity?: number;
   isStackable?: boolean;
   isLocked?: boolean;
 }
 
+export type EquipmentSlotName =
+  | 'MeleeWeapon'
+  | 'RangedWeapon'
+  | 'Focus'
+  | 'Head'
+  | 'Chest'
+  | 'Legs'
+  | 'Hands'
+  | 'Feet'
+  | 'Accessory';
+
 export interface EquipmentSlots {
+  // Legacy ids (kept for backward compat during transition)
   weaponId?: string;
   armorId?: string;
   accessoryId?: string;
-  weaponName?: string;
-  armorName?: string;
+  // New 9-slot names
+  meleeWeaponName?: string;
+  rangedWeaponName?: string;
+  focusName?: string;
+  headName?: string;
+  chestName?: string;
+  legsName?: string;
+  handsName?: string;
+  feetName?: string;
   accessoryName?: string;
+  // Map of slot name → item id (from EquipmentChanged events)
+  equippedItems?: Record<string, string>;
 }
 
 export interface AbilityState {
@@ -152,6 +174,7 @@ export interface InventorySnapshot {
   autoSalvageWeaponThreshold: number;
   autoSalvageArmorThreshold: number;
   items: InventoryItem[];
+  // Legacy three-slot ids (may be absent after migration)
   equippedWeaponId?: string;
   equippedArmorId?: string;
   equippedAccessoryId?: string;
@@ -186,6 +209,7 @@ export interface LootDropEvent {
   description: string;
   workmanship: number;
   category: string;
+  slot?: string;
 }
 
 export interface AutoFarmStatus {

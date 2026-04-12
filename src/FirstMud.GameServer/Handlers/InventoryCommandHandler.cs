@@ -35,6 +35,7 @@ public class OpenInventoryCommandHandler(
                 i.Description,
                 Workmanship = i.Workmanship.Value,
                 Category = i.Category.ToString(),
+                Slot = i.Slot.ToString(),
                 i.Quantity,
                 i.IsStackable,
                 i.IsLocked
@@ -68,11 +69,12 @@ public class EquipCommandHandler(
         // Send the full equipment state so the client always has a consistent view
         var equippedPayload = new
         {
-            WeaponId = player.EquippedWeaponId?.ToString(),
-            ArmorId = player.EquippedArmorId?.ToString(),
-            AccessoryId = player.EquippedAccessoryId?.ToString(),
+            EquippedItems = player.EquippedItems.ToDictionary(
+                kv => kv.Key.ToString(),
+                kv => kv.Value.ToString()),
             ChangedItemId = item.Id.ToString(),
             ChangedItemName = item.Name,
+            Slot = item.Slot.ToString(),
             Category = item.Category.ToString(),
             ReplacedItemId = previousId?.ToString()
         };
@@ -123,6 +125,7 @@ public class LockItemCommandHandler(
                 i.Description,
                 Workmanship = i.Workmanship.Value,
                 Category = i.Category.ToString(),
+                Slot = i.Slot.ToString(),
                 i.Quantity,
                 i.IsStackable,
                 i.IsLocked
@@ -145,10 +148,11 @@ public class UnequipCommandHandler(
         if (player is null)
             return new CommandResult(false, "Player not found.");
 
-        if (!Enum.TryParse<ItemCategory>(cmd.Slot, ignoreCase: true, out var slotCategory))
-            return new CommandResult(false, $"Unknown equipment slot: {cmd.Slot}. Valid: Weapon, Armor, Accessory.");
+        if (!Enum.TryParse<EquipmentSlot>(cmd.Slot, ignoreCase: true, out var slot) || slot == EquipmentSlot.None)
+            return new CommandResult(false,
+                $"Unknown equipment slot: {cmd.Slot}. Valid: MeleeWeapon, RangedWeapon, Focus, Head, Chest, Legs, Hands, Feet, Accessory.");
 
-        var removedId = player.Unequip(slotCategory);
+        var removedId = player.Unequip(slot);
         if (removedId is null)
             return new CommandResult(false, "No item equipped in that slot.");
 
@@ -159,9 +163,9 @@ public class UnequipCommandHandler(
         // Send the full equipment state so the client always has a consistent view
         var unequipPayload = new
         {
-            WeaponId = player.EquippedWeaponId?.ToString(),
-            ArmorId = player.EquippedArmorId?.ToString(),
-            AccessoryId = player.EquippedAccessoryId?.ToString(),
+            EquippedItems = player.EquippedItems.ToDictionary(
+                kv => kv.Key.ToString(),
+                kv => kv.Value.ToString()),
             RemovedSlot = cmd.Slot
         };
         await notificationService.SendEventAsync(cmd.PlayerId, "EquipmentChanged", unequipPayload, ct);

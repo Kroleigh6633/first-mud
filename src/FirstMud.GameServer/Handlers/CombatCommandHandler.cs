@@ -25,15 +25,17 @@ public class StartCombatCommandHandler(
         var dangerLevel = (int)(cmd.ZoneId.GetHashCode() & 0x7FFFFFFF) % 3 + 1;
         var monsters = CombatHelpers.BuildMonsterPack(dangerLevel);
 
-        var equippedWeapon = player.EquippedWeaponId.HasValue
-            ? await itemRepository.GetByIdAsync(player.EquippedWeaponId.Value, ct)
-            : null;
-        var equippedArmor = player.EquippedArmorId.HasValue
-            ? await itemRepository.GetByIdAsync(player.EquippedArmorId.Value, ct)
-            : null;
+        // Load all equipped items into a slot → Item dictionary
+        var equippedItems = new Dictionary<Domain.Enums.EquipmentSlot, Domain.Entities.Item>();
+        foreach (var (slot, itemId) in player.EquippedItems)
+        {
+            var equippedItem = await itemRepository.GetByIdAsync(itemId, ct);
+            if (equippedItem is not null)
+                equippedItems[slot] = equippedItem;
+        }
 
         var encounter = await combatService.StartEncounterAsync(
-            cmd.PlayerId, cmd.ZoneId, player, [], monsters, equippedWeapon, equippedArmor, ct);
+            cmd.PlayerId, cmd.ZoneId, player, [], monsters, equippedItems, ct);
 
         await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, encounter, ct);
 

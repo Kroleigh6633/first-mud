@@ -148,6 +148,37 @@ public class CombatHelpers(
 
         var item = result.Item!;
         await notificationService.SendMessageAsync(playerId, "loot", result.Message, ct);
+
+        // Auto-equip logic: only for items with a real slot
+        if (item.Slot != Domain.Enums.EquipmentSlot.None)
+        {
+            var slot = item.Slot;
+            var currentEquippedId = player.GetEquipped(slot);
+
+            if (currentEquippedId is null)
+            {
+                // Slot is empty — auto-equip
+                player.Equip(slot, item.Id);
+                await playerRepository.UpdateAsync(player, ct);
+                await notificationService.SendMessageAsync(playerId, "loot", $"You equip the {item.Name}.", ct);
+            }
+            else
+            {
+                // Compare workmanship
+                var currentEquipped = await itemRepository.GetByIdAsync(currentEquippedId.Value, ct);
+                if (currentEquipped is not null
+                    && item.Workmanship.Value > currentEquipped.Workmanship.Value
+                    && !currentEquipped.IsLocked)
+                {
+                    // Swap: new item is better and old item is not locked
+                    player.Equip(slot, item.Id);
+                    await playerRepository.UpdateAsync(player, ct);
+                    await notificationService.SendMessageAsync(playerId, "loot",
+                        $"You swap your {currentEquipped.Name} W{currentEquipped.Workmanship.Value} for {item.Name} W{item.Workmanship.Value}. Much better.", ct);
+                }
+            }
+        }
+
         await hubContext.Clients
             .Group(playerId.ToString())
             .SendAsync("LootDropped", new
@@ -156,7 +187,8 @@ public class CombatHelpers(
                 item.Name,
                 item.Description,
                 Workmanship = item.Workmanship.Value,
-                Category = item.Category.ToString()
+                Category = item.Category.ToString(),
+                Slot = item.Slot.ToString()
             }, ct);
     }
 

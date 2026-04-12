@@ -56,10 +56,9 @@ public class Player
     private readonly List<PlayerFactionReputation> _reputations = [];
     public IReadOnlyList<PlayerFactionReputation> Reputations => _reputations.AsReadOnly();
 
-    // Equipment slots
-    public Guid? EquippedWeaponId { get; private set; }
-    public Guid? EquippedArmorId { get; private set; }
-    public Guid? EquippedAccessoryId { get; private set; }
+    // Equipment — 9-slot dictionary backed by a JSON column
+    // EF Core maps this directly; callers should treat it as read-only via GetEquipped/Equip/Unequip.
+    public Dictionary<EquipmentSlot, Guid> EquippedItems { get; private set; } = [];
 
     // Companions (active slots — max 3)
     private readonly List<Guid> _activeCompanionIds = [];
@@ -211,52 +210,41 @@ public class Player
         _activeCompanionIds.Remove(companionId);
 
     /// <summary>
-    /// Equips an item into the appropriate slot based on its category.
+    /// Returns the item ID currently equipped in the given slot, or null if empty.
+    /// </summary>
+    public Guid? GetEquipped(EquipmentSlot slot) =>
+        EquippedItems.TryGetValue(slot, out var id) ? id : null;
+
+    /// <summary>
+    /// Equips an item into its designated slot.
     /// Returns the previously-equipped item id in that slot (for swap), or null if the slot was empty.
+    /// Items with Slot == None fall back to Accessory slot.
     /// </summary>
     public Guid? Equip(Item item)
     {
-        Guid? previous;
-        switch (item.Category)
-        {
-            case ItemCategory.Weapon:
-                previous = EquippedWeaponId;
-                EquippedWeaponId = item.Id;
-                break;
-            case ItemCategory.Armor:
-                previous = EquippedArmorId;
-                EquippedArmorId = item.Id;
-                break;
-            default:
-                // Accessory, Component, and everything else goes into accessory slot
-                previous = EquippedAccessoryId;
-                EquippedAccessoryId = item.Id;
-                break;
-        }
-        return previous;
+        var slot = item.Slot == EquipmentSlot.None ? EquipmentSlot.Accessory : item.Slot;
+        return Equip(slot, item.Id);
+    }
+
+    /// <summary>
+    /// Equips an item by slot and id directly.
+    /// Returns the previous item id in that slot, or null if it was empty.
+    /// </summary>
+    public Guid? Equip(EquipmentSlot slot, Guid itemId)
+    {
+        EquippedItems.TryGetValue(slot, out var previous);
+        EquippedItems[slot] = itemId;
+        return previous == Guid.Empty ? null : previous;
     }
 
     /// <summary>
     /// Unequips the item in the given slot. Returns the unequipped item id, or null if slot was empty.
     /// </summary>
-    public Guid? Unequip(ItemCategory slot)
+    public Guid? Unequip(EquipmentSlot slot)
     {
-        Guid? removed;
-        switch (slot)
-        {
-            case ItemCategory.Weapon:
-                removed = EquippedWeaponId;
-                EquippedWeaponId = null;
-                break;
-            case ItemCategory.Armor:
-                removed = EquippedArmorId;
-                EquippedArmorId = null;
-                break;
-            default:
-                removed = EquippedAccessoryId;
-                EquippedAccessoryId = null;
-                break;
-        }
+        if (!EquippedItems.TryGetValue(slot, out var removed))
+            return null;
+        EquippedItems.Remove(slot);
         return removed;
     }
 

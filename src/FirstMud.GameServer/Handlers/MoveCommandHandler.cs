@@ -73,7 +73,7 @@ public class MoveCommandHandler(
         var monsters = CombatHelpers.BuildMonsterPack(nearbyZone.DangerLevel);
 
         var encounter = await combatService.StartEncounterAsync(
-            playerId, Guid.NewGuid(), player, [], monsters, null, null, ct);
+            playerId, Guid.NewGuid(), player, [], monsters, ct: ct);
 
         var monsterNames = string.Join(", ", monsters.Select(m => m.Name));
         await notificationService.SendMessageAsync(

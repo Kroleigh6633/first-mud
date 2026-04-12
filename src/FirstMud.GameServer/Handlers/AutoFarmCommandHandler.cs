@@ -105,8 +105,7 @@ public class AutoFarmCommandHandler(
                 var monsters = CombatHelpers.BuildMonsterPack(dangerLevel);
 
                 var encounter = await combatSvc.StartEncounterAsync(
-                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), player, [], monsters,
-                    equippedWeapon: null, equippedArmor: null, ct: farmCt);
+                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), player, [], monsters, ct: farmCt);
 
                 await hubContext.Clients
                     .Group(playerId.ToString())

@@ -57,18 +57,22 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.ActionPoints);
         builder.Property(p => p.MaxActionPoints);
 
-        // Equipment slots — nullable foreign key columns (no navigation, just IDs)
-        builder.Property(p => p.EquippedWeaponId)
-            .HasColumnName("EquippedWeaponId")
-            .IsRequired(false);
-
-        builder.Property(p => p.EquippedArmorId)
-            .HasColumnName("EquippedArmorId")
-            .IsRequired(false);
-
-        builder.Property(p => p.EquippedAccessoryId)
-            .HasColumnName("EquippedAccessoryId")
-            .IsRequired(false);
+        // Equipment — 9-slot dictionary stored as JSON
+        builder.Property(p => p.EquippedItems)
+            .HasColumnName("EquippedItemsJson")
+            .HasColumnType("nvarchar(max)")
+            .HasConversion(
+                v => System.Text.Json.JsonSerializer.Serialize(
+                    v.ToDictionary(kv => (int)kv.Key, kv => kv.Value),
+                    (System.Text.Json.JsonSerializerOptions?)null),
+                v => System.Text.Json.JsonSerializer
+                        .Deserialize<Dictionary<int, Guid>>(v, (System.Text.Json.JsonSerializerOptions?)null)!
+                        .ToDictionary(kv => (EquipmentSlot)kv.Key, kv => kv.Value))
+            .Metadata.SetValueComparer(new ValueComparer<Dictionary<EquipmentSlot, Guid>>(
+                (a, b) => a != null && b != null && a.Count == b.Count &&
+                          !a.Except(b).Any(),
+                v => v.Aggregate(0, (h, kv) => HashCode.Combine(h, kv.Key.GetHashCode(), kv.Value.GetHashCode())),
+                v => v.ToDictionary(kv => kv.Key, kv => kv.Value)));
 
         // Weave owned type — stored as two int columns
         builder.OwnsOne(p => p.Weave, weave =>

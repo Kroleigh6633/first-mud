@@ -154,20 +154,26 @@ export default function StatusPanel({ player, currentTile, equipment }: Props) {
       })}
 
       <div style={sectionHeaderStyle}>Equipment</div>
-      {equipment?.weaponName ? (
-        <div style={{ color: '#ffcc00', fontSize: '11px', marginBottom: '2px' }}>
-          <span style={{ color: '#888888' }}>Weapon: </span>{equipment.weaponName}
+      {[
+        ['Melee', equipment?.meleeWeaponName],
+        ['Ranged', equipment?.rangedWeaponName],
+        ['Focus', equipment?.focusName],
+        ['Head', equipment?.headName],
+        ['Chest', equipment?.chestName],
+        ['Legs', equipment?.legsName],
+        ['Hands', equipment?.handsName],
+        ['Feet', equipment?.feetName],
+        ['Acc', equipment?.accessoryName],
+      ].map(([label, name]) => (
+        <div key={label as string} style={{ fontSize: '11px', marginBottom: '1px', display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: '#888888', minWidth: '46px' }}>{label}:</span>
+          {name ? (
+            <span style={{ color: '#ffcc00', textAlign: 'right', flex: 1 }}>{name as string}</span>
+          ) : (
+            <span style={{ color: '#333333', textAlign: 'right', flex: 1 }}>—</span>
+          )}
         </div>
-      ) : (
-        <div style={{ color: '#444444', fontSize: '11px', marginBottom: '2px' }}>Weapon: —</div>
-      )}
-      {equipment?.armorName ? (
-        <div style={{ color: '#ffcc00', fontSize: '11px', marginBottom: '2px' }}>
-          <span style={{ color: '#888888' }}>Armor: </span>{equipment.armorName}
-        </div>
-      ) : (
-        <div style={{ color: '#444444', fontSize: '11px', marginBottom: '2px' }}>Armor: —</div>
-      )}
+      ))}
 
       <div style={sectionHeaderStyle}>Companions</div>
       {player.activeCompanionIds.length === 0 ? (

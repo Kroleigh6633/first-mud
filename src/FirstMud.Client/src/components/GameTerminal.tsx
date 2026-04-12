@@ -359,7 +359,7 @@ export default function GameTerminal({
         />
       )}
       {showCharSheet && (
-        <CharacterSheet player={worldState?.player ?? null} onClose={() => setShowCharSheet(false)} />
+        <CharacterSheet player={worldState?.player ?? null} equipment={equipment} onClose={() => setShowCharSheet(false)} />
       )}
       {combat && <CombatPanel combat={combat} sendCommand={sendCommand} />}
       {showStorage && atHomestead && (
