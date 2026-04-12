@@ -239,6 +239,12 @@ public class GameHub : Hub
                 playerId,
                 TryGetGuid(payload, "itemId")),
 
+            "viewrecipes" => new ViewRecipesCommand(playerId),
+
+            "useconsumable" => new UseConsumableCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
             _ => null
         };
     }

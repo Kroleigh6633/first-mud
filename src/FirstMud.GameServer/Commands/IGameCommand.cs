@@ -40,3 +40,5 @@ public record ImbueCommand(Guid PlayerId, Guid ItemId, Guid TaperId) : IGameComm
 public record AssignCompanionDutyCommand(Guid PlayerId, Guid CompanionId, string Duty) : IGameCommand;
 public record RecallCompanionCommand(Guid PlayerId, Guid CompanionId) : IGameCommand;
 public record QueueSalvageCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
+public record ViewRecipesCommand(Guid PlayerId) : IGameCommand;
+public record UseConsumableCommand(Guid PlayerId, Guid ItemId) : IGameCommand;

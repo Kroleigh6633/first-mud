@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -71,6 +71,8 @@ export interface GameConnectionResult {
   capturedCompanions: CompanionCapturedEvent[];
   wanderingNpcs: WanderingNpc[];
   companionRoster: CompanionState[];
+  recipes: RecipeInfo[];
+  lastCraftResult: CraftingCompleteEvent | null;
 }
 
 export function useGameConnection(): GameConnectionResult {
@@ -93,6 +95,8 @@ export function useGameConnection(): GameConnectionResult {
   const [capturedCompanions, setCapturedCompanions] = useState<CompanionCapturedEvent[]>([]);
   const [wanderingNpcs, setWanderingNpcs] = useState<WanderingNpc[]>([]);
   const [companionRoster, setCompanionRoster] = useState<CompanionState[]>([]);
+  const [recipes, setRecipes] = useState<RecipeInfo[]>([]);
+  const [lastCraftResult, setLastCraftResult] = useState<CraftingCompleteEvent | null>(null);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
@@ -437,6 +441,18 @@ export function useGameConnection(): GameConnectionResult {
       sendCommand('enterzone', { worldId: 1, zoneId: '00000000-0000-0000-0000-000000000000' });
     });
 
+    connection.on('RecipeList', (payload: { recipes: RecipeInfo[] }) => {
+      setRecipes(payload?.recipes ?? []);
+    });
+
+    connection.on('CraftingComplete', (result: CraftingCompleteEvent) => {
+      setLastCraftResult(result);
+      // Refresh inventory after a successful craft so the new item appears
+      if (result.outcome === 'Success' || result.outcome === 'Discovery') {
+        connection.invoke('SendCommand', 'openinventory', null).catch(() => {/* ignore */});
+      }
+    });
+
     connection.onreconnecting(() => {
       setConnectionState('connecting');
       appendMessage({
@@ -548,5 +564,7 @@ export function useGameConnection(): GameConnectionResult {
     capturedCompanions,
     wanderingNpcs,
     companionRoster,
+    recipes,
+    lastCraftResult,
   };
 }

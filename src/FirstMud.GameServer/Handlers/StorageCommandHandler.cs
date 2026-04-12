@@ -135,7 +135,16 @@ public class OpenStorageCommandHandler(
                 i.Name,
                 i.Description,
                 Category = i.Category.ToString(),
-                Workmanship = i.Workmanship.Value
+                Workmanship = i.Workmanship.Value,
+                i.Quantity,
+                i.IsStackable,
+                i.IsUnstable,
+                MaxImbueSlots = i.MaxImbueSlots,
+                Imbues = i.Imbues.Select(imbue => new
+                {
+                    Type = imbue.Type.ToString(),
+                    imbue.Power
+                }).ToList()
             }).ToList()
         };
 

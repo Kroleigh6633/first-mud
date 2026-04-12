@@ -206,6 +206,17 @@ const imbueBtnStyle: React.CSSProperties = {
   marginLeft: '6px',
 };
 
+const useBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #44ffaa',
+  color: '#44ffaa',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+  marginLeft: '6px',
+};
+
 const unequipBtnStyle: React.CSSProperties = {
   background: 'none',
   border: '1px solid #ff8800',
@@ -243,6 +254,34 @@ function imbueSymbol(_type: string): string {
 
 function imbueColor(type: string): string {
   return imbueTypeColors[type] ?? '#888888';
+}
+
+function renderImbueDetails(item: InventoryItem): React.ReactNode {
+  const imbues = item.imbues;
+  if (!imbues || imbues.length === 0) return null;
+  const parts = imbues.map(im => {
+    const pct = Math.round(im.power * 100);
+    const label = im.type === 'Fortifying'
+      ? `${im.type} +${(item.workmanship ?? 1)}W`
+      : pct > 0
+        ? `${im.type} +${pct}%`
+        : im.type;
+    return (
+      <span key={`${im.type}-${im.power}`} style={{ color: imbueColor(im.type) }}>
+        {label}
+      </span>
+    );
+  });
+  const joined: React.ReactNode[] = [];
+  parts.forEach((p, i) => {
+    joined.push(p);
+    if (i < parts.length - 1) joined.push(<span key={`sep-${i}`} style={{ color: '#555555' }}>, </span>);
+  });
+  return (
+    <div style={{ fontSize: '10px', marginTop: '2px', color: '#888888' }}>
+      imbues: {joined}
+    </div>
+  );
 }
 
 function renderImbueSlots(item: InventoryItem): React.ReactNode {
@@ -335,6 +374,11 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
     sendCommand('deposit', { itemId });
     // Re-request inventory after a short delay so the deposited item disappears
     // from the panel without the player needing to open Storage (V) first.
+    setTimeout(() => sendCommand('openinventory', null), 400);
+  };
+
+  const handleUseConsumable = (itemId: string) => {
+    sendCommand('useconsumable', { itemId });
     setTimeout(() => sendCommand('openinventory', null), 400);
   };
 
@@ -543,6 +587,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                     </span>
                   </div>
                   {item.description && <div style={itemDescStyle}>{item.description}</div>}
+                  {isImbueable && renderImbueDetails(item)}
                   {/* Imbue sub-panel */}
                   {isShowingImbuePanel && (
                     <div style={imbuePanelStyle}>
@@ -678,6 +723,17 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                           imbue
                         </button>
                     )}
+                    {item.category === 'Consumable' && (
+                      <button
+                        type="button"
+                        style={useBtnStyle}
+                        onClick={() => handleUseConsumable(item.id)}
+                        aria-label={`use ${item.name}`}
+                        title={`Use ${item.name}`}
+                      >
+                        use
+                      </button>
+                    )}
                     {atHomestead && (
                       <button
                         type="button"
@@ -726,6 +782,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                   </span>
                 </div>
                 {item.description && <div style={itemDescStyle}>{item.description}</div>}
+                {isImbueable && renderImbueDetails(item)}
                 {/* Imbue sub-panel */}
                 {isShowingImbuePanel && (
                   <div style={imbuePanelStyle}>

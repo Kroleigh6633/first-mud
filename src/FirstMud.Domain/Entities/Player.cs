@@ -216,6 +216,15 @@ public class Player
         CurrentHp = Math.Min(MaxHp, CurrentHp + amount);
     }
 
+    /// <summary>
+    /// Sets CurrentHp directly (e.g. to sync back the result of a combat encounter).
+    /// Value is clamped to [1, MaxHp] — use 1 as minimum so the player is never stored at 0 HP.
+    /// </summary>
+    public void SetCurrentHp(int hp)
+    {
+        CurrentHp = Math.Clamp(hp, 1, MaxHp);
+    }
+
     public void UnlockPortal(WorldId worldId)
     {
         if (_unlockedPortals.Add(worldId))

@@ -1,5 +1,4 @@
 using FirstMud.Application.Services;
-using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
@@ -79,8 +78,17 @@ public class UseCombatAbilityCommandHandler(
         if (updated.State == EncounterState.Victory)
         {
             await combatHelpers.AwardCombatXpAsync(cmd.PlayerId, updated, ct);
+            await combatHelpers.SyncPlayerHpAfterCombatAsync(cmd.PlayerId, updated, ct);
             await combatHelpers.TryRollLootAsync(cmd.PlayerId, updated.ZoneId, ct);
             await combatHelpers.TryCaptureCompanionAsync(cmd.PlayerId, updated, ct);
+        }
+        else if (updated.State == EncounterState.Defeat)
+        {
+            await combatHelpers.HandlePlayerDefeatAsync(cmd.PlayerId, ct);
+        }
+        else if (updated.State == EncounterState.Fled)
+        {
+            await combatHelpers.SyncPlayerHpAfterCombatAsync(cmd.PlayerId, updated, ct);
         }
 
         var dto = CombatHelpers.BuildCombatUpdateDto(updated, message);

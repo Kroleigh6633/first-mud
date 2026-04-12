@@ -232,6 +232,11 @@ export interface StorageItem {
   description: string;
   category: string;
   workmanship: number;
+  quantity?: number;
+  isStackable?: boolean;
+  isUnstable?: boolean;
+  maxImbueSlots?: number;
+  imbues?: AppliedImbue[];
 }
 
 export interface StorageViewSnapshot {
@@ -257,6 +262,37 @@ export interface AutoFarmStatus {
   kills?: number;
   items?: number;
   reason?: string;
+}
+
+export interface RecipeIngredient {
+  ingredientName: string;
+  baseQuantity: number;
+  category: string;
+}
+
+export interface RecipeInfo {
+  recipeId: string;
+  name: string;
+  resultItemName: string;
+  resultCategory: string;
+  requiredCraftingSkill: number;
+  requiredWorld: string;
+  requiredTaperType?: string | null;
+  baseWorkmanshipMin: number;
+  baseWorkmanshipMax: number;
+  isDiscoverable: boolean;
+  ingredients: RecipeIngredient[];
+}
+
+export interface CraftingCompleteEvent {
+  outcome: string;
+  itemId?: string | null;
+  itemName?: string | null;
+  workmanship: number;
+  category?: string | null;
+  slot?: string | null;
+  isDiscovery: boolean;
+  message: string;
 }
 
 export interface WanderingNpc {

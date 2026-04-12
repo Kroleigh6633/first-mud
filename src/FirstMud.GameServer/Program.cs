@@ -77,6 +77,9 @@ builder.Services.AddScoped<ICommandHandler<ImbueCommand>, ImbueCommandHandler>()
 builder.Services.AddScoped<ICommandHandler<AssignCompanionDutyCommand>, AssignCompanionDutyCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<RecallCompanionCommand>, RecallCompanionCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<QueueSalvageCommand>, QueueSalvageCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<CraftCommand>, CraftCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ViewRecipesCommand>, ViewRecipesCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<UseConsumableCommand>, UseConsumableCommandHandler>();
 
 var app = builder.Build();
 

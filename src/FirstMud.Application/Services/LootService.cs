@@ -76,6 +76,19 @@ public class LootService
         new("Bone Fragment",        "A large bone fragment — useful as a crafting material.",                    ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Wyrd Shard",           "A jagged shard of crystallised Wyrd-energy. Handle with care.",             ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 3, MaxWork: 7),
 
+        // Consumables — healing
+        new("Minor Healing Draught", "A small vial of copper-coloured tonic. Restores 30 HP when consumed.",      ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 1, MaxWork: 2),
+        new("Healing Potion",        "A corked flask of luminous green liquid. Restores 60 HP when consumed.",    ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 3),
+        new("Greater Healing Elixir","A heavy bottle of deep-crimson elixir. Restores 100 HP when consumed.",    ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 3, MaxWork: 5),
+
+        // Consumables — weave
+        new("Weave Tincture",        "A small vial of shimmering blue tincture. Restores 20 Weave when consumed.", ItemCategory.Consumable, EquipmentSlot.None,       MinWork: 1, MaxWork: 2),
+        new("Weave Elixir",          "A flask of swirling violet liquid. Restores 50 Weave when consumed.",       ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 4),
+
+        // Consumables — buffs
+        new("Fortitude Brew",        "A dark amber brew that hardens the body. +10% max HP for next combat.",     ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 3),
+        new("Speed Draught",         "A clear, fizzing draught that quickens the limbs. +20% speed for next combat.", ItemCategory.Consumable, EquipmentSlot.None,    MinWork: 2, MaxWork: 3),
+        new("Strength Tonic",        "A thick red tonic with a sharp bite. +15% strike damage for next combat.",  ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 3),
     ];
 
     // -------------------------------------------------------------------------
@@ -154,6 +167,19 @@ public class LootService
         ],
     };
 
+    // Consumable templates — rolled separately at ~10% chance after the main loot roll
+    private static readonly LootTemplate[] ConsumableTemplates =
+    [
+        new("Minor Healing Draught", "A small vial of copper-coloured tonic. Restores 30 HP when consumed.",      ItemCategory.Consumable, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Healing Potion",        "A corked flask of luminous green liquid. Restores 60 HP when consumed.",    ItemCategory.Consumable, EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+        new("Greater Healing Elixir","A heavy bottle of deep-crimson elixir. Restores 100 HP when consumed.",    ItemCategory.Consumable, EquipmentSlot.None, MinWork: 3, MaxWork: 5),
+        new("Weave Tincture",        "A small vial of shimmering blue tincture. Restores 20 Weave when consumed.", ItemCategory.Consumable, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+        new("Weave Elixir",          "A flask of swirling violet liquid. Restores 50 Weave when consumed.",       ItemCategory.Consumable, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+        new("Fortitude Brew",        "A dark amber brew that hardens the body. +10% max HP for next combat.",     ItemCategory.Consumable, EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+        new("Speed Draught",         "A clear, fizzing draught that quickens the limbs. +20% speed for next combat.", ItemCategory.Consumable, EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+        new("Strength Tonic",        "A thick red tonic with a sharp bite. +15% strike damage for next combat.",  ItemCategory.Consumable, EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+    ];
+
     // Taper templates — rolled separately at ~15% chance after the main loot roll
     private static readonly LootTemplate[] TaperTemplates =
     [
@@ -221,12 +247,29 @@ public class LootService
             }
         }
 
+        // Separate consumable drop: 10% flat chance (independent of main drop)
+        if (Random.Shared.Next(100) < 10)
+        {
+            var consumableTemplate = ConsumableTemplates[Random.Shared.Next(ConsumableTemplates.Length)];
+            var consumableWork = Workmanship.Of(Math.Clamp(
+                consumableTemplate.MinWork + Random.Shared.Next(consumableTemplate.MaxWork - consumableTemplate.MinWork + 1),
+                1, 10));
+            var consumableItem = Item.Create(consumableTemplate.Name, consumableTemplate.Description,
+                consumableTemplate.Category, consumableWork, originWorld, slot: consumableTemplate.Slot);
+            consumableItem.SetOwner(ownerId);
+            await _itemRepository.AddAsync(consumableItem, ct);
+            _logger.LogInformation("Consumable drop for player {PlayerId}: {Name}", ownerId, consumableTemplate.Name);
+        }
+
         if (Random.Shared.Next(100) >= dropChance)
             return new LootDropResult(false, null, string.Empty);
 
-        // Select a template — higher danger skews toward later (better) templates
-        var maxTemplateIndex = Math.Min(Templates.Length - 1, 4 + dangerLevel);
-        var template = Templates[Random.Shared.Next(0, maxTemplateIndex + 1)];
+        // Select a template — pick from ALL templates at all danger levels.
+        // Previously this index-capped selection caused low-danger loot to only draw
+        // from the first few templates (mostly melee weapons), so legs/hands/feet armor
+        // never dropped at danger 1-3. Now we pick uniformly across every slot type;
+        // workmanship is already scaled by the danger bonus below.
+        var template = Templates[Random.Shared.Next(Templates.Length)];
 
         // For material categories, replace with a biome-appropriate material
         if (template.Category is ItemCategory.Component or ItemCategory.Reagent)

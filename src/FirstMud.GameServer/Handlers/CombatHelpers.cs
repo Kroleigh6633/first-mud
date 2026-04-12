@@ -834,4 +834,70 @@ public class CombatHelpers(
             encounter.RoundNumber,
             lastActionText);
     }
+
+    // -------------------------------------------------------------------------
+    // HP sync helpers (Issue 2)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// After combat ends (Victory or Fled), syncs the player combatant's remaining HP
+    /// back to the Player entity so damage persists between encounters.
+    /// </summary>
+    public async Task SyncPlayerHpAfterCombatAsync(Guid playerId, Encounter encounter, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(playerId, ct);
+        if (player is null) return;
+
+        var playerCombatant = encounter.Combatants
+            .FirstOrDefault(c => c.IsPlayerSide && c.CombatantType == CombatantType.Player);
+
+        if (playerCombatant is null) return;
+
+        // Cap at the player's actual MaxHp — combat MaxHp can be inflated by armor bonuses
+        var syncedHp = Math.Min(playerCombatant.CurrentHp, player.MaxHp);
+        player.SetCurrentHp(syncedHp);
+        await playerRepository.UpdateAsync(player, ct);
+
+        // TODO: sync Weave cost from Weave Bolt usage once Weave deduction is implemented in combat
+
+        logger.LogDebug("Synced player {PlayerId} HP to {Hp} after combat", playerId, syncedHp);
+    }
+
+    /// <summary>
+    /// Handles player defeat: sets HP to 1, portals them home, broadcasts the narrative.
+    /// </summary>
+    public async Task HandlePlayerDefeatAsync(Guid playerId, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(playerId, ct);
+        if (player is null) return;
+
+        player.SetCurrentHp(1);
+
+        // Mirror the same homestead position used by PortalHomeCommandHandler
+        var homesteadPosition = new Domain.ValueObjects.Position(player.Position.World, 0, -100, -100);
+        player.PortalHome(homesteadPosition);
+
+        await playerRepository.UpdateAsync(player, ct);
+
+        await notificationService.SendMessageAsync(playerId, "system",
+            "You have been defeated. You wake at your homestead, wounds bound and spirit shaken...", ct);
+
+        // Push updated world state so client reflects new position
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("PlayerMoved", new
+            {
+                Id = playerId,
+                X = homesteadPosition.X,
+                Y = homesteadPosition.Y,
+                ZoneId = homesteadPosition.ZoneId,
+                World = homesteadPosition.World.ToString()
+            }, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("AtHomestead", new { playerId }, ct);
+
+        logger.LogInformation("Player {PlayerId} defeated — portaled home", playerId);
+    }
 }

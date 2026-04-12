@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import type { StorageViewSnapshot } from '../types/game';
+import type { StorageViewSnapshot, AppliedImbue } from '../types/game';
 
 interface Props {
   snapshot: StorageViewSnapshot | null;
-  inventoryItems: { id: string; name: string; description: string; workmanship: number; category?: string }[];
+  inventoryItems: { id: string; name: string; description: string; workmanship: number; category?: string; quantity?: number; isStackable?: boolean; isUnstable?: boolean; maxImbueSlots?: number; imbues?: AppliedImbue[] }[];
   onDeposit: (itemId: string) => void;
   onWithdraw: (itemId: string) => void;
   onClose: () => void;
@@ -13,9 +13,61 @@ interface GroupedItem<T> {
   representative: T;
   ids: string[];
   count: number;
+  totalQuantity: number;
 }
 
 type TabCategory = 'All' | 'Weapon' | 'Armor' | 'Component' | 'Reagent' | 'Consumable';
+
+const imbueTypeColors: Record<string, string> = {
+  Fire: '#ff4422',
+  Water: '#2288ff',
+  Earth: '#88aa22',
+  Air: '#aaccff',
+  Protective: '#44ddaa',
+  Fortifying: '#ffaa22',
+  Wyrd: '#cc44ff',
+  Restoration: '#44ff88',
+};
+
+function imbueColor(type: string): string {
+  return imbueTypeColors[type] ?? '#888888';
+}
+
+function renderImbueSlots(item: { maxImbueSlots?: number; imbues?: AppliedImbue[] }): React.ReactNode {
+  const maxSlots = item.maxImbueSlots ?? 1;
+  const imbues = item.imbues ?? [];
+  const slots: React.ReactNode[] = [];
+  for (let i = 0; i < maxSlots; i++) {
+    const imbue = imbues[i];
+    if (imbue) {
+      slots.push(
+        <span key={i} title={`${imbue.type} +${Math.round(imbue.power * 100)}%`} style={{ color: imbueColor(imbue.type), cursor: 'help' }}>✦</span>
+      );
+    } else {
+      slots.push(<span key={i} style={{ color: '#333333' }}>○</span>);
+    }
+  }
+  return <span style={{ marginLeft: '6px', letterSpacing: '2px' }}>{slots}</span>;
+}
+
+function renderImbueDetails(imbues: AppliedImbue[] | undefined): React.ReactNode {
+  if (!imbues || imbues.length === 0) return null;
+  const parts = imbues.map(im => {
+    const pct = Math.round(im.power * 100);
+    return (
+      <span key={`${im.type}-${im.power}`} style={{ color: imbueColor(im.type) }}>
+        {im.type}{pct > 0 ? ` +${pct}%` : ''}
+      </span>
+    );
+  });
+  const joined: React.ReactNode[] = [];
+  parts.forEach((p, i) => { joined.push(p); if (i < parts.length - 1) joined.push(<span key={`sep-${i}`} style={{ color: '#555' }}>, </span>); });
+  return (
+    <div style={{ fontSize: '10px', marginTop: '2px', color: '#888888' }}>
+      imbues: {joined}
+    </div>
+  );
+}
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
@@ -103,18 +155,20 @@ const actionBtnStyle: React.CSSProperties = {
 
 const TABS: TabCategory[] = ['All', 'Weapon', 'Armor', 'Component', 'Reagent', 'Consumable'];
 
-function groupItems<T extends { id: string; name: string; workmanship: number; category?: string }>(
+function groupItems<T extends { id: string; name: string; workmanship: number; category?: string; quantity?: number; isStackable?: boolean }>(
   items: T[]
 ): GroupedItem<T>[] {
   const map = new Map<string, GroupedItem<T>>();
   for (const item of items) {
     const key = `${item.name}||${item.workmanship}||${item.category ?? ''}`;
+    const qty = item.quantity ?? 1;
     const existing = map.get(key);
     if (existing) {
       existing.ids.push(item.id);
       existing.count += 1;
+      existing.totalQuantity += qty;
     } else {
-      map.set(key, { representative: item, ids: [item.id], count: 1 });
+      map.set(key, { representative: item, ids: [item.id], count: 1, totalQuantity: qty });
     }
   }
   return Array.from(map.values());
@@ -191,29 +245,41 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
         ) : (
           groupedStorageItems.map(group => {
             const item = group.representative;
+            const isImbueable = item.category === 'Weapon' || item.category === 'Armor' || item.category === 'Accessory';
+            const isStackable = item.isStackable ?? (item.category === 'Component' || item.category === 'Reagent' || item.category === 'Consumable');
+            const displayQty = isStackable ? group.totalQuantity : group.count;
             return (
-              <div key={item.id} style={itemRowStyle}>
-                <div>
-                  <span style={{ color: '#00ff41' }}>{item.name}</span>
-                  <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
-                    W{item.workmanship}
-                  </span>
-                  <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
-                    [{item.category}]
-                  </span>
-                  {group.count > 1 && (
-                    <span style={{ color: '#aaaaaa', fontSize: '11px', marginLeft: '6px' }}>
-                      x{group.count}
+              <div key={item.id} style={{ ...itemRowStyle, ...(item.isUnstable ? { borderLeft: '2px solid #cc44ff' } : {}) }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ color: '#00ff41' }}>{item.name}</span>
+                    {isImbueable && renderImbueSlots(item)}
+                    <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
+                      W{item.workmanship}
                     </span>
-                  )}
+                    <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
+                      [{item.category}]
+                    </span>
+                    {displayQty > 1 && (
+                      <span style={{ color: '#ffdd44', fontSize: '11px', marginLeft: '6px' }}>
+                        x{displayQty}
+                      </span>
+                    )}
+                    {item.isUnstable && (
+                      <span style={{ color: '#cc44ff', fontSize: '10px', marginLeft: '4px' }}>
+                        [UNSTABLE]
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    style={actionBtnStyle}
+                    onClick={() => onWithdraw(group.ids[0])}
+                  >
+                    withdraw
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  style={actionBtnStyle}
-                  onClick={() => onWithdraw(group.ids[0])}
-                >
-                  withdraw
-                </button>
+                {isImbueable && renderImbueDetails(item.imbues)}
               </div>
             );
           })
@@ -228,31 +294,43 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
         ) : (
           groupedInventoryItems.map(group => {
             const item = group.representative;
+            const isImbueable = item.category === 'Weapon' || item.category === 'Armor' || item.category === 'Accessory';
+            const isStackable = item.isStackable ?? (item.category === 'Component' || item.category === 'Reagent' || item.category === 'Consumable');
+            const displayQty = isStackable ? group.totalQuantity : group.count;
             return (
-              <div key={item.id} style={itemRowStyle}>
-                <div>
-                  <span style={{ color: '#ccff88' }}>{item.name}</span>
-                  <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
-                    W{item.workmanship}
-                  </span>
-                  {item.category && (
-                    <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
-                      [{item.category}]
+              <div key={item.id} style={{ ...itemRowStyle, ...(item.isUnstable ? { borderLeft: '2px solid #cc44ff' } : {}) }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ color: '#ccff88' }}>{item.name}</span>
+                    {isImbueable && renderImbueSlots(item)}
+                    <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
+                      W{item.workmanship}
                     </span>
-                  )}
-                  {group.count > 1 && (
-                    <span style={{ color: '#aaaaaa', fontSize: '11px', marginLeft: '6px' }}>
-                      x{group.count}
-                    </span>
-                  )}
+                    {item.category && (
+                      <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
+                        [{item.category}]
+                      </span>
+                    )}
+                    {displayQty > 1 && (
+                      <span style={{ color: '#ffdd44', fontSize: '11px', marginLeft: '6px' }}>
+                        x{displayQty}
+                      </span>
+                    )}
+                    {item.isUnstable && (
+                      <span style={{ color: '#cc44ff', fontSize: '10px', marginLeft: '4px' }}>
+                        [UNSTABLE]
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    style={{ ...actionBtnStyle, borderColor: '#ccaa00', color: '#ccaa00' }}
+                    onClick={() => onDeposit(group.ids[0])}
+                  >
+                    deposit
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  style={{ ...actionBtnStyle, borderColor: '#ccaa00', color: '#ccaa00' }}
-                  onClick={() => onDeposit(group.ids[0])}
-                >
-                  deposit
-                </button>
+                {isImbueable && renderImbueDetails(item.imbues)}
               </div>
             );
           })
