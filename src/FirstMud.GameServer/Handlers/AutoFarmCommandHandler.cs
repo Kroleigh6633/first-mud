@@ -678,6 +678,20 @@ public class AutoFarmCommandHandler(
                     continue;
                 }
 
+                // --- PRE-FIGHT: skip if HP too low to start a new encounter ---
+                if (freshPlayer.CurrentHp < freshPlayer.MaxHp * 0.5)
+                {
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("GameMessage", new
+                        {
+                            timestamp = DateTime.UtcNow.ToString("O"),
+                            category  = "system",
+                            text      = "Auto-farm: resting before next fight (HP too low)."
+                        }, farmCt);
+                    continue;
+                }
+
                 // --- PRE-FIGHT: buff consumables in danger 7+ zones ---
                 if (dangerLevel >= 7)
                 {
@@ -718,6 +732,38 @@ public class AutoFarmCommandHandler(
                         text = $"[Auto-farm] Encounter! {string.Join(", ", monsters.Select(m => m.Name))}."
                     }, farmCt);
 
+                // Track weave spent locally (Combatant has no Weave field; freshPlayer.Weave tracks it)
+                int currentWeave = freshPlayer.Weave.Current;
+
+                // --- PRE-FIGHT flee check: estimate if we can survive ---
+                {
+                    var preEnemies = encounter.Combatants.Where(c => !c.IsPlayerSide && !c.IsDefeated).ToList();
+                    var prePc = encounter.Combatants
+                        .FirstOrDefault(c => c.IsPlayerSide && c.CombatantType == CombatantType.Player);
+                    if (prePc is not null && preEnemies.Count > 0)
+                    {
+                        int totalEnemyHp        = preEnemies.Sum(e => e.CurrentHp);
+                        int playerDamagePerRound = 20; // conservative Strike estimate
+                        int enemyDamagePerRound  = preEnemies.Count * 10;
+                        int roundsToKill         = Math.Max(1, totalEnemyHp / playerDamagePerRound);
+                        int playerHpAfterFight   = prePc.CurrentHp - roundsToKill * enemyDamagePerRound;
+
+                        if (playerHpAfterFight < 0)
+                        {
+                            var (fleeSuc, _, fleeEnc) = await combatSvc.FleeAsync(encounter.Id, farmCt);
+                            if (fleeSuc && fleeEnc is not null) encounter = fleeEnc;
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category  = "system",
+                                    text      = "Auto-farm: fleeing — fight looks unwinnable."
+                                }, farmCt);
+                        }
+                    }
+                }
+
                 var safety = 0;
                 while (encounter.State == EncounterState.InProgress && safety++ < 50)
                 {
@@ -726,12 +772,54 @@ public class AutoFarmCommandHandler(
 
                     if (actor.IsPlayerSide)
                     {
-                        var enemies = encounter.Combatants
+                        var livingEnemies = encounter.Combatants
                             .Where(c => !c.IsPlayerSide && !c.IsDefeated)
                             .ToList();
-                        if (enemies.Count == 0) break;
-                        var target = enemies[Random.Shared.Next(enemies.Count)];
-                        await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, "Strike", target.Id, farmCt);
+                        if (livingEnemies.Count == 0) break;
+
+                        var playerCombatant = encounter.Combatants
+                            .FirstOrDefault(c => c.IsPlayerSide && c.CombatantType == CombatantType.Player);
+
+                        // 1. Heal check: use Restore if HP < 40% and it's the player's turn
+                        if (actor.CombatantType == CombatantType.Player && playerCombatant is not null)
+                        {
+                            float hpPct = (float)playerCombatant.CurrentHp / playerCombatant.MaxHp;
+                            var healAbility = actor.Abilities
+                                .FirstOrDefault(a => a.Category == AbilityCategory.Heal);
+
+                            if (hpPct < 0.4f && healAbility is not null && currentWeave >= healAbility.WeaveCost)
+                            {
+                                currentWeave -= healAbility.WeaveCost;
+                                await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, healAbility.Name, actor.Id, farmCt);
+                                encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
+                                continue;
+                            }
+                        }
+
+                        // 2. Target priority: kill weakest enemy first
+                        var target = livingEnemies.OrderBy(e => e.CurrentHp).First();
+
+                        // 3. Best attack ability: prefer element advantage × BasePower; skip if not enough weave
+                        var attackAbilities = actor.Abilities
+                            .Where(a => a.Category == AbilityCategory.Attack && currentWeave >= a.WeaveCost)
+                            .ToList();
+
+                        CombatAbility chosenAbility;
+                        if (attackAbilities.Count == 0)
+                        {
+                            // No weave-affordable ability found — fall back to Strike (0 cost)
+                            chosenAbility = actor.Abilities.FirstOrDefault(a => a.Name == "Strike")
+                                ?? actor.Abilities.First(a => a.Category == AbilityCategory.Attack);
+                        }
+                        else
+                        {
+                            chosenAbility = attackAbilities
+                                .OrderByDescending(a => ElementMatchup.GetMultiplier(a.Element, target.Element) * a.BasePower)
+                                .First();
+                        }
+
+                        currentWeave -= chosenAbility.WeaveCost;
+                        await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, chosenAbility.Name, target.Id, farmCt);
                     }
                     else
                     {
