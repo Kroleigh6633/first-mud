@@ -129,12 +129,20 @@ export function useGameConnection(): GameConnectionResult {
     });
 
     connection.on('WorldStateUpdate', (snapshot: WorldStateSnapshot) => {
-      setWorldState(snapshot);
+      // Server sends weavePercent as a 0–1 fraction; normalise to 0–100 for display.
+      setWorldState({
+        ...snapshot,
+        player: { ...snapshot.player, weavePercent: Math.round(snapshot.player.weavePercent * 100) },
+      });
     });
 
     // Server pushes this after Authenticate so the status panel populates
     connection.on('WorldState', (snapshot: WorldStateSnapshot) => {
-      setWorldState(snapshot);
+      // Server sends weavePercent as a 0–1 fraction; normalise to 0–100 for display.
+      setWorldState({
+        ...snapshot,
+        player: { ...snapshot.player, weavePercent: Math.round(snapshot.player.weavePercent * 100) },
+      });
     });
 
     connection.on('GameMessage', (msg: GameMessage) => {
@@ -234,6 +242,27 @@ export function useGameConnection(): GameConnectionResult {
 
     connection.on('Inventory', (snapshot: InventorySnapshot) => {
       setInventory(snapshot);
+      // Derive equipment names from the equipped items map so StatusPanel/CharacterSheet display correctly
+      setEquipment(prev => {
+        const equipped = prev.equippedItems ?? {};
+        const findName = (slotKey: string) => {
+          const itemId = equipped[slotKey];
+          if (!itemId) return undefined;
+          return snapshot.items.find(i => i.id === itemId)?.name;
+        };
+        return {
+          ...prev,
+          meleeWeaponName:  findName('MeleeWeapon'),
+          rangedWeaponName: findName('RangedWeapon'),
+          focusName:        findName('Focus'),
+          headName:         findName('Head'),
+          chestName:        findName('Chest'),
+          legsName:         findName('Legs'),
+          handsName:        findName('Hands'),
+          feetName:         findName('Feet'),
+          accessoryName:    findName('Accessory'),
+        };
+      });
     });
 
     connection.on('CombatUpdate', (update: CombatUpdate) => {
@@ -292,22 +321,38 @@ export function useGameConnection(): GameConnectionResult {
     });
 
     connection.on('EquipmentChanged', (payload: {
-      weaponId?: string;
-      armorId?: string;
-      accessoryId?: string;
+      equippedItems?: Record<string, string>;
       changedItemId?: string;
       changedItemName?: string;
+      slot?: string;
       category?: string;
       replacedItemId?: string;
       removedSlot?: string;
+      // Legacy fields
+      weaponId?: string;
+      armorId?: string;
+      accessoryId?: string;
     }) => {
       if (!payload) return;
-      // Server always sends the full equipment state (all three slot ids)
-      setEquipment({
-        weaponId: payload.weaponId ?? undefined,
-        armorId: payload.armorId ?? undefined,
-        accessoryId: payload.accessoryId ?? undefined,
-      });
+      // New server sends equippedItems map; legacy fallback uses separate id fields
+      if (payload.equippedItems) {
+        const slots = payload.equippedItems;
+        setEquipment(prev => ({
+          ...prev,
+          equippedItems: slots,
+          // Populate named fields from the slot map so StatusPanel/CharacterSheet can display them
+          // without needing to join against inventory (names are set via Inventory event)
+        }));
+        // Request a fresh inventory to get updated item names for equipment display
+        connection.invoke('SendCommand', 'inventory', null).catch(() => {/* ignore */});
+      } else {
+        // Legacy three-slot update
+        setEquipment({
+          weaponId: payload.weaponId ?? undefined,
+          armorId: payload.armorId ?? undefined,
+          accessoryId: payload.accessoryId ?? undefined,
+        });
+      }
     });
 
     connection.on('CompanionCaptured', (captured: CompanionCapturedEvent) => {
@@ -328,7 +373,8 @@ export function useGameConnection(): GameConnectionResult {
             ...prev.player,
             currentHp: payload.currentHp,
             maxHp: payload.maxHp,
-            ...(payload.weavePercent !== undefined ? { weavePercent: payload.weavePercent } : {}),
+            // Server sends weavePercent as a 0–1 fraction; normalise to 0–100 for display.
+            ...(payload.weavePercent !== undefined ? { weavePercent: Math.round(payload.weavePercent * 100) } : {}),
             ...(payload.weaveState !== undefined ? { weaveState: payload.weaveState as import('../types/game').WeaveState } : {}),
           },
         };
