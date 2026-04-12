@@ -101,6 +101,8 @@ export interface InventoryItem {
   description: string;
   workmanship: number;
   category?: string;
+  quantity?: number;
+  isStackable?: boolean;
 }
 
 export interface EquipmentSlots {

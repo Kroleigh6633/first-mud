@@ -258,6 +258,11 @@ public class Player
         return removed;
     }
 
+    public void GainSalvageSkillXp(int amount)
+    {
+        SalvageSkill = Math.Max(1, SalvageSkill + amount);
+    }
+
     public ReputationTier GetReputationTier(FactionId factionId) =>
         _reputations.FirstOrDefault(r => r.FactionId == factionId)?.Score.Tier ?? ReputationTier.Unknown;
 

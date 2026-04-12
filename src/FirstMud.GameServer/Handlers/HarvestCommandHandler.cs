@@ -50,15 +50,31 @@ public class HarvestCommandHandler(
         await resourceNodeRepository.UpdateAsync(node, ct);
 
         var resourceName = node.ResourceType.ToString();
-        var resourceItem = Item.Create(
-            $"{resourceName} Bundle",
-            $"A bundle of {actual} unit(s) of {resourceName.ToLowerInvariant()} gathered from the wilds.",
-            ItemCategory.Component,
-            Workmanship.Of(1),
-            player.Position.World);
-        resourceItem.SetOwner(cmd.PlayerId);
+        var itemName = resourceName; // e.g. "Wood", "Stone", "Metal"
 
-        await itemRepository.AddAsync(resourceItem, ct);
+        // Check for an existing stack and merge, otherwise create new
+        var existingStack = await itemRepository.GetByOwnerAndNameAsync(
+            cmd.PlayerId, itemName, ItemCategory.Component, ct);
+
+        Item resourceItem;
+        if (existingStack is not null)
+        {
+            existingStack.AddQuantity(actual);
+            await itemRepository.UpdateAsync(existingStack, ct);
+            resourceItem = existingStack;
+        }
+        else
+        {
+            resourceItem = Item.Create(
+                itemName,
+                $"A resource gathered from the wilds: {resourceName.ToLowerInvariant()}.",
+                ItemCategory.Component,
+                Workmanship.Of(1),
+                player.Position.World);
+            resourceItem.SetOwner(cmd.PlayerId);
+            if (actual > 1) resourceItem.AddQuantity(actual - 1);
+            await itemRepository.AddAsync(resourceItem, ct);
+        }
 
         var message = $"You harvested {actual} unit(s) of {resourceName}.";
         await notificationService.SendMessageAsync(cmd.PlayerId, "loot", message, ct);

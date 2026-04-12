@@ -14,6 +14,7 @@ public static class ServiceExtensions
         services.AddScoped<AutomationService>();
         services.AddSingleton<CombatService>();
         services.AddScoped<LootService>();
+        services.AddScoped<SalvageService>();
         services.AddSingleton<AutoFarmService>();
         return services;
     }

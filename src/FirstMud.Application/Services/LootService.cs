@@ -77,6 +77,20 @@ public class LootService
         var item = Item.Create(template.Name, template.Description, template.Category, workmanship, originWorld);
         item.SetOwner(ownerId);
 
+        // For stackable categories (Component/Reagent), merge into an existing stack if one exists
+        if (item.IsStackable)
+        {
+            var existingStack = await _itemRepository.GetByOwnerAndNameAsync(ownerId, template.Name, template.Category, ct);
+            if (existingStack is not null)
+            {
+                existingStack.AddQuantity(1);
+                await _itemRepository.UpdateAsync(existingStack, ct);
+                var stackMessage = $"You found: {existingStack.Name} (now x{existingStack.Quantity}) [Workmanship {workValue}]!";
+                _logger.LogInformation("Loot stack merge for player {PlayerId}: {ItemName}", ownerId, template.Name);
+                return new LootDropResult(true, existingStack, stackMessage);
+            }
+        }
+
         await _itemRepository.AddAsync(item, ct);
 
         var message = $"You found: {item.Name} [Workmanship {workValue}]!";

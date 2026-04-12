@@ -66,6 +66,8 @@ builder.Services.AddScoped<ICommandHandler<DepositCommand>, DepositCommandHandle
 builder.Services.AddScoped<ICommandHandler<WithdrawCommand>, WithdrawCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<OpenStorageCommand>, OpenStorageCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<AutoFarmCommand>, AutoFarmCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<SalvageCommand>, SalvageCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<SalvageAllCommand>, SalvageAllCommandHandler>();
 
 var app = builder.Build();
 

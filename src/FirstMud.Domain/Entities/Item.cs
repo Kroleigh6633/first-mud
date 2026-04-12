@@ -27,6 +27,10 @@ public class Item
     // Ownership — null means world loot / homestead storage
     public Guid? OwnerId { get; private set; }
 
+    // Stacking — Components and Reagents stack; equipment items do not
+    public int Quantity { get; private set; } = 1;
+    public bool IsStackable => Category == ItemCategory.Component || Category == ItemCategory.Reagent;
+
     private Item() { }
 
     public static Item Create(
@@ -60,6 +64,26 @@ public class Item
         MagicalElement = element;
         MagicalPolarity = polarity;
         if (taperType == TaperType.Wyrd) IsWyrdTouched = true;
+    }
+
+    public void AddQuantity(int amount)
+    {
+        if (amount <= 0) return;
+        Quantity += amount;
+    }
+
+    /// <summary>
+    /// Attempts to remove <paramref name="amount"/> units from this stack.
+    /// Returns true if successful; <paramref name="remaining"/> is the leftover quantity (≥0).
+    /// Returns false if the stack does not have enough units.
+    /// </summary>
+    public bool TryRemoveQuantity(int amount, out int remaining)
+    {
+        remaining = 0;
+        if (amount <= 0 || amount > Quantity) return false;
+        Quantity -= amount;
+        remaining = Quantity;
+        return true;
     }
 
     public void MarkDiscoveredBy(string playerName) => DiscoveredByPlayerName = playerName;

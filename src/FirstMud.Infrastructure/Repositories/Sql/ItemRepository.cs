@@ -35,6 +35,12 @@ internal sealed class ItemRepository : IItemRepository
             .ToListAsync(ct);
     }
 
+    public async Task<Item?> GetByOwnerAndNameAsync(Guid ownerId, string name, ItemCategory category, CancellationToken ct = default)
+    {
+        return await _context.Items
+            .FirstOrDefaultAsync(i => i.OwnerId == ownerId && i.Name == name && i.Category == category, ct);
+    }
+
     public async Task AddAsync(Item item, CancellationToken ct = default)
     {
         await _context.Items.AddAsync(item, ct);

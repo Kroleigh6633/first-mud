@@ -218,6 +218,10 @@ namespace FirstMud.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("OwnerId");
 
+                    b.Property<int>("Quantity")
+                        .HasDefaultValue(1)
+                        .HasColumnType("int");
+
                     b.Property<int?>("TaperQuality")
                         .HasColumnType("int")
                         .HasColumnName("TaperQuality");

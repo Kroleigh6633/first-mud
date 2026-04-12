@@ -30,7 +30,10 @@ public class OpenInventoryCommandHandler(
                 Id = i.Id.ToString(),
                 i.Name,
                 i.Description,
-                Workmanship = i.Workmanship.Value
+                Workmanship = i.Workmanship.Value,
+                Category = i.Category.ToString(),
+                i.Quantity,
+                i.IsStackable
             }).ToList()
         };
 

@@ -24,7 +24,7 @@ const panelStyle: React.CSSProperties = {
   fontFamily: 'monospace',
   fontSize: '13px',
   color: '#00ff41',
-  width: '560px',
+  width: '580px',
   maxHeight: '82vh',
   overflowY: 'auto',
   boxShadow: '0 0 40px rgba(0, 255, 65, 0.25)',
@@ -44,9 +44,12 @@ const sectionHeadingStyle: React.CSSProperties = {
   fontSize: '11px',
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  margin: '14px 14px 6px',
+  margin: '14px 14px 4px',
   borderBottom: '1px solid #1a1a1a',
   paddingBottom: '4px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
 };
 
 const itemRowStyle: React.CSSProperties = {
@@ -103,6 +106,27 @@ const equipBtnStyle: React.CSSProperties = {
   marginLeft: '8px',
 };
 
+const salvageBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #ff8800',
+  color: '#ff8800',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+  marginLeft: '6px',
+};
+
+const salvageAllBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #ff8800',
+  color: '#ff8800',
+  fontFamily: 'monospace',
+  fontSize: '10px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+};
+
 const equippedTagStyle: React.CSSProperties = {
   color: '#00ff41',
   fontSize: '10px',
@@ -111,10 +135,28 @@ const equippedTagStyle: React.CSSProperties = {
   marginLeft: '6px',
 };
 
+const quantityTagStyle: React.CSSProperties = {
+  color: '#ffdd44',
+  fontSize: '11px',
+  marginLeft: '4px',
+};
+
+const slotsStyle: React.CSSProperties = {
+  color: '#888888',
+  fontSize: '11px',
+  padding: '4px 14px 8px',
+};
+
 function isEquippable(category?: string): boolean {
   if (!category) return false;
   const c = category.toLowerCase();
   return c === 'weapon' || c === 'armor' || c === 'accessory' || c === 'component';
+}
+
+function isSalvageable(category?: string): boolean {
+  if (!category) return false;
+  const c = category.toLowerCase();
+  return c === 'weapon' || c === 'armor' || c === 'consumable';
 }
 
 function isEquipped(itemId: string, equipment: EquipmentSlots): boolean {
@@ -128,9 +170,27 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
     sendCommand('equip', { itemId });
   };
 
+  const handleSalvage = (itemId: string) => {
+    sendCommand('salvage', { itemId });
+  };
+
+  const handleSalvageAll = (category: string) => {
+    sendCommand('salvageall', { category });
+  };
+
   // Collect equipped item ids for display at the top
   const equippedItems = snapshot?.items.filter(i => isEquipped(i.id, equipment)) ?? [];
   const unequippedItems = snapshot?.items.filter(i => !isEquipped(i.id, equipment)) ?? [];
+
+  // Compute slot usage: stacks count as 1 slot regardless of quantity; non-stackable count 1 each
+  const allItems = snapshot?.items ?? [];
+  const slotsUsed = unequippedItems.length; // each row = 1 inventory slot
+  const totalItems = allItems.reduce((acc, i) => acc + (i.quantity ?? 1), 0);
+  const maxSlots = 20; // matches Player._maxInventorySlots default
+
+  // Group unequipped items by category for bulk salvage buttons
+  const hasWeapons = unequippedItems.some(i => i.category?.toLowerCase() === 'weapon');
+  const hasArmor   = unequippedItems.some(i => i.category?.toLowerCase() === 'armor');
 
   return (
     <div
@@ -148,30 +208,60 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
           </button>
         </div>
 
-        <div style={sectionHeadingStyle}>Skills</div>
-        {snapshot ? (
-          <>
-            <div style={skillRowStyle}>
-              <span>Crafting</span>
-              <span style={{ color: '#00ccff' }}>{snapshot.craftingSkill}</span>
-            </div>
-            <div style={skillRowStyle}>
-              <span>Salvage</span>
-              <span style={{ color: '#00ccff' }}>{snapshot.salvageSkill}</span>
-            </div>
-          </>
-        ) : (
-          <div style={emptyStyle}>loading...</div>
+        <div style={skillRowStyle}>
+          <span>Crafting</span>
+          <span style={{ color: '#00ccff' }}>{snapshot?.craftingSkill ?? '—'}</span>
+        </div>
+        <div style={skillRowStyle}>
+          <span>Salvage</span>
+          <span style={{ color: '#00ccff' }}>{snapshot?.salvageSkill ?? '—'}</span>
+        </div>
+
+        {snapshot && (
+          <div style={slotsStyle}>
+            Slots: {slotsUsed}/{maxSlots} &nbsp;|&nbsp; Items: {totalItems}
+          </div>
+        )}
+
+        {/* Bulk salvage buttons */}
+        {(hasWeapons || hasArmor) && (
+          <div style={{ padding: '4px 14px 8px', display: 'flex', gap: '8px' }}>
+            {hasWeapons && (
+              <button
+                type="button"
+                style={salvageAllBtnStyle}
+                onClick={() => handleSalvageAll('Weapon')}
+                aria-label="salvage all weapons"
+              >
+                salvage all weapons
+              </button>
+            )}
+            {hasArmor && (
+              <button
+                type="button"
+                style={salvageAllBtnStyle}
+                onClick={() => handleSalvageAll('Armor')}
+                aria-label="salvage all armor"
+              >
+                salvage all armor
+              </button>
+            )}
+          </div>
         )}
 
         {equippedItems.length > 0 && (
           <>
-            <div style={sectionHeadingStyle}>Equipped</div>
+            <div style={sectionHeadingStyle}>
+              <span>Equipped</span>
+            </div>
             {equippedItems.map((item) => (
               <div key={item.id} style={itemRowStyle} data-testid="equipped-item">
                 <div style={itemNameStyle}>
                   <span>
                     {item.name}
+                    {item.isStackable && (item.quantity ?? 1) > 1 && (
+                      <span style={quantityTagStyle}>x{item.quantity}</span>
+                    )}
                     <span style={equippedTagStyle}>equipped</span>
                   </span>
                   <span style={{ color: '#888888', fontSize: '11px' }}>
@@ -184,7 +274,9 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
           </>
         )}
 
-        <div style={sectionHeadingStyle}>Items</div>
+        <div style={sectionHeadingStyle}>
+          <span>Items</span>
+        </div>
         {!snapshot ? (
           <div style={emptyStyle}>loading...</div>
         ) : unequippedItems.length === 0 && equippedItems.length === 0 ? (
@@ -197,7 +289,12 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
           unequippedItems.map((item) => (
             <div key={item.id} style={itemRowStyle}>
               <div style={itemNameStyle}>
-                <span>{item.name}</span>
+                <span>
+                  {item.name}
+                  {item.isStackable && (item.quantity ?? 1) > 1 && (
+                    <span style={quantityTagStyle}>x{item.quantity}</span>
+                  )}
+                </span>
                 <span style={{ display: 'flex', alignItems: 'center' }}>
                   <span style={{ color: '#888888', fontSize: '11px' }}>
                     {item.category ?? ''} W{item.workmanship}
@@ -210,6 +307,16 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                       aria-label={`equip ${item.name}`}
                     >
                       equip
+                    </button>
+                  )}
+                  {isSalvageable(item.category) && (
+                    <button
+                      type="button"
+                      style={salvageBtnStyle}
+                      onClick={() => handleSalvage(item.id)}
+                      aria-label={`salvage ${item.name}`}
+                    >
+                      salvage
                     </button>
                   )}
                 </span>

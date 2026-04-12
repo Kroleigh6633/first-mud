@@ -194,6 +194,14 @@ public class GameHub : Hub
                 playerId,
                 TryGetString(payload, "slot") ?? "Weapon"),
 
+            "salvage" => new SalvageCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
+            "salvageall" => new SalvageAllCommand(
+                playerId,
+                TryGetString(payload, "category") ?? "Weapon"),
+
             _ => null
         };
     }

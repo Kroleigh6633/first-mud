@@ -269,6 +269,16 @@ export function useGameConnection(): GameConnectionResult {
       });
     });
 
+    connection.on('SalvageComplete', (payload: { yields?: Array<{ name: string; quantity: number }>; message?: string }) => {
+      if (!payload?.yields?.length) return;
+      const summary = payload.yields.map(y => `${y.name} x${y.quantity}`).join(', ');
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'loot',
+        text: `Salvage yielded: ${summary}`,
+      });
+    });
+
     connection.on('HarvestComplete', (payload: { itemId?: string; name?: string; amount?: number; resourceType?: string }) => {
       appendMessage({
         timestamp: new Date().toISOString(),

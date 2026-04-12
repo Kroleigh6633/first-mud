@@ -54,6 +54,12 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.MaxDurability);
         builder.Property(i => i.IsSalvageable);
 
+        builder.Property(i => i.Quantity)
+            .HasDefaultValue(1);
+
+        // IsStackable is computed from Category — not stored
+        builder.Ignore(i => i.IsStackable);
+
         builder.Property(i => i.OriginWorld)
             .HasConversion<int>();
 
