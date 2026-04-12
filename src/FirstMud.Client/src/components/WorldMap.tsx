@@ -1,11 +1,12 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { WorldStateSnapshot, ZoneTile, WanderingNpc } from '../types/game';
+import type { WorldStateSnapshot, ZoneTile, WanderingNpc, QuestWaypoint } from '../types/game';
 import { getBiome, isPathTile, type BiomeType } from '../utils/biome';
 
 interface Props {
   worldState: WorldStateSnapshot | null;
   zoneTiles: ZoneTile[];
   wanderingNpcs?: WanderingNpc[];
+  questWaypoint?: QuestWaypoint | null;
 }
 
 // ─── Tile dimensions ────────────────────────────────────────────────────────
@@ -333,7 +334,7 @@ const MINI_SIZE = 100;
 const MINI_DOT  = 3;
 const MINI_PAD  = 8;
 
-export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: Props) {
+export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], questWaypoint = null }: Props) {
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -353,12 +354,14 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
   const lastSaveFrame = useRef<number>(0);
 
   // Stable prop refs
-  const worldStateRef   = useRef(worldState);
-  const zoneTilesRef    = useRef(zoneTiles);
+  const worldStateRef    = useRef(worldState);
+  const zoneTilesRef     = useRef(zoneTiles);
   const wanderingNpcsRef = useRef(wanderingNpcs);
-  worldStateRef.current   = worldState;
-  zoneTilesRef.current    = zoneTiles;
+  const questWaypointRef = useRef(questWaypoint);
+  worldStateRef.current    = worldState;
+  zoneTilesRef.current     = zoneTiles;
   wanderingNpcsRef.current = wanderingNpcs;
+  questWaypointRef.current = questWaypoint;
 
   // ─── Load visited tiles when player ID becomes available ──────────────────
   useEffect(() => {
@@ -746,6 +749,108 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
     }
 
     ctx.restore();
+
+    // ── Quest waypoint ─────────────────────────────────────────────────────────
+    const wp = questWaypointRef.current;
+    if (wp) {
+      const wpX = wp.targetX;
+      const wpY = wp.targetY;
+      const [wpSx, wpSy] = gridToScreen(wpX, wpY, vpCx, vpCy);
+      const wpAsx = wpSx + camOffX;
+      const wpAsy = wpSy + camOffY;
+
+      const pulse = 0.65 + 0.35 * Math.sin(waterFrame * 0.08);
+      const wpColor = '#00e5ff';
+
+      // Dotted line from player to waypoint
+      const [plSx, plSy] = gridToScreen(playerX, playerY, vpCx, vpCy);
+      const plAsx = plSx + camOffX;
+      const plAsy = plSy + camOffY;
+
+      ctx.save();
+      ctx.globalAlpha = 0.45 * pulse;
+      ctx.setLineDash([4 * dpr, 6 * dpr]);
+      ctx.strokeStyle = wpColor;
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(plAsx, plAsy - tileH / 4);
+      ctx.lineTo(wpAsx, wpAsy - tileH / 4);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Pulsing glow ring
+      ctx.save();
+      ctx.globalAlpha = 0.25 * pulse;
+      ctx.beginPath();
+      ctx.arc(wpAsx, wpAsy - tileH / 4, 16 * dpr * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = wpColor;
+      ctx.fill();
+      ctx.restore();
+
+      // Diamond marker
+      ctx.save();
+      ctx.globalAlpha = 0.85 * pulse;
+      const dmS = 8 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(wpAsx,        wpAsy - tileH / 4 - dmS); // top
+      ctx.lineTo(wpAsx + dmS,  wpAsy - tileH / 4);       // right
+      ctx.lineTo(wpAsx,        wpAsy - tileH / 4 + dmS); // bottom
+      ctx.lineTo(wpAsx - dmS,  wpAsy - tileH / 4);       // left
+      ctx.closePath();
+      ctx.fillStyle = wpColor;
+      ctx.shadowColor = wpColor;
+      ctx.shadowBlur = 10 * dpr;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1 * dpr;
+      ctx.stroke();
+      ctx.restore();
+
+      // Quest name label above the diamond
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.font = `bold ${9 * dpr}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 4 * dpr;
+      ctx.fillStyle = wpColor;
+      const labelText = wp.questTitle.length > 22 ? wp.questTitle.slice(0, 19) + '...' : wp.questTitle;
+      ctx.fillText(labelText, wpAsx, wpAsy - tileH / 4 - dmS - 4 * dpr);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // Also draw waypoint dot on minimap
+      if (zoneTilesRef.current.length > 0) {
+        let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
+        for (const t of zoneTilesRef.current) {
+          if (t.x < minX2) minX2 = t.x;
+          if (t.x > maxX2) maxX2 = t.x;
+          if (t.y < minY2) minY2 = t.y;
+          if (t.y > maxY2) maxY2 = t.y;
+        }
+        const rangeX2 = Math.max(maxX2 - minX2, 1);
+        const rangeY2 = Math.max(maxY2 - minY2, 1);
+        const mmSize2 = MINI_SIZE * dpr;
+        const mmPad2  = MINI_PAD  * dpr;
+        const mmX2    = canvas.width - mmSize2 - mmPad2;
+        const mmY2    = mmPad2;
+        const wpMx = mmX2 + ((wpX - minX2) / rangeX2) * (mmSize2 - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
+        const wpMy = mmY2 + ((wpY - minY2) / rangeY2) * (mmSize2 - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
+        ctx.save();
+        ctx.globalAlpha = 0.85 * pulse;
+        ctx.beginPath();
+        ctx.arc(wpMx, wpMy, (MINI_DOT + 1) * dpr * 0.75, 0, Math.PI * 2);
+        ctx.fillStyle = wpColor;
+        ctx.shadowColor = wpColor;
+        ctx.shadowBlur = 4 * dpr;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+    }
   }, [markVisited]);
 
   // ─── Animation loop ──────────────────────────────────────────────────────────

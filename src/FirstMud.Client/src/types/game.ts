@@ -329,6 +329,14 @@ export interface WanderingNpc {
   dialogue: string;
 }
 
+export interface QuestWaypoint {
+  questId: string;
+  questTitle: string;
+  targetX: number;
+  targetY: number;
+  description: string;
+}
+
 export interface WorldEvent {
   timestamp: string;
   category: string;

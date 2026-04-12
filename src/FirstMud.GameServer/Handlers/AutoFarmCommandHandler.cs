@@ -783,11 +783,19 @@ public class AutoFarmCommandHandler(
                     }
                 }
 
+                // Broadcast initial combat state so the client panel appears
+                var initDto = CombatHelpers.BuildCombatUpdateDto(encounter);
+                await hubContext.Clients
+                    .Group(playerId.ToString())
+                    .SendAsync("CombatUpdate", initDto, farmCt);
+
                 var safety = 0;
                 while (encounter.State == EncounterState.InProgress && safety++ < 50)
                 {
                     var actor = encounter.CurrentActor;
                     if (actor is null) break;
+
+                    string? actionText = null;
 
                     if (actor.IsPlayerSide)
                     {
@@ -809,8 +817,12 @@ public class AutoFarmCommandHandler(
                             if (hpPct < 0.4f && healAbility is not null && currentWeave >= healAbility.WeaveCost)
                             {
                                 currentWeave -= healAbility.WeaveCost;
-                                await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, healAbility.Name, actor.Id, farmCt);
+                                var (_, healNarr, _) = await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, healAbility.Name, actor.Id, farmCt);
+                                actionText = healNarr;
                                 encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
+                                var healDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText);
+                                await hubContext.Clients.Group(playerId.ToString()).SendAsync("CombatUpdate", healDto, farmCt);
+                                await Task.Delay(500, farmCt);
                                 continue;
                             }
                         }
@@ -838,7 +850,8 @@ public class AutoFarmCommandHandler(
                         }
 
                         currentWeave -= chosenAbility.WeaveCost;
-                        await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, chosenAbility.Name, target.Id, farmCt);
+                        var (_, atkNarr, _) = await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, chosenAbility.Name, target.Id, farmCt);
+                        actionText = atkNarr;
                     }
                     else
                     {
@@ -848,11 +861,25 @@ public class AutoFarmCommandHandler(
                         var allies = encounter.Combatants.Where(c => c.IsPlayerSide && !c.IsDefeated).ToList();
                         if (allies.Count == 0) break;
                         var target = allies[Random.Shared.Next(allies.Count)];
-                        await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, ability.Name, target.Id, farmCt);
+                        var (_, eNarr, _) = await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, ability.Name, target.Id, farmCt);
+                        actionText = eNarr;
                     }
 
                     encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
+
+                    // Broadcast combat state after each action so the player can watch
+                    var actionDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText);
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("CombatUpdate", actionDto, farmCt);
+                    await Task.Delay(500, farmCt);
                 }
+
+                // Broadcast final encounter state
+                var finalDto = CombatHelpers.BuildCombatUpdateDto(encounter);
+                await hubContext.Clients
+                    .Group(playerId.ToString())
+                    .SendAsync("CombatUpdate", finalDto, farmCt);
 
                 if (encounter.State == EncounterState.Defeat)
                 {

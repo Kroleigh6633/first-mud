@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import type { CombatUpdate, CombatantState } from '../types/game';
+import type { CombatUpdate, CombatantState, AutoFarmStatus } from '../types/game';
 
 interface Props {
   combat: CombatUpdate;
   sendCommand: (command: string, payload?: unknown) => void;
+  autoFarmStatus?: AutoFarmStatus | null;
 }
 
 function HpBar({ current, max, color }: { current: number; max: number; color: string }) {
@@ -100,7 +101,8 @@ function PartyRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: bo
 
 // Abilities are now sourced from the current actor's CombatantState.
 
-export default function CombatPanel({ combat, sendCommand }: Props) {
+export default function CombatPanel({ combat, sendCommand, autoFarmStatus }: Props) {
+  const isAutoFarm = autoFarmStatus?.active === true;
   const isOver = combat.state === 'Victory' || combat.state === 'Defeat' || combat.state === 'Fled';
   const playerSide = combat.combatants.filter(c => c.isPlayerSide);
   const enemySide = combat.combatants.filter(c => !c.isPlayerSide);
@@ -301,55 +303,69 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
           <div style={{
             padding: '10px 14px', borderTop: '1px solid #1a3a1a',
           }}>
-            <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px' }}>
-              Choose an ability to use against <span style={{ color: '#ccaa00' }}>{targetName}</span>:
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(currentActor?.abilities ?? []).map(a => (
-                <button
-                  key={a.name}
-                  onClick={() => handleAbility(a.name)}
-                  title={`${a.element} ${a.category} — power ${a.basePower}${a.weaveCost > 0 ? `, costs ${a.weaveCost} weave` : ''}`}
-                  style={{
-                    background: 'none',
-                    border: `1px solid ${a.category === 'Heal' ? '#00ccff' : '#00ff41'}`,
-                    color: a.category === 'Heal' ? '#00ccff' : '#00ff41',
-                    fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {a.name}
-                  <span style={{ color: '#666', fontSize: '9px', marginLeft: '4px' }}>
-                    {a.basePower > 0 ? `${a.basePower}` : ''}{a.weaveCost > 0 ? ` ◆${a.weaveCost}` : ''}
-                  </span>
-                </button>
-              ))}
-              <button
-                onClick={handleFlee}
-                style={{
-                  background: 'none', border: '1px solid #ccaa00', color: '#ccaa00',
-                  fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
-                  cursor: 'pointer', marginLeft: 'auto',
-                }}
-              >
-                Flee
-              </button>
-              <button
-                onClick={() => setAutoCombat(prev => !prev)}
-                title="Toggle auto-combat (press 'a')"
-                style={{
-                  background: autoCombat ? 'rgba(255,204,0,0.08)' : 'none',
-                  border: autoCombat ? '1px solid #ffcc00' : '1px solid #336600',
-                  color: autoCombat ? '#ffcc00' : '#336600',
-                  fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
-                  cursor: 'pointer',
-                  boxShadow: autoCombat ? '0 0 6px rgba(255,204,0,0.4)' : 'none',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {autoCombat ? 'Auto ●' : 'Auto'}
-              </button>
-            </div>
+            {isAutoFarm ? (
+              <div style={{
+                textAlign: 'center',
+                color: '#44ff88',
+                fontSize: '12px',
+                letterSpacing: '0.1em',
+                padding: '6px 0',
+              }}>
+                ⚙ Auto-farming... [F] to stop
+              </div>
+            ) : (
+              <>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px' }}>
+                  Choose an ability to use against <span style={{ color: '#ccaa00' }}>{targetName}</span>:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {(currentActor?.abilities ?? []).map(a => (
+                    <button
+                      key={a.name}
+                      onClick={() => handleAbility(a.name)}
+                      title={`${a.element} ${a.category} — power ${a.basePower}${a.weaveCost > 0 ? `, costs ${a.weaveCost} weave` : ''}`}
+                      style={{
+                        background: 'none',
+                        border: `1px solid ${a.category === 'Heal' ? '#00ccff' : '#00ff41'}`,
+                        color: a.category === 'Heal' ? '#00ccff' : '#00ff41',
+                        fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {a.name}
+                      <span style={{ color: '#666', fontSize: '9px', marginLeft: '4px' }}>
+                        {a.basePower > 0 ? `${a.basePower}` : ''}{a.weaveCost > 0 ? ` ◆${a.weaveCost}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                  <button
+                    onClick={handleFlee}
+                    style={{
+                      background: 'none', border: '1px solid #ccaa00', color: '#ccaa00',
+                      fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
+                      cursor: 'pointer', marginLeft: 'auto',
+                    }}
+                  >
+                    Flee
+                  </button>
+                  <button
+                    onClick={() => setAutoCombat(prev => !prev)}
+                    title="Toggle auto-combat (press 'a')"
+                    style={{
+                      background: autoCombat ? 'rgba(255,204,0,0.08)' : 'none',
+                      border: autoCombat ? '1px solid #ffcc00' : '1px solid #336600',
+                      color: autoCombat ? '#ffcc00' : '#336600',
+                      fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
+                      cursor: 'pointer',
+                      boxShadow: autoCombat ? '0 0 6px rgba(255,204,0,0.4)' : 'none',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {autoCombat ? 'Auto ●' : 'Auto'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

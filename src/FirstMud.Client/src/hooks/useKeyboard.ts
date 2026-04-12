@@ -15,6 +15,7 @@ export type KeyAction =
   | { type: 'storage' }
   | { type: 'companions' }
   | { type: 'crafting' }
+  | { type: 'navigate' }
   | null;
 
 export function useKeyboard(): KeyAction {
@@ -96,6 +97,10 @@ export function useKeyboard(): KeyAction {
         case 'r':
         case 'R':
           next = { type: 'crafting' };
+          break;
+        case 'n':
+        case 'N':
+          next = { type: 'navigate' };
           break;
         case 'Escape':
           next = { type: 'escape' };

@@ -32,6 +32,7 @@ const SECTIONS: Section[] = [
       { keys: ['E'], description: 'harvest resource at current zone' },
       { keys: ['P'], description: 'portal home (or portal back when at homestead)' },
       { keys: ['F'], description: 'start / stop auto-farm (5 min default)' },
+      { keys: ['N'], description: 'auto-navigate to active quest waypoint (press again or move to cancel)' },
       { keys: ['I'], description: 'open inventory — includes Auto-Salvage Settings to auto-dismantle low-quality loot on pickup (set threshold per weapon/armor; Off = disabled)' },
     ],
   },

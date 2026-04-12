@@ -1,4 +1,5 @@
 using FirstMud.Application.Services;
+using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
@@ -13,6 +14,66 @@ public class AcceptQuestCommandHandler(
     IQuestGraphRepository questGraphRepository,
     IHubContext<GameHub> hubContext) : ICommandHandler<AcceptQuestCommand>
 {
+    // Zone centre coordinates matching ZoneGridLayout.cs (also in biome.ts)
+    private static readonly Dictionary<FactionId, (int x, int y, string desc)> FactionWaypoints = new()
+    {
+        [FactionId.HouseCaervorn]    = (8,  3,  "Caervorn Highlands"),
+        [FactionId.ThornwoodCovens]  = (13, 5,  "The Thornwood"),
+        [FactionId.EmeraldCompact]   = (24, 13, "Portmere (Compact)"),
+        [FactionId.Gravenguard]      = (28, 9,  "Gravenmarsh area"),
+        [FactionId.Fairgean]         = (32, 15, "The Drowned Coast"),
+        [FactionId.AshenCourt]       = (34, 4,  "The Ashen Reach"),
+        [FactionId.Golvari]          = (36, 18, "The Maw Borderlands"),
+    };
+
+    /// <summary>
+    /// Determines a target waypoint from the quest description and faction.
+    /// Gather/kill quests near dangerous zones use the danger zone; delivery quests
+    /// use the destination faction; all others fall back to the quest faction HQ.
+    /// </summary>
+    private static (int x, int y, string desc) ResolveWaypoint(string title, string description, FactionId factionId)
+    {
+        var lower = (title + " " + description).ToLowerInvariant();
+
+        // Delivery quest: target destination based on description keyword
+        if (lower.Contains("deliver") || lower.Contains("package") || lower.Contains("message"))
+        {
+            // Try to find a zone name mentioned in the description
+            foreach (var (fid, waypoint) in FactionWaypoints)
+            {
+                if (fid != factionId && lower.Contains(waypoint.desc.ToLowerInvariant()))
+                    return waypoint;
+            }
+        }
+
+        // Kill quest: target appropriate danger zone
+        if (lower.Contains("kill") || lower.Contains("slay") || lower.Contains("defeat") || lower.Contains("bandit") || lower.Contains("ruin"))
+        {
+            if (lower.Contains("maw") || lower.Contains("borderland") || lower.Contains("wyrd"))
+                return FactionWaypoints[FactionId.Golvari];
+            if (lower.Contains("coast") || lower.Contains("drowned") || lower.Contains("shore"))
+                return FactionWaypoints[FactionId.Fairgean];
+            if (lower.Contains("thornwood") || lower.Contains("forest"))
+                return FactionWaypoints[FactionId.ThornwoodCovens];
+            if (lower.Contains("ashen") || lower.Contains("desert") || lower.Contains("reach"))
+                return FactionWaypoints[FactionId.AshenCourt];
+        }
+
+        // Gather quest: point toward the resource zone
+        if (lower.Contains("gather") || lower.Contains("collect") || lower.Contains("find") || lower.Contains("bring"))
+        {
+            if (lower.Contains("highland") || lower.Contains("stone") || lower.Contains("ore"))
+                return FactionWaypoints[FactionId.HouseCaervorn];
+            if (lower.Contains("herb") || lower.Contains("root") || lower.Contains("wood") || lower.Contains("forest"))
+                return FactionWaypoints[FactionId.ThornwoodCovens];
+        }
+
+        // Default: faction HQ
+        return FactionWaypoints.TryGetValue(factionId, out var fallback)
+            ? fallback
+            : (20, 10, "Starting Road");
+    }
+
     public async Task<CommandResult> HandleAsync(AcceptQuestCommand cmd, CancellationToken ct)
     {
         var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
@@ -30,6 +91,25 @@ public class AcceptQuestCommandHandler(
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
             .SendAsync("QuestAccepted", questPayload, ct);
+
+        // Broadcast a quest waypoint so the client can navigate
+        var quest = await questGraphRepository.GetQuestAsync(cmd.QuestId, ct);
+        if (quest is not null)
+        {
+            var (wpX, wpY, wpDesc) = ResolveWaypoint(quest.Title, quest.Description, quest.FactionId);
+            var waypointPayload = new
+            {
+                QuestId    = cmd.QuestId,
+                QuestTitle = quest.Title,
+                TargetX    = wpX,
+                TargetY    = wpY,
+                Description = wpDesc,
+            };
+
+            await hubContext.Clients
+                .Group(cmd.PlayerId.ToString())
+                .SendAsync("QuestWaypoint", waypointPayload, ct);
+        }
 
         return new CommandResult(true, $"Quest '{cmd.QuestId}' accepted.", questPayload);
     }

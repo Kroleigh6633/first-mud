@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint } from '../types/game';
 import WorldMap from './WorldMap';
 import { getBiome } from '../utils/biome';
 import StatusPanel from './StatusPanel';
@@ -38,6 +38,7 @@ interface Props {
   companionRoster?: CompanionState[];
   recipes?: RecipeInfo[];
   lastCraftResult?: CraftingCompleteEvent | null;
+  questWaypoint?: QuestWaypoint | null;
 }
 
 /**
@@ -61,6 +62,42 @@ function findTileAt(tiles: ZoneTile[], x: number, y: number): ZoneTile | null {
   return best;
 }
 
+// Simple step-toward-waypoint helper used by auto-navigate
+function stepToward(
+  playerX: number,
+  playerY: number,
+  targetX: number,
+  targetY: number,
+  getB: (x: number, y: number) => { type: string },
+): { deltaX: number; deltaY: number } | null {
+  const dx = Math.sign(targetX - playerX);
+  const dy = Math.sign(targetY - playerY);
+
+  // Try direct diagonal/cardinal step first
+  if (dx !== 0 || dy !== 0) {
+    const directBiome = getB(playerX + dx, playerY + dy);
+    if (directBiome.type !== 'water' && directBiome.type !== 'snowMountain') {
+      return { deltaX: dx, deltaY: dy };
+    }
+  }
+
+  // Try horizontal only
+  if (dx !== 0) {
+    const hBiome = getB(playerX + dx, playerY);
+    if (hBiome.type !== 'water' && hBiome.type !== 'snowMountain')
+      return { deltaX: dx, deltaY: 0 };
+  }
+
+  // Try vertical only
+  if (dy !== 0) {
+    const vBiome = getB(playerX, playerY + dy);
+    if (vBiome.type !== 'water' && vBiome.type !== 'snowMountain')
+      return { deltaX: 0, deltaY: dy };
+  }
+
+  return null; // stuck
+}
+
 export default function GameTerminal({
   connectionState,
   sendCommand,
@@ -81,6 +118,7 @@ export default function GameTerminal({
   companionRoster = [],
   recipes = [],
   lastCraftResult = null,
+  questWaypoint = null,
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
@@ -91,6 +129,7 @@ export default function GameTerminal({
   const [showCompanions, setShowCompanions] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
   const [statusCollapsed, setStatusCollapsed] = useState(false);
+  const [autoNavigating, setAutoNavigating] = useState(false);
 
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
@@ -108,6 +147,12 @@ export default function GameTerminal({
   autoFarmRef.current = autoFarmStatus;
   const currentTileRef = useRef(currentTile);
   currentTileRef.current = currentTile;
+  const questWaypointRef = useRef(questWaypoint);
+  questWaypointRef.current = questWaypoint;
+  const autoNavigatingRef = useRef(autoNavigating);
+  autoNavigatingRef.current = autoNavigating;
+  const worldStateRef = useRef(worldState);
+  worldStateRef.current = worldState;
 
   // When the player arrives at a new zone tile (or leaves one), narrate it
   // into the message log so the user knows what they're walking on.
@@ -137,10 +182,61 @@ export default function GameTerminal({
     lastZoneIdRef.current = currentZoneId;
   }, [currentTile, appendMessage]);
 
+  // Auto-navigate interval: steps toward the waypoint every 300ms
+  useEffect(() => {
+    if (!autoNavigating) return;
+
+    const intervalId = setInterval(() => {
+      const wp = questWaypointRef.current;
+      const player = worldStateRef.current?.player;
+      if (!wp || !player) {
+        setAutoNavigating(false);
+        return;
+      }
+
+      const distX = Math.abs(wp.targetX - player.x);
+      const distY = Math.abs(wp.targetY - player.y);
+
+      if (distX <= 2 && distY <= 2) {
+        setAutoNavigating(false);
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'quest',
+          text: `Arrived at waypoint: ${wp.questTitle}.`,
+        });
+        return;
+      }
+
+      const step = stepToward(player.x, player.y, wp.targetX, wp.targetY, getBiome);
+      if (!step) {
+        setAutoNavigating(false);
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: 'Auto-navigate: path blocked.',
+        });
+        return;
+      }
+
+      sendCommand('move', step);
+    }, 300);
+
+    return () => clearInterval(intervalId);
+  }, [autoNavigating, sendCommand, appendMessage]);
+
   useEffect(() => {
     if (!keyAction) return;
     switch (keyAction.type) {
       case 'move':
+        // Cancel auto-navigate on manual movement
+        if (autoNavigatingRef.current) {
+          setAutoNavigating(false);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'Auto-navigate cancelled.',
+          });
+        }
         // Server-side MoveCommand expects `deltaX`/`deltaY`, not dx/dy.
         sendCommand('move', { deltaX: keyAction.dx, deltaY: keyAction.dy });
         break;
@@ -212,7 +308,35 @@ export default function GameTerminal({
         sendCommand('viewrecipes', null);
         setShowCrafting(prev => !prev);
         break;
+      case 'navigate': {
+        const wp = questWaypointRef.current;
+        if (!wp) {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'No active quest waypoint. Accept a quest first.',
+          });
+          break;
+        }
+        if (autoNavigatingRef.current) {
+          setAutoNavigating(false);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'Auto-navigate cancelled.',
+          });
+        } else {
+          setAutoNavigating(true);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: `Navigating to ${wp.questTitle}... Press [N] or any movement key to cancel.`,
+          });
+        }
+        break;
+      }
       case 'escape':
+        setAutoNavigating(false);
         setShowHelp(false);
         setShowQuestLog(false);
         setShowInventory(false);
@@ -288,7 +412,7 @@ export default function GameTerminal({
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} />
+          <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} questWaypoint={questWaypoint} />
         </div>
 
         {/* Status panel — collapsible */}
@@ -441,6 +565,34 @@ export default function GameTerminal({
         </div>
       )}
 
+      {/* Auto-navigate status bar */}
+      {autoNavigating && questWaypoint && (
+        <div
+          style={{
+            position: 'absolute',
+            top: autoFarmStatus?.active ? '28px' : '4px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#0d1020',
+            border: '1px solid #00aacc',
+            color: '#00e5ff',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            padding: '3px 14px',
+            letterSpacing: '0.08em',
+            pointerEvents: 'none',
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ color: '#44ccff', fontWeight: 'bold' }}>NAVIGATING</span>
+          <span>{questWaypoint.questTitle}</span>
+          <span style={{ color: '#666' }}>→ ({questWaypoint.targetX}, {questWaypoint.targetY})</span>
+          <span style={{ color: '#666' }}>· [N] cancel</span>
+        </div>
+      )}
+
       {/* Modals */}
       {needsPlayerCreation && (
         <PlayerCreation onCreated={() => { /* reload handled inside PlayerCreation */ }} />
@@ -466,7 +618,7 @@ export default function GameTerminal({
       {showCharSheet && (
         <CharacterSheet player={worldState?.player ?? null} equipment={equipment} onClose={() => setShowCharSheet(false)} />
       )}
-      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} />}
+      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} autoFarmStatus={autoFarmStatus} />}
       {showStorage && atHomestead && (
         <StoragePanel
           snapshot={storageView}
