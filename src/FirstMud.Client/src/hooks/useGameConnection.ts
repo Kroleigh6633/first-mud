@@ -363,11 +363,11 @@ export function useGameConnection(): GameConnectionResult {
       setWanderingNpcs(prev => prev.filter(n => n.id !== payload.id));
     });
 
-    connection.on('NewQuestAvailable', (event: { questId: string; title: string; faction: string; repReward: number }) => {
+    connection.on('NewQuestAvailable', (event: { questId: string; title: string; faction: string; repReward: number; announcementText?: string }) => {
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'quest',
-        text: `A new quest is available: "${event.title}" (${event.faction}, +${event.repReward} rep)`,
+        text: event.announcementText ?? `A new quest is available: "${event.title}" (${event.faction}, +${event.repReward} rep)`,
       });
       // Auto-refresh quest log
       sendCommand('getquests');

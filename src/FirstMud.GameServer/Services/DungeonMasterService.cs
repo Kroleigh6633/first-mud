@@ -186,20 +186,21 @@ public class DungeonMasterService : BackgroundService
         return (category, text);
     }
 
-    private string FillTemplate(string template)
+    private string FillTemplate(string template, int reputationReward = 0)
     {
         var result = template;
 
-        result = result.Replace("{zone}",         Pick(ZoneNames));
-        result = result.Replace("{world}",        "Aeldran");
-        result = result.Replace("{faction}",      Pick(FactionNames));
-        result = result.Replace("{monster_type}", Pick(MonsterNames));
-        result = result.Replace("{monster}",      Pick(MonsterNames));
-        result = result.Replace("{item}",         Pick(DialogueItems));
-        result = result.Replace("{npc_name}",     BuildNpcName());
-        result = result.Replace("{resource}",     Pick(ResourceNames));
-        result = result.Replace("{element}",      Pick(ElementNames));
-        result = result.Replace("{region}",       Pick(RegionNames));
+        result = result.Replace("{zone}",               Pick(ZoneNames));
+        result = result.Replace("{world}",              "Aeldran");
+        result = result.Replace("{faction}",            Pick(FactionNames));
+        result = result.Replace("{monster_type}",       Pick(MonsterNames));
+        result = result.Replace("{monster}",            Pick(MonsterNames));
+        result = result.Replace("{item}",               Pick(DialogueItems));
+        result = result.Replace("{npc_name}",           BuildNpcName());
+        result = result.Replace("{resource}",           Pick(ResourceNames));
+        result = result.Replace("{element}",            Pick(ElementNames));
+        result = result.Replace("{region}",             Pick(RegionNames));
+        result = result.Replace("{reputationReward}",   reputationReward.ToString());
 
         return result;
     }
@@ -297,6 +298,7 @@ public class DungeonMasterService : BackgroundService
             var repReward  = 50 + difficulty * 90; // 140 – 500
 
             var (title, description, outcomes) = BuildQuestContent(difficulty);
+            var announcementText = BuildQuestAnnouncement(title, factionId.ToString(), repReward);
 
             _logger.LogDebug("DM Quest generated: {Id} '{Title}' for {Faction}", questId, title, factionId);
 
@@ -338,9 +340,10 @@ public class DungeonMasterService : BackgroundService
             {
                 questId,
                 title,
-                faction   = factionId.ToString(),
+                faction          = factionId.ToString(),
                 repReward,
                 difficulty,
+                announcementText,
             }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -409,6 +412,17 @@ public class DungeonMasterService : BackgroundService
     {
         var ids = Enum.GetValues<FactionId>();
         return ids[_rng.Next(ids.Length)];
+    }
+
+    private string BuildQuestAnnouncement(string title, string faction, int reputationReward)
+    {
+        var template = Pick(QuestAnnouncementTemplates);
+        return template
+            .Replace("{title}",             title)
+            .Replace("{faction}",           faction)
+            .Replace("{reputationReward}",  reputationReward.ToString())
+            .Replace("{zone}",              Pick(ZoneNames))
+            .Replace("{npc_name}",          BuildNpcName());
     }
 
     // =======================================================================
@@ -830,6 +844,32 @@ public class DungeonMasterService : BackgroundService
             "until they can be moved.",
         "A {adjective} {noun} has blocked the main road through {zone}. " +
             "Trade has stopped. Clear it.",
+    ];
+
+    // -----------------------------------------------------------------------
+    // Quest announcement templates (18 immersive variants)
+    // -----------------------------------------------------------------------
+
+    private static readonly string[] QuestAnnouncementTemplates =
+    [
+        "A {faction} messenger arrives breathless: '{title}' — they say {reputationReward} reputation hangs in the balance.",
+        "Word spreads through the roads: someone seeks a brave soul for a matter involving '{title}'.",
+        "A weathered notice has been nailed to the signpost at {zone}: '{title}'. The {faction} offers {reputationReward} standing to whoever answers.",
+        "{npc_name} of the {faction} is seeking a rider bold enough to undertake '{title}'.",
+        "Whispers in the tavern speak of '{title}'. The {faction} are involved.",
+        "A raven arrives bearing a sealed message. It reads: '{title}'. Signed, the {faction}.",
+        "An old woman by the road stops you: 'Have you heard? {title}. The {faction} need help.'",
+        "Campfire talk tonight: '{title}'. Worth {reputationReward} reputation with the {faction}, they say.",
+        "A {faction} scout approaches with a curt nod: 'We have a task. {title}. Are you interested?'",
+        "A notice posted in {zone} reads: 'Seek capable hands for the matter of {title}. Inquire with the {faction}.'",
+        "Three riders from the {faction} passed through {zone} at speed, spreading word of '{title}'.",
+        "The innkeeper leans close: 'Between you and me — the {faction} are paying {reputationReward} standing for someone to handle {title}.'",
+        "A sealed letter left at your door: '{title}.' No signature. The wax bears the mark of the {faction}.",
+        "Voices carry from the next table: 'The {faction} have posted a task near {zone}. Something about {title}.'",
+        "A young page in {faction} livery hands you a folded parchment: '{title}. Report to us when done.'",
+        "The road through {zone} is buzzing with rumor: {title}. The {faction} will not say why it cannot wait.",
+        "You overhear a {faction} officer outside the keep: 'We need someone for {title}. {reputationReward} reputation, no questions.'",
+        "A broadsheet pinned to the market post: 'SOUGHT: Capable adventurer. Task: {title}. Patron: {faction}. Reward: {reputationReward} standing.'",
     ];
 
     // -----------------------------------------------------------------------
