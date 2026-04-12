@@ -67,7 +67,7 @@ public class LootService
         new("Silver Amulet",        "A small silver disc on a chain, engraved with a warding sigil.",             ItemCategory.Accessory, EquipmentSlot.Accessory,    MinWork: 2, MaxWork: 5),
         new("Wyrd Charm",           "A knotted cord strung with crystalline fragments. Unsettling to hold.",      ItemCategory.Accessory, EquipmentSlot.Accessory,    MinWork: 3, MaxWork: 7),
 
-            // Materials / Reagents (no slot — go straight to inventory)
+        // Materials / Reagents — redirected to biome-specific pool by PickBiomeMaterial() at roll time
         new("Iron Ore",             "Rough lumps of iron ore, ready for the smelter.",                           ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Beast Hide",           "Thick hide stripped from a slain creature.",                                ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Sinew",                "Dried sinew — useful in bowstrings and bindings.",                          ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
@@ -75,21 +75,11 @@ public class LootService
         new("Dravenite Dust",       "Fine crystalline powder with latent magical resonance. Used in restoration imbuing.", ItemCategory.Reagent, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
         new("Bone Fragment",        "A large bone fragment — useful as a crafting material.",                    ItemCategory.Component, EquipmentSlot.None,         MinWork: 1, MaxWork: 2),
         new("Wyrd Shard",           "A jagged shard of crystallised Wyrd-energy. Handle with care.",             ItemCategory.Reagent,   EquipmentSlot.None,         MinWork: 3, MaxWork: 7),
-
-        // Consumables — healing
-        new("Minor Healing Draught", "A small vial of copper-coloured tonic. Restores 30 HP when consumed.",      ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 1, MaxWork: 2),
-        new("Healing Potion",        "A corked flask of luminous green liquid. Restores 60 HP when consumed.",    ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 3),
-        new("Greater Healing Elixir","A heavy bottle of deep-crimson elixir. Restores 100 HP when consumed.",    ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 3, MaxWork: 5),
-
-        // Consumables — weave
-        new("Weave Tincture",        "A small vial of shimmering blue tincture. Restores 20 Weave when consumed.", ItemCategory.Consumable, EquipmentSlot.None,       MinWork: 1, MaxWork: 2),
-        new("Weave Elixir",          "A flask of swirling violet liquid. Restores 50 Weave when consumed.",       ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 4),
-
-        // Consumables — buffs
-        new("Fortitude Brew",        "A dark amber brew that hardens the body. +10% max HP for next combat.",     ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 3),
-        new("Speed Draught",         "A clear, fizzing draught that quickens the limbs. +20% speed for next combat.", ItemCategory.Consumable, EquipmentSlot.None,    MinWork: 2, MaxWork: 3),
-        new("Strength Tonic",        "A thick red tonic with a sharp bite. +15% strike damage for next combat.",  ItemCategory.Consumable, EquipmentSlot.None,        MinWork: 2, MaxWork: 3),
     ];
+    // NOTE: Consumables are NOT in Templates — they have their own dedicated ConsumableTemplates pool
+    // and are rolled at a flat 10% chance independently.  Adding them here would dilute the equipment
+    // drop probability and was the original cause of Focus/Legs/Hands/Feet/Accessory items appearing
+    // far less often than expected.
 
     // -------------------------------------------------------------------------
     // Common materials — dropped in every biome
