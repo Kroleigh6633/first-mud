@@ -3,10 +3,16 @@ import type { StorageViewSnapshot } from '../types/game';
 
 interface Props {
   snapshot: StorageViewSnapshot | null;
-  inventoryItems: { id: string; name: string; description: string; workmanship: number }[];
+  inventoryItems: { id: string; name: string; description: string; workmanship: number; category?: string }[];
   onDeposit: (itemId: string) => void;
   onWithdraw: (itemId: string) => void;
   onClose: () => void;
+}
+
+interface GroupedItem<T> {
+  representative: T;
+  ids: string[];
+  count: number;
 }
 
 type TabCategory = 'All' | 'Weapon' | 'Armor' | 'Component' | 'Reagent' | 'Consumable';
@@ -97,12 +103,37 @@ const actionBtnStyle: React.CSSProperties = {
 
 const TABS: TabCategory[] = ['All', 'Weapon', 'Armor', 'Component', 'Reagent', 'Consumable'];
 
+function groupItems<T extends { id: string; name: string; workmanship: number; category?: string }>(
+  items: T[]
+): GroupedItem<T>[] {
+  const map = new Map<string, GroupedItem<T>>();
+  for (const item of items) {
+    const key = `${item.name}||${item.workmanship}||${item.category ?? ''}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.ids.push(item.id);
+      existing.count += 1;
+    } else {
+      map.set(key, { representative: item, ids: [item.id], count: 1 });
+    }
+  }
+  return Array.from(map.values());
+}
+
 export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWithdraw, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<TabCategory>('All');
 
   const filteredStorageItems = snapshot
     ? snapshot.items.filter(i => activeTab === 'All' || i.category === activeTab)
     : [];
+
+  const groupedStorageItems = groupItems(filteredStorageItems);
+
+  const filteredInventoryItems = activeTab === 'All'
+    ? inventoryItems
+    : inventoryItems.filter(i => i.category === activeTab);
+
+  const groupedInventoryItems = groupItems(filteredInventoryItems);
 
   return (
     <div
@@ -155,53 +186,76 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
         <div style={sectionHeadingStyle}>In Storage</div>
         {!snapshot ? (
           <div style={emptyStyle}>Loading storage...</div>
-        ) : filteredStorageItems.length === 0 ? (
+        ) : groupedStorageItems.length === 0 ? (
           <div style={emptyStyle}>Storage is empty.</div>
         ) : (
-          filteredStorageItems.map(item => (
-            <div key={item.id} style={itemRowStyle}>
-              <div>
-                <span style={{ color: '#00ff41' }}>{item.name}</span>
-                <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
-                  W{item.workmanship}
-                </span>
-                <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
-                  [{item.category}]
-                </span>
+          groupedStorageItems.map(group => {
+            const item = group.representative;
+            return (
+              <div key={item.id} style={itemRowStyle}>
+                <div>
+                  <span style={{ color: '#00ff41' }}>{item.name}</span>
+                  <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
+                    W{item.workmanship}
+                  </span>
+                  <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
+                    [{item.category}]
+                  </span>
+                  {group.count > 1 && (
+                    <span style={{ color: '#aaaaaa', fontSize: '11px', marginLeft: '6px' }}>
+                      x{group.count}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  style={actionBtnStyle}
+                  onClick={() => onWithdraw(group.ids[0])}
+                >
+                  withdraw
+                </button>
               </div>
-              <button
-                type="button"
-                style={actionBtnStyle}
-                onClick={() => onWithdraw(item.id)}
-              >
-                withdraw
-              </button>
-            </div>
-          ))
+            );
+          })
         )}
 
         {/* Inventory — items to deposit */}
         <div style={sectionHeadingStyle}>Your Inventory (deposit)</div>
-        {inventoryItems.length === 0 ? (
-          <div style={emptyStyle}>Inventory is empty.</div>
+        {groupedInventoryItems.length === 0 ? (
+          <div style={emptyStyle}>
+            {activeTab === 'All' ? 'Inventory is empty.' : `No ${activeTab.toLowerCase()} items in inventory.`}
+          </div>
         ) : (
-          inventoryItems.map(item => (
-            <div key={item.id} style={itemRowStyle}>
-              <div>
-                <span style={{ color: '#ccff88' }}>{item.name}</span>
-                <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
-                  W{item.workmanship}
-                </span>
+          groupedInventoryItems.map(group => {
+            const item = group.representative;
+            return (
+              <div key={item.id} style={itemRowStyle}>
+                <div>
+                  <span style={{ color: '#ccff88' }}>{item.name}</span>
+                  <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
+                    W{item.workmanship}
+                  </span>
+                  {item.category && (
+                    <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
+                      [{item.category}]
+                    </span>
+                  )}
+                  {group.count > 1 && (
+                    <span style={{ color: '#aaaaaa', fontSize: '11px', marginLeft: '6px' }}>
+                      x{group.count}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  style={{ ...actionBtnStyle, borderColor: '#ccaa00', color: '#ccaa00' }}
+                  onClick={() => onDeposit(group.ids[0])}
+                >
+                  deposit
+                </button>
               </div>
-              <button
-                type="button"
-                style={{ ...actionBtnStyle, borderColor: '#ccaa00', color: '#ccaa00' }}
-                onClick={() => onDeposit(item.id)}
-              >
-                deposit
-              </button>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
