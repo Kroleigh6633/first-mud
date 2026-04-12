@@ -11,6 +11,9 @@ using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+// BiomeService and MonsterFactory are static helpers extracted from this class.
+// All callers continue to use CombatHelpers.GetBiome / CombatHelpers.BuildMonsterPack
+// via the forwarding wrappers below — no call-site changes required.
 
 namespace FirstMud.GameServer.Handlers;
 
