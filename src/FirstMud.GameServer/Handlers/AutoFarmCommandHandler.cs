@@ -78,6 +78,220 @@ public class AutoFarmCommandHandler(
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Consumable helpers (inline — mirrors UseConsumableCommandHandler logic)
+    // -------------------------------------------------------------------------
+
+    private sealed record ConsumableEffect(
+        string EffectType,
+        int Amount,
+        string? BuffKey = null,
+        float BuffValue = 0f);
+
+    /// <summary>Consumable priority for healing: higher index = better.</summary>
+    private static readonly string[] HealingPriority =
+    [
+        "minor healing draught",
+        "healing potion",
+        "greater healing elixir"
+    ];
+
+    /// <summary>Consumable priority for weave restore: higher index = better.</summary>
+    private static readonly string[] WeavePriority =
+    [
+        "weave tincture",
+        "weave elixir"
+    ];
+
+    /// <summary>Buff consumable names that should each be applied once before a danger 7+ fight.</summary>
+    private static readonly string[] BuffNames =
+    [
+        "fortitude brew",
+        "speed draught",
+        "strength tonic"
+    ];
+
+    private static ConsumableEffect? ResolveEffect(string name)
+    {
+        var n = name.ToLowerInvariant();
+        if (n.Contains("minor healing draught"))  return new ConsumableEffect("Heal", 30);
+        if (n.Contains("healing potion"))         return new ConsumableEffect("Heal", 60);
+        if (n.Contains("greater healing elixir")) return new ConsumableEffect("Heal", 100);
+        if (n.Contains("weave tincture"))         return new ConsumableEffect("RestoreWeave", 20);
+        if (n.Contains("weave elixir"))           return new ConsumableEffect("RestoreWeave", 50);
+        if (n.Contains("fortitude brew"))         return new ConsumableEffect("Buff", 0, "MaxHpBonus", 0.10f);
+        if (n.Contains("speed draught"))          return new ConsumableEffect("Buff", 0, "SpeedBonus", 0.20f);
+        if (n.Contains("strength tonic"))         return new ConsumableEffect("Buff", 0, "StrikeDamageBonus", 0.15f);
+        return null;
+    }
+
+    /// <summary>
+    /// Applies a consumable effect to the player, removes one use from the item stack,
+    /// then persists both entities. Returns a broadcast-ready message, or null if the
+    /// item had no known effect.
+    /// </summary>
+    private static async Task<string?> ApplyAndConsumeAsync(
+        Player player,
+        Item item,
+        IPlayerRepository playerRepo,
+        IItemRepository itemRepo,
+        CancellationToken ct)
+    {
+        var effect = ResolveEffect(item.Name);
+        if (effect is null) return null;
+
+        string message;
+        switch (effect.EffectType)
+        {
+            case "Heal":
+            {
+                var before  = player.CurrentHp;
+                player.HealHp(effect.Amount);
+                var healed  = player.CurrentHp - before;
+                message = $"Auto-farm: used {item.Name}, restored {healed} HP. ({player.CurrentHp}/{player.MaxHp} HP)";
+                break;
+            }
+            case "RestoreWeave":
+            {
+                player.RestoreWeave(effect.Amount);
+                message = $"Auto-farm: used {item.Name}, restored {effect.Amount} Weave. ({player.Weave.VisibleState})";
+                break;
+            }
+            case "Buff":
+            {
+                var label = effect.BuffKey switch
+                {
+                    "MaxHpBonus"        => $"+{(int)(effect.BuffValue * 100)}% max HP",
+                    "SpeedBonus"        => $"+{(int)(effect.BuffValue * 100)}% speed",
+                    "StrikeDamageBonus" => $"+{(int)(effect.BuffValue * 100)}% strike damage",
+                    _                   => "a bonus"
+                };
+                message = $"Auto-farm: used {item.Name} ({label}) before dangerous fight.";
+                break;
+            }
+            default:
+                return null;
+        }
+
+        await playerRepo.UpdateAsync(player, ct);
+
+        if (item.IsStackable && item.Quantity > 1)
+        {
+            item.TryRemoveQuantity(1, out _);
+            await itemRepo.UpdateAsync(item, ct);
+        }
+        else
+        {
+            await itemRepo.DeleteAsync(item.Id, ct);
+        }
+
+        return message;
+    }
+
+    /// <summary>
+    /// Finds the best available consumable from <paramref name="priorityNames"/> in the
+    /// player's inventory (highest priority = last entry in the array wins).
+    /// </summary>
+    private static Item? FindBestConsumable(IReadOnlyList<Item> inventory, string[] priorityNames)
+    {
+        Item? best = null;
+        int bestPriority = -1;
+
+        foreach (var item in inventory)
+        {
+            if (item.Category != ItemCategory.Consumable) continue;
+            var lower = item.Name.ToLowerInvariant();
+            for (int i = 0; i < priorityNames.Length; i++)
+            {
+                if (lower.Contains(priorityNames[i]) && i > bestPriority)
+                {
+                    best = item;
+                    bestPriority = i;
+                }
+            }
+        }
+
+        return best;
+    }
+
+    // -------------------------------------------------------------------------
+    // Portal-home-to-heal helper
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Portals the player to their homestead, waits 5 seconds (homestead heals 10 HP/s),
+    /// then portals back to <paramref name="returnPos"/> and continues farming.
+    /// </summary>
+    private async Task PortalHomeToHealAsync(
+        Guid playerId,
+        Position returnPos,
+        IPlayerRepository playerRepo,
+        CancellationToken ct)
+    {
+        var healPlayer = await playerRepo.GetByIdAsync(playerId, ct);
+        if (healPlayer is null) return;
+
+        var homePos = new Position(healPlayer.Position.World, 0, -100, -100);
+        healPlayer.PortalHome(homePos);
+        await playerRepo.UpdateAsync(healPlayer, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("PlayerMoved", new
+            {
+                healPlayer.Id,
+                X = homePos.X,
+                Y = homePos.Y,
+                ZoneId = homePos.ZoneId,
+                World = homePos.World.ToString()
+            }, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category  = "system",
+                text      = "Auto-farm: no healing consumables and HP critical — portalling home to recover."
+            }, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("AtHomestead", new { playerId }, ct);
+
+        // Wait 5 s — homestead heals 10 HP/s, so ≈50 HP recovered.
+        await Task.Delay(5_000, ct);
+
+        // Apply the homestead passive heal (50 HP over 5 s)
+        var recoveredPlayer = await playerRepo.GetByIdAsync(playerId, ct);
+        if (recoveredPlayer is not null)
+        {
+            recoveredPlayer.HealHp(50);
+            recoveredPlayer.Move(returnPos);
+            await playerRepo.UpdateAsync(recoveredPlayer, ct);
+
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("PlayerMoved", new
+                {
+                    recoveredPlayer.Id,
+                    X = returnPos.X,
+                    Y = returnPos.Y,
+                    ZoneId = returnPos.ZoneId,
+                    World = returnPos.World.ToString()
+                }, ct);
+
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("GameMessage", new
+                {
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    category  = "system",
+                    text      = $"Auto-farm: recovered at homestead (+50 HP). Resuming at ({returnPos.X}, {returnPos.Y})."
+                }, ct);
+        }
+    }
+
     private async Task RunAutoFarmLoopAsync(
         Guid playerId, AutoFarmSession session, CancellationToken serverCt)
     {
@@ -294,6 +508,30 @@ public class AutoFarmCommandHandler(
                     continue;
                 }
 
+                // --- PRE-FIGHT: use buff consumables in danger 7+ zones ---
+                if (dangerLevel >= 7)
+                {
+                    var preInventory = await itemRepo.GetByOwnerAsync(playerId, farmCt);
+                    var buffPlayer   = freshPlayer;
+                    foreach (var buffName in BuffNames)
+                    {
+                        var buff = FindBestConsumable(preInventory, [buffName]);
+                        if (buff is not null)
+                        {
+                            var msg = await ApplyAndConsumeAsync(buffPlayer, buff, playerRepo, itemRepo, farmCt);
+                            if (msg is not null)
+                                await hubContext.Clients
+                                    .Group(playerId.ToString())
+                                    .SendAsync("GameMessage", new
+                                    {
+                                        timestamp = DateTime.UtcNow.ToString("O"),
+                                        category  = "system",
+                                        text      = msg
+                                    }, farmCt);
+                        }
+                    }
+                }
+
                 var encounter = await combatSvc.StartEncounterAsync(
                     playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, [], monsters, ct: farmCt);
 
@@ -389,6 +627,55 @@ public class AutoFarmCommandHandler(
                         {
                             winPlayer.SetCurrentHp(Math.Min(playerCombatant.CurrentHp, winPlayer.MaxHp));
                             await playerRepo.UpdateAsync(winPlayer, farmCt);
+                        }
+
+                        // --- POST-COMBAT CONSUMABLE CHECKS ---
+                        var postInventory = await itemRepo.GetByOwnerAsync(playerId, farmCt);
+
+                        // (a) HP below 50% → use best healing consumable
+                        if (winPlayer.CurrentHp < winPlayer.MaxHp / 2)
+                        {
+                            var healer = FindBestConsumable(postInventory, HealingPriority);
+                            if (healer is not null)
+                            {
+                                var msg = await ApplyAndConsumeAsync(winPlayer, healer, playerRepo, itemRepo, farmCt);
+                                if (msg is not null)
+                                    await hubContext.Clients
+                                        .Group(playerId.ToString())
+                                        .SendAsync("GameMessage", new
+                                        {
+                                            timestamp = DateTime.UtcNow.ToString("O"),
+                                            category  = "system",
+                                            text      = msg
+                                        }, farmCt);
+                            }
+                            else if (winPlayer.CurrentHp < winPlayer.MaxHp * 3 / 10)
+                            {
+                                // HP below 30% and no healing consumables → portal home
+                                await PortalHomeToHealAsync(playerId, winPlayer.Position, playerRepo, farmCt);
+                                // Refresh local reference after portal
+                                winPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
+                            }
+                        }
+
+                        // (b) Weave below 20% → use best weave consumable
+                        if (winPlayer is not null && winPlayer.Weave.Percentage < 20)
+                        {
+                            var postInventory2 = await itemRepo.GetByOwnerAsync(playerId, farmCt);
+                            var weaveCons = FindBestConsumable(postInventory2, WeavePriority);
+                            if (weaveCons is not null)
+                            {
+                                var msg = await ApplyAndConsumeAsync(winPlayer, weaveCons, playerRepo, itemRepo, farmCt);
+                                if (msg is not null)
+                                    await hubContext.Clients
+                                        .Group(playerId.ToString())
+                                        .SendAsync("GameMessage", new
+                                        {
+                                            timestamp = DateTime.UtcNow.ToString("O"),
+                                            category  = "system",
+                                            text      = msg
+                                        }, farmCt);
+                            }
                         }
                     }
 
