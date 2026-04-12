@@ -27,6 +27,10 @@ public class Companion
     // Warning system — tracks how many times player has ignored companion warnings
     public int IgnoredWarnings { get; private set; }
 
+    // Homestead duty — null = adventuring, set = assigned to homestead
+    public HomesteadDuty? AssignedDuty { get; private set; }
+    public DateTime? DutyStartedAt { get; private set; }
+
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
     public void ClearDomainEvents() => _domainEvents.Clear();
@@ -107,6 +111,58 @@ public class Companion
     public void ResetWarnings() => IgnoredWarnings = 0;
 
     public void SetActive(bool active) => IsActive = active;
+
+    /// <summary>
+    /// Assigns the companion to homestead duty.
+    /// The caller must ensure the companion is not in the active adventuring party first.
+    /// </summary>
+    public void AssignToHomestead(HomesteadDuty duty)
+    {
+        if (duty == HomesteadDuty.None)
+            throw new InvalidOperationException("Use RecallFromHomestead to clear duty.");
+        if (IsActive)
+            throw new InvalidOperationException($"{Name} is still in the adventuring party. Deactivate first.");
+        AssignedDuty = duty;
+        DutyStartedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Removes the companion from homestead duty, allowing them to be re-added to the party.
+    /// </summary>
+    public void RecallFromHomestead()
+    {
+        AssignedDuty = null;
+        DutyStartedAt = null;
+    }
+
+    /// <summary>
+    /// Returns the aptitude multiplier (1–3 stars) for a given duty based on companion type.
+    /// </summary>
+    public int GetAptitude(HomesteadDuty duty) => (Type, duty) switch
+    {
+        (CompanionType.Wildfolk,         HomesteadDuty.Harvester) => 3,
+        (CompanionType.Wildfolk,         HomesteadDuty.Salvager)  => 1,
+        (CompanionType.Wildfolk,         HomesteadDuty.Guard)     => 2,
+        (CompanionType.Wildfolk,         HomesteadDuty.Crafter)   => 2,
+        (CompanionType.CapturedMonster,  HomesteadDuty.Harvester) => 2,
+        (CompanionType.CapturedMonster,  HomesteadDuty.Salvager)  => 1,
+        (CompanionType.CapturedMonster,  HomesteadDuty.Guard)     => 3,
+        (CompanionType.CapturedMonster,  HomesteadDuty.Crafter)   => 1,
+        (CompanionType.ArdweldConstruct, HomesteadDuty.Harvester) => 1,
+        (CompanionType.ArdweldConstruct, HomesteadDuty.Salvager)  => 3,
+        (CompanionType.ArdweldConstruct, HomesteadDuty.Guard)     => 3,
+        (CompanionType.ArdweldConstruct, HomesteadDuty.Crafter)   => 3,
+        (CompanionType.HiredHero,        HomesteadDuty.Harvester) => 2,
+        (CompanionType.HiredHero,        HomesteadDuty.Salvager)  => 2,
+        (CompanionType.HiredHero,        HomesteadDuty.Guard)     => 2,
+        (CompanionType.HiredHero,        HomesteadDuty.Crafter)   => 2,
+        // BoundShade — moderate at everything, not specialized
+        (CompanionType.BoundShade,       HomesteadDuty.Harvester) => 2,
+        (CompanionType.BoundShade,       HomesteadDuty.Salvager)  => 2,
+        (CompanionType.BoundShade,       HomesteadDuty.Guard)     => 2,
+        (CompanionType.BoundShade,       HomesteadDuty.Crafter)   => 1,
+        _ => 1
+    };
 
     public bool TryEvolve(string branch)
     {

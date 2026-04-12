@@ -43,5 +43,12 @@ internal sealed class CompanionConfiguration : IEntityTypeConfiguration<Companio
 
         builder.Property(c => c.RelationshipDepth);
         builder.Property(c => c.IgnoredWarnings);
+
+        builder.Property(c => c.AssignedDuty)
+            .HasConversion<int?>()
+            .IsRequired(false);
+
+        builder.Property(c => c.DutyStartedAt)
+            .IsRequired(false);
     }
 }

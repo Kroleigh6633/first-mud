@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using FirstMud.Application.Services;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
 using Microsoft.AspNetCore.SignalR;
@@ -14,6 +15,7 @@ public class GameLoopService : BackgroundService
     private const int HomesteadHealIntervalSeconds = 1;      // Homestead healing: 10 HP per second
     private const int ResourceRegenIntervalSeconds = 60;     // Resource node regen every 60 seconds
     private const int WeaveRegenIntervalSeconds = 10;        // Out-of-combat Weave regen: 1 point every 10 seconds
+    private const int HomesteadCompanionIntervalSeconds = 60; // Homestead companion duties every 60 seconds
 
     private readonly ConcurrentQueue<IGameCommand> _commandQueue = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -92,6 +94,11 @@ public class GameLoopService : BackgroundService
         var ticksPerWeaveRegen = (long)(WeaveRegenIntervalSeconds * 1000.0 / TickIntervalMs);
         if (_tickCount % ticksPerWeaveRegen == 0 && _tickCount > 0)
             await ProcessWeaveRegenAsync(ct);
+
+        // 7. Every 60 seconds: process homestead companion duties
+        var ticksPerHomesteadCompanion = (long)(HomesteadCompanionIntervalSeconds * 1000.0 / TickIntervalMs);
+        if (_tickCount % ticksPerHomesteadCompanion == 0 && _tickCount > 0)
+            await ProcessHomesteadCompanionsAsync(ct);
     }
 
     private async Task ProcessCommandsAsync(CancellationToken ct)
@@ -231,6 +238,41 @@ public class GameLoopService : BackgroundService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error in Weave regen tick.");
+        }
+    }
+
+    /// <summary>
+    /// Processes all homestead companion duties (Harvester, Salvager, Guard, Crafter).
+    /// Broadcasts a message to each player whose companion did something.
+    /// </summary>
+    private async Task ProcessHomesteadCompanionsAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<HomesteadCompanionService>();
+            var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+
+            var results = await service.ProcessAllDutiesAsync(ct);
+
+            foreach (var result in results)
+            {
+                await hubContext.Clients
+                    .Group(result.PlayerId.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category = "system",
+                        text = result.Message
+                    }, ct);
+            }
+
+            if (results.Count > 0)
+                _logger.LogDebug("Homestead companion tick complete. {Count} duty action(s) processed.", results.Count);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in homestead companion tick.");
         }
     }
 

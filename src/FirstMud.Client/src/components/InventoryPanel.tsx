@@ -194,6 +194,17 @@ const imbueBtnStyle: React.CSSProperties = {
   marginLeft: '6px',
 };
 
+const unequipBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #ff8800',
+  color: '#ff8800',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+  marginLeft: '6px',
+};
+
 
 const imbuePanelStyle: React.CSSProperties = {
   background: '#0a0a1a',
@@ -313,6 +324,10 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
 
   const handleToggleLock = (itemId: string) => {
     sendCommand('lockitem', { itemId });
+  };
+
+  const handleUnequip = (slot: string) => {
+    sendCommand('unequip', { slot });
   };
 
   const salvageSkill = snapshot?.salvageSkill ?? 1;
@@ -439,25 +454,124 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
             <div style={sectionHeadingStyle}>
               <span>Equipped</span>
             </div>
-            {equippedItems.map((item) => (
-              <div key={item.id} style={itemRowStyle} data-testid="equipped-item">
-                <div style={itemNameStyle}>
-                  <span>
-                    {item.name}
-                    {item.isStackable && (item.quantity ?? 1) > 1 && (
-                      <span style={quantityTagStyle}>x{item.quantity}</span>
-                    )}
-                    <span style={equippedTagStyle}>
-                      {item.slot && item.slot !== 'None' ? item.slot : 'equipped'}
+            {equippedItems.map((item) => {
+              const isImbueable = (item.category === 'Weapon' || item.category === 'Armor' || item.category === 'Accessory');
+              const hasOpenSlot = (item.imbues?.length ?? 0) < (item.maxImbueSlots ?? 1);
+              const availableTapers = snapshot?.items.filter(t =>
+                t.category === 'Reagent' &&
+                t.id !== item.id &&
+                ['fire shaping taper', 'water shaping taper', 'earth shaping taper', 'air shaping taper',
+                 'fortitude taper', 'warding taper', 'wyrd shard', 'dravenite dust',
+                 'fire shard', 'water shard', 'earth shard', 'air shard'].some(k => t.name.toLowerCase().includes(k.split(' ')[0]))
+              ) ?? [];
+              const isShowingImbuePanel = imbuingItemId === item.id;
+
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    ...itemRowStyle,
+                    ...(item.isLocked ? { borderLeft: '2px solid #ffcc00' } : {}),
+                  }}
+                  data-testid="equipped-item"
+                >
+                  <div style={itemNameStyle}>
+                    <span>
+                      {item.name}
+                      {item.isStackable && (item.quantity ?? 1) > 1 && (
+                        <span style={quantityTagStyle}>x{item.quantity}</span>
+                      )}
+                      {isImbueable && renderImbueSlots(item)}
+                      <span style={equippedTagStyle}>
+                        {item.slot && item.slot !== 'None' ? item.slot : 'equipped'}
+                      </span>
                     </span>
-                  </span>
-                  <span style={{ color: '#888888', fontSize: '11px' }}>
-                    W{item.workmanship}
-                  </span>
+                    <span style={{ display: 'flex', alignItems: 'center' }}>
+                      <span style={{ color: '#888888', fontSize: '11px' }}>
+                        {item.category ?? ''} W{item.workmanship}
+                      </span>
+                      {/* Lock/star toggle */}
+                      <button
+                        type="button"
+                        style={item.isLocked ? lockBtnLockedStyle : lockBtnStyle}
+                        onClick={() => handleToggleLock(item.id)}
+                        title={item.isLocked ? 'Locked — click to unlock' : 'Click to lock (prevents salvage)'}
+                        aria-label={item.isLocked ? `unlock ${item.name}` : `lock ${item.name}`}
+                      >
+                        ★
+                      </button>
+                      {/* Imbue button */}
+                      {isImbueable && (
+                        <button
+                          type="button"
+                          style={isShowingImbuePanel ? { ...imbueBtnStyle, background: '#1a0a2a' } : imbueBtnStyle}
+                          onClick={() => setImbuingItemId(isShowingImbuePanel ? null : item.id)}
+                          aria-label={`imbue ${item.name}`}
+                          title={!hasOpenSlot ? 'All slots filled — overimbuing is risky!' : 'Imbue this item'}
+                        >
+                          imbue
+                        </button>
+                      )}
+                      {/* Unequip button */}
+                      {item.slot && item.slot !== 'None' && (
+                        <button
+                          type="button"
+                          style={unequipBtnStyle}
+                          onClick={() => handleUnequip(item.slot!)}
+                          aria-label={`unequip ${item.name}`}
+                          title={`Move ${item.name} back to inventory`}
+                        >
+                          unequip
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                  {item.description && <div style={itemDescStyle}>{item.description}</div>}
+                  {/* Imbue sub-panel */}
+                  {isShowingImbuePanel && (
+                    <div style={imbuePanelStyle}>
+                      <div style={{ color: '#cc44ff', marginBottom: '6px', fontSize: '11px' }}>
+                        SELECT TAPER TO IMBUE — {item.name}
+                        {!hasOpenSlot && (
+                          <span style={{ color: '#ff4422', marginLeft: '8px' }}>
+                            ⚠ OVERIMBUING: 50% catastrophic failure
+                          </span>
+                        )}
+                      </div>
+                      {availableTapers.length === 0 ? (
+                        <div style={{ color: '#666666', fontStyle: 'italic' }}>
+                          No imbuing reagents in inventory.
+                        </div>
+                      ) : (
+                        availableTapers.map(taper => (
+                          <div key={taper.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                            <span style={{ color: '#ccaaff' }}>
+                              {taper.name}
+                              {(taper.quantity ?? 1) > 1 && <span style={quantityTagStyle}>x{taper.quantity}</span>}
+                            </span>
+                            <button
+                              type="button"
+                              style={imbueBtnStyle}
+                              onClick={() => handleImbue(item.id, taper.id)}
+                              aria-label={`apply ${taper.name} to ${item.name}`}
+                            >
+                              apply
+                            </button>
+                          </div>
+                        ))
+                      )}
+                      <button
+                        type="button"
+                        style={{ ...imbueBtnStyle, marginTop: '4px', marginLeft: '0' }}
+                        onClick={() => setImbuingItemId(null)}
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {item.description && <div style={itemDescStyle}>{item.description}</div>}
-              </div>
-            ))}
+              );
+            })}
           </>
         )}
 

@@ -74,6 +74,9 @@ builder.Services.AddScoped<ICommandHandler<ViewCompanionsCommand>, ViewCompanion
 builder.Services.AddScoped<ICommandHandler<ActivateCompanionCommand>, ActivateCompanionCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<DeactivateCompanionCommand>, DeactivateCompanionCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<ImbueCommand>, ImbueCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<AssignCompanionDutyCommand>, AssignCompanionDutyCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<RecallCompanionCommand>, RecallCompanionCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<QueueSalvageCommand>, QueueSalvageCommandHandler>();
 
 var app = builder.Build();
 

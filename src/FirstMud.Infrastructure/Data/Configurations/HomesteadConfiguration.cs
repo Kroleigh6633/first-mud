@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FirstMud.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -26,5 +27,14 @@ internal sealed class HomesteadConfiguration : IEntityTypeConfiguration<Homestea
             .HasMaxLength(200);
 
         builder.Property(h => h.StorageSlots);
+
+        builder.Property(h => h.SalvageQueue)
+            .HasColumnName("SalvageQueueJson")
+            .HasColumnType("nvarchar(max)")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<List<Guid>>(v, (JsonSerializerOptions?)null) ?? new List<Guid>())
+            .HasDefaultValue(new List<Guid>())
+            .IsRequired(false);
     }
 }

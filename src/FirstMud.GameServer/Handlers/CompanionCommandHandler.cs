@@ -1,4 +1,6 @@
 using FirstMud.Application.Services;
+using FirstMud.Domain.Entities;
+using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Hubs;
@@ -24,17 +26,7 @@ public class ViewCompanionsCommandHandler(
             .Where(c => !c.IsPermanentlyGone)
             .OrderBy(c => c.IsActive ? 0 : 1)
             .ThenByDescending(c => c.CurrentLayer)
-            .Select(c => new CompanionDto(
-                c.Id,
-                c.Name,
-                c.Type.ToString(),
-                c.Element.ToString(),
-                c.Level,
-                c.CurrentLayer,
-                c.UsageCounter,
-                c.DriftAccumulator,
-                c.IsActive,
-                c.RelationshipDepth))
+            .Select(c => CompanionDtoHelpers.ToDto(c))
             .ToList();
 
         await hubContext.Clients
@@ -70,6 +62,9 @@ public class ActivateCompanionCommandHandler(
         if (companion.IsActive)
             return new CommandResult(false, $"{companion.Name} is already active.");
 
+        if (companion.AssignedDuty.HasValue && companion.AssignedDuty != HomesteadDuty.None)
+            return new CommandResult(false, $"{companion.Name} is on homestead duty ({companion.AssignedDuty}). Recall them first.");
+
         if (!player.TryAddActiveCompanion(companion.Id))
         {
             await notificationService.SendMessageAsync(cmd.PlayerId, "system",
@@ -85,21 +80,7 @@ public class ActivateCompanionCommandHandler(
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} joins your active party. (Layer {companion.CurrentLayer} {companion.Type})", ct);
 
-        // Broadcast updated companion list
-        var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-        var payload = allCompanions
-            .Where(c => !c.IsPermanentlyGone)
-            .OrderBy(c => c.IsActive ? 0 : 1)
-            .ThenByDescending(c => c.CurrentLayer)
-            .Select(c => new CompanionDto(
-                c.Id, c.Name, c.Type.ToString(), c.Element.ToString(),
-                c.Level, c.CurrentLayer, c.UsageCounter, c.DriftAccumulator,
-                c.IsActive, c.RelationshipDepth))
-            .ToList();
-
-        await hubContext.Clients
-            .Group(cmd.PlayerId.ToString())
-            .SendAsync("CompanionList", payload, ct);
+        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
 
         return new CommandResult(true, $"{companion.Name} activated.");
     }
@@ -136,23 +117,178 @@ public class DeactivateCompanionCommandHandler(
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} returns to the roster. (Remember: unused companions drift!)", ct);
 
-        // Broadcast updated companion list
-        var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
+
+        return new CommandResult(true, $"{companion.Name} deactivated.");
+    }
+}
+
+/// <summary>
+/// Assigns a companion to homestead duty.
+/// The companion must first be deactivated (removed from the adventuring party).
+/// </summary>
+public class AssignCompanionDutyCommandHandler(
+    ICompanionRepository companionRepository,
+    IHomesteadRepository homesteadRepository,
+    GameNotificationService notificationService,
+    IHubContext<GameHub> hubContext) : ICommandHandler<AssignCompanionDutyCommand>
+{
+    public async Task<CommandResult> HandleAsync(AssignCompanionDutyCommand cmd, CancellationToken ct)
+    {
+        if (!Enum.TryParse<HomesteadDuty>(cmd.Duty, ignoreCase: true, out var duty) || duty == HomesteadDuty.None)
+            return new CommandResult(false, $"Unknown duty '{cmd.Duty}'. Choose: Harvester, Salvager, Guard, Crafter.");
+
+        var companion = await companionRepository.GetByIdAsync(cmd.CompanionId, ct);
+        if (companion is null)
+            return new CommandResult(false, "Companion not found.");
+
+        if (companion.OwnerId != cmd.PlayerId)
+            return new CommandResult(false, "That companion does not belong to you.");
+
+        if (companion.IsPermanentlyGone)
+            return new CommandResult(false, $"{companion.Name} is gone permanently.");
+
+        if (companion.IsActive)
+            return new CommandResult(false,
+                $"{companion.Name} is still adventuring. Deactivate them first before assigning homestead duty.");
+
+        var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is null)
+            return new CommandResult(false, "You don't have a homestead yet.");
+
+        try
+        {
+            companion.AssignToHomestead(duty);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new CommandResult(false, ex.Message);
+        }
+
+        await companionRepository.UpdateAsync(companion, ct);
+
+        var aptitude = companion.GetAptitude(duty);
+        var stars = new string('★', aptitude) + new string('☆', 3 - aptitude);
+
+        var dutyMsg = duty switch
+        {
+            HomesteadDuty.Guard   => $"{companion.Name} stands watch over your homestead. [{stars}]",
+            HomesteadDuty.Crafter => $"{companion.Name} heads to the crafting station... (awaiting crafting station construction). [{stars}]",
+            _                     => $"{companion.Name} is now assigned as {duty}. [{stars}] Passive income begins."
+        };
+
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system", dutyMsg, ct);
+        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
+
+        return new CommandResult(true, dutyMsg);
+    }
+}
+
+/// <summary>
+/// Recalls a companion from homestead duty, allowing them to return to adventuring.
+/// </summary>
+public class RecallCompanionCommandHandler(
+    ICompanionRepository companionRepository,
+    GameNotificationService notificationService,
+    IHubContext<GameHub> hubContext) : ICommandHandler<RecallCompanionCommand>
+{
+    public async Task<CommandResult> HandleAsync(RecallCompanionCommand cmd, CancellationToken ct)
+    {
+        var companion = await companionRepository.GetByIdAsync(cmd.CompanionId, ct);
+        if (companion is null)
+            return new CommandResult(false, "Companion not found.");
+
+        if (companion.OwnerId != cmd.PlayerId)
+            return new CommandResult(false, "That companion does not belong to you.");
+
+        if (!companion.AssignedDuty.HasValue || companion.AssignedDuty == HomesteadDuty.None)
+            return new CommandResult(false, $"{companion.Name} is not on homestead duty.");
+
+        var prevDuty = companion.AssignedDuty.ToString();
+        companion.RecallFromHomestead();
+        await companionRepository.UpdateAsync(companion, ct);
+
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system",
+            $"{companion.Name} has been recalled from {prevDuty} duty and is ready to adventure.", ct);
+
+        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
+
+        return new CommandResult(true, $"{companion.Name} recalled from homestead.");
+    }
+}
+
+/// <summary>
+/// Queues a player's inventory item for companion-assisted salvaging at the homestead.
+/// The item stays in inventory; a Salvager companion will process it during the next duty tick.
+/// </summary>
+public class QueueSalvageCommandHandler(
+    IPlayerRepository playerRepository,
+    IItemRepository itemRepository,
+    IHomesteadRepository homesteadRepository,
+    GameNotificationService notificationService) : ICommandHandler<QueueSalvageCommand>
+{
+    public async Task<CommandResult> HandleAsync(QueueSalvageCommand cmd, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        var item = await itemRepository.GetByIdAsync(cmd.ItemId, ct);
+        if (item is null || item.OwnerId != cmd.PlayerId)
+            return new CommandResult(false, "Item not found in your inventory.");
+
+        if (item.IsLocked)
+            return new CommandResult(false, $"{item.Name} is locked. Unlock it first.");
+
+        var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is null)
+            return new CommandResult(false, "You don't have a homestead yet.");
+
+        homestead.EnqueueForSalvage(item.Id);
+        await homesteadRepository.UpdateAsync(homestead, ct);
+
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system",
+            $"{item.Name} added to the homestead salvage queue. A Salvager companion will process it.", ct);
+
+        return new CommandResult(true, $"{item.Name} queued for salvage.");
+    }
+}
+
+// ─── shared helpers ───────────────────────────────────────────────────────────
+
+internal static class CompanionDtoHelpers
+{
+    public static CompanionDto ToDto(Companion c) => new(
+        c.Id,
+        c.Name,
+        c.Type.ToString(),
+        c.Element.ToString(),
+        c.Level,
+        c.CurrentLayer,
+        c.UsageCounter,
+        c.DriftAccumulator,
+        c.IsActive,
+        c.RelationshipDepth,
+        c.AssignedDuty?.ToString(),
+        c.DutyStartedAt);
+
+    public static async Task BroadcastCompanionListAsync(
+        Guid playerId,
+        ICompanionRepository companionRepository,
+        IHubContext<GameHub> hubContext,
+        CancellationToken ct)
+    {
+        var allCompanions = await companionRepository.GetByOwnerAsync(playerId, ct);
         var payload = allCompanions
             .Where(c => !c.IsPermanentlyGone)
             .OrderBy(c => c.IsActive ? 0 : 1)
             .ThenByDescending(c => c.CurrentLayer)
-            .Select(c => new CompanionDto(
-                c.Id, c.Name, c.Type.ToString(), c.Element.ToString(),
-                c.Level, c.CurrentLayer, c.UsageCounter, c.DriftAccumulator,
-                c.IsActive, c.RelationshipDepth))
+            .Select(c => CompanionDtoHelpers.ToDto(c))
             .ToList();
 
         await hubContext.Clients
-            .Group(cmd.PlayerId.ToString())
+            .Group(playerId.ToString())
             .SendAsync("CompanionList", payload, ct);
-
-        return new CommandResult(true, $"{companion.Name} deactivated.");
     }
 }
 
@@ -169,4 +305,6 @@ public record CompanionDto(
     int UsageCounter,
     float DriftAccumulator,
     bool IsActive,
-    int RelationshipDepth);
+    int RelationshipDepth,
+    string? AssignedDuty = null,
+    DateTime? DutyStartedAt = null);

@@ -226,6 +226,19 @@ public class GameHub : Hub
                 TryGetGuid(payload, "itemId"),
                 TryGetGuid(payload, "taperId")),
 
+            "assigncompanionduty" => new AssignCompanionDutyCommand(
+                playerId,
+                TryGetGuid(payload, "companionId"),
+                TryGetString(payload, "duty") ?? string.Empty),
+
+            "recallcompanion" => new RecallCompanionCommand(
+                playerId,
+                TryGetGuid(payload, "companionId")),
+
+            "queuesalvage" => new QueueSalvageCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
             _ => null
         };
     }

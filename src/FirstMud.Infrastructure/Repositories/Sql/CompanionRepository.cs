@@ -1,4 +1,5 @@
 using FirstMud.Domain.Entities;
+using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,13 @@ internal sealed class CompanionRepository : ICompanionRepository
     {
         return await _context.Companions
             .Where(c => c.OwnerId == ownerId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Companion>> GetAllOnDutyAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Companions
+            .Where(c => c.AssignedDuty != null && c.AssignedDuty != HomesteadDuty.None && !c.IsPermanentlyGone)
             .ToListAsync(cancellationToken);
     }
 

@@ -49,4 +49,26 @@ internal sealed class HomesteadRepository : IHomesteadRepository
             await _context.SaveChangesAsync(ct);
         }
     }
+
+    public async Task UpdateAsync(Homestead homestead, CancellationToken ct = default)
+    {
+        _context.Homesteads.Update(homestead);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<HomesteadStorageItem?> GetStorageItemByNameAsync(Guid homesteadId, string name, CancellationToken ct = default)
+    {
+        // Join to Items table to find by name
+        var storageItems = await _context.HomesteadStorageItems
+            .Where(s => s.HomesteadId == homesteadId)
+            .ToListAsync(ct);
+
+        foreach (var si in storageItems)
+        {
+            var item = await _context.Items.FirstOrDefaultAsync(i => i.Id == si.ItemId, ct);
+            if (item is not null && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+                return si;
+        }
+        return null;
+    }
 }

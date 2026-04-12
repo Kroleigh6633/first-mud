@@ -199,6 +199,7 @@ export interface InventorySnapshot {
 }
 
 export type CompanionType = 'Wildfolk' | 'CapturedMonster' | 'ArdweldConstruct' | 'HiredHero' | 'BoundShade';
+export type HomesteadDuty = 'Harvester' | 'Salvager' | 'Guard' | 'Crafter';
 
 export interface CompanionState {
   id: string;
@@ -211,6 +212,8 @@ export interface CompanionState {
   driftAccumulator: number;
   isActive: boolean;
   relationshipDepth: number;
+  assignedDuty?: HomesteadDuty | null;
+  dutyStartedAt?: string | null;
 }
 
 export interface CompanionCapturedEvent {
