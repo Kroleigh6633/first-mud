@@ -182,9 +182,7 @@ public class GameHub : Hub
 
             "openstorage" => new OpenStorageCommand(playerId),
 
-            "autofarm" => new AutoFarmCommand(
-                playerId,
-                TryGetInt(payload, "durationSeconds") is int d && d > 0 ? d : 300),
+            "autofarm" => new AutoFarmCommand(playerId),
 
             "equip" => new EquipCommand(
                 playerId,

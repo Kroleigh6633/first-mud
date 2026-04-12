@@ -4,18 +4,21 @@ namespace FirstMud.Application.Services;
 
 public record AutoFarmSession(
     Guid PlayerId,
-    int DurationSeconds,
     DateTimeOffset StartedAt,
     CancellationTokenSource Cts)
 {
     public int Kills { get; set; }
     public int ItemsFound { get; set; }
     public int ItemsAutoSalvaged { get; set; }
+    public int ItemsDeposited { get; set; }
+
+    /// <summary>Current loop state: idle | walking | fighting | resting | depositing</summary>
+    public string FarmState { get; set; } = "idle";
 }
 
 /// <summary>
 /// Singleton that tracks active auto-farm sessions.
-/// Actual farm logic is driven externally (CommandDispatcher / GameLoopService)
+/// Actual farm logic is driven externally (AutoFarmCommandHandler)
 /// so that it can access scoped services (IItemRepository, etc.).
 /// </summary>
 public class AutoFarmService
@@ -27,7 +30,7 @@ public class AutoFarmService
 
     public bool IsActive(Guid playerId) => _sessions.ContainsKey(playerId);
 
-    public AutoFarmSession StartSession(Guid playerId, int durationSeconds)
+    public AutoFarmSession StartSession(Guid playerId)
     {
         // Cancel any existing session first
         if (_sessions.TryGetValue(playerId, out var existing))
@@ -37,7 +40,7 @@ public class AutoFarmService
         }
 
         var cts = new CancellationTokenSource();
-        var session = new AutoFarmSession(playerId, durationSeconds, DateTimeOffset.UtcNow, cts);
+        var session = new AutoFarmSession(playerId, DateTimeOffset.UtcNow, cts);
         _sessions[playerId] = session;
         return session;
     }
@@ -59,6 +62,14 @@ public class AutoFarmService
     public void RecordAutoSalvage(Guid playerId) =>
         _sessions.GetValueOrDefault(playerId)
             ?.Let(s => s.ItemsAutoSalvaged++);
+
+    public void RecordDeposit(Guid playerId, int count) =>
+        _sessions.GetValueOrDefault(playerId)
+            ?.Let(s => s.ItemsDeposited += count);
+
+    public void SetState(Guid playerId, string state) =>
+        _sessions.GetValueOrDefault(playerId)
+            ?.Let(s => s.FarmState = state);
 }
 
 internal static class AutoFarmExtensions

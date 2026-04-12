@@ -163,7 +163,7 @@ public class CombatHelpers(
     // XP + level-up helpers
     // -------------------------------------------------------------------------
 
-    public async Task AwardCombatXpAsync(Guid playerId, Encounter encounter, CancellationToken ct)
+    public async Task AwardCombatXpAsync(Guid playerId, Encounter encounter, CancellationToken ct, bool isAutoFarm = false)
     {
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
@@ -199,17 +199,25 @@ public class CombatHelpers(
             breakdown.Add(label);
         }
 
+        // Auto-farm degrades XP to 25% of manual rate
+        string autoFarmSuffix = string.Empty;
+        if (isAutoFarm && totalXp > 0)
+        {
+            totalXp = Math.Max(1, (int)(totalXp * 0.25f));
+            autoFarmSuffix = " (auto-farm: 25% rate)";
+        }
+
         if (totalXp > 0)
         {
             player.GainExperience(totalXp);
             await playerRepository.UpdateAsync(player, ct);
-            logger.LogDebug("Awarded {Xp} XP to player {PlayerId}", totalXp, playerId);
+            logger.LogDebug("Awarded {Xp} XP to player {PlayerId} (autoFarm={IsAutoFarm})", totalXp, playerId, isAutoFarm);
         }
 
         var detail = string.Join(", ", breakdown);
         await notificationService.SendMessageAsync(
             playerId, "combat",
-            $"You gained {totalXp} experience! ({detail})",
+            $"You gained {totalXp} experience{autoFarmSuffix}! ({detail})",
             ct);
 
         await BroadcastLevelUpEventsAsync(playerId, player, ct);

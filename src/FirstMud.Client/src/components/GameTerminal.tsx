@@ -190,7 +190,7 @@ export default function GameTerminal({
         sendCommand('harvest', null);
         break;
       case 'autofarm':
-        sendCommand('autofarm', { durationSeconds: 300 });
+        sendCommand('autofarm', null);
         break;
       case 'storage':
         if (!atHomesteadRef.current) {
@@ -417,9 +417,27 @@ export default function GameTerminal({
             padding: '3px 14px',
             letterSpacing: '0.08em',
             pointerEvents: 'none',
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'center',
           }}
         >
-          AUTO-FARM ACTIVE · Press [F] to stop
+          <span style={{ color: '#44ff88', fontWeight: 'bold' }}>AUTO-FARM ACTIVE</span>
+          {autoFarmStatus.state && (
+            <span style={{ color: '#aaffcc', textTransform: 'capitalize' }}>
+              [{autoFarmStatus.state}]
+            </span>
+          )}
+          <span>Kills: {autoFarmStatus.kills ?? 0}</span>
+          <span>Items: {autoFarmStatus.items ?? 0}</span>
+          <span>Salvaged: {autoFarmStatus.salvaged ?? 0}</span>
+          <span>Deposited: {autoFarmStatus.deposited ?? 0}</span>
+          {autoFarmStatus.biome && (
+            <span style={{ color: '#88ccaa' }}>
+              {autoFarmStatus.biome}{autoFarmStatus.dangerLevel !== undefined ? ` (D${autoFarmStatus.dangerLevel})` : ''}
+            </span>
+          )}
+          <span style={{ color: '#666' }}>· [F] stop</span>
         </div>
       )}
 

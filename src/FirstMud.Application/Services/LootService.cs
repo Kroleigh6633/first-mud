@@ -203,6 +203,7 @@ public class LootService
     /// dangerLevel: 1-10 zone danger.
     /// ownerId: the player's ID — item is placed in their inventory (OwnerId set).
     /// currentInventoryCount: used by caller to enforce carry capacity.
+    /// isAutoFarm: if true, applies degraded rewards (−40% drop chance, −2 workmanship).
     /// Returns LootDropResult with Dropped=false if no drop or inventory full.
     /// </summary>
     public async Task<LootDropResult> RollLootDropAsync(
@@ -213,14 +214,18 @@ public class LootService
         int maxInventorySlots,
         CancellationToken ct = default,
         Player? player = null,
-        string? zoneName = null)
+        string? zoneName = null,
+        bool isAutoFarm = false)
     {
         // Inventory full check
         if (currentInventoryCount >= maxInventorySlots)
             return new LootDropResult(false, null, "Your inventory is full!");
 
         // Drop chance: 40% at danger 1, up to 80% at danger 10
+        // Auto-farm reduces drop chance by 40% (e.g. 48% → ~29%)
         var dropChance = 40 + dangerLevel * 4;
+        if (isAutoFarm)
+            dropChance = (int)(dropChance * 0.60);
 
         // Separate taper drop: 15% flat chance (independent of main drop)
         if (Random.Shared.Next(100) < 15)
@@ -280,6 +285,9 @@ public class LootService
         // Workmanship: template range + danger bonus
         var workValue = template.MinWork + (int)(Random.Shared.NextDouble() * (template.MaxWork - template.MinWork + 1));
         workValue = Math.Clamp(workValue, 1, 10);
+        // Auto-farm penalty: −2 workmanship (minimum W1)
+        if (isAutoFarm)
+            workValue = Math.Max(1, workValue - 2);
         var workmanship = Workmanship.Of(workValue);
 
         var item = Item.Create(template.Name, template.Description, template.Category, workmanship, originWorld,

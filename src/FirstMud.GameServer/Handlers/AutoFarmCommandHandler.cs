@@ -35,16 +35,24 @@ public class AutoFarmCommandHandler(
         if (player is null)
             return new CommandResult(false, "Player not found.");
 
-        var session = autoFarmService.StartSession(cmd.PlayerId, cmd.DurationSeconds);
+        var session = autoFarmService.StartSession(cmd.PlayerId);
 
         await notificationService.SendMessageAsync(
             cmd.PlayerId,
             "system",
-            $"Auto-farm started. Duration: {cmd.DurationSeconds / 60} minute(s). Press [F] again to stop.",
+            "Auto-farm started. Runs until stopped. Press [F] again to stop.",
             ct);
 
         await notificationService.SendEventAsync(cmd.PlayerId, "AutoFarmStatus",
-            new { active = true, durationSeconds = cmd.DurationSeconds }, ct);
+            new
+            {
+                active = true,
+                state = "idle",
+                kills = 0,
+                items = 0,
+                salvaged = 0,
+                deposited = 0
+            }, ct);
 
         _ = Task.Run(async () =>
         {
@@ -56,18 +64,15 @@ public class AutoFarmCommandHandler(
 
     // -------------------------------------------------------------------------
     // Clockwise spiral step generator
-    // Yields (dx, dy) steps in the pattern: R R D D L L L U U U R R R R ...
     // -------------------------------------------------------------------------
     private static IEnumerable<(int dx, int dy)> SpiralSteps()
     {
-        // Directions: right, down, left, up
         (int dx, int dy)[] dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)];
         int steps = 1;
         int dirIdx = 0;
 
         while (true)
         {
-            // Each side length is repeated twice before growing
             for (int repeat = 0; repeat < 2; repeat++)
             {
                 for (int i = 0; i < steps; i++)
@@ -79,7 +84,7 @@ public class AutoFarmCommandHandler(
     }
 
     // -------------------------------------------------------------------------
-    // Consumable helpers (inline — mirrors UseConsumableCommandHandler logic)
+    // Consumable helpers
     // -------------------------------------------------------------------------
 
     private sealed record ConsumableEffect(
@@ -88,7 +93,6 @@ public class AutoFarmCommandHandler(
         string? BuffKey = null,
         float BuffValue = 0f);
 
-    /// <summary>Consumable priority for healing: higher index = better.</summary>
     private static readonly string[] HealingPriority =
     [
         "minor healing draught",
@@ -96,14 +100,12 @@ public class AutoFarmCommandHandler(
         "greater healing elixir"
     ];
 
-    /// <summary>Consumable priority for weave restore: higher index = better.</summary>
     private static readonly string[] WeavePriority =
     [
         "weave tincture",
         "weave elixir"
     ];
 
-    /// <summary>Buff consumable names that should each be applied once before a danger 7+ fight.</summary>
     private static readonly string[] BuffNames =
     [
         "fortitude brew",
@@ -125,11 +127,6 @@ public class AutoFarmCommandHandler(
         return null;
     }
 
-    /// <summary>
-    /// Applies a consumable effect to the player, removes one use from the item stack,
-    /// then persists both entities. Returns a broadcast-ready message, or null if the
-    /// item had no known effect.
-    /// </summary>
     private static async Task<string?> ApplyAndConsumeAsync(
         Player player,
         Item item,
@@ -188,10 +185,6 @@ public class AutoFarmCommandHandler(
         return message;
     }
 
-    /// <summary>
-    /// Finds the best available consumable from <paramref name="priorityNames"/> in the
-    /// player's inventory (highest priority = last entry in the array wins).
-    /// </summary>
     private static Item? FindBestConsumable(IReadOnlyList<Item> inventory, string[] priorityNames)
     {
         Item? best = null;
@@ -218,10 +211,6 @@ public class AutoFarmCommandHandler(
     // Portal-home-to-heal helper
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Portals the player to their homestead, waits 5 seconds (homestead heals 10 HP/s),
-    /// then portals back to <paramref name="returnPos"/> and continues farming.
-    /// </summary>
     private async Task PortalHomeToHealAsync(
         Guid playerId,
         Position returnPos,
@@ -259,10 +248,8 @@ public class AutoFarmCommandHandler(
             .Group(playerId.ToString())
             .SendAsync("AtHomestead", new { playerId }, ct);
 
-        // Wait 5 s — homestead heals 10 HP/s, so ≈50 HP recovered.
         await Task.Delay(5_000, ct);
 
-        // Apply the homestead passive heal (50 HP over 5 s)
         var recoveredPlayer = await playerRepo.GetByIdAsync(playerId, ct);
         if (recoveredPlayer is not null)
         {
@@ -292,16 +279,156 @@ public class AutoFarmCommandHandler(
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Inventory-full auto-deposit helper
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// When inventory is full: portal home, batch-deposit all non-equipped non-locked
+    /// items into homestead storage, wait 2s, portal back to farming position.
+    /// </summary>
+    private async Task AutoDepositAndReturnAsync(
+        Guid playerId,
+        Position returnPos,
+        IPlayerRepository playerRepo,
+        IItemRepository itemRepo,
+        IHomesteadRepository homesteadRepo,
+        AutoFarmSession session,
+        CancellationToken ct)
+    {
+        var p = await playerRepo.GetByIdAsync(playerId, ct);
+        if (p is null) return;
+
+        var homePos = new Position(p.Position.World, 0, -100, -100);
+        p.PortalHome(homePos);
+        await playerRepo.UpdateAsync(p, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("PlayerMoved", new
+            {
+                p.Id,
+                X = homePos.X,
+                Y = homePos.Y,
+                ZoneId = homePos.ZoneId,
+                World = homePos.World.ToString()
+            }, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("AtHomestead", new { playerId }, ct);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category  = "system",
+                text      = "Auto-farm: inventory full, depositing at homestead..."
+            }, ct);
+
+        // Gather eligible items: not equipped, not locked
+        var equippedIds = new HashSet<Guid>(p.EquippedItems.Values);
+        var allItems = await itemRepo.GetByOwnerAsync(playerId, ct);
+        var homestead = await homesteadRepo.GetByPlayerIdAsync(playerId, ct);
+
+        int deposited = 0;
+        if (homestead is not null)
+        {
+            var storageItems = await homesteadRepo.GetStorageItemsAsync(homestead.Id, ct);
+            int freeSlots = homestead.StorageSlots - storageItems.Count;
+
+            foreach (var item in allItems)
+            {
+                if (freeSlots <= 0) break;
+                if (equippedIds.Contains(item.Id)) continue;
+                if (item.IsLocked) continue;
+
+                item.SetOwner(null);
+                await itemRepo.UpdateAsync(item, ct);
+
+                var storageItem = HomesteadStorageItem.Create(homestead.Id, item.Id);
+                await homesteadRepo.AddStorageItemAsync(storageItem, ct);
+
+                deposited++;
+                freeSlots--;
+            }
+        }
+
+        autoFarmService.RecordDeposit(playerId, deposited);
+        session.ItemsDeposited += deposited;
+
+        await Task.Delay(2_000, ct);
+
+        var returnPlayer = await playerRepo.GetByIdAsync(playerId, ct);
+        if (returnPlayer is not null)
+        {
+            returnPlayer.Move(returnPos);
+            await playerRepo.UpdateAsync(returnPlayer, ct);
+
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("PlayerMoved", new
+                {
+                    returnPlayer.Id,
+                    X = returnPos.X,
+                    Y = returnPos.Y,
+                    ZoneId = returnPos.ZoneId,
+                    World = returnPos.World.ToString()
+                }, ct);
+
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("GameMessage", new
+                {
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    category  = "system",
+                    text      = $"Auto-farm: deposited {deposited} item(s), resuming..."
+                }, ct);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Status broadcast helper
+    // -------------------------------------------------------------------------
+
+    private async Task BroadcastStatusAsync(
+        Guid playerId,
+        AutoFarmSession session,
+        string state,
+        string biome,
+        int dangerLevel,
+        CancellationToken ct)
+    {
+        autoFarmService.SetState(playerId, state);
+
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("AutoFarmStatus", new
+            {
+                active    = true,
+                state,
+                kills     = session.Kills,
+                items     = session.ItemsFound,
+                salvaged  = session.ItemsAutoSalvaged,
+                deposited = session.ItemsDeposited,
+                biome,
+                dangerLevel
+            }, ct);
+    }
+
+    // -------------------------------------------------------------------------
+    // Main loop
+    // -------------------------------------------------------------------------
+
     private async Task RunAutoFarmLoopAsync(
         Guid playerId, AutoFarmSession session, CancellationToken serverCt)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(serverCt, session.Cts.Token);
         var farmCt = linked.Token;
 
-        var endTime = session.StartedAt.AddSeconds(session.DurationSeconds);
         const int stepIntervalMs = 3000;
 
-        // Remember starting position so we can return there at the end
         int originX = 0, originY = 0;
         bool originSet = false;
 
@@ -309,7 +436,7 @@ public class AutoFarmCommandHandler(
 
         try
         {
-            while (!farmCt.IsCancellationRequested && DateTimeOffset.UtcNow < endTime)
+            while (!farmCt.IsCancellationRequested)
             {
                 await Task.Delay(stepIntervalMs, farmCt);
                 if (farmCt.IsCancellationRequested) break;
@@ -321,11 +448,11 @@ public class AutoFarmCommandHandler(
                 var lootSvc          = scope.ServiceProvider.GetRequiredService<LootService>();
                 var combatSvc        = scope.ServiceProvider.GetRequiredService<CombatService>();
                 var resourceNodeRepo = scope.ServiceProvider.GetRequiredService<IResourceNodeRepository>();
+                var homesteadRepo    = scope.ServiceProvider.GetRequiredService<IHomesteadRepository>();
 
                 var player = await playerRepo.GetByIdAsync(playerId, farmCt);
                 if (player is null) break;
 
-                // Capture origin on first step
                 if (!originSet)
                 {
                     originX = player.Position.X;
@@ -333,21 +460,9 @@ public class AutoFarmCommandHandler(
                     originSet = true;
                 }
 
-                // --- STATUS TICKER ---
-                var remaining = endTime - DateTimeOffset.UtcNow;
-                var remainingMin = Math.Max(0, (int)remaining.TotalMinutes);
-                var remainingSec = Math.Max(0, (int)remaining.TotalSeconds % 60);
-
-                await hubContext.Clients
-                    .Group(playerId.ToString())
-                    .SendAsync("GameMessage", new
-                    {
-                        timestamp = DateTime.UtcNow.ToString("O"),
-                        category = "system",
-                        text = $"Auto-farming... {remainingMin}m {remainingSec}s left. Kills: {session.Kills}. Items: {session.ItemsFound}."
-                    }, farmCt);
-
                 // --- WALK ONE STEP in the spiral ---
+                autoFarmService.SetState(playerId, "walking");
+
                 spiralEnumerator.MoveNext();
                 var (dx, dy) = spiralEnumerator.Current;
 
@@ -357,7 +472,7 @@ public class AutoFarmCommandHandler(
                     player.Position.X + dx,
                     player.Position.Y + dy);
 
-                // Danger check before moving: if 4+ levels above player, turn back
+                // Danger check: if 4+ levels above player, retreat toward origin
                 var zonesForDanger = await zoneRepo.GetByWorldAsync(newPos.World, farmCt);
                 var newZone = ZoneProximity.FindNearby(zonesForDanger, newPos.X, newPos.Y);
                 var newDanger = newZone?.DangerLevel
@@ -375,17 +490,14 @@ public class AutoFarmCommandHandler(
                             text = "Auto-farm: area ahead is too dangerous — turning back."
                         }, farmCt);
 
-                    // Retreat one step toward origin
                     int retX = player.Position.X + Math.Sign(originX - player.Position.X);
                     int retY = player.Position.Y + Math.Sign(originY - player.Position.Y);
                     newPos = new Position(player.Position.World, player.Position.ZoneId, retX, retY);
                 }
 
-                // Move the player
                 player.Move(newPos);
                 await playerRepo.UpdateAsync(player, farmCt);
 
-                // Broadcast position change so the map updates
                 await hubContext.Clients
                     .Group(playerId.ToString())
                     .SendAsync("PlayerMoved", new
@@ -397,7 +509,7 @@ public class AutoFarmCommandHandler(
                         World = newPos.World.ToString()
                     }, farmCt);
 
-                // --- HARVEST if the current tile has harvestable resource nodes ---
+                // --- HARVEST resource nodes ---
                 try
                 {
                     var harvestZones = await zoneRepo.GetByWorldAsync(newPos.World, farmCt);
@@ -439,13 +551,14 @@ public class AutoFarmCommandHandler(
                                         await itemRepo.AddAsync(newItem, farmCt);
                                     }
 
+                                    // Harvest XP: 1 in auto-farm (vs 5 manual)
                                     await hubContext.Clients
                                         .Group(playerId.ToString())
                                         .SendAsync("GameMessage", new
                                         {
                                             timestamp = DateTime.UtcNow.ToString("O"),
                                             category = "loot",
-                                            text = $"[Auto-farm] Harvested {actual}x {itemName}."
+                                            text = $"[Auto-farm] Harvested {actual}x {itemName}. (+1 harvest XP)"
                                         }, farmCt);
                                 }
                             }
@@ -478,6 +591,8 @@ public class AutoFarmCommandHandler(
                     encounterChance = biome == "path" ? 2 : Math.Min(dangerLevel * 4, 40);
                 }
 
+                await BroadcastStatusAsync(playerId, session, "walking", biome, dangerLevel, farmCt);
+
                 if (dangerLevel <= 0 && biome != "path")
                     continue;
 
@@ -508,17 +623,16 @@ public class AutoFarmCommandHandler(
                     continue;
                 }
 
-                // --- PRE-FIGHT: use buff consumables in danger 7+ zones ---
+                // --- PRE-FIGHT: buff consumables in danger 7+ zones ---
                 if (dangerLevel >= 7)
                 {
                     var preInventory = await itemRepo.GetByOwnerAsync(playerId, farmCt);
-                    var buffPlayer   = freshPlayer;
                     foreach (var buffName in BuffNames)
                     {
                         var buff = FindBestConsumable(preInventory, [buffName]);
                         if (buff is not null)
                         {
-                            var msg = await ApplyAndConsumeAsync(buffPlayer, buff, playerRepo, itemRepo, farmCt);
+                            var msg = await ApplyAndConsumeAsync(freshPlayer, buff, playerRepo, itemRepo, farmCt);
                             if (msg is not null)
                                 await hubContext.Clients
                                     .Group(playerId.ToString())
@@ -532,6 +646,10 @@ public class AutoFarmCommandHandler(
                     }
                 }
 
+                // --- FIGHT ---
+                autoFarmService.SetState(playerId, "fighting");
+                await BroadcastStatusAsync(playerId, session, "fighting", biome, dangerLevel, farmCt);
+
                 var encounter = await combatSvc.StartEncounterAsync(
                     playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, [], monsters, ct: farmCt);
 
@@ -544,7 +662,6 @@ public class AutoFarmCommandHandler(
                         text = $"[Auto-farm] Encounter! {string.Join(", ", monsters.Select(m => m.Name))}."
                     }, farmCt);
 
-                // Auto-fight to completion
                 var safety = 0;
                 while (encounter.State == EncounterState.InProgress && safety++ < 50)
                 {
@@ -576,7 +693,6 @@ public class AutoFarmCommandHandler(
 
                 if (encounter.State == EncounterState.Defeat)
                 {
-                    // Sync HP and portal home on defeat
                     var defPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                     if (defPlayer is not null)
                     {
@@ -611,13 +727,21 @@ public class AutoFarmCommandHandler(
                         }, serverCt);
                     await hubContext.Clients
                         .Group(playerId.ToString())
-                        .SendAsync("AutoFarmStatus", new { active = false, reason = "defeat" }, serverCt);
+                        .SendAsync("AutoFarmStatus", new
+                        {
+                            active    = false,
+                            reason    = "defeat",
+                            kills     = session.Kills,
+                            items     = session.ItemsFound,
+                            salvaged  = session.ItemsAutoSalvaged,
+                            deposited = session.ItemsDeposited
+                        }, serverCt);
                     return;
                 }
 
                 if (encounter.State == EncounterState.Victory)
                 {
-                    // Sync HP back to player entity after winning a fight
+                    // Sync HP after combat
                     var winPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                     if (winPlayer is not null)
                     {
@@ -632,7 +756,6 @@ public class AutoFarmCommandHandler(
                         // --- POST-COMBAT CONSUMABLE CHECKS ---
                         var postInventory = await itemRepo.GetByOwnerAsync(playerId, farmCt);
 
-                        // (a) HP below 50% → use best healing consumable
                         if (winPlayer.CurrentHp < winPlayer.MaxHp / 2)
                         {
                             var healer = FindBestConsumable(postInventory, HealingPriority);
@@ -651,14 +774,11 @@ public class AutoFarmCommandHandler(
                             }
                             else if (winPlayer.CurrentHp < winPlayer.MaxHp * 3 / 10)
                             {
-                                // HP below 30% and no healing consumables → portal home
                                 await PortalHomeToHealAsync(playerId, winPlayer.Position, playerRepo, farmCt);
-                                // Refresh local reference after portal
                                 winPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                             }
                         }
 
-                        // (b) Weave below 20% → use best weave consumable
                         if (winPlayer is not null && winPlayer.Weave.Percentage < 20)
                         {
                             var postInventory2 = await itemRepo.GetByOwnerAsync(playerId, farmCt);
@@ -680,24 +800,48 @@ public class AutoFarmCommandHandler(
                     }
 
                     autoFarmService.RecordKill(playerId);
+                    session.Kills = autoFarmService.GetSession(playerId)?.Kills ?? session.Kills;
 
+                    // XP award — degraded in auto-farm
+                    await using var xpScope = scopeFactory.CreateAsyncScope();
+                    var combatHelpers = xpScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+                    await combatHelpers.AwardCombatXpAsync(playerId, encounter, farmCt, isAutoFarm: true);
+
+                    // Loot — check inventory full before rolling
                     var currentItems = await itemRepo.GetByOwnerAsync(playerId, farmCt);
                     var lootPlayer = winPlayer ?? freshPlayer;
+
+                    if (lootPlayer is not null && currentItems.Count >= lootPlayer.MaxInventorySlots)
+                    {
+                        // Auto-deposit before rolling loot
+                        autoFarmService.SetState(playerId, "depositing");
+                        await BroadcastStatusAsync(playerId, session, "depositing", biome, dangerLevel, farmCt);
+                        await AutoDepositAndReturnAsync(playerId, newPos, playerRepo, itemRepo, homesteadRepo, session, farmCt);
+                        // Refresh after deposit
+                        currentItems = await itemRepo.GetByOwnerAsync(playerId, farmCt);
+                        lootPlayer = await playerRepo.GetByIdAsync(playerId, farmCt) ?? lootPlayer;
+                    }
+
+                    if (lootPlayer is null) continue;
+
                     var lootResult = await lootSvc.RollLootDropAsync(
                         dangerLevel, playerId, lootPlayer.Position.World,
                         currentItems.Count, lootPlayer.MaxInventorySlots, farmCt,
                         lootPlayer,
-                        nearbyZone?.Name);
+                        nearbyZone?.Name,
+                        isAutoFarm: true);
 
                     if (lootResult.Dropped)
                     {
                         if (lootResult.AutoSalvaged)
                         {
                             autoFarmService.RecordAutoSalvage(playerId);
+                            session.ItemsAutoSalvaged = autoFarmService.GetSession(playerId)?.ItemsAutoSalvaged ?? session.ItemsAutoSalvaged;
                         }
                         else
                         {
                             autoFarmService.RecordItem(playerId);
+                            session.ItemsFound = autoFarmService.GetSession(playerId)?.ItemsFound ?? session.ItemsFound;
                         }
 
                         await hubContext.Clients
@@ -722,19 +866,41 @@ public class AutoFarmCommandHandler(
                                 }, farmCt);
                     }
 
-                    // Running summary after each fight
-                    var currentSession = autoFarmService.GetSession(playerId);
-                    var kills    = currentSession?.Kills             ?? session.Kills;
-                    var kept     = currentSession?.ItemsFound        ?? session.ItemsFound;
-                    var salvaged = currentSession?.ItemsAutoSalvaged ?? 0;
+                    // --- REST between fights ---
+                    var restPlayer = winPlayer ?? freshPlayer;
+                    autoFarmService.SetState(playerId, "resting");
+                    await BroadcastStatusAsync(playerId, session, "resting", biome, dangerLevel, farmCt);
 
+                    // Natural HP regen: +5 HP during rest
+                    if (restPlayer is not null)
+                    {
+                        var restedPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
+                        if (restedPlayer is not null)
+                        {
+                            restedPlayer.HealHp(5);
+                            await playerRepo.UpdateAsync(restedPlayer, farmCt);
+
+                            await hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("GameMessage", new
+                                {
+                                    timestamp = DateTime.UtcNow.ToString("O"),
+                                    category = "system",
+                                    text = restedPlayer.CurrentHp < restedPlayer.MaxHp
+                                        ? $"Resting... (HP: {restedPlayer.CurrentHp}/{restedPlayer.MaxHp})"
+                                        : "Resting... (HP full)"
+                                }, farmCt);
+                        }
+                    }
+
+                    // Running summary
                     await hubContext.Clients
                         .Group(playerId.ToString())
                         .SendAsync("GameMessage", new
                         {
                             timestamp = DateTime.UtcNow.ToString("O"),
                             category = "system",
-                            text = $"Auto-farm: {kills} kill(s), {kept} item(s) kept, {salvaged} auto-salvaged."
+                            text = $"Auto-farm: {session.Kills} kill(s), {session.ItemsFound} item(s) kept, {session.ItemsAutoSalvaged} auto-salvaged, {session.ItemsDeposited} deposited."
                         }, farmCt);
                 }
             }
@@ -782,9 +948,10 @@ public class AutoFarmCommandHandler(
             }
 
             var finalSession = autoFarmService.GetSession(playerId);
-            var kills    = finalSession?.Kills             ?? session.Kills;
-            var items    = finalSession?.ItemsFound        ?? session.ItemsFound;
-            var salvaged = finalSession?.ItemsAutoSalvaged ?? 0;
+            var kills     = finalSession?.Kills             ?? session.Kills;
+            var items     = finalSession?.ItemsFound        ?? session.ItemsFound;
+            var salvaged  = finalSession?.ItemsAutoSalvaged ?? session.ItemsAutoSalvaged;
+            var deposited = finalSession?.ItemsDeposited    ?? session.ItemsDeposited;
             autoFarmService.EndSession(playerId);
 
             await hubContext.Clients
@@ -793,12 +960,19 @@ public class AutoFarmCommandHandler(
                 {
                     timestamp = DateTime.UtcNow.ToString("O"),
                     category = "system",
-                    text = $"Auto-farm complete: {kills} kill(s), {items} item(s) kept, {salvaged} auto-salvaged."
+                    text = $"Auto-farm stopped: {kills} kill(s), {items} item(s) kept, {salvaged} auto-salvaged, {deposited} deposited."
                 }, serverCt);
 
             await hubContext.Clients
                 .Group(playerId.ToString())
-                .SendAsync("AutoFarmStatus", new { active = false, kills, items, salvaged }, serverCt);
+                .SendAsync("AutoFarmStatus", new
+                {
+                    active    = false,
+                    kills,
+                    items,
+                    salvaged,
+                    deposited
+                }, serverCt);
         }
     }
 }

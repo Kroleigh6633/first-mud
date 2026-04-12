@@ -258,9 +258,14 @@ export interface LootDropEvent {
 
 export interface AutoFarmStatus {
   active: boolean;
-  durationSeconds?: number;
+  /** Current loop state: idle | walking | fighting | resting | depositing */
+  state?: string;
   kills?: number;
   items?: number;
+  salvaged?: number;
+  deposited?: number;
+  biome?: string;
+  dangerLevel?: number;
   reason?: string;
 }
 
