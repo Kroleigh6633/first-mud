@@ -30,7 +30,9 @@ public class CombatHelpers(
     LootService lootService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext,
-    ILogger<CombatHelpers> logger)
+    ILogger<CombatHelpers> logger,
+    QuestProgressTracker questProgressTracker,
+    FirstMud.Domain.Interfaces.IQuestGraphRepository questGraphRepository)
 {
     // -------------------------------------------------------------------------
     // Enemy auto-turn processing
@@ -231,6 +233,53 @@ public class CombatHelpers(
 
         await BroadcastLevelUpEventsAsync(playerId, player, ct);
         player.ClearDomainEvents();
+
+        // ── Quest kill tracking ──────────────────────────────────────────────
+        // For each active kill quest, record the enemies defeated in this encounter
+        // and broadcast progress back to the client.
+        await TrackQuestKillsAsync(playerId, defeatedEnemies.Count, ct);
+    }
+
+    /// <summary>
+    /// Records kills for any accepted kill-type quests and broadcasts progress.
+    /// Called after every combat Victory.
+    /// </summary>
+    private async Task TrackQuestKillsAsync(Guid playerId, int killCount, CancellationToken ct)
+    {
+        if (killCount <= 0) return;
+
+        // Load in-progress quests for this player
+        var inProgressQuests = await questGraphRepository.GetAvailableQuestsAsync(playerId, null, ct);
+        var killQuests = inProgressQuests
+            .Where(q => q.IsTaken && IsKillQuest(q.Title))
+            .ToList();
+
+        foreach (var quest in killQuests)
+        {
+            questProgressTracker.RecordKill(playerId, quest.QuestId, killCount);
+            var totalKills = questProgressTracker.GetKills(playerId, quest.QuestId);
+
+            var required = ParseKillCount(quest.Description);
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("QuestKillProgress", new
+                {
+                    QuestId  = quest.QuestId,
+                    Kills    = totalKills,
+                    Required = required,
+                }, ct);
+        }
+    }
+
+    private static bool IsKillQuest(string title) =>
+        title.Contains("Defeat", StringComparison.OrdinalIgnoreCase)
+     || title.Contains("Slay",   StringComparison.OrdinalIgnoreCase)
+     || title.Contains("Hunt",   StringComparison.OrdinalIgnoreCase);
+
+    private static int ParseKillCount(string description)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(description, @"\b(\d+)\b");
+        return match.Success && int.TryParse(match.Value, out var n) && n > 0 ? n : 3;
     }
 
     public async Task BroadcastLevelUpEventsAsync(Guid playerId, Player player, CancellationToken ct)

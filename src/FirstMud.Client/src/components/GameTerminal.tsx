@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap } from '../types/game';
 import WorldMap from './WorldMap';
 import { getBiome } from '../utils/biome';
 import StatusPanel from './StatusPanel';
@@ -39,6 +39,7 @@ interface Props {
   recipes?: RecipeInfo[];
   lastCraftResult?: CraftingCompleteEvent | null;
   questWaypoint?: QuestWaypoint | null;
+  questProgress?: QuestProgressMap;
 }
 
 /**
@@ -119,6 +120,7 @@ export default function GameTerminal({
   recipes = [],
   lastCraftResult = null,
   questWaypoint = null,
+  questProgress = {},
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
@@ -153,6 +155,8 @@ export default function GameTerminal({
   autoNavigatingRef.current = autoNavigating;
   const worldStateRef = useRef(worldState);
   worldStateRef.current = worldState;
+  const questProgressRef = useRef(questProgress);
+  questProgressRef.current = questProgress;
 
   // When the player arrives at a new zone tile (or leaves one), narrate it
   // into the message log so the user knows what they're walking on.
@@ -204,6 +208,8 @@ export default function GameTerminal({
           category: 'quest',
           text: `Arrived at waypoint: ${wp.questTitle}.`,
         });
+        // Auto-attempt quest interaction on arrival
+        sendCommand('interactquest', { questId: wp.questId });
         return;
       }
 
@@ -241,6 +247,18 @@ export default function GameTerminal({
         sendCommand('move', { deltaX: keyAction.dx, deltaY: keyAction.dy });
         break;
       case 'interact': {
+        // Check if the player is within 2 tiles of a quest waypoint first
+        const wp = questWaypointRef.current;
+        const player = worldStateRef.current?.player;
+        if (wp && player) {
+          const dx = Math.abs(wp.targetX - player.x);
+          const dy = Math.abs(wp.targetY - player.y);
+          if (dx <= 2 && dy <= 2) {
+            sendCommand('interactquest', { questId: wp.questId });
+            break;
+          }
+        }
+        // Fall back to zone tile description
         const tile = currentTileRef.current;
         if (tile) {
           appendMessage({
@@ -600,8 +618,27 @@ export default function GameTerminal({
       {!needsPlayerCreation && showQuestLog && (
         <QuestLog
           quests={availableQuests}
+          questProgress={questProgress}
           onAccept={handleAcceptQuest}
           onComplete={handleCompleteQuest}
+          onNavigate={(questId) => {
+            setShowQuestLog(false);
+            // Find the active waypoint for this quest and start auto-navigate
+            if (questWaypoint?.questId === questId) {
+              setAutoNavigating(true);
+              appendMessage({
+                timestamp: new Date().toISOString(),
+                category: 'system',
+                text: `Navigating to ${questWaypoint.questTitle}... Press [N] or any movement key to cancel.`,
+              });
+            } else {
+              appendMessage({
+                timestamp: new Date().toISOString(),
+                category: 'quest',
+                text: 'Accept the quest first to set a waypoint, then press [N] to navigate.',
+              });
+            }
+          }}
           onClose={() => setShowQuestLog(false)}
         />
       )}

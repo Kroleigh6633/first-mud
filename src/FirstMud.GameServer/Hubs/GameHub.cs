@@ -47,9 +47,10 @@ public class GameHub : Hub
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
 
-        // Immediately seed the client with available quests and current zone view
+        // Immediately seed the client with available quests, current zone view, and equipment state
         _gameLoop.EnqueueCommand(new GetAvailableQuestsCommand(playerId));
         _gameLoop.EnqueueCommand(new EnterZoneCommand(playerId, 0, Guid.Empty));
+        _gameLoop.EnqueueCommand(new OpenInventoryCommand(playerId));
     }
 
     public async Task SendCommand(string command, object? payload)
@@ -242,6 +243,10 @@ public class GameHub : Hub
             "useconsumable" => new UseConsumableCommand(
                 playerId,
                 TryGetGuid(payload, "itemId")),
+
+            "interactquest" => new InteractQuestCommand(
+                playerId,
+                TryGetString(payload, "questId") ?? string.Empty),
 
             _ => null
         };

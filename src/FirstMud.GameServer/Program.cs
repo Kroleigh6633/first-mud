@@ -47,6 +47,9 @@ builder.Services.AddScoped<StartupSeeder>();
 builder.Services.AddScoped<CombatHelpers>();
 builder.Services.AddScoped<FarmingOrchestrator>();
 
+// Quest objective interaction
+builder.Services.AddSingleton<QuestProgressTracker>();
+
 // Command handlers — one per command type (ICommandHandler<TCommand>)
 builder.Services.AddScoped<ICommandHandler<MoveCommand>, MoveCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<InteractCommand>, InteractCommandHandler>();
@@ -81,6 +84,7 @@ builder.Services.AddScoped<ICommandHandler<QueueSalvageCommand>, QueueSalvageCom
 builder.Services.AddScoped<ICommandHandler<CraftCommand>, CraftCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<ViewRecipesCommand>, ViewRecipesCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<UseConsumableCommand>, UseConsumableCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<InteractQuestCommand>, InteractQuestCommandHandler>();
 
 var app = builder.Build();
 

@@ -109,6 +109,14 @@ function companionTypeIcon(type: CompanionType): string {
   }
 }
 
+const LAYER_THRESHOLDS: Record<CompanionType, number[]> = {
+  Wildfolk:         [0, 200, 500, 1000, 2000, 4000],
+  HiredHero:        [0, 200, 600, 1200, 2500, 5000],
+  CapturedMonster:  [0, 150, 400, 900,  1800, 3600],
+  ArdweldConstruct: [0, 500, 1500, 3000, 6000, 12000],
+  BoundShade:       [0, 300, 700, 1500, 3000, 6000],
+};
+
 function LayerStars({ layer }: { layer: number }) {
   return (
     <span>
@@ -122,6 +130,24 @@ function LayerStars({ layer }: { layer: number }) {
 function CompanionRow({ companion }: { companion: CompanionState }) {
   const isDrifting = companion.driftAccumulator >= 30;
   const isDanger   = companion.driftAccumulator >= 40;
+
+  const layerBarContent = (() => {
+    if (companion.currentLayer >= 6) {
+      return <span style={{ color: '#ffcc00' }}>MAX</span>;
+    }
+    const thresholds = LAYER_THRESHOLDS[companion.type] ?? LAYER_THRESHOLDS.Wildfolk;
+    const current = thresholds[companion.currentLayer - 1] ?? 0;
+    const next    = thresholds[companion.currentLayer] ?? 1;
+    const gained  = companion.usageCounter - current;
+    const needed  = next - current;
+    return (
+      <>
+        <Bar current={gained} max={needed} width={8} color="#ccaa00" />
+        <span style={{ color: '#888888' }}> {gained}/{needed}</span>
+      </>
+    );
+  })();
+
   return (
     <div style={{ marginBottom: '4px', fontSize: '11px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -138,6 +164,10 @@ function CompanionRow({ companion }: { companion: CompanionState }) {
       </div>
       <div style={{ color: '#555555', paddingLeft: '4px' }}>
         Lv.{companion.level} {companion.type} · L{companion.currentLayer}
+      </div>
+      <div style={{ paddingLeft: '4px' }}>
+        <span style={{ color: '#888888' }}>Layer: </span>
+        {layerBarContent}
       </div>
     </div>
   );
@@ -182,6 +212,18 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
       <div style={sectionHeaderStyle}>Player</div>
       <div style={{ marginBottom: '4px' }}>
         [{player.name}] Lv.{player.level} Rider
+      </div>
+      <div style={{ marginBottom: '2px' }}>
+        {(() => {
+          const xpForNext = player.level * player.level * 100;
+          return (
+            <>
+              <span style={{ color: '#888888' }}>XP: </span>
+              <Bar current={player.experience} max={xpForNext} width={12} color="#00ccff" />
+              <span style={{ color: '#888888' }}> {player.experience}/{xpForNext}</span>
+            </>
+          );
+        })()}
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>HP: </span>

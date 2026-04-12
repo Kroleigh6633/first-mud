@@ -337,6 +337,16 @@ export interface QuestWaypoint {
   description: string;
 }
 
+/** In-memory progress for a single quest (kills or items gathered). */
+export interface QuestProgress {
+  questId: string;
+  kills: number;
+  required: number;
+}
+
+/** Map of questId → QuestProgress, maintained entirely on the client. */
+export type QuestProgressMap = Record<string, QuestProgress>;
+
 export interface WorldEvent {
   timestamp: string;
   category: string;

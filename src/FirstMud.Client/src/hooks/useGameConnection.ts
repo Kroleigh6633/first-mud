@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent, QuestWaypoint } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -74,6 +74,7 @@ export interface GameConnectionResult {
   recipes: RecipeInfo[];
   lastCraftResult: CraftingCompleteEvent | null;
   questWaypoint: QuestWaypoint | null;
+  questProgress: QuestProgressMap;
 }
 
 export function useGameConnection(): GameConnectionResult {
@@ -99,6 +100,7 @@ export function useGameConnection(): GameConnectionResult {
   const [recipes, setRecipes] = useState<RecipeInfo[]>([]);
   const [lastCraftResult, setLastCraftResult] = useState<CraftingCompleteEvent | null>(null);
   const [questWaypoint, setQuestWaypoint] = useState<QuestWaypoint | null>(null);
+  const [questProgress, setQuestProgress] = useState<QuestProgressMap>({});
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
@@ -178,7 +180,7 @@ export function useGameConnection(): GameConnectionResult {
       sendCommand('getquests');
     });
 
-    connection.on('QuestCompleted', (result: QuestCompleteResult) => {
+    connection.on('QuestCompleted', (result: QuestCompleteResult & { questId?: string }) => {
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'quest',
@@ -191,8 +193,15 @@ export function useGameConnection(): GameConnectionResult {
           text: 'Your wyrd settles slightly.',
         });
       }
-      // Clear the quest waypoint when any quest is completed
+      // Clear the quest waypoint and kill progress when any quest is completed
       setQuestWaypoint(null);
+      if (result.questId) {
+        setQuestProgress(prev => {
+          const next = { ...prev };
+          delete next[result.questId!];
+          return next;
+        });
+      }
     });
 
     connection.on('QuestWaypoint', (wp: QuestWaypoint) => {
@@ -202,6 +211,20 @@ export function useGameConnection(): GameConnectionResult {
         category: 'quest',
         text: `Waypoint set: ${wp.questTitle} — navigate to (${wp.targetX}, ${wp.targetY}). Press [N] to auto-navigate.`,
       });
+    });
+
+    connection.on('QuestKillProgress', (payload: { questId: string; kills: number; required: number }) => {
+      setQuestProgress(prev => ({
+        ...prev,
+        [payload.questId]: { questId: payload.questId, kills: payload.kills, required: payload.required },
+      }));
+      if (payload.kills >= payload.required) {
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'quest',
+          text: `Quest objective complete! Navigate to the waypoint and press [E] to finish.`,
+        });
+      }
     });
 
     connection.on('ReputationChanged', (payload: { playerId?: string; factionTiers?: Record<string, string> }) => {
@@ -598,5 +621,6 @@ export function useGameConnection(): GameConnectionResult {
     recipes,
     lastCraftResult,
     questWaypoint,
+    questProgress,
   };
 }
