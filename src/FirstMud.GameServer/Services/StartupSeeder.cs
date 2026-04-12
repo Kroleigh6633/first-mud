@@ -19,6 +19,8 @@ public class StartupSeeder(
     public async Task SeedAsync(CancellationToken ct)
     {
         await FixTrailingCommaEquippedItemsJsonAsync(ct);
+        await FixMisassignedEquipmentSlotsAsync(ct);
+        await FixFlatStartingStatsAsync(ct);
         await SeedDevPlayerAsync(ct);
         await SeedNeo4jLoreAsync(ct);
         await SeedAeldranZonesAsync(ct);
@@ -57,6 +59,130 @@ public class StartupSeeder(
         {
             await conn.CloseAsync();
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Equipment slot fixup
+    // -------------------------------------------------------------------------
+
+    // Slot mismatch fixup: corrects any persisted Item rows whose Slot field
+    // does not match the canonical slot for that item's name, and repairs the
+    // owning player's EquippedItems dictionary if the item is currently
+    // equipped in the wrong slot.
+    //
+    // Covers ranged weapons (Thornwood Bow, Hunter's Crossbow, Sling) that may
+    // have been persisted as MeleeWeapon due to an earlier template error.
+    // Designed to be idempotent — safe to run on every startup.
+    private static readonly Dictionary<string, EquipmentSlot> CanonicalItemSlots = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Ranged weapons
+        ["Thornwood Bow"]     = EquipmentSlot.RangedWeapon,
+        ["Hunter's Crossbow"] = EquipmentSlot.RangedWeapon,
+        ["Sling"]             = EquipmentSlot.RangedWeapon,
+        // Focus weapons
+        ["Oak Wand"]          = EquipmentSlot.Focus,
+        ["Crystal Focus"]     = EquipmentSlot.Focus,
+        ["Ashwood Staff"]     = EquipmentSlot.Focus,
+    };
+
+    private async Task FixMisassignedEquipmentSlotsAsync(CancellationToken ct)
+    {
+        // Load all items whose name is in our canonical map
+        var targetNames = CanonicalItemSlots.Keys.ToList();
+        var mismatchedItems = await db.Items
+            .Where(i => targetNames.Contains(i.Name) && i.Slot != EquipmentSlot.None)
+            .ToListAsync(ct);
+
+        var toFix = mismatchedItems
+            .Where(i => CanonicalItemSlots.TryGetValue(i.Name, out var correct) && i.Slot != correct)
+            .ToList();
+
+        if (toFix.Count == 0)
+        {
+            logger.LogInformation("FixMisassignedEquipmentSlots: no mismatched items found.");
+            return;
+        }
+
+        // For each mismatched item, correct its Slot and repair any player
+        // EquippedItems dictionary that references it under the wrong key.
+        var affectedItemIds = toFix.Select(i => i.Id).ToHashSet();
+
+        // Load all players so we can inspect and repair EquippedItems
+        var allPlayers = await db.Players.ToListAsync(ct);
+        var playersModified = 0;
+
+        foreach (var item in toFix)
+        {
+            var wrongSlot  = item.Slot;
+            var rightSlot  = CanonicalItemSlots[item.Name];
+
+            item.SetSlot(rightSlot);
+
+            // Repair each player who has this item equipped under the wrong slot
+            foreach (var player in allPlayers)
+            {
+                if (!player.EquippedItems.TryGetValue(wrongSlot, out var equippedId)
+                    || equippedId != item.Id)
+                    continue;
+
+                // Remove the bad slot entry and place item in the correct slot.
+                // If the correct slot is already occupied, bump that item to
+                // inventory (unequip only — it stays in the player's item list).
+                player.Unequip(wrongSlot);
+                var displaced = player.Equip(rightSlot, item.Id);
+                playersModified++;
+
+                logger.LogWarning(
+                    "FixMisassignedEquipmentSlots: moved {ItemName} (Id={ItemId}) from {WrongSlot} to {RightSlot} for player {PlayerId}{Displaced}.",
+                    item.Name, item.Id, wrongSlot, rightSlot, player.Id,
+                    displaced.HasValue ? $"; displaced item {displaced.Value} to inventory" : string.Empty);
+            }
+
+            logger.LogWarning(
+                "FixMisassignedEquipmentSlots: corrected Slot on item {ItemName} (Id={ItemId}) from {WrongSlot} to {RightSlot}.",
+                item.Name, item.Id, wrongSlot, rightSlot);
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation(
+            "FixMisassignedEquipmentSlots: corrected {ItemCount} item(s), updated {PlayerCount} player(s).",
+            toFix.Count, playersModified);
+    }
+
+    // -------------------------------------------------------------------------
+    // Flat stat fixup
+    // -------------------------------------------------------------------------
+
+    // One-time fixup: players created before the element-based stat system had
+    // all five attributes set to exactly 10. Reassign their starting stats based
+    // on their PrimaryElement so existing characters get the correct archetype.
+    // Safe to run on every startup — it only touches rows where all five stats
+    // are exactly 10 and the player is at level 1 (no level-up gains applied yet).
+    private async Task FixFlatStartingStatsAsync(CancellationToken ct)
+    {
+        var flatPlayers = await db.Players
+            .Where(p => p.Level == 1
+                     && p.Strength == 10 && p.Agility == 10
+                     && p.Intellect == 10 && p.Fortitude == 10
+                     && p.Speed == 10)
+            .ToListAsync(ct);
+
+        if (flatPlayers.Count == 0)
+        {
+            logger.LogInformation("FixFlatStartingStats: no players with uniform stats found.");
+            return;
+        }
+
+        foreach (var player in flatPlayers)
+        {
+            player.ReassignArchetypeStats();
+            logger.LogWarning(
+                "FixFlatStartingStats: reassigned stats for player {Name} ({Id}) as {Element} archetype.",
+                player.Name, player.Id, player.PrimaryElement);
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("FixFlatStartingStats: updated {Count} player(s).", flatPlayers.Count);
     }
 
     // -------------------------------------------------------------------------

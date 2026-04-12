@@ -44,9 +44,19 @@ public class CombatService
         int feetBonus     = equippedItems.TryGetValue(EquipmentSlot.Feet,         out var ft) ? ft.Workmanship.Value * 1 : 0;
         int accBonusHp    = equippedItems.TryGetValue(EquipmentSlot.Accessory,    out var ac) ? ac.Workmanship.Value * 2 : 0;
 
-        int strikeBonus   = meleeBonus + rangedBonus + handsBonus;
-        int weaveBoltBonus= focusBonus;
-        int combatMaxHp   = player.MaxHp + headBonusHp + chestBonusHp + legsBonusHp + accBonusHp;
+        // Stat bonuses:
+        // Strength: adds to melee Strike damage (Str / 5)
+        // Agility: future dodge chance — tracked but not yet implemented in hit resolution
+        // Intellect: adds to Weave Bolt damage (Int / 5)
+        // Fortitude: adds bonus HP in combat (Fort / 2)
+        // Speed: already affects turn order + Feet equipment bonus
+        int statStrikeBonus    = player.Strength / 5;
+        int statSpellBonus     = player.Intellect / 5;
+        int statFortBonus      = player.Fortitude / 2;
+
+        int strikeBonus   = meleeBonus + rangedBonus + handsBonus + statStrikeBonus;
+        int weaveBoltBonus= focusBonus + statSpellBonus;
+        int combatMaxHp   = player.MaxHp + headBonusHp + chestBonusHp + legsBonusHp + accBonusHp + statFortBonus;
         int combatSpeed   = player.Speed + feetBonus;
 
         var playerAbilities = new List<CombatAbility>

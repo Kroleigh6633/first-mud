@@ -57,12 +57,16 @@ const EQUIPMENT_SLOTS: Array<[string, keyof EquipmentSlots]> = [
 export default function CharacterSheet({ player, equipment, onClose }: Props) {
   if (!player) return null;
 
-  const stats = [
-    ['Strength', player.strength],
-    ['Agility', player.agility],
-    ['Intellect', player.intellect],
-    ['Fortitude', player.fortitude],
-    ['Speed', player.speed],
+  const strBonus = Math.floor((player.strength ?? 0) / 5);
+  const intBonus = Math.floor((player.intellect ?? 0) / 5);
+  const fortBonus = Math.floor((player.fortitude ?? 0) / 2);
+
+  const stats: Array<[string, number | undefined, string]> = [
+    ['Strength', player.strength, `+${strBonus} melee damage`],
+    ['Agility', player.agility, 'dodge (future)'],
+    ['Intellect', player.intellect, `+${intBonus} spell damage`],
+    ['Fortitude', player.fortitude, `+${fortBonus} bonus HP`],
+    ['Speed', player.speed, 'turn order priority'],
   ];
 
   const skills = [
@@ -121,13 +125,16 @@ export default function CharacterSheet({ player, equipment, onClose }: Props) {
 
         <div style={sectionStyle}>Attributes</div>
         <div style={hintStyle}>
-          All attributes increase by +1 per level up. Affect combat calculations.
+          Attributes increase per level based on your element archetype. Each stat affects combat.
         </div>
-        {stats.map(([name, val]) => (
-          <div key={name as string} style={rowStyle}>
-            <span style={{ color: '#aaa' }}>{name}</span>
-            <span style={{ color: '#00ff41' }}>{val ?? '?'}</span>
-          </div>
+        {stats.map(([name, val, hint]) => (
+          <React.Fragment key={name as string}>
+            <div style={rowStyle}>
+              <span style={{ color: '#aaa' }}>{name as string}</span>
+              <span style={{ color: '#00ff41' }}>{(val as number | undefined) ?? '?'}</span>
+            </div>
+            <div style={hintStyle}>{hint as string}</div>
+          </React.Fragment>
         ))}
 
         <div style={sectionStyle}>Skills</div>

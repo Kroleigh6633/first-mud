@@ -134,6 +134,19 @@ public class Player
     {
         if (ElementRevealed) return;
 
+        // Re-apply archetype stats if the revealed element differs from the creation assignment.
+        if (element != PrimaryElement)
+        {
+            var (str, agi, intel, fort, spd, maxHp) = GetArchetypeStats(element);
+            Strength = str;
+            Agility = agi;
+            Intellect = intel;
+            Fortitude = fort;
+            Speed = spd;
+            MaxHp = maxHp;
+            CurrentHp = maxHp;
+        }
+
         PrimaryElement = element;
         Polarity = polarity;
         ElementRevealed = true;
@@ -267,6 +280,22 @@ public class Player
             return null;
         EquippedItems.Remove(slot);
         return removed;
+    }
+
+    /// <summary>
+    /// Reassigns starting stats based on the player's current PrimaryElement.
+    /// Used by the seeder to fix players created before the element-based stat system.
+    /// </summary>
+    public void ReassignArchetypeStats()
+    {
+        var (str, agi, intel, fort, spd, maxHp) = GetArchetypeStats(PrimaryElement == default ? MagicElement.Aether : PrimaryElement);
+        Strength = str;
+        Agility = agi;
+        Intellect = intel;
+        Fortitude = fort;
+        Speed = spd;
+        MaxHp = maxHp;
+        CurrentHp = Math.Min(CurrentHp, maxHp);
     }
 
     public void GainSalvageSkillXp(int amount)

@@ -16,12 +16,13 @@ public class PlayerTests
     }
 
     [Fact]
-    public void Create_InitializesWithHp100()
+    public void Create_InitializesHpBasedOnElement()
     {
         var player = Player.Create("TestPlayer", 42);
 
-        player.CurrentHp.Should().Be(100);
-        player.MaxHp.Should().Be(100);
+        // HP is element-dependent; valid starting values are 85–120
+        player.MaxHp.Should().BeInRange(85, 120);
+        player.CurrentHp.Should().Be(player.MaxHp);
     }
 
     [Fact]
