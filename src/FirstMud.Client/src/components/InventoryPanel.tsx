@@ -1,9 +1,11 @@
 import React from 'react';
-import type { InventorySnapshot } from '../types/game';
+import type { InventorySnapshot, EquipmentSlots } from '../types/game';
 
 interface Props {
   snapshot: InventorySnapshot | null;
+  equipment: EquipmentSlots;
   onClose: () => void;
+  sendCommand: (command: string, payload?: unknown) => void;
 }
 
 const overlayStyle: React.CSSProperties = {
@@ -90,7 +92,46 @@ const closeBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-export default function InventoryPanel({ snapshot, onClose }: Props) {
+const equipBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #00ccff',
+  color: '#00ccff',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+  marginLeft: '8px',
+};
+
+const equippedTagStyle: React.CSSProperties = {
+  color: '#00ff41',
+  fontSize: '10px',
+  border: '1px solid #00ff41',
+  padding: '0 4px',
+  marginLeft: '6px',
+};
+
+function isEquippable(category?: string): boolean {
+  if (!category) return false;
+  const c = category.toLowerCase();
+  return c === 'weapon' || c === 'armor' || c === 'accessory' || c === 'component';
+}
+
+function isEquipped(itemId: string, equipment: EquipmentSlots): boolean {
+  return equipment.weaponId === itemId
+    || equipment.armorId === itemId
+    || equipment.accessoryId === itemId;
+}
+
+export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand }: Props) {
+  const handleEquip = (itemId: string) => {
+    sendCommand('equip', { itemId });
+  };
+
+  // Collect equipped item ids for display at the top
+  const equippedItems = snapshot?.items.filter(i => isEquipped(i.id, equipment)) ?? [];
+  const unequippedItems = snapshot?.items.filter(i => !isEquipped(i.id, equipment)) ?? [];
+
   return (
     <div
       style={overlayStyle}
@@ -123,20 +164,54 @@ export default function InventoryPanel({ snapshot, onClose }: Props) {
           <div style={emptyStyle}>loading...</div>
         )}
 
+        {equippedItems.length > 0 && (
+          <>
+            <div style={sectionHeadingStyle}>Equipped</div>
+            {equippedItems.map((item) => (
+              <div key={item.id} style={itemRowStyle} data-testid="equipped-item">
+                <div style={itemNameStyle}>
+                  <span>
+                    {item.name}
+                    <span style={equippedTagStyle}>equipped</span>
+                  </span>
+                  <span style={{ color: '#888888', fontSize: '11px' }}>
+                    {item.category ?? ''} W{item.workmanship}
+                  </span>
+                </div>
+                {item.description && <div style={itemDescStyle}>{item.description}</div>}
+              </div>
+            ))}
+          </>
+        )}
+
         <div style={sectionHeadingStyle}>Items</div>
         {!snapshot ? (
           <div style={emptyStyle}>loading...</div>
-        ) : snapshot.items.length === 0 ? (
+        ) : unequippedItems.length === 0 && equippedItems.length === 0 ? (
           <div style={emptyStyle} data-testid="inventory-empty">
             Your pack is empty.
           </div>
+        ) : unequippedItems.length === 0 ? (
+          <div style={emptyStyle}>All items are equipped.</div>
         ) : (
-          snapshot.items.map((item) => (
+          unequippedItems.map((item) => (
             <div key={item.id} style={itemRowStyle}>
               <div style={itemNameStyle}>
                 <span>{item.name}</span>
-                <span style={{ color: '#888888', fontSize: '11px' }}>
-                  Workmanship {item.workmanship}
+                <span style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ color: '#888888', fontSize: '11px' }}>
+                    {item.category ?? ''} W{item.workmanship}
+                  </span>
+                  {isEquippable(item.category) && (
+                    <button
+                      type="button"
+                      style={equipBtnStyle}
+                      onClick={() => handleEquip(item.id)}
+                      aria-label={`equip ${item.name}`}
+                    >
+                      equip
+                    </button>
+                  )}
                 </span>
               </div>
               {item.description && <div style={itemDescStyle}>{item.description}</div>}

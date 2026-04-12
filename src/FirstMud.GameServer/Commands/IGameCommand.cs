@@ -27,3 +27,5 @@ public record DepositCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record WithdrawCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record OpenStorageCommand(Guid PlayerId) : IGameCommand;
 public record AutoFarmCommand(Guid PlayerId, int DurationSeconds) : IGameCommand;
+public record EquipCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
+public record UnequipCommand(Guid PlayerId, string Slot) : IGameCommand;

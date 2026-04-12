@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
@@ -29,6 +29,9 @@ interface Props {
   atHomestead: boolean;
   storageView: StorageViewSnapshot | null;
   autoFarmStatus: AutoFarmStatus | null;
+  equipment: EquipmentSlots;
+  capturedCompanions?: unknown[];
+  wanderingNpcs?: WanderingNpc[];
 }
 
 /**
@@ -67,6 +70,8 @@ export default function GameTerminal({
   atHomestead,
   storageView,
   autoFarmStatus,
+  equipment,
+  wanderingNpcs = [],
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
@@ -79,18 +84,18 @@ export default function GameTerminal({
   // cause the effect to re-fire when they change. This prevents the
   // portal infinite loop: atHomestead toggling → effect re-runs →
   // sends opposite portal command → toggles again.
+  // Compute the zone tile the player is currently standing on, if any
+  const currentTile = useMemo(() => {
+    if (!worldState?.player) return null;
+    return findTileAt(zoneTiles, worldState.player.x, worldState.player.y);
+  }, [worldState?.player, zoneTiles]);
+
   const atHomesteadRef = useRef(atHomestead);
   atHomesteadRef.current = atHomestead;
   const autoFarmRef = useRef(autoFarmStatus);
   autoFarmRef.current = autoFarmStatus;
   const currentTileRef = useRef(currentTile);
   currentTileRef.current = currentTile;
-
-  // Compute the zone tile the player is currently standing on, if any
-  const currentTile = useMemo(() => {
-    if (!worldState?.player) return null;
-    return findTileAt(zoneTiles, worldState.player.x, worldState.player.y);
-  }, [worldState?.player, zoneTiles]);
 
   // When the player arrives at a new zone tile (or leaves one), narrate it
   // into the message log so the user knows what they're walking on.
@@ -262,12 +267,12 @@ export default function GameTerminal({
           padding: '4px',
           boxSizing: 'border-box',
         }}>
-          <WorldMap worldState={worldState} zoneTiles={zoneTiles} />
+          <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} />
         </div>
 
         {/* Status panel */}
         <div style={{ overflow: 'hidden' }}>
-          <StatusPanel player={worldState?.player ?? null} currentTile={currentTile} />
+          <StatusPanel player={worldState?.player ?? null} currentTile={currentTile} equipment={equipment} />
         </div>
       </div>
 
@@ -345,7 +350,12 @@ export default function GameTerminal({
         />
       )}
       {showInventory && (
-        <InventoryPanel snapshot={inventory} onClose={() => setShowInventory(false)} />
+        <InventoryPanel
+          snapshot={inventory}
+          equipment={equipment}
+          onClose={() => setShowInventory(false)}
+          sendCommand={sendCommand}
+        />
       )}
       {showCharSheet && (
         <CharacterSheet player={worldState?.player ?? null} onClose={() => setShowCharSheet(false)} />

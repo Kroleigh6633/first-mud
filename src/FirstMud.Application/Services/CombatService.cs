@@ -26,12 +26,20 @@ public class CombatService
         Player player,
         IReadOnlyList<Companion> activeCompanions,
         IReadOnlyList<MonsterTemplate> enemies,
+        Item? equippedWeapon = null,
+        Item? equippedArmor = null,
         CancellationToken ct = default)
     {
         var element = player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement;
+
+        // Equipment bonuses: weapon adds to Strike power, armor adds bonus HP
+        int weaponBonus = equippedWeapon is not null ? equippedWeapon.Workmanship.Value * 3 : 0;
+        int armorBonusHp = equippedArmor is not null ? equippedArmor.Workmanship.Value * 5 : 0;
+        int combatMaxHp = player.MaxHp + armorBonusHp;
+
         var playerAbilities = new List<CombatAbility>
         {
-            new("Strike", 18, 0, element,
+            new("Strike", 18 + weaponBonus, 0, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
             new("Weave Bolt", 30, 10, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
@@ -43,7 +51,7 @@ public class CombatService
             player.Name,
             CombatantType.Player,
             player.Id,
-            player.MaxHp,
+            combatMaxHp,
             player.Speed,
             player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement,
             isPlayerSide: true,

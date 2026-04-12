@@ -1,8 +1,9 @@
-import type { PlayerState, WeaveState, ReputationTier, ZoneTile } from '../types/game';
+import type { PlayerState, WeaveState, ReputationTier, ZoneTile, EquipmentSlots } from '../types/game';
 
 interface Props {
   player: PlayerState | null;
   currentTile: ZoneTile | null;
+  equipment?: EquipmentSlots;
 }
 
 function Bar({ current, max, width, color }: { current: number; max: number; width: number; color: string }) {
@@ -53,7 +54,7 @@ function dangerColor(level: number): string {
   return '#cc2200';
 }
 
-export default function StatusPanel({ player, currentTile }: Props) {
+export default function StatusPanel({ player, currentTile, equipment }: Props) {
   const panelStyle: React.CSSProperties = {
     padding: '8px 10px',
     fontFamily: 'monospace',
@@ -151,6 +152,22 @@ export default function StatusPanel({ player, currentTile }: Props) {
           </div>
         );
       })}
+
+      <div style={sectionHeaderStyle}>Equipment</div>
+      {equipment?.weaponName ? (
+        <div style={{ color: '#ffcc00', fontSize: '11px', marginBottom: '2px' }}>
+          <span style={{ color: '#888888' }}>Weapon: </span>{equipment.weaponName}
+        </div>
+      ) : (
+        <div style={{ color: '#444444', fontSize: '11px', marginBottom: '2px' }}>Weapon: —</div>
+      )}
+      {equipment?.armorName ? (
+        <div style={{ color: '#ffcc00', fontSize: '11px', marginBottom: '2px' }}>
+          <span style={{ color: '#888888' }}>Armor: </span>{equipment.armorName}
+        </div>
+      ) : (
+        <div style={{ color: '#444444', fontSize: '11px', marginBottom: '2px' }}>Armor: —</div>
+      )}
 
       <div style={sectionHeaderStyle}>Companions</div>
       {player.activeCompanionIds.length === 0 ? (

@@ -54,6 +54,11 @@ public class Player
     private readonly List<PlayerFactionReputation> _reputations = [];
     public IReadOnlyList<PlayerFactionReputation> Reputations => _reputations.AsReadOnly();
 
+    // Equipment slots
+    public Guid? EquippedWeaponId { get; private set; }
+    public Guid? EquippedArmorId { get; private set; }
+    public Guid? EquippedAccessoryId { get; private set; }
+
     // Companions (active slots — max 3)
     private readonly List<Guid> _activeCompanionIds = [];
     public IReadOnlyList<Guid> ActiveCompanionIds => _activeCompanionIds.AsReadOnly();
@@ -203,6 +208,56 @@ public class Player
     public void RemoveActiveCompanion(Guid companionId) =>
         _activeCompanionIds.Remove(companionId);
 
+    /// <summary>
+    /// Equips an item into the appropriate slot based on its category.
+    /// Returns the previously-equipped item id in that slot (for swap), or null if the slot was empty.
+    /// </summary>
+    public Guid? Equip(Item item)
+    {
+        Guid? previous;
+        switch (item.Category)
+        {
+            case ItemCategory.Weapon:
+                previous = EquippedWeaponId;
+                EquippedWeaponId = item.Id;
+                break;
+            case ItemCategory.Armor:
+                previous = EquippedArmorId;
+                EquippedArmorId = item.Id;
+                break;
+            default:
+                // Accessory, Component, and everything else goes into accessory slot
+                previous = EquippedAccessoryId;
+                EquippedAccessoryId = item.Id;
+                break;
+        }
+        return previous;
+    }
+
+    /// <summary>
+    /// Unequips the item in the given slot. Returns the unequipped item id, or null if slot was empty.
+    /// </summary>
+    public Guid? Unequip(ItemCategory slot)
+    {
+        Guid? removed;
+        switch (slot)
+        {
+            case ItemCategory.Weapon:
+                removed = EquippedWeaponId;
+                EquippedWeaponId = null;
+                break;
+            case ItemCategory.Armor:
+                removed = EquippedArmorId;
+                EquippedArmorId = null;
+                break;
+            default:
+                removed = EquippedAccessoryId;
+                EquippedAccessoryId = null;
+                break;
+        }
+        return removed;
+    }
+
     public ReputationTier GetReputationTier(FactionId factionId) =>
         _reputations.FirstOrDefault(r => r.FactionId == factionId)?.Score.Tier ?? ReputationTier.Unknown;
 
@@ -211,8 +266,13 @@ public class Player
         MaxHp += 10;
         CurrentHp = MaxHp;
         Weave = Weave.ExpandMaximum(5).RestoreFull();
+        Strength += 1;
+        Agility += 1;
         Intellect += 1;
         Fortitude += 1;
+        Speed += 1;
+        MaxActionPoints += 2;
+        ActionPoints = MaxActionPoints;
     }
 
     private void ApplyFactionTensions(FactionId changedFaction, int delta)

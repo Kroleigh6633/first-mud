@@ -186,6 +186,14 @@ public class GameHub : Hub
                 playerId,
                 TryGetInt(payload, "durationSeconds") is int d && d > 0 ? d : 300),
 
+            "equip" => new EquipCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
+            "unequip" => new UnequipCommand(
+                playerId,
+                TryGetString(payload, "slot") ?? "Weapon"),
+
             _ => null
         };
     }

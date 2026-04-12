@@ -53,6 +53,19 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.ActionPoints);
         builder.Property(p => p.MaxActionPoints);
 
+        // Equipment slots — nullable foreign key columns (no navigation, just IDs)
+        builder.Property(p => p.EquippedWeaponId)
+            .HasColumnName("EquippedWeaponId")
+            .IsRequired(false);
+
+        builder.Property(p => p.EquippedArmorId)
+            .HasColumnName("EquippedArmorId")
+            .IsRequired(false);
+
+        builder.Property(p => p.EquippedAccessoryId)
+            .HasColumnName("EquippedAccessoryId")
+            .IsRequired(false);
+
         // Weave owned type — stored as two int columns
         builder.OwnsOne(p => p.Weave, weave =>
         {

@@ -13,6 +13,7 @@ public class GameLoopService : BackgroundService
     private const int AutomationTickIntervalSeconds = 300;   // Automation upkeep every 300 seconds
     private const int HomesteadHealIntervalSeconds = 1;      // Homestead healing: 10 HP per second
     private const int ResourceRegenIntervalSeconds = 60;     // Resource node regen every 60 seconds
+    private const int WeaveRegenIntervalSeconds = 10;        // Out-of-combat Weave regen: 1 point every 10 seconds
 
     private readonly ConcurrentQueue<IGameCommand> _commandQueue = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -86,6 +87,11 @@ public class GameLoopService : BackgroundService
         var ticksPerRegenCycle = (long)(ResourceRegenIntervalSeconds * 1000.0 / TickIntervalMs);
         if (_tickCount % ticksPerRegenCycle == 0 && _tickCount > 0)
             await ProcessResourceRegenAsync(ct);
+
+        // 6. Every 10 seconds: regenerate Weave for players out of combat
+        var ticksPerWeaveRegen = (long)(WeaveRegenIntervalSeconds * 1000.0 / TickIntervalMs);
+        if (_tickCount % ticksPerWeaveRegen == 0 && _tickCount > 0)
+            await ProcessWeaveRegenAsync(ct);
     }
 
     private async Task ProcessCommandsAsync(CancellationToken ct)
@@ -122,7 +128,8 @@ public class GameLoopService : BackgroundService
     }
 
     /// <summary>
-    /// Heals players who are at the homestead (position -100,-100) by 10 HP per second.
+    /// Heals players who are at the homestead (position -100,-100) by 10 HP per second
+    /// and restores 5 Weave per second while at homestead.
     /// Broadcasts a WorldState update so the status panel reflects the change.
     /// </summary>
     private async Task ProcessHomesteadHealAsync(CancellationToken ct)
@@ -138,9 +145,24 @@ public class GameLoopService : BackgroundService
             {
                 // Homestead is at the sentinel coordinate -100,-100
                 if (player.Position.X != -100 || player.Position.Y != -100) continue;
-                if (player.CurrentHp >= player.MaxHp) continue;
 
-                player.HealHp(10);
+                var changed = false;
+
+                if (player.CurrentHp < player.MaxHp)
+                {
+                    player.HealHp(10);
+                    changed = true;
+                }
+
+                // Homestead also restores 5 Weave per second
+                if (player.Weave.Current < player.Weave.Maximum)
+                {
+                    player.RestoreWeave(5);
+                    changed = true;
+                }
+
+                if (!changed) continue;
+
                 await playerRepo.UpdateAsync(player, ct);
 
                 // Notify the player of the heal
@@ -150,7 +172,7 @@ public class GameLoopService : BackgroundService
                     {
                         timestamp = DateTime.UtcNow.ToString("O"),
                         category = "system",
-                        text = $"Homestead sanctuary heals you. HP: {player.CurrentHp}/{player.MaxHp}."
+                        text = $"Homestead sanctuary heals you. HP: {player.CurrentHp}/{player.MaxHp} | Weave: {player.Weave.Current}/{player.Weave.Maximum}."
                     }, ct);
 
                 // Push an updated HP reading via a lightweight event
@@ -160,13 +182,55 @@ public class GameLoopService : BackgroundService
                     {
                         player.Id,
                         player.CurrentHp,
-                        player.MaxHp
+                        player.MaxHp,
+                        WeavePercent = player.Weave.Percentage,
+                        WeaveState = player.Weave.VisibleState.ToString()
                     }, ct);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error in homestead heal tick.");
+        }
+    }
+
+    /// <summary>
+    /// Restores 1 Weave per 10-second tick for players who are out of combat (not at homestead).
+    /// Homestead gives 5 per second via ProcessHomesteadHealAsync.
+    /// </summary>
+    private async Task ProcessWeaveRegenAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+
+            var players = await playerRepo.GetActivePlayersAsync(ct);
+            foreach (var player in players)
+            {
+                // Skip players at homestead (handled by homestead tick at a faster rate)
+                if (player.Position.X == -100 && player.Position.Y == -100) continue;
+                if (player.Weave.Current >= player.Weave.Maximum) continue;
+
+                player.RestoreWeave(1);
+                await playerRepo.UpdateAsync(player, ct);
+
+                await hubContext.Clients
+                    .Group(player.Id.ToString())
+                    .SendAsync("PlayerHealed", new
+                    {
+                        player.Id,
+                        player.CurrentHp,
+                        player.MaxHp,
+                        WeavePercent = player.Weave.Percentage,
+                        WeaveState = player.Weave.VisibleState.ToString()
+                    }, ct);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in Weave regen tick.");
         }
     }
 

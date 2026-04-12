@@ -2,6 +2,8 @@ using FirstMud.Application;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Interfaces;
+using FirstMud.GameServer.Commands;
+using FirstMud.GameServer.Handlers;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using FirstMud.Infrastructure;
@@ -34,10 +36,36 @@ builder.Services.AddApplicationServices();
 builder.Services.AddSingleton<AiPlayerService>();
 builder.Services.AddSingleton<GameLoopService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
+builder.Services.AddSingleton<DungeonMasterService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DungeonMasterService>());
 builder.Services.AddScoped<CommandDispatcher>();
 builder.Services.AddScoped<WorldStateService>();
 builder.Services.AddScoped<GameNotificationService>();
 builder.Services.AddScoped<StartupSeeder>();
+
+// Shared combat utilities
+builder.Services.AddScoped<CombatHelpers>();
+
+// Command handlers — one per command type (ICommandHandler<TCommand>)
+builder.Services.AddScoped<ICommandHandler<MoveCommand>, MoveCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<InteractCommand>, InteractCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<OpenInventoryCommand>, OpenInventoryCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<EquipCommand>, EquipCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<UnequipCommand>, UnequipCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<AcceptQuestCommand>, AcceptQuestCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<CompleteQuestCommand>, CompleteQuestCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<GetAvailableQuestsCommand>, GetAvailableQuestsCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<EnterZoneCommand>, EnterZoneCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<StartCombatCommand>, StartCombatCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<UseCombatAbilityCommand>, UseCombatAbilityCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<FleeCombatCommand>, FleeCombatCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<PortalHomeCommand>, PortalHomeCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<PortalBackCommand>, PortalBackCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<HarvestCommand>, HarvestCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<DepositCommand>, DepositCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<WithdrawCommand>, WithdrawCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<OpenStorageCommand>, OpenStorageCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<AutoFarmCommand>, AutoFarmCommandHandler>();
 
 var app = builder.Build();
 

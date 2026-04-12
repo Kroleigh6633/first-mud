@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, WanderingNpc } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -67,6 +67,9 @@ export interface GameConnectionResult {
   atHomestead: boolean;
   storageView: StorageViewSnapshot | null;
   autoFarmStatus: AutoFarmStatus | null;
+  equipment: EquipmentSlots;
+  capturedCompanions: CompanionCapturedEvent[];
+  wanderingNpcs: WanderingNpc[];
 }
 
 export function useGameConnection(): GameConnectionResult {
@@ -85,6 +88,9 @@ export function useGameConnection(): GameConnectionResult {
   const [atHomestead, setAtHomestead] = useState<boolean>(false);
   const [storageView, setStorageView] = useState<StorageViewSnapshot | null>(null);
   const [autoFarmStatus, setAutoFarmStatus] = useState<AutoFarmStatus | null>(null);
+  const [equipment, setEquipment] = useState<EquipmentSlots>({});
+  const [capturedCompanions, setCapturedCompanions] = useState<CompanionCapturedEvent[]>([]);
+  const [wanderingNpcs, setWanderingNpcs] = useState<WanderingNpc[]>([]);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
@@ -275,7 +281,39 @@ export function useGameConnection(): GameConnectionResult {
       setAutoFarmStatus(status.active ? status : null);
     });
 
-    connection.on('PlayerHealed', (payload: { id: string; currentHp: number; maxHp: number }) => {
+    connection.on('EquipmentChanged', (payload: { itemId?: string; slot?: string; category?: string; name?: string; replacedItemId?: string }) => {
+      if (!payload) return;
+      if (payload.slot === null || payload.slot === undefined) {
+        // An item was equipped — update by category
+        const cat = payload.category?.toLowerCase();
+        setEquipment(prev => ({
+          ...prev,
+          ...(cat === 'weapon' ? { weaponId: payload.itemId, weaponName: payload.name } : {}),
+          ...(cat === 'armor' ? { armorId: payload.itemId, armorName: payload.name } : {}),
+          ...(cat !== 'weapon' && cat !== 'armor' ? { accessoryId: payload.itemId, accessoryName: payload.name } : {}),
+        }));
+      } else {
+        // Unequip
+        const slot = payload.slot?.toLowerCase();
+        setEquipment(prev => ({
+          ...prev,
+          ...(slot === 'weapon' ? { weaponId: undefined, weaponName: undefined } : {}),
+          ...(slot === 'armor' ? { armorId: undefined, armorName: undefined } : {}),
+          ...(slot !== 'weapon' && slot !== 'armor' ? { accessoryId: undefined, accessoryName: undefined } : {}),
+        }));
+      }
+    });
+
+    connection.on('CompanionCaptured', (captured: CompanionCapturedEvent) => {
+      setCapturedCompanions(prev => [...prev, captured]);
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'system',
+        text: `You captured ${captured.name}! (${captured.element} ${captured.type})`,
+      });
+    });
+
+    connection.on('PlayerHealed', (payload: { id: string; currentHp: number; maxHp: number; weavePercent?: number; weaveState?: string }) => {
       setWorldState(prev => {
         if (!prev) return prev;
         return {
@@ -284,9 +322,55 @@ export function useGameConnection(): GameConnectionResult {
             ...prev.player,
             currentHp: payload.currentHp,
             maxHp: payload.maxHp,
+            ...(payload.weavePercent !== undefined ? { weavePercent: payload.weavePercent } : {}),
+            ...(payload.weaveState !== undefined ? { weaveState: payload.weaveState as import('../types/game').WeaveState } : {}),
           },
         };
       });
+    });
+
+    // -----------------------------------------------------------------------
+    // DungeonMasterService events
+    // -----------------------------------------------------------------------
+
+    connection.on('WorldEvent', (event: { timestamp: string; category: string; text: string }) => {
+      appendMessage({
+        timestamp: event.timestamp,
+        category: 'wyrd',
+        text: event.text,
+      });
+    });
+
+    connection.on('NpcAppeared', (npc: WanderingNpc) => {
+      setWanderingNpcs(prev => {
+        // Deduplicate by id
+        const filtered = prev.filter(n => n.id !== npc.id);
+        return [...filtered, npc];
+      });
+    });
+
+    connection.on('NpcDespawned', (payload: { id: string }) => {
+      setWanderingNpcs(prev => prev.filter(n => n.id !== payload.id));
+    });
+
+    connection.on('NewQuestAvailable', (event: { questId: string; title: string; faction: string; repReward: number }) => {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'quest',
+        text: `A new quest is available: "${event.title}" (${event.faction}, +${event.repReward} rep)`,
+      });
+      // Auto-refresh quest log
+      sendCommand('getquests');
+    });
+
+    connection.on('NewZoneDiscovered', (event: { name: string }) => {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'wyrd',
+        text: `Explorers report a new area: ${event.name}`,
+      });
+      // Re-enter current zone to refresh the zone view with the new zone included
+      sendCommand('enterzone', { worldId: 1, zoneId: '00000000-0000-0000-0000-000000000000' });
     });
 
     connection.onreconnecting(() => {
@@ -396,5 +480,8 @@ export function useGameConnection(): GameConnectionResult {
     atHomestead,
     storageView,
     autoFarmStatus,
+    equipment,
+    capturedCompanions,
+    wanderingNpcs,
   };
 }

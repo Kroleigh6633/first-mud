@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import * as ROT from 'rot-js';
-import type { WorldStateSnapshot, ZoneTile } from '../types/game';
+import type { WorldStateSnapshot, ZoneTile, WanderingNpc } from '../types/game';
 
 interface Props {
   worldState: WorldStateSnapshot | null;
   zoneTiles: ZoneTile[];
+  wanderingNpcs?: WanderingNpc[];
 }
 
 const MAP_WIDTH = 40;
@@ -88,7 +89,33 @@ function drawPaths(
   }
 }
 
-export default function WorldMap({ worldState, zoneTiles }: Props) {
+// Map NPC role to display character
+function npcGlyph(role: string): string {
+  switch (role) {
+    case 'Merchant':  return 'M';
+    case 'Wanderer':  return 'W';
+    case 'Scout':     return 'S';
+    case 'Hermit':    return 'H';
+    case 'Refugee':   return 'R';
+    case 'Bard':      return 'B';
+    default:          return 'N';
+  }
+}
+
+// NPC color by role
+function npcColor(role: string): string {
+  switch (role) {
+    case 'Merchant':  return '#ffcc44';
+    case 'Wanderer':  return '#aaaaff';
+    case 'Scout':     return '#44ffaa';
+    case 'Hermit':    return '#cc88ff';
+    case 'Refugee':   return '#ff8844';
+    case 'Bard':      return '#ff44cc';
+    default:          return '#cccccc';
+  }
+}
+
+export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const displayRef = useRef<ROT.Display | null>(null);
   const blinkRef = useRef<boolean>(false);
@@ -181,7 +208,16 @@ export default function WorldMap({ worldState, zoneTiles }: Props) {
         }
       }
 
-      // Layer 4: player
+      // Layer 4: wandering NPCs
+      for (const npc of wanderingNpcs) {
+        const sx = npc.x - offsetX;
+        const sy = npc.y - offsetY;
+        if (sx >= 0 && sx < MAP_WIDTH && sy >= 0 && sy < MAP_HEIGHT) {
+          display.draw(sx, sy, npcGlyph(npc.role), npcColor(npc.role), '#0d0d0d');
+        }
+      }
+
+      // Layer 5: player
       const playerScreenX = playerX - offsetX;
       const playerScreenY = playerY - offsetY;
       if (playerScreenX >= 0 && playerScreenX < MAP_WIDTH &&
@@ -194,7 +230,7 @@ export default function WorldMap({ worldState, zoneTiles }: Props) {
     const timer = setInterval(render, 100);
     render();
     return () => clearInterval(timer);
-  }, [worldState, zoneTiles]);
+  }, [worldState, zoneTiles, wanderingNpcs]);
 
   return (
     <div

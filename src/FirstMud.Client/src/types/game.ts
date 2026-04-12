@@ -100,6 +100,16 @@ export interface InventoryItem {
   name: string;
   description: string;
   workmanship: number;
+  category?: string;
+}
+
+export interface EquipmentSlots {
+  weaponId?: string;
+  armorId?: string;
+  accessoryId?: string;
+  weaponName?: string;
+  armorName?: string;
+  accessoryName?: string;
 }
 
 export interface AbilityState {
@@ -137,6 +147,16 @@ export interface InventorySnapshot {
   craftingSkill: number;
   salvageSkill: number;
   items: InventoryItem[];
+  equippedWeaponId?: string;
+  equippedArmorId?: string;
+  equippedAccessoryId?: string;
+}
+
+export interface CompanionCapturedEvent {
+  companionId: string;
+  name: string;
+  element: string;
+  type: string;
 }
 
 export interface StorageItem {
@@ -169,4 +189,39 @@ export interface AutoFarmStatus {
   kills?: number;
   items?: number;
   reason?: string;
+}
+
+export interface WanderingNpc {
+  id: string;
+  name: string;
+  role: string;
+  x: number;
+  y: number;
+  dialogue: string;
+}
+
+export interface WorldEvent {
+  timestamp: string;
+  category: string;
+  text: string;
+}
+
+export interface NewQuestEvent {
+  questId: string;
+  title: string;
+  faction: string;
+  repReward: number;
+  difficulty: number;
+}
+
+export interface NewZoneEvent {
+  zoneId: string;
+  zoneNumber: number;
+  name: string;
+  description: string;
+  asciiSymbol: string;
+  dangerLevel: number;
+  x: number;
+  y: number;
+  worldId: string;
 }
