@@ -539,7 +539,13 @@ public class CommandDispatcher
                 c.Speed,
                 c.Element.ToString(),
                 c.IsPlayerSide,
-                c.IsDefeated))
+                c.IsDefeated,
+                c.Abilities.Select(a => new AbilityDto(
+                    a.Name,
+                    a.BasePower,
+                    a.WeaveCost,
+                    a.Element.ToString(),
+                    a.Category.ToString())).ToList()))
             .ToList();
 
         var currentActorId = encounter.CurrentActor?.Id ?? Guid.Empty;

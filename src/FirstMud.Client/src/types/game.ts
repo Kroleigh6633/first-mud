@@ -102,6 +102,14 @@ export interface InventoryItem {
   workmanship: number;
 }
 
+export interface AbilityState {
+  name: string;
+  basePower: number;
+  weaveCost: number;
+  element: string;
+  category: string; // Attack, Heal, Buff
+}
+
 export interface CombatantState {
   id: string;
   name: string;
@@ -112,6 +120,7 @@ export interface CombatantState {
   element: string;
   isPlayerSide: boolean;
   isDefeated: boolean;
+  abilities: AbilityState[];
 }
 
 export interface CombatUpdate {

@@ -98,12 +98,7 @@ function PartyRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: bo
   );
 }
 
-const ABILITIES = [
-  { name: 'Strike', desc: 'Basic attack' },
-  { name: 'Claw', desc: 'Earth melee' },
-  { name: 'Fire Breath', desc: 'Fire ranged' },
-  { name: 'Water Jet', desc: 'Water ranged' },
-];
+// Abilities are now sourced from the current actor's CombatantState.
 
 export default function CombatPanel({ combat, sendCommand }: Props) {
   const isOver = combat.state === 'Victory' || combat.state === 'Defeat' || combat.state === 'Fled';
@@ -216,18 +211,23 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
               Choose an ability to use against <span style={{ color: '#ccaa00' }}>{targetName}</span>:
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {ABILITIES.map(a => (
+              {(currentActor?.abilities ?? []).map(a => (
                 <button
                   key={a.name}
                   onClick={() => handleAbility(a.name)}
-                  title={a.desc}
+                  title={`${a.element} ${a.category} — power ${a.basePower}${a.weaveCost > 0 ? `, costs ${a.weaveCost} weave` : ''}`}
                   style={{
-                    background: 'none', border: '1px solid #00ff41', color: '#00ff41',
+                    background: 'none',
+                    border: `1px solid ${a.category === 'Heal' ? '#00ccff' : '#00ff41'}`,
+                    color: a.category === 'Heal' ? '#00ccff' : '#00ff41',
                     fontFamily: 'monospace', fontSize: '12px', padding: '4px 12px',
                     cursor: 'pointer',
                   }}
                 >
                   {a.name}
+                  <span style={{ color: '#666', fontSize: '9px', marginLeft: '4px' }}>
+                    {a.basePower > 0 ? `${a.basePower}` : ''}{a.weaveCost > 0 ? ` ◆${a.weaveCost}` : ''}
+                  </span>
                 </button>
               ))}
               <button
