@@ -1,4 +1,5 @@
 using FirstMud.Domain.Entities;
+using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Hubs;
@@ -11,6 +12,7 @@ public class DepositCommandHandler(
     IPlayerRepository playerRepository,
     IItemRepository itemRepository,
     IHomesteadRepository homesteadRepository,
+    ICompanionRepository companionRepository,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<DepositCommand>
 {
@@ -31,8 +33,44 @@ public class DepositCommandHandler(
         if (item is null || item.OwnerId != cmd.PlayerId)
             return new CommandResult(false, "Item not found in your inventory.");
 
-        var storageItems = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
-        if (storageItems.Count >= homestead.StorageSlots)
+        // Count guard companions for storage capacity bonus
+        var companions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        var guardCount = companions.Count(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone);
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardCount);
+
+        // Each row in storage = 1 slot (stack), regardless of quantity
+        var storageEntries = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
+        int usedSlots = storageEntries.Count;
+
+        // For stackable items: try to merge into an existing matching stack in storage
+        if (item.IsStackable)
+        {
+            var storageItemIds = storageEntries.Select(s => s.ItemId).ToList();
+            var storageItemEntities = await itemRepository.GetByIdsAsync(storageItemIds, ct);
+            var existingStack = storageItemEntities.FirstOrDefault(s =>
+                s.Name == item.Name && s.Category == item.Category && s.IsStackable);
+
+            if (existingStack is not null)
+            {
+                // Merge: add quantity to the existing stack and delete the deposited item
+                existingStack.AddQuantity(item.Quantity);
+                await itemRepository.UpdateAsync(existingStack, ct);
+                await itemRepository.DeleteAsync(item.Id, ct);
+
+                await notificationService.SendMessageAsync(
+                    cmd.PlayerId, "system",
+                    $"Merged {item.Quantity}x {item.Name} into existing storage stack (now {existingStack.Quantity}x).", ct);
+
+                await hubContext.Clients
+                    .Group(cmd.PlayerId.ToString())
+                    .SendAsync("StorageUpdated", new { homesteadId = homestead.Id }, ct);
+
+                return new CommandResult(true, $"Deposited {item.Name} (merged into existing stack).");
+            }
+        }
+
+        // No existing stack to merge into — need a free slot
+        if (usedSlots >= effectiveSlots)
             return new CommandResult(false, "Homestead storage is full.");
 
         item.SetOwner(null);
@@ -104,6 +142,7 @@ public class OpenStorageCommandHandler(
     IPlayerRepository playerRepository,
     IItemRepository itemRepository,
     IHomesteadRepository homesteadRepository,
+    ICompanionRepository companionRepository,
     GameNotificationService notificationService) : ICommandHandler<OpenStorageCommand>
 {
     public async Task<CommandResult> HandleAsync(OpenStorageCommand cmd, CancellationToken ct)
@@ -119,6 +158,11 @@ public class OpenStorageCommandHandler(
         if (homestead is null)
             return new CommandResult(false, "Homestead not found.");
 
+        // Compute effective capacity including guard companion bonus
+        var companions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        var guardCount = companions.Count(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone);
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardCount);
+
         var storageEntries = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
         var itemIds = storageEntries.Select(s => s.ItemId).ToList();
         var items = await itemRepository.GetByIdsAsync(itemIds, ct);
@@ -127,7 +171,7 @@ public class OpenStorageCommandHandler(
         {
             HomesteadId = homestead.Id,
             homestead.Name,
-            homestead.StorageSlots,
+            StorageSlots = effectiveSlots,
             UsedSlots = storageEntries.Count,
             Items = items.Select(i => new
             {
