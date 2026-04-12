@@ -53,6 +53,9 @@ public class SalvageService
         if (item.Category == ItemCategory.Reagent)
             return new SalvageResult(false, $"{item.Name} is a reagent and cannot be salvaged.", []);
 
+        if (item.IsLocked)
+            return new SalvageResult(false, $"{item.Name} is locked. Unlock it first (★) to salvage.", []);
+
         if (!item.IsSalvageable)
             return new SalvageResult(false, $"{item.Name} is broken and cannot be salvaged.", []);
 
@@ -136,7 +139,7 @@ public class SalvageService
 
         var allItems = await _items.GetByOwnerAsync(playerId, ct);
         var targets = allItems
-            .Where(i => i.Category == parsedCategory && i.IsSalvageable)
+            .Where(i => i.Category == parsedCategory && i.IsSalvageable && !i.IsLocked)
             .ToList();
 
         if (targets.Count == 0)
@@ -181,8 +184,11 @@ public class SalvageService
         Item item,
         CancellationToken ct = default)
     {
-        // Only weapons and armor are subject to auto-salvage
+        // Only weapons and armor are subject to auto-salvage; locked items are always skipped
         if (item.Category != ItemCategory.Weapon && item.Category != ItemCategory.Armor)
+            return null;
+
+        if (item.IsLocked)
             return null;
 
         var threshold = item.Category == ItemCategory.Weapon

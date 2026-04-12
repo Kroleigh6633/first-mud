@@ -207,6 +207,10 @@ public class GameHub : Hub
                 TryGetString(payload, "category") ?? "weapon",
                 TryGetInt(payload, "maxWorkmanship")),
 
+            "lockitem" => new LockItemCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
             _ => null
         };
     }

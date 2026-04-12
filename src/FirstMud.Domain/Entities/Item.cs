@@ -27,6 +27,9 @@ public class Item
     // Ownership — null means world loot / homestead storage
     public Guid? OwnerId { get; private set; }
 
+    // Lock — prevents the item from being auto-salvaged or bulk-salvaged
+    public bool IsLocked { get; private set; }
+
     // Stacking — Components and Reagents stack; equipment items do not
     public int Quantity { get; private set; } = 1;
     public bool IsStackable => Category == ItemCategory.Component || Category == ItemCategory.Reagent;
@@ -85,6 +88,8 @@ public class Item
         remaining = Quantity;
         return true;
     }
+
+    public void ToggleLock() => IsLocked = !IsLocked;
 
     public void MarkDiscoveredBy(string playerName) => DiscoveredByPlayerName = playerName;
 

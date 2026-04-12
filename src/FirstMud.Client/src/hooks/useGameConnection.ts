@@ -291,27 +291,23 @@ export function useGameConnection(): GameConnectionResult {
       setAutoFarmStatus(status.active ? status : null);
     });
 
-    connection.on('EquipmentChanged', (payload: { itemId?: string; slot?: string; category?: string; name?: string; replacedItemId?: string }) => {
+    connection.on('EquipmentChanged', (payload: {
+      weaponId?: string;
+      armorId?: string;
+      accessoryId?: string;
+      changedItemId?: string;
+      changedItemName?: string;
+      category?: string;
+      replacedItemId?: string;
+      removedSlot?: string;
+    }) => {
       if (!payload) return;
-      if (payload.slot === null || payload.slot === undefined) {
-        // An item was equipped — update by category
-        const cat = payload.category?.toLowerCase();
-        setEquipment(prev => ({
-          ...prev,
-          ...(cat === 'weapon' ? { weaponId: payload.itemId, weaponName: payload.name } : {}),
-          ...(cat === 'armor' ? { armorId: payload.itemId, armorName: payload.name } : {}),
-          ...(cat !== 'weapon' && cat !== 'armor' ? { accessoryId: payload.itemId, accessoryName: payload.name } : {}),
-        }));
-      } else {
-        // Unequip
-        const slot = payload.slot?.toLowerCase();
-        setEquipment(prev => ({
-          ...prev,
-          ...(slot === 'weapon' ? { weaponId: undefined, weaponName: undefined } : {}),
-          ...(slot === 'armor' ? { armorId: undefined, armorName: undefined } : {}),
-          ...(slot !== 'weapon' && slot !== 'armor' ? { accessoryId: undefined, accessoryName: undefined } : {}),
-        }));
-      }
+      // Server always sends the full equipment state (all three slot ids)
+      setEquipment({
+        weaponId: payload.weaponId ?? undefined,
+        armorId: payload.armorId ?? undefined,
+        accessoryId: payload.accessoryId ?? undefined,
+      });
     });
 
     connection.on('CompanionCaptured', (captured: CompanionCapturedEvent) => {

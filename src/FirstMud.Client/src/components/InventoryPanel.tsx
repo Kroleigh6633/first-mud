@@ -6,6 +6,7 @@ interface Props {
   equipment: EquipmentSlots;
   onClose: () => void;
   sendCommand: (command: string, payload?: unknown) => void;
+  atHomestead?: boolean;
 }
 
 const overlayStyle: React.CSSProperties = {
@@ -134,6 +135,34 @@ const salvageAllBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+const storeBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #ccaa00',
+  color: '#ccaa00',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+  marginLeft: '6px',
+};
+
+const lockBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: '#888888',
+  fontFamily: 'monospace',
+  fontSize: '13px',
+  padding: '0 4px',
+  cursor: 'pointer',
+  marginLeft: '4px',
+  lineHeight: 1,
+};
+
+const lockBtnLockedStyle: React.CSSProperties = {
+  ...lockBtnStyle,
+  color: '#ffcc00',
+};
+
 const equippedTagStyle: React.CSSProperties = {
   color: '#00ff41',
   fontSize: '10px',
@@ -165,7 +194,7 @@ function maxSalvageableWorkmanship(skill: number): number {
 function isEquippable(category?: string): boolean {
   if (!category) return false;
   const c = category.toLowerCase();
-  return c === 'weapon' || c === 'armor' || c === 'accessory' || c === 'component';
+  return c === 'weapon' || c === 'armor';
 }
 
 function isSalvageable(category?: string): boolean {
@@ -180,7 +209,7 @@ function isEquipped(itemId: string, equipment: EquipmentSlots): boolean {
     || equipment.accessoryId === itemId;
 }
 
-export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand }: Props) {
+export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand, atHomestead = false }: Props) {
   const handleEquip = (itemId: string) => {
     sendCommand('equip', { itemId });
   };
@@ -196,6 +225,14 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
   const handleAutoSalvageChange = (category: string, value: string) => {
     const maxWorkmanship = parseInt(value, 10);
     sendCommand('autosalvage', { category, maxWorkmanship });
+  };
+
+  const handleStore = (itemId: string) => {
+    sendCommand('deposit', { itemId });
+  };
+
+  const handleToggleLock = (itemId: string) => {
+    sendCommand('lockitem', { itemId });
   };
 
   const salvageSkill = snapshot?.salvageSkill ?? 1;
@@ -344,6 +381,11 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
 
         <div style={sectionHeadingStyle}>
           <span>Items</span>
+          {!atHomestead && (
+            <span style={{ color: '#666666', fontSize: '10px', fontStyle: 'italic' }}>
+              [P] portal home · [V] storage
+            </span>
+          )}
         </div>
         {!snapshot ? (
           <div style={emptyStyle}>loading...</div>
@@ -355,7 +397,13 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
           <div style={emptyStyle}>All items are equipped.</div>
         ) : (
           unequippedItems.map((item) => (
-            <div key={item.id} style={itemRowStyle}>
+            <div
+              key={item.id}
+              style={{
+                ...itemRowStyle,
+                ...(item.isLocked ? { borderLeft: '2px solid #ffcc00' } : {}),
+              }}
+            >
               <div style={itemNameStyle}>
                 <span>
                   {item.name}
@@ -367,6 +415,16 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                   <span style={{ color: '#888888', fontSize: '11px' }}>
                     {item.category ?? ''} W{item.workmanship}
                   </span>
+                  {/* Lock/star toggle — always visible */}
+                  <button
+                    type="button"
+                    style={item.isLocked ? lockBtnLockedStyle : lockBtnStyle}
+                    onClick={() => handleToggleLock(item.id)}
+                    title={item.isLocked ? 'Locked — click to unlock' : 'Click to lock (prevents salvage)'}
+                    aria-label={item.isLocked ? `unlock ${item.name}` : `lock ${item.name}`}
+                  >
+                    ★
+                  </button>
                   {isEquippable(item.category) && (
                     <button
                       type="button"
@@ -377,15 +435,32 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                       equip
                     </button>
                   )}
+                  {atHomestead && (
+                    <button
+                      type="button"
+                      style={storeBtnStyle}
+                      onClick={() => handleStore(item.id)}
+                      aria-label={`store ${item.name}`}
+                    >
+                      store
+                    </button>
+                  )}
                   {isSalvageable(item.category) && (() => {
                     const tooHighSkill = (item.workmanship ?? 1) > maxSalvageable;
+                    const locked = item.isLocked ?? false;
+                    const disabled = tooHighSkill || locked;
+                    const titleText = locked
+                      ? `${item.name} is locked — unlock (★) to salvage`
+                      : tooHighSkill
+                      ? `Skill too low (need skill to reach W${item.workmanship})`
+                      : undefined;
                     return (
                       <button
                         type="button"
-                        style={tooHighSkill ? salvageBtnDisabledStyle : salvageBtnStyle}
-                        onClick={() => !tooHighSkill && handleSalvage(item.id)}
-                        disabled={tooHighSkill}
-                        title={tooHighSkill ? `Skill too low (need skill to reach W${item.workmanship})` : undefined}
+                        style={disabled ? salvageBtnDisabledStyle : salvageBtnStyle}
+                        onClick={() => !disabled && handleSalvage(item.id)}
+                        disabled={disabled}
+                        title={titleText}
                         aria-label={`salvage ${item.name}`}
                       >
                         salvage

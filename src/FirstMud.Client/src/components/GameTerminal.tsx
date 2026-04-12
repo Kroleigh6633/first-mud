@@ -355,6 +355,7 @@ export default function GameTerminal({
           equipment={equipment}
           onClose={() => setShowInventory(false)}
           sendCommand={sendCommand}
+          atHomestead={atHomestead}
         />
       )}
       {showCharSheet && (

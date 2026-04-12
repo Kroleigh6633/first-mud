@@ -44,7 +44,8 @@ public class SalvageCommandHandler(
                     Workmanship = i.Workmanship.Value,
                     Category = i.Category.ToString(),
                     i.Quantity,
-                    i.IsStackable
+                    i.IsStackable,
+                    i.IsLocked
                 }).ToList()
             };
 
@@ -101,7 +102,8 @@ public class SalvageAllCommandHandler(
                     Workmanship = i.Workmanship.Value,
                     Category = i.Category.ToString(),
                     i.Quantity,
-                    i.IsStackable
+                    i.IsStackable,
+                    i.IsLocked
                 }).ToList()
             };
 
@@ -170,7 +172,8 @@ public class SetAutoSalvageCommandHandler(
                 Workmanship = i.Workmanship.Value,
                 Category = i.Category.ToString(),
                 i.Quantity,
-                i.IsStackable
+                i.IsStackable,
+                i.IsLocked
             }).ToList()
         };
 

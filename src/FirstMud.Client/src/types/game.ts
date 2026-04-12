@@ -103,6 +103,7 @@ export interface InventoryItem {
   category?: string;
   quantity?: number;
   isStackable?: boolean;
+  isLocked?: boolean;
 }
 
 export interface EquipmentSlots {

@@ -54,6 +54,9 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.MaxDurability);
         builder.Property(i => i.IsSalvageable);
 
+        builder.Property(i => i.IsLocked)
+            .HasDefaultValue(false);
+
         builder.Property(i => i.Quantity)
             .HasDefaultValue(1);
 

@@ -69,6 +69,7 @@ builder.Services.AddScoped<ICommandHandler<AutoFarmCommand>, AutoFarmCommandHand
 builder.Services.AddScoped<ICommandHandler<SalvageCommand>, SalvageCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SalvageAllCommand>, SalvageAllCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SetAutoSalvageCommand>, SetAutoSalvageCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<LockItemCommand>, LockItemCommandHandler>();
 
 var app = builder.Build();
 
