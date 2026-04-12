@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState } from '../types/game';
 import WorldMap from './WorldMap';
+import { getBiome } from '../utils/biome';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
 import ConnectionStatus from './ConnectionStatus';
@@ -118,10 +119,12 @@ export default function GameTerminal({
           text: `You arrive at ${currentTile.name}. ${currentTile.description}`,
         });
       } else {
+        const { x, y } = worldState?.player ?? { x: 0, y: 0 };
+        const biome = getBiome(x, y);
         appendMessage({
           timestamp: new Date().toISOString(),
           category: 'system',
-          text: 'You leave the marked paths. Open country stretches ahead.',
+          text: `You leave the marked paths. ${biome.name} stretches ahead.`,
         });
       }
     }

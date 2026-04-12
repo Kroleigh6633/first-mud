@@ -1,4 +1,5 @@
 import type { PlayerState, WeaveState, ReputationTier, ZoneTile, EquipmentSlots, CompanionState, MagicElement, CompanionType } from '../types/game';
+import { getBiome } from '../utils/biome';
 
 interface Props {
   player: PlayerState | null;
@@ -197,7 +198,10 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
         </div>
       ) : (
         <div data-testid="current-tile-empty" style={{ color: '#666666', fontStyle: 'italic' }}>
-          Open country. Nothing of note here.
+          {(() => {
+            const biome = getBiome(player.x, player.y);
+            return `${biome.name}. Nothing of note here.`;
+          })()}
         </div>
       )}
 

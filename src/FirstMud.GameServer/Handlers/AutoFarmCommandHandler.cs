@@ -102,7 +102,8 @@ public class AutoFarmCommandHandler(
                     continue;
 
                 // Start and auto-fight the encounter
-                var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level);
+                var biome = CombatHelpers.GetBiome(nearbyZone);
+                var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
                 // Skip grey encounters — monsters too weak to bother fighting
                 var avgMonsterLevel = monsters.Count > 0

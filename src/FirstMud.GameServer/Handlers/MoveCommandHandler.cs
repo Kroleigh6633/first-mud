@@ -70,7 +70,8 @@ public class MoveCommandHandler(
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
 
-        var monsters = CombatHelpers.BuildMonsterPack(nearbyZone.DangerLevel, player.Level);
+        var biome = CombatHelpers.GetBiome(nearbyZone);
+        var monsters = CombatHelpers.BuildMonsterPack(nearbyZone.DangerLevel, player.Level, biome);
 
         // Aggro check: high-level players in low-level zones don't get bothered
         var avgMonsterLevel = monsters.Count > 0
@@ -101,10 +102,11 @@ public class MoveCommandHandler(
             playerId, Guid.NewGuid(), player, [], monsters, ct: ct);
 
         var monsterNames = string.Join(", ", monsters.Select(m => m.Name));
+        var narration = CombatHelpers.GetBiomeNarration(biome, monsterNames);
         await notificationService.SendMessageAsync(
             playerId,
             "combat",
-            $"Hostile creatures emerge from {nearbyZone.Name}! You face: {monsterNames}.",
+            narration,
             ct);
 
         await combatHelpers.ProcessEnemyTurnsAsync(playerId, encounter, ct);

@@ -12,6 +12,7 @@ namespace FirstMud.GameServer.Handlers;
 public class StartCombatCommandHandler(
     IPlayerRepository playerRepository,
     IItemRepository itemRepository,
+    IZoneRepository zoneRepository,
     CombatService combatService,
     CombatHelpers combatHelpers,
     IHubContext<GameHub> hubContext) : ICommandHandler<StartCombatCommand>
@@ -22,8 +23,11 @@ public class StartCombatCommandHandler(
         if (player is null)
             return new CommandResult(false, "Player not found.");
 
-        var dangerLevel = (int)(cmd.ZoneId.GetHashCode() & 0x7FFFFFFF) % 3 + 1;
-        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel);
+        var zones = await zoneRepository.GetByWorldAsync(player.Position.World, ct);
+        var zone = zones.FirstOrDefault(z => z.Id == cmd.ZoneId);
+        var dangerLevel = zone?.DangerLevel ?? (int)(cmd.ZoneId.GetHashCode() & 0x7FFFFFFF) % 3 + 1;
+        var biome = CombatHelpers.GetBiome(zone);
+        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
         // Load all equipped items into a slot → Item dictionary
         var equippedItems = new Dictionary<Domain.Enums.EquipmentSlot, Domain.Entities.Item>();

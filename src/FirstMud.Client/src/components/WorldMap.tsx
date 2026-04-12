@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { WorldStateSnapshot, ZoneTile, WanderingNpc } from '../types/game';
+import { getBiome, isPathTile, type BiomeType } from '../utils/biome';
 
 interface Props {
   worldState: WorldStateSnapshot | null;
@@ -10,6 +11,10 @@ interface Props {
 // ─── Tile dimensions ────────────────────────────────────────────────────────
 const TILE_W = 64;
 const TILE_H = 32;
+
+// ─── Fog of war visibility radii ────────────────────────────────────────────
+const VIS_RADIUS      = 8;   // tiles that count as "currently visible"
+const VISITED_MARK_R  = 2;   // radius around player that gets marked as visited
 
 // ─── Coordinate helpers ──────────────────────────────────────────────────────
 function gridToScreen(
@@ -36,60 +41,41 @@ function screenToGrid(
   return [gx, gy];
 }
 
-// ─── Terrain hash ────────────────────────────────────────────────────────────
-function terrainHash(x: number, y: number): number {
-  let h = (x * 374761 + y * 668265) & 0x7fffffff;
-  h = ((h >> 16) ^ h) * 0x45d9f3b;
-  h = ((h >> 16) ^ h) * 0x45d9f3b;
-  return ((h >> 16) ^ h) & 0xff;
-}
-
-// ─── Terrain type ────────────────────────────────────────────────────────────
-type TerrainKind = 'grass' | 'tree' | 'water' | 'mountain' | 'sand' | 'rock' | 'path';
-
-function getTerrainKind(wx: number, wy: number): TerrainKind {
-  const h = terrainHash(wx, wy);
-  if (h < 18)  return 'tree';
-  if (h < 30)  return 'sand';
-  if (h < 50)  return 'grass';
-  if (h < 60)  return 'water';
-  if (h < 70)  return 'mountain';
-  if (h < 80)  return 'rock';
-  if (h < 90)  return 'path';
-  return 'grass';
-}
-
-// ─── Terrain colors ──────────────────────────────────────────────────────────
+// ─── Terrain colors derived from biome ──────────────────────────────────────
 interface TerrainColors {
   top: string;
   left: string;
   right: string;
 }
 
-function grassColor(wx: number, wy: number): string {
-  // ±15% variation around base #4a8a2a — warm lush green
-  const h = terrainHash(wx * 3 + 7, wy * 5 + 11) & 0x1f; // 0–31
-  const shift = h - 16; // -16 to +15
+function grassVariant(wx: number, wy: number): string {
+  // Small deterministic variation in green shade
+  let h = (wx * 374761 + wy * 668265) & 0x7fffffff;
+  h = ((h >> 16) ^ h) * 0x45d9f3b;
+  h = ((h >> 16) ^ h) * 0x45d9f3b;
+  const shift = (((h >> 16) ^ h) & 0x1f) - 16; // -16 to +15
   const r = Math.max(0x30, Math.min(0x70, 0x4a + Math.round(shift * 0.3)));
   const g = Math.max(0x60, Math.min(0xaa, 0x8a + Math.round(shift * 0.8)));
   const b = Math.max(0x15, Math.min(0x45, 0x2a + Math.round(shift * 0.2)));
   return `rgb(${r},${g},${b})`;
 }
 
-function getTerrainColors(kind: TerrainKind, wx: number, wy: number): TerrainColors {
-  switch (kind) {
-    case 'grass':
-      return { top: grassColor(wx, wy), left: '#2e5a18', right: '#3a6e20' };
-    case 'tree':
-      return { top: '#2a6a1a', left: '#1a4010', right: '#226018' };
+function getBiomeColors(type: BiomeType, wx: number, wy: number): TerrainColors {
+  switch (type) {
     case 'water':
       return { top: '#2266aa', left: '#14447a', right: '#1c558e' };
-    case 'mountain':
-      return { top: '#7a7a6a', left: '#4e4e42', right: '#626256' };
     case 'sand':
       return { top: '#c4a84a', left: '#8a7230', right: '#a68d3c' };
-    case 'rock':
-      return { top: '#6a6a5a', left: '#444438', right: '#565648' };
+    case 'grassland':
+      return { top: grassVariant(wx, wy), left: '#2e5a18', right: '#3a6e20' };
+    case 'lightForest':
+      return { top: '#2a6a1a', left: '#1a4010', right: '#226018' };
+    case 'denseForest':
+      return { top: '#1a4e10', left: '#0e2c08', right: '#163c0e' };
+    case 'mountain':
+      return { top: '#7a7a6a', left: '#4e4e42', right: '#626256' };
+    case 'snowMountain':
+      return { top: '#c8c8d8', left: '#8a8a9a', right: '#a0a0b0' };
     case 'path':
     default:
       return { top: '#8a7a5a', left: '#5a503c', right: '#6e6248' };
@@ -109,6 +95,17 @@ function zoneSaturatedColor(tile: ZoneTile): TerrainColors {
   if (tile.dangerLevel <= 3) return { top: '#8a7a5a', left: '#5a503c', right: '#6e6248' };
   if (tile.dangerLevel <= 6) return { top: '#7a6a4a', left: '#4e4430', right: '#60523a' };
   return { top: '#4a3a2a', left: '#2c221a', right: '#3a2e22' };
+}
+
+/** Difficulty border color based on (zoneLevel - playerLevel) */
+function difficultyBorderColor(zoneDanger: number, playerLevel: number): string {
+  const diff = zoneDanger - playerLevel;
+  if (diff <= -4) return '#00ff88'; // trivial — bright green
+  if (diff <= -2) return '#44cc44'; // easy
+  if (diff <=  0) return '#ddcc00'; // appropriate
+  if (diff <=  2) return '#ff8800'; // challenging
+  if (diff <=  4) return '#ee2200'; // dangerous
+  return '#880000';                  // deadly
 }
 
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
@@ -134,8 +131,29 @@ function drawIsoDiamond(
   ctx.stroke();
 }
 
+/** Draw just the diamond outline (for fog/difficulty borders) */
+function strokeIsoDiamond(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  tileW: number,
+  tileH: number,
+  color: string,
+  lineWidth: number,
+) {
+  ctx.beginPath();
+  ctx.moveTo(sx,              sy - tileH / 2);
+  ctx.lineTo(sx + tileW / 2, sy);
+  ctx.lineTo(sx,              sy + tileH / 2);
+  ctx.lineTo(sx - tileW / 2, sy);
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+}
+
 // Rounded canopy tree — multiple overlapping circles + a dark trunk
-function drawTreeDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
+function drawTreeDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number, dense = false) {
   const baseY = sy - TILE_H / 2;
 
   // Trunk
@@ -144,8 +162,7 @@ function drawTreeDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
   ctx.fillStyle = '#3a2a1a';
   ctx.fill();
 
-  // Three overlapping circles for a round canopy
-  const canopyColor = '#2a6a1a';
+  const canopyColor = dense ? '#164a0c' : '#2a6a1a';
   const canopyData: [number, number, number][] = [
     [sx,      baseY - 14, 8],
     [sx - 6,  baseY - 9,  6],
@@ -159,23 +176,23 @@ function drawTreeDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
   }
 }
 
-function drawMountainDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
+function drawMountainDecal(ctx: CanvasRenderingContext2D, sx: number, sy: number, snowy = false) {
   // Main grey mountain body
   ctx.beginPath();
   ctx.moveTo(sx,              sy - TILE_H / 2 - 14);
   ctx.lineTo(sx + 11,         sy - TILE_H / 2 + 2);
   ctx.lineTo(sx - 11,         sy - TILE_H / 2 + 2);
   ctx.closePath();
-  ctx.fillStyle = '#7a7a6a';
+  ctx.fillStyle = snowy ? '#9a9aaa' : '#7a7a6a';
   ctx.fill();
 
-  // Snow cap — white triangle at peak
+  // Snow cap
   ctx.beginPath();
   ctx.moveTo(sx,              sy - TILE_H / 2 - 14);
   ctx.lineTo(sx + 4,          sy - TILE_H / 2 - 6);
   ctx.lineTo(sx - 4,          sy - TILE_H / 2 - 6);
   ctx.closePath();
-  ctx.fillStyle = '#ddddcc';
+  ctx.fillStyle = snowy ? '#ffffff' : '#ddddcc';
   ctx.fill();
 }
 
@@ -188,10 +205,8 @@ function drawZoneBuilding(
   roofColor: string,
 ) {
   const baseY = sy - TILE_H / 2;
-  // Wall rectangle
   ctx.fillStyle = wallColor;
   ctx.fillRect(sx - 6, baseY - 8, 12, 8);
-  // Roof triangle
   ctx.beginPath();
   ctx.moveTo(sx,       baseY - 8);
   ctx.lineTo(sx + 8,   baseY - 2);
@@ -211,7 +226,6 @@ function drawWaterWaves(
   waterFrame: number,
 ) {
   ctx.save();
-  // Clip to diamond shape
   ctx.beginPath();
   ctx.moveTo(sx,              sy - tileH / 2);
   ctx.lineTo(sx + tileW / 2, sy);
@@ -220,7 +234,6 @@ function drawWaterWaves(
   ctx.closePath();
   ctx.clip();
 
-  // Draw two horizontal ripple lines with sinusoidal offset
   const rippleColor = '#3388cc';
   ctx.strokeStyle = rippleColor;
   ctx.lineWidth = 1;
@@ -276,6 +289,31 @@ function zoneBuildingColors(tile: ZoneTile): { wall: string; roof: string } {
   return { wall: '#2a1a12', roof: '#4a2a1a' };
 }
 
+// ─── Visited tiles storage ────────────────────────────────────────────────────
+function visitedKey(playerId: string): string {
+  return `firstmud_visited_${playerId}`;
+}
+
+function loadVisited(playerId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(visitedKey(playerId));
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveVisited(playerId: string, visited: Set<string>): void {
+  try {
+    // Only persist every N additions to avoid thrashing localStorage
+    localStorage.setItem(visitedKey(playerId), JSON.stringify(Array.from(visited)));
+  } catch {
+    // Quota exceeded — silently ignore
+  }
+}
+
 // ─── Minimap constants ────────────────────────────────────────────────────────
 const MINI_SIZE = 100;
 const MINI_DOT  = 3;
@@ -285,7 +323,6 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Dimensions tracked via ResizeObserver
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
 
   // Animation state
@@ -296,13 +333,49 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
   // Hover state
   const hoverRef = useRef<{ gx: number; gy: number } | null>(null);
 
-  // Stable prop refs so the render loop always sees the latest values
+  // Fog of war — visited tile set
+  const visitedRef    = useRef<Set<string>>(new Set());
+  const playerIdRef   = useRef<string | null>(null);
+  const lastSaveFrame = useRef<number>(0);
+
+  // Stable prop refs
   const worldStateRef   = useRef(worldState);
   const zoneTilesRef    = useRef(zoneTiles);
   const wanderingNpcsRef = useRef(wanderingNpcs);
   worldStateRef.current   = worldState;
   zoneTilesRef.current    = zoneTiles;
   wanderingNpcsRef.current = wanderingNpcs;
+
+  // ─── Load visited tiles when player ID becomes available ──────────────────
+  useEffect(() => {
+    const pid = worldState?.player?.id ?? null;
+    if (pid && pid !== playerIdRef.current) {
+      playerIdRef.current = pid;
+      visitedRef.current  = loadVisited(pid);
+    }
+  }, [worldState?.player?.id]);
+
+  // ─── Mark current position + radius as visited ───────────────────────────
+  const markVisited = useCallback((px: number, py: number) => {
+    const pid = playerIdRef.current;
+    if (!pid) return;
+    const set = visitedRef.current;
+    let changed = false;
+    for (let dx = -VISITED_MARK_R; dx <= VISITED_MARK_R; dx++) {
+      for (let dy = -VISITED_MARK_R; dy <= VISITED_MARK_R; dy++) {
+        const k = `${px + dx},${py + dy}`;
+        if (!set.has(k)) { set.add(k); changed = true; }
+      }
+    }
+    if (changed) {
+      // Debounce saves: only write localStorage every 60 frames
+      const frame = waterFrameRef.current;
+      if (frame - lastSaveFrame.current > 60) {
+        saveVisited(pid, set);
+        lastSaveFrame.current = frame;
+      }
+    }
+  }, []);
 
   // ─── Resize ─────────────────────────────────────────────────────────────────
   const handleResize = useCallback((w: number, h: number) => {
@@ -352,23 +425,24 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
 
     const playerX = worldStateRef.current?.player?.x ?? 0;
     const playerY = worldStateRef.current?.player?.y ?? 0;
+    const playerLevel = worldStateRef.current?.player?.level ?? 1;
+
+    // Mark player vicinity as visited
+    markVisited(playerX, playerY);
 
     // Camera offset: player always at viewport center
     const [psx, psy] = gridToScreen(playerX, playerY, vpCx, vpCy);
     const camOffX = vpCx - psx;
     const camOffY = vpCy - psy;
 
-    // How many tiles fit on screen (add generous margin)
     const halfW = Math.ceil(w / TILE_W) + 4;
     const halfH = Math.ceil(h / TILE_H) + 8;
 
-    // Collect all tile grid positions in visible range
     interface TileEntry {
       gx: number;
       gy: number;
       sx: number;
       sy: number;
-      zone?: ZoneTile;
     }
 
     const entries: TileEntry[] = [];
@@ -378,14 +452,13 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         const [sx, sy] = gridToScreen(gx, gy, vpCx, vpCy);
         const asx = sx + camOffX;
         const asy = sy + camOffY;
-        // Cull tiles that are fully off-screen
         if (asx + tileW / 2 < 0 || asx - tileW / 2 > w * dpr) continue;
         if (asy + tileH / 2 < 0 || asy - tileH / 2 > h * dpr) continue;
         entries.push({ gx, gy, sx: asx, sy: asy });
       }
     }
 
-    // Painter's algorithm: sort by (gx + gy) asc, then gy asc
+    // Painter's algorithm
     entries.sort((a, b) => {
       const sa = a.gx + a.gy;
       const sb = b.gx + b.gy;
@@ -393,7 +466,7 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       return a.gy - b.gy;
     });
 
-    // Build zone lookup: (x,y) → ZoneTile (including 3×3 area)
+    // Zone lookup maps
     const zoneCenterMap = new Map<string, ZoneTile>();
     const zoneHaloMap   = new Map<string, ZoneTile>();
     for (const tile of zoneTilesRef.current) {
@@ -406,7 +479,18 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       }
     }
 
-    // Build NPC lookup: (x,y) → WanderingNpc[]
+    // Difficulty border halo: 3×3 around zone centre (including the halo)
+    // The difficulty border shows on the zone centre AND its surrounding 3×3
+    const zoneDiffMap = new Map<string, ZoneTile>(); // key → zone (for difficulty borders)
+    for (const tile of zoneTilesRef.current) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          zoneDiffMap.set(`${tile.x + dx},${tile.y + dy}`, tile);
+        }
+      }
+    }
+
+    // NPC lookup
     const npcMap = new Map<string, WanderingNpc[]>();
     for (const npc of wanderingNpcsRef.current) {
       const key = `${npc.x},${npc.y}`;
@@ -414,14 +498,16 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       npcMap.get(key)!.push(npc);
     }
 
-    // Clear — dark warm parchment background
+    const visited = visitedRef.current;
+
+    // Clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#1a1510';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const hover = hoverRef.current;
     const waterFrame = waterFrameRef.current;
-    const waterShift = (Math.sin(waterFrame * 0.04) * 0.1); // subtle hue shift
+    const waterShift = (Math.sin(waterFrame * 0.04) * 0.1);
 
     // ── Draw terrain + zone tiles ──────────────────────────────────────────────
     for (const entry of entries) {
@@ -431,28 +517,54 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       const haloTile   = zoneHaloMap.get(key);
       const isHovered  = hover?.gx === gx && hover?.gy === gy;
 
-      // Determine terrain
-      const kind = getTerrainKind(gx, gy);
+      // ── Fog of war ─────────────────────────────────────────────────────────
+      const distToPlayer = Math.sqrt((gx - playerX) ** 2 + (gy - playerY) ** 2);
+      const isVisible    = distToPlayer <= VIS_RADIUS;
+      const isVisited    = visited.has(key);
+
+      // Determine per-tile opacity
+      let fogAlpha: number;
+      if (isVisible) {
+        fogAlpha = 1.0; // full brightness
+      } else if (isVisited) {
+        // Gradient fade at the edge of visibility
+        const fadeStart = VIS_RADIUS;
+        const fadeEnd   = VIS_RADIUS + 3;
+        fogAlpha = distToPlayer <= fadeEnd
+          ? 0.65 + 0.35 * (1 - (distToPlayer - fadeStart) / (fadeEnd - fadeStart))
+          : 0.65;
+      } else {
+        fogAlpha = 0.15; // unvisited — dark and mysterious
+      }
+
+      ctx.save();
+      ctx.globalAlpha = fogAlpha;
+
+      // ── Biome / terrain ────────────────────────────────────────────────────
+      const biome = getBiome(gx, gy);
+      const path  = !centerTile && !haloTile && isPathTile(gx, gy);
 
       if (centerTile) {
-        // Zone center tile — saturated warm stone color
         const colors = zoneSaturatedColor(centerTile);
         const glow   = zoneGlowColor(centerTile);
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top, glow);
       } else if (haloTile) {
-        // Zone halo — terrain with tinted glow border
-        const colors = getTerrainColors(kind, gx, gy);
+        const colors = path
+          ? getBiomeColors('path', gx, gy)
+          : getBiomeColors(biome.type, gx, gy);
         const glow   = zoneGlowColor(haloTile) + '66';
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top, glow);
-      } else if (kind === 'water') {
-        // Animated water — warm river blue
+      } else if (path) {
+        const colors = getBiomeColors('path', gx, gy);
+        drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top);
+      } else if (biome.type === 'water') {
         const blueBase = 0x22 + Math.round(waterShift * 16);
         const greenVal = Math.round(0x66 + waterShift * 20);
-        const col  = `rgb(${blueBase},${greenVal},${0xaa})`;
+        const col = `rgb(${blueBase},${greenVal},${0xaa})`;
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, col);
         drawWaterWaves(ctx, sx, sy, tileW, tileH, waterFrame);
       } else {
-        const colors = getTerrainColors(kind, gx, gy);
+        const colors = getBiomeColors(biome.type, gx, gy);
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top);
       }
 
@@ -469,13 +581,15 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         ctx.stroke();
       }
 
-      // Terrain decals
-      if (!centerTile) {
-        if (kind === 'tree')     drawTreeDecal(ctx, sx, sy);
-        if (kind === 'mountain') drawMountainDecal(ctx, sx, sy);
+      // ── Terrain decals ─────────────────────────────────────────────────────
+      if (!centerTile && !path) {
+        if (biome.type === 'denseForest')  drawTreeDecal(ctx, sx, sy, true);
+        if (biome.type === 'lightForest')  drawTreeDecal(ctx, sx, sy, false);
+        if (biome.type === 'mountain')     drawMountainDecal(ctx, sx, sy, false);
+        if (biome.type === 'snowMountain') drawMountainDecal(ctx, sx, sy, true);
       }
 
-      // Zone center — small building + glowing symbol
+      // ── Zone building + glyph ──────────────────────────────────────────────
       if (centerTile) {
         const bldColors = zoneBuildingColors(centerTile);
         drawZoneBuilding(ctx, sx, sy, bldColors.wall, bldColors.roof);
@@ -491,36 +605,53 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         ctx.shadowBlur = 0;
       }
 
-      // NPCs on this tile
-      const npcs = npcMap.get(key);
-      if (npcs) {
-        for (let i = 0; i < npcs.length; i++) {
-          const npc = npcs[i];
-          const color = npcColor(npc.role);
-          const letter = npcGlyph(npc.role);
-          const offsetI = (i - (npcs.length - 1) / 2) * 8 * dpr;
+      // ── Difficulty border (zone 3×3 halo including centre) ─────────────────
+      // Only drawn on visited tiles, not on unvisited fog
+      const diffZone = zoneDiffMap.get(key);
+      if (diffZone && (isVisited || isVisible)) {
+        // Unvisited zone = black border, visited = difficulty color
+        const borderColor = isVisited || isVisible
+          ? difficultyBorderColor(diffZone.dangerLevel, playerLevel)
+          : '#000000';
+        strokeIsoDiamond(ctx, sx, sy, tileW, tileH, borderColor, 1.8 * dpr);
+      }
 
-          // Body dot
-          ctx.beginPath();
-          ctx.arc(sx + offsetI, sy - tileH / 2 - 4 * dpr, 4 * dpr, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.fill();
+      // ── Fog overlay for unvisited tiles ────────────────────────────────────
+      // Already handled by globalAlpha above; restore before drawing NPCs/player
+      ctx.restore();
 
-          // Letter label
-          ctx.font = `bold ${8 * dpr}px monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillStyle = color;
-          ctx.fillText(letter, sx + offsetI, sy - tileH / 2 - 10 * dpr);
+      // ── NPCs on this tile ──────────────────────────────────────────────────
+      if (isVisible || isVisited) {
+        const npcs = npcMap.get(key);
+        if (npcs) {
+          ctx.save();
+          ctx.globalAlpha = isVisible ? 1.0 : 0.65;
+          for (let i = 0; i < npcs.length; i++) {
+            const npc = npcs[i];
+            const color = npcColor(npc.role);
+            const letter = npcGlyph(npc.role);
+            const offsetI = (i - (npcs.length - 1) / 2) * 8 * dpr;
+
+            ctx.beginPath();
+            ctx.arc(sx + offsetI, sy - tileH / 2 - 4 * dpr, 4 * dpr, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            ctx.font = `bold ${8 * dpr}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillStyle = color;
+            ctx.fillText(letter, sx + offsetI, sy - tileH / 2 - 10 * dpr);
+          }
+          ctx.restore();
         }
       }
 
-      // Player — bright gold body, white head, pops against terrain
+      // ── Player ─────────────────────────────────────────────────────────────
       if (gx === playerX && gy === playerY) {
         const headColor = '#ffffff';
         const bodyColor = blinkRef.current ? '#ffcc33' : '#e6b820';
 
-        // Body (triangle)
         const bx = sx;
         const by = sy - tileH / 2;
         ctx.beginPath();
@@ -529,13 +660,11 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
         ctx.lineTo(bx - 5 * dpr, by + 10 * dpr);
         ctx.closePath();
         ctx.fillStyle = bodyColor;
-        // Gold glow
         ctx.shadowColor = '#ffcc33';
         ctx.shadowBlur = 6 * dpr;
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Head (circle)
         ctx.beginPath();
         ctx.arc(bx, by - 5 * dpr, 4 * dpr, 0, Math.PI * 2);
         ctx.fillStyle = headColor;
@@ -544,22 +673,19 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
     }
 
     // ── Minimap ────────────────────────────────────────────────────────────────
-    const mmSize   = MINI_SIZE * dpr;
-    const mmPad    = MINI_PAD  * dpr;
-    const mmX      = canvas.width - mmSize - mmPad;
-    const mmY      = mmPad;
+    const mmSize = MINI_SIZE * dpr;
+    const mmPad  = MINI_PAD  * dpr;
+    const mmX    = canvas.width - mmSize - mmPad;
+    const mmY    = mmPad;
 
     ctx.save();
-    // Dark parchment background
     ctx.fillStyle = '#2a2218';
     ctx.fillRect(mmX, mmY, mmSize, mmSize);
-    // Warm border
     ctx.strokeStyle = '#6a5a3a';
     ctx.lineWidth   = 1.5 * dpr;
     ctx.strokeRect(mmX, mmY, mmSize, mmSize);
 
     if (zoneTilesRef.current.length > 0) {
-      // Determine world bounds from zone tiles
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (const t of zoneTilesRef.current) {
         if (t.x < minX) minX = t.x;
@@ -570,24 +696,20 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
       const rangeX = Math.max(maxX - minX, 1);
       const rangeY = Math.max(maxY - minY, 1);
 
-      // Draw zone dots as small gems (circles with inner highlight)
       for (const t of zoneTilesRef.current) {
         const mx = mmX + ((t.x - minX) / rangeX) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
         const my = mmY + ((t.y - minY) / rangeY) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
         const r = MINI_DOT * dpr * 0.75;
-        // Gem body
         ctx.beginPath();
         ctx.arc(mx, my, r, 0, Math.PI * 2);
         ctx.fillStyle = zoneGlowColor(t);
         ctx.fill();
-        // Gem highlight
         ctx.beginPath();
         ctx.arc(mx - r * 0.3, my - r * 0.3, r * 0.35, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.fill();
       }
 
-      // Player dot (blinking white gem)
       const px = mmX + ((playerX - minX) / rangeX) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
       const py = mmY + ((playerY - minY) / rangeY) * (mmSize - MINI_DOT * dpr * 2) + MINI_DOT * dpr;
       if (blinkRef.current) {
@@ -607,18 +729,17 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
     }
 
     ctx.restore();
-  }, []);
+  }, [markVisited]);
 
   // ─── Animation loop ──────────────────────────────────────────────────────────
   useEffect(() => {
-    let frameCount  = 0;
-    let blinkCount  = 0;
+    let frameCount = 0;
+    let blinkCount = 0;
 
     const loop = () => {
       frameCount++;
       waterFrameRef.current = frameCount;
 
-      // Blink every ~30 frames (≈500ms at 60fps)
       blinkCount++;
       if (blinkCount >= 30) {
         blinkRef.current = !blinkRef.current;
@@ -647,7 +768,6 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [] }: 
 
     ro.observe(wrapper);
 
-    // Initial size
     const rect = wrapper.getBoundingClientRect();
     handleResize(Math.floor(rect.width), Math.floor(rect.height));
 
