@@ -6,9 +6,14 @@ interface Props {
   sendCommand: (command: string, payload?: unknown) => void;
 }
 
-function hpBar(current: number, max: number): string {
+function HpBar({ current, max, color }: { current: number; max: number; color: string }) {
   const pct = Math.round((current / Math.max(max, 1)) * 10);
-  return '█'.repeat(pct) + '░'.repeat(10 - pct);
+  return (
+    <>
+      <span style={{ color }}>{'\u2588'.repeat(pct)}</span>
+      <span style={{ color: '#222' }}>{'\u2588'.repeat(10 - pct)}</span>
+    </>
+  );
 }
 
 function elementColor(element: string): string {
@@ -41,9 +46,7 @@ function CombatantRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor
         {c.isDefeated && <span style={{ color: '#555', marginLeft: '6px' }}>DEFEATED</span>}
       </div>
       <div style={{ fontSize: '12px' }}>
-        <span style={{ color: c.isPlayerSide ? '#ff4444' : '#cc4444' }}>
-          {hpBar(c.currentHp, c.maxHp)}
-        </span>
+        <HpBar current={c.currentHp} max={c.maxHp} color={c.isPlayerSide ? '#ff4444' : '#cc4444'} />
         <span style={{ color: '#888', marginLeft: '4px' }}>{c.currentHp}/{c.maxHp}</span>
       </div>
     </div>

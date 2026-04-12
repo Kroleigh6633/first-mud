@@ -5,9 +5,14 @@ interface Props {
   currentTile: ZoneTile | null;
 }
 
-function makeBar(current: number, max: number, width: number, fillChar = '█', emptyChar = '░'): string {
+function Bar({ current, max, width, color }: { current: number; max: number; width: number; color: string }) {
   const filled = Math.round((current / Math.max(max, 1)) * width);
-  return fillChar.repeat(filled) + emptyChar.repeat(width - filled);
+  return (
+    <>
+      <span style={{ color }}>{'\u2588'.repeat(filled)}</span>
+      <span style={{ color: '#222' }}>{'\u2588'.repeat(width - filled)}</span>
+    </>
+  );
 }
 
 function weaveColor(state: WeaveState): string {
@@ -80,8 +85,7 @@ export default function StatusPanel({ player, currentTile }: Props) {
     );
   }
 
-  const hpBar = makeBar(player.currentHp, player.maxHp, 10);
-  const weaveBar = makeBar(player.weavePercent, 100, 10);
+  // Bars are rendered inline as JSX — see Bar component above.
 
   return (
     <div style={panelStyle}>
@@ -91,14 +95,14 @@ export default function StatusPanel({ player, currentTile }: Props) {
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>HP: </span>
-        <span style={{ color: '#ff4444' }}>{hpBar}</span>
+        <Bar current={player.currentHp} max={player.maxHp} width={10} color="#ff4444" />
         <span style={{ color: '#888888' }}> {player.currentHp}/{player.maxHp}</span>
       </div>
       <div style={{ marginBottom: '2px' }}>
         <span style={{ color: '#888888' }}>Weave </span>
         <span style={{ color: '#555555', fontSize: '10px' }}>(mana)</span>
         <span style={{ color: '#888888' }}>: </span>
-        <span style={{ color: weaveColor(player.weaveState) }}>{weaveBar}</span>
+        <Bar current={player.weavePercent} max={100} width={10} color={weaveColor(player.weaveState)} />
         <span style={{ color: '#888888' }}> {player.weavePercent}%</span>
       </div>
       <div style={{ marginBottom: '2px' }}>
