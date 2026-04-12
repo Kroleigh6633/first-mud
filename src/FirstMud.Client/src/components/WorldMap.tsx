@@ -90,16 +90,34 @@ export default function WorldMap({ worldState, zoneTiles }: Props) {
         }
       }
 
-      // Draw real zone tiles
+      // Draw real zone tiles — each zone covers a 3×3 area with its
+      // symbol at the center and dim dots around the perimeter so the
+      // player can see the walkable zone boundaries.
       for (const tile of zoneTiles) {
+        const [fg] = tileColor(tile);
+        const dimFg = fg + '44'; // 25% alpha
+        const dimBg = '#111111';
+
+        // Draw surrounding 3×3 halo (excluding center)
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const sx = tile.x + dx - offsetX;
+            const sy = tile.y + dy - offsetY;
+            if (sx >= 0 && sx < MAP_WIDTH && sy >= 0 && sy < MAP_HEIGHT) {
+              display.draw(sx, sy, '\u00b7', dimFg, dimBg); // middle dot ·
+            }
+          }
+        }
+
+        // Draw center symbol
         const screenX = tile.x - offsetX;
         const screenY = tile.y - offsetY;
         if (
           screenX >= 0 && screenX < MAP_WIDTH &&
           screenY >= 0 && screenY < MAP_HEIGHT
         ) {
-          const [fg, bg] = tileColor(tile);
-          display.draw(screenX, screenY, tile.asciiSymbol, fg, bg);
+          display.draw(screenX, screenY, tile.asciiSymbol, fg, '#0d0d0d');
         }
       }
 

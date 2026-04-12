@@ -24,8 +24,25 @@ interface Props {
   playerId: string | null;
 }
 
+/**
+ * Finds the zone tile the player is standing in. Each zone occupies a 3×3
+ * area centered on its grid coordinate — so the player doesn't have to
+ * land on the exact pixel. Exact matches take priority; then within-1.
+ */
 function findTileAt(tiles: ZoneTile[], x: number, y: number): ZoneTile | null {
-  return tiles.find(t => t.x === x && t.y === y) ?? null;
+  const exact = tiles.find(t => t.x === x && t.y === y);
+  if (exact) return exact;
+  let best: ZoneTile | null = null;
+  let bestDist = Infinity;
+  for (const t of tiles) {
+    const dx = Math.abs(t.x - x);
+    const dy = Math.abs(t.y - y);
+    if (dx <= 1 && dy <= 1) {
+      const dist = dx + dy;
+      if (dist < bestDist) { bestDist = dist; best = t; }
+    }
+  }
+  return best;
 }
 
 export default function GameTerminal({
