@@ -100,7 +100,7 @@ public class MoveCommandHandler(
 
         var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
-        var activeCompanions = new List<Domain.Entities.Companion>();
+        var activeCompanions = new List<Companion>();
         foreach (var compId in player.ActiveCompanionIds)
         {
             var comp = await companionRepository.GetByIdAsync(compId, ct);

@@ -730,8 +730,16 @@ public class AutoFarmCommandHandler(
                 autoFarmService.SetState(playerId, "fighting");
                 await BroadcastStatusAsync(playerId, session, "fighting", biome, dangerLevel, farmCt);
 
+                var farmActiveCompanions = new List<Companion>();
+                foreach (var compId in freshPlayer.ActiveCompanionIds)
+                {
+                    var comp = await companionRepo.GetByIdAsync(compId, farmCt);
+                    if (comp != null && !comp.IsPermanentlyGone)
+                        farmActiveCompanions.Add(comp);
+                }
+
                 var encounter = await combatSvc.StartEncounterAsync(
-                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, [], monsters, ct: farmCt);
+                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, farmActiveCompanions, monsters, ct: farmCt);
 
                 var encounterCategory = CombatHelpers.GetCombatDifficultyCategory(avgMonsterLevel, freshPlayer.Level);
                 await hubContext.Clients
