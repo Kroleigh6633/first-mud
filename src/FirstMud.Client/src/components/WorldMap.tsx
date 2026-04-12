@@ -551,7 +551,8 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
           ? 0.65 + 0.35 * (1 - (distToPlayer - fadeStart) / (fadeEnd - fadeStart))
           : 0.65;
       } else {
-        fogAlpha = 0.15; // unvisited — dark and mysterious
+        // Unvisited — draw terrain dimmed so it looks mysterious, not like a wall
+        fogAlpha = 0.38;
       }
 
       ctx.save();
@@ -637,7 +638,44 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       }
 
       // ── Fog overlay for unvisited tiles ────────────────────────────────────
-      // Already handled by globalAlpha above; restore before drawing NPCs/player
+      if (!isVisible && !isVisited) {
+        // Check if adjacent to any visited tile for edge-gradient effect
+        const adjToVisited =
+          visited.has(`${gx - 1},${gy}`) || visited.has(`${gx + 1},${gy}`) ||
+          visited.has(`${gx},${gy - 1}`) || visited.has(`${gx},${gy + 1}`) ||
+          visited.has(`${gx - 1},${gy - 1}`) || visited.has(`${gx + 1},${gy - 1}`) ||
+          visited.has(`${gx - 1},${gy + 1}`) || visited.has(`${gx + 1},${gy + 1}`);
+
+        // Warm grey fog overlay — softer at edges, denser further in
+        const fogOverlayAlpha = adjToVisited ? 0.40 : 0.70;
+
+        ctx.globalAlpha = fogOverlayAlpha;
+        ctx.beginPath();
+        ctx.moveTo(sx,              sy - tileH / 2);
+        ctx.lineTo(sx + tileW / 2,  sy);
+        ctx.lineTo(sx,              sy + tileH / 2);
+        ctx.lineTo(sx - tileW / 2,  sy);
+        ctx.closePath();
+        ctx.fillStyle = '#3a3530';
+        ctx.fill();
+
+        // Scatter subtle "?" hints on non-edge fog tiles to invite exploration
+        if (!adjToVisited) {
+          // Use tile coords as a stable pseudo-random seed
+          const seed = ((gx * 374761393 + gy * 668265263) >>> 0) % 1000;
+          if (seed < 80) { // ~8% of deep-fog tiles get a hint
+            ctx.globalAlpha = 0.28;
+            ctx.font = `bold ${7 * dpr}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#c8b89a';
+            ctx.fillText('?', sx, sy - tileH * 0.08);
+          }
+        }
+
+        ctx.globalAlpha = 1.0;
+      }
+
       ctx.restore();
 
       // ── NPCs on this tile ──────────────────────────────────────────────────
