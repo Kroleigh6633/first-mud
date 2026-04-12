@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.ValueObjects;
 
@@ -37,9 +38,25 @@ public class Item
     public int Quantity { get; private set; } = 1;
     public bool IsStackable => Category == ItemCategory.Component || Category == ItemCategory.Reagent;
 
-    // Imbuing — applied imbues stored as JSON column
-    private readonly List<AppliedImbue> _imbues = [];
-    public IReadOnlyList<AppliedImbue> Imbues => _imbues.AsReadOnly();
+    // Imbuing — applied imbues persisted as a JSON string column; exposed via List<AppliedImbue>
+    // EF maps this property directly; the Imbues accessor deserializes on demand.
+    public string ImbuesJson { get; private set; } = "[]";
+
+    private List<AppliedImbue>? _imbuesCache;
+    private List<AppliedImbue> ImbuesList
+    {
+        get
+        {
+            if (_imbuesCache is null)
+                _imbuesCache = JsonSerializer.Deserialize<List<AppliedImbue>>(ImbuesJson) ?? [];
+            return _imbuesCache;
+        }
+    }
+
+    public IReadOnlyList<AppliedImbue> Imbues => ImbuesList.AsReadOnly();
+
+    private void FlushImbues() =>
+        ImbuesJson = JsonSerializer.Serialize(ImbuesList);
 
     public bool IsUnstable { get; private set; }
 
@@ -54,7 +71,7 @@ public class Item
     };
 
     /// <summary>True when more imbues have been applied than the item's MaxImbueSlots.</summary>
-    public bool IsOverimbued => _imbues.Count > MaxImbueSlots;
+    public bool IsOverimbued => ImbuesList.Count > MaxImbueSlots;
 
     private Item() { }
 
@@ -145,7 +162,8 @@ public class Item
     /// </summary>
     public void ApplyImbue(ImbueType type, float power)
     {
-        _imbues.Add(new AppliedImbue(type, power));
+        ImbuesList.Add(new AppliedImbue(type, power));
+        FlushImbues();
         IsWyrdTouched = true;
         if (IsOverimbued)
             IsUnstable = true;
@@ -154,9 +172,10 @@ public class Item
     /// <summary>Removes a random imbue — used on catastrophic failure / instability decay.</summary>
     public void RemoveRandomImbue()
     {
-        if (_imbues.Count == 0) return;
-        var index = Random.Shared.Next(_imbues.Count);
-        _imbues.RemoveAt(index);
+        if (ImbuesList.Count == 0) return;
+        var index = Random.Shared.Next(ImbuesList.Count);
+        ImbuesList.RemoveAt(index);
+        FlushImbues();
         // Re-evaluate stability: no longer overimbued → stable again
         if (!IsOverimbued)
             IsUnstable = false;

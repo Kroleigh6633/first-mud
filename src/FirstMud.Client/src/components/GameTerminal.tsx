@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
@@ -11,6 +11,7 @@ import InventoryPanel from './InventoryPanel';
 import StoragePanel from './StoragePanel';
 import CharacterSheet from './CharacterSheet';
 import CombatPanel from './CombatPanel';
+import CompanionPanel from './CompanionPanel';
 import { useKeyboard } from '../hooks/useKeyboard';
 
 interface Props {
@@ -32,6 +33,7 @@ interface Props {
   equipment: EquipmentSlots;
   capturedCompanions?: unknown[];
   wanderingNpcs?: WanderingNpc[];
+  companionRoster?: CompanionState[];
 }
 
 /**
@@ -72,6 +74,7 @@ export default function GameTerminal({
   autoFarmStatus,
   equipment,
   wanderingNpcs = [],
+  companionRoster = [],
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
@@ -79,6 +82,7 @@ export default function GameTerminal({
   const [showInventory, setShowInventory] = useState(false);
   const [showCharSheet, setShowCharSheet] = useState(false);
   const [showStorage, setShowStorage] = useState(false);
+  const [showCompanions, setShowCompanions] = useState(false);
 
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
@@ -190,12 +194,17 @@ export default function GameTerminal({
           setShowStorage(prev => !prev);
         }
         break;
+      case 'companions':
+        sendCommand('viewcompanions', null);
+        setShowCompanions(prev => !prev);
+        break;
       case 'escape':
         setShowHelp(false);
         setShowQuestLog(false);
         setShowInventory(false);
         setShowCharSheet(false);
         setShowStorage(false);
+        setShowCompanions(false);
         break;
       case 'pass':
         appendMessage({
@@ -369,6 +378,14 @@ export default function GameTerminal({
           onDeposit={handleDeposit}
           onWithdraw={handleWithdraw}
           onClose={() => setShowStorage(false)}
+        />
+      )}
+      {showCompanions && (
+        <CompanionPanel
+          companions={companionRoster}
+          onActivate={(id) => sendCommand('activatecompanion', { companionId: id })}
+          onDeactivate={(id) => sendCommand('deactivatecompanion', { companionId: id })}
+          onClose={() => setShowCompanions(false)}
         />
       )}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}

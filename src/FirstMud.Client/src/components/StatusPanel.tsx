@@ -1,4 +1,4 @@
-import type { PlayerState, WeaveState, ReputationTier, ZoneTile, EquipmentSlots } from '../types/game';
+import type { PlayerState, WeaveState, ReputationTier, ZoneTile, EquipmentSlots, CompanionState, MagicElement, CompanionType } from '../types/game';
 
 interface Props {
   player: PlayerState | null;
@@ -52,6 +52,60 @@ function dangerColor(level: number): string {
   if (level <= 3) return '#00bb33';
   if (level <= 6) return '#ccaa00';
   return '#cc2200';
+}
+
+function companionElementColor(element: MagicElement): string {
+  switch (element) {
+    case 'Fire':   return '#ff6633';
+    case 'Water':  return '#33aaff';
+    case 'Earth':  return '#88bb44';
+    case 'Air':    return '#ccddff';
+    case 'Aether': return '#cc88ff';
+  }
+}
+
+function companionTypeIcon(type: CompanionType): string {
+  switch (type) {
+    case 'Wildfolk':         return '~';
+    case 'CapturedMonster':  return '#';
+    case 'ArdweldConstruct': return '[';
+    case 'HiredHero':        return 'H';
+    case 'BoundShade':       return '@';
+  }
+}
+
+function LayerStars({ layer }: { layer: number }) {
+  return (
+    <span>
+      {Array.from({ length: 6 }, (_, i) => (
+        <span key={i} style={{ color: i < layer ? '#ffcc00' : '#222222', fontSize: '10px' }}>★</span>
+      ))}
+    </span>
+  );
+}
+
+function CompanionRow({ companion }: { companion: CompanionState }) {
+  const isDrifting = companion.driftAccumulator >= 30;
+  const isDanger   = companion.driftAccumulator >= 40;
+  return (
+    <div style={{ marginBottom: '4px', fontSize: '11px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ color: companionElementColor(companion.element) }}>
+          [{companionTypeIcon(companion.type)}]
+        </span>
+        <span style={{ color: '#00ccff' }}>{companion.name}</span>
+        <LayerStars layer={companion.currentLayer} />
+        {isDrifting && (
+          <span style={{ color: isDanger ? '#ff4444' : '#ff8800', fontSize: '10px' }}>
+            {isDanger ? '⚠ DANGER' : '⚠ Drifting!'}
+          </span>
+        )}
+      </div>
+      <div style={{ color: '#555555', paddingLeft: '4px' }}>
+        Lv.{companion.level} {companion.type} · L{companion.currentLayer}
+      </div>
+    </div>
+  );
 }
 
 export default function StatusPanel({ player, currentTile, equipment }: Props) {
@@ -179,12 +233,14 @@ export default function StatusPanel({ player, currentTile, equipment }: Props) {
         </div>
       ))}
 
-      <div style={sectionHeaderStyle}>Companions</div>
-      {player.activeCompanionIds.length === 0 ? (
-        <div style={{ color: '#888888', fontSize: '11px' }}>None</div>
+      <div style={sectionHeaderStyle}>Companions <span style={{ color: '#555555', fontWeight: 'normal' }}>[B]</span></div>
+      {(player.activeCompanions?.length ?? 0) === 0 ? (
+        <div style={{ color: '#888888', fontSize: '11px' }}>
+          {player.activeCompanionIds.length === 0 ? 'None active' : `${player.activeCompanionIds.length} active`}
+        </div>
       ) : (
-        player.activeCompanionIds.map(id => (
-          <div key={id} style={{ color: '#00ccff', fontSize: '11px' }}>{id}</div>
+        player.activeCompanions!.map(companion => (
+          <CompanionRow key={companion.id} companion={companion} />
         ))
       )}
 

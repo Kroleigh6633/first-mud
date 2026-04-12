@@ -104,6 +104,11 @@ export interface ZoneView {
   tiles: ZoneTile[];
 }
 
+export interface AppliedImbue {
+  type: string;
+  power: number;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -114,6 +119,9 @@ export interface InventoryItem {
   quantity?: number;
   isStackable?: boolean;
   isLocked?: boolean;
+  isUnstable?: boolean;
+  maxImbueSlots?: number;
+  imbues?: AppliedImbue[];
 }
 
 export type EquipmentSlotName =
@@ -173,6 +181,7 @@ export interface CombatUpdate {
   combatants: CombatantState[];
   currentActorId: string;
   round: number;
+  lastActionText?: string;
 }
 
 export interface InventorySnapshot {

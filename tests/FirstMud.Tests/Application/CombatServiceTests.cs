@@ -113,15 +113,31 @@ public class CombatServiceTests
         int enemyHpBefore = enemyCombatant.CurrentHp;
 
         // Make sure the current actor is the player combatant
-        // Player speed = 10 (from Player.Create), enemy speed = 6 → player goes first
+        // Player speed = 11 (Fire archetype), enemy speed = 6 → player goes first
         encounter.CurrentActor!.Id.Should().Be(playerCombatant.Id);
 
-        var (success, _, updated) = await svc.ExecuteActionAsync(
-            encounter.Id, playerCombatant.Id, "Weave Bolt", enemyCombatant.Id);
+        // Attempt multiple times to account for miss/dodge probability
+        bool damageDealt = false;
+        for (int attempt = 0; attempt < 20 && !damageDealt; attempt++)
+        {
+            // Re-create encounter if turn has advanced (enemy is now actor)
+            if (encounter.CurrentActor?.Id != playerCombatant.Id)
+            {
+                encounter = await svc.StartEncounterAsync(player.Id, Guid.NewGuid(), player, [], new[] { BasicMonster() });
+                playerCombatant = encounter.Combatants.First(c => c.IsPlayerSide);
+                enemyCombatant = encounter.Combatants.First(c => !c.IsPlayerSide);
+            }
 
-        success.Should().BeTrue();
-        // Damage = (25 + 1*2) * 1.5 = 40.5 → 40; enemy hp should drop
-        enemyCombatant.CurrentHp.Should().BeLessThan(enemyHpBefore);
+            var (success, _, _) = await svc.ExecuteActionAsync(
+                encounter.Id, playerCombatant.Id, "Weave Bolt", enemyCombatant.Id);
+
+            success.Should().BeTrue();
+            if (enemyCombatant.CurrentHp < enemyHpBefore)
+                damageDealt = true;
+        }
+
+        // Over 20 attempts at ~88% hit rate, probability of zero damage is negligible (<0.04%)
+        damageDealt.Should().BeTrue("expected at least one Weave Bolt to connect and deal damage");
     }
 
     // -------------------------------------------------------------------------

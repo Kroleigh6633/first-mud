@@ -1,7 +1,5 @@
-using System.Text.Json;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
-using FirstMud.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -81,5 +79,18 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
             .HasColumnName("OwnerId");
 
         builder.HasIndex(i => i.OwnerId);
+
+        // Imbuing
+        builder.Property(i => i.IsUnstable)
+            .HasDefaultValue(false);
+
+        builder.Property(i => i.ImbuesJson)
+            .HasColumnName("Imbues")
+            .HasDefaultValue("[]");
+
+        // Computed/derived — not stored in DB
+        builder.Ignore(i => i.Imbues);
+        builder.Ignore(i => i.MaxImbueSlots);
+        builder.Ignore(i => i.IsOverimbued);
     }
 }

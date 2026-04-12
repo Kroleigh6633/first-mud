@@ -168,6 +168,24 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
           </div>
         )}
 
+        {/* Last action text */}
+        {!isOver && combat.lastActionText && (
+          <div style={{
+            padding: '6px 14px',
+            borderBottom: '1px solid #1a1a1a',
+            textAlign: 'center',
+            fontSize: '12px',
+            color: combat.lastActionText.startsWith('CRITICAL')
+              ? '#ffcc00'
+              : combat.lastActionText.includes('miss') || combat.lastActionText.includes('dodged')
+                ? '#888888'
+                : '#cccccc',
+            fontStyle: 'italic',
+          }}>
+            {combat.lastActionText}
+          </div>
+        )}
+
         {/* Enemies — clickable for target selection */}
         <div style={{ padding: '4px 0' }}>
           <div style={{

@@ -105,17 +105,12 @@ public class CombatHelpers(
                     targetName = enemy?.Name ?? "enemy";
                 }
 
-                var (cSuccess, _, _) = await combatService.ExecuteActionAsync(
+                var (cSuccess, cNarration, _) = await combatService.ExecuteActionAsync(
                     encounter.Id, actor.Id, chosenAbility.Name, targetId, ct);
                 if (!cSuccess) break;
 
                 string narrative;
-                if (chosenAbility.Category is AbilityCategory.Heal or AbilityCategory.Revive)
-                {
-                    int heal = chosenAbility.BasePower + actor.Level * 2;
-                    narrative = $"{actor.Name} uses {chosenAbility.Name} on {targetName}, restoring {heal} HP.";
-                }
-                else if (chosenAbility.Category == AbilityCategory.Buff)
+                if (chosenAbility.Category == AbilityCategory.Buff)
                 {
                     narrative = $"{actor.Name} uses {chosenAbility.Name}! The party is bolstered.";
                 }
@@ -123,17 +118,14 @@ public class CombatHelpers(
                 {
                     narrative = $"{actor.Name} uses {chosenAbility.Name} on {targetName}! They falter.";
                 }
+                else if (!string.IsNullOrEmpty(cNarration))
+                {
+                    // Use the narration returned by ExecuteActionAsync (hit/miss/dodge/crit/heal)
+                    narrative = cNarration;
+                }
                 else
                 {
-                    int rawPower = chosenAbility.BasePower + actor.Level * 2;
-                    // Get target element for multiplier display
-                    var targetCombatant = encounter.Combatants.FirstOrDefault(c => c.Id == targetId);
-                    float mult = targetCombatant is not null
-                        ? ElementMatchup.GetMultiplier(chosenAbility.Element, targetCombatant.Element)
-                        : 1f;
-                    int dmg = (int)(rawPower * mult);
-                    var multLabel = mult > 1f ? " (super effective!)" : mult < 1f ? " (resisted)" : "";
-                    narrative = $"{actor.Name} uses {chosenAbility.Name} on {targetName} for {dmg} damage{multLabel}.";
+                    narrative = $"{actor.Name} acts.";
                 }
 
                 await notificationService.SendMessageAsync(playerId, "combat", narrative, ct);
@@ -151,20 +143,15 @@ public class CombatHelpers(
             if (targets.Count == 0) break;
             var target = targets[Random.Shared.Next(targets.Count)];
 
-            var (eSuccess, _, _) = await combatService.ExecuteActionAsync(
+            var (eSuccess, eNarration, _) = await combatService.ExecuteActionAsync(
                 encounter.Id, actor.Id, enemyAbility.Name, target.Id, ct);
             if (!eSuccess) break;
 
-            int ePower = enemyAbility.BasePower + actor.Level * 2;
-            float eMult = ElementMatchup.GetMultiplier(enemyAbility.Element, target.Element);
-            int eDmg = (int)(ePower * eMult);
-            var eMultLabel = eMult > 1f ? " (super effective!)" : eMult < 1f ? " (resisted)" : "";
+            var eNarrText = !string.IsNullOrEmpty(eNarration)
+                ? eNarration
+                : $"{actor.Name} uses {enemyAbility.Name} on {target.Name}.";
 
-            await notificationService.SendMessageAsync(
-                playerId,
-                "combat",
-                $"{actor.Name} uses {enemyAbility.Name} on {target.Name} for {eDmg} damage{eMultLabel}.",
-                ct);
+            await notificationService.SendMessageAsync(playerId, "combat", eNarrText, ct);
         }
 
         // Clean up buff tracking when encounter ends
@@ -494,7 +481,7 @@ public class CombatHelpers(
     // DTO builder
     // -------------------------------------------------------------------------
 
-    public static CombatUpdateDto BuildCombatUpdateDto(Encounter encounter)
+    public static CombatUpdateDto BuildCombatUpdateDto(Encounter encounter, string? lastActionText = null)
     {
         var combatantDtos = encounter.Combatants
             .Select(c => new CombatantDto(
@@ -520,6 +507,7 @@ public class CombatHelpers(
             encounter.State.ToString(),
             combatantDtos,
             encounter.CurrentActor?.Id ?? Guid.Empty,
-            encounter.RoundNumber);
+            encounter.RoundNumber,
+            lastActionText);
     }
 }

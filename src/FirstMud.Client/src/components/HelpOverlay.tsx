@@ -42,6 +42,7 @@ const SECTIONS: Section[] = [
       { keys: ['I'], description: 'open inventory' },
       { keys: ['C'], description: 'character sheet' },
       { keys: ['V'], description: 'open homestead storage vault (at homestead only)' },
+      { keys: ['B'], description: 'open companion panel — manage your party of 3' },
       { keys: ['?', 'H'], description: 'open / close this help menu' },
       { keys: ['Esc'], description: 'close any open panel / cancel auto-farm' },
     ],

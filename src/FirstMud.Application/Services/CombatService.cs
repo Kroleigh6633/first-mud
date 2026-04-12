@@ -63,10 +63,9 @@ public class CombatService
         // Imbue bonuses from equipped weapon (melee, ranged, or focus)
         var equippedWeapon = mw ?? rw ?? fc;
         int elementalImbueBonus = 0;
-        bool hasRestorationImbue = false;
-        float restorationPower   = 0f;
-        bool hasWyrdImbue        = false;
-        float wyrdPower          = 0f;
+        float restorationPower  = 0f;
+        bool hasWyrdImbue       = false;
+        float wyrdPower         = 0f;
 
         if (equippedWeapon is not null)
         {
@@ -82,7 +81,6 @@ public class CombatService
                         elementalImbueBonus += (int)(18 * imbue.Power);
                         break;
                     case Domain.Enums.ImbueType.Restoration:
-                        hasRestorationImbue = true;
                         restorationPower = Math.Max(restorationPower, imbue.Power);
                         break;
                     case Domain.Enums.ImbueType.Wyrd:

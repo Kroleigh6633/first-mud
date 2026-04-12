@@ -79,7 +79,7 @@ public class UseCombatAbilityCommandHandler(
             await combatHelpers.TryCaptureCompanionAsync(cmd.PlayerId, updated, ct);
         }
 
-        var dto = CombatHelpers.BuildCombatUpdateDto(updated);
+        var dto = CombatHelpers.BuildCombatUpdateDto(updated, message);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
