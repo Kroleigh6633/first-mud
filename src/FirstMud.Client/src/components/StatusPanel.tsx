@@ -64,10 +64,29 @@ const FACTIONS = [
   'Ashen Court',
 ];
 
-function dangerColor(level: number): string {
-  if (level <= 3) return '#00bb33';
-  if (level <= 6) return '#ccaa00';
-  return '#cc2200';
+/** Matches difficultyBorderColor in WorldMap.tsx — relative to player level */
+function dangerColor(dangerLevel: number, playerLevel: number): string {
+  const diff = dangerLevel - playerLevel;
+  if (diff <= -3) return '#44aa44';
+  if (diff === -2) return '#66bb44';
+  if (diff === -1) return '#88cc44';
+  if (diff ===  0) return '#cccc44';
+  if (diff ===  1) return '#ddaa33';
+  if (diff ===  2) return '#dd7722';
+  if (diff ===  3) return '#cc4422';
+  if (diff ===  4) return '#cc2222';
+  if (diff ===  5) return '#881111';
+  return '#440808';
+}
+
+function difficultyLabel(dangerLevel: number, playerLevel: number): string {
+  const diff = dangerLevel - playerLevel;
+  if (diff <= -3) return 'trivial';
+  if (diff <= -1) return 'easy';
+  if (diff ===  0) return 'fair';
+  if (diff <=  2) return 'challenging';
+  if (diff <=  4) return 'dangerous';
+  return 'deadly';
 }
 
 function companionElementColor(element: MagicElement): string {
@@ -207,8 +226,11 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
           </div>
           <div style={{ marginBottom: '2px' }}>
             <span style={{ color: '#888888' }}>Danger: </span>
-            <span style={{ color: dangerColor(currentTile.dangerLevel) }}>
+            <span style={{ color: dangerColor(currentTile.dangerLevel, player.level) }}>
               {currentTile.dangerLevel}/10
+            </span>
+            <span style={{ color: dangerColor(currentTile.dangerLevel, player.level), marginLeft: '6px', fontSize: '11px' }}>
+              ({difficultyLabel(currentTile.dangerLevel, player.level)})
             </span>
             {currentTile.isPortalZone && (
               <span style={{ color: '#cc88ff', marginLeft: '8px' }}>◈ portal</span>
@@ -231,8 +253,11 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
                 </div>
                 <div style={{ marginBottom: '2px' }}>
                   <span style={{ color: '#888888' }}>Danger: </span>
-                  <span style={{ color: dangerColor(biome.dangerEstimate) }}>
+                  <span style={{ color: dangerColor(biome.dangerEstimate, player.level) }}>
                     {biome.dangerEstimate}/10
+                  </span>
+                  <span style={{ color: dangerColor(biome.dangerEstimate, player.level), marginLeft: '6px', fontSize: '11px' }}>
+                    ({difficultyLabel(biome.dangerEstimate, player.level)})
                   </span>
                 </div>
               </>

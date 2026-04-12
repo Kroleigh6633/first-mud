@@ -6,6 +6,7 @@ using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using Microsoft.AspNetCore.SignalR;
+using System.Text.RegularExpressions;
 
 namespace FirstMud.GameServer.Handlers;
 
