@@ -7,6 +7,7 @@ interface Props {
   onClose: () => void;
   sendCommand: (command: string, payload?: unknown) => void;
   atHomestead?: boolean;
+  hasSalvager?: boolean;
 }
 
 const overlayStyle: React.CSSProperties = {
@@ -139,6 +140,17 @@ const storeBtnStyle: React.CSSProperties = {
   background: 'none',
   border: '1px solid #ccaa00',
   color: '#ccaa00',
+  fontFamily: 'monospace',
+  fontSize: '11px',
+  padding: '1px 6px',
+  cursor: 'pointer',
+  marginLeft: '6px',
+};
+
+const queueSalvageBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: '1px solid #888844',
+  color: '#aaa844',
   fontFamily: 'monospace',
   fontSize: '11px',
   padding: '1px 6px',
@@ -289,7 +301,7 @@ function isEquipped(itemId: string, equipment: EquipmentSlots): boolean {
     || equipment.accessoryId === itemId;
 }
 
-export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand, atHomestead = false }: Props) {
+export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand, atHomestead = false, hasSalvager = false }: Props) {
   // imbuingItemId: the item currently waiting for a taper selection (null = none)
   const [imbuingItemId, setImbuingItemId] = useState<string | null>(null);
 
@@ -299,6 +311,10 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
 
   const handleSalvage = (itemId: string) => {
     sendCommand('salvage', { itemId });
+  };
+
+  const handleQueueSalvage = (itemId: string) => {
+    sendCommand('queuesalvage', { itemId });
   };
 
   const handleImbue = (itemId: string, taperId: string) => {
@@ -682,16 +698,29 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                         ? `Skill too low (need skill to reach W${item.workmanship})`
                         : undefined;
                       return (
-                        <button
-                          type="button"
-                          style={disabled ? salvageBtnDisabledStyle : salvageBtnStyle}
-                          onClick={() => !disabled && handleSalvage(item.id)}
-                          disabled={disabled}
-                          title={titleText}
-                          aria-label={`salvage ${item.name}`}
-                        >
-                          salvage
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            style={disabled ? salvageBtnDisabledStyle : salvageBtnStyle}
+                            onClick={() => !disabled && handleSalvage(item.id)}
+                            disabled={disabled}
+                            title={titleText}
+                            aria-label={`salvage ${item.name}`}
+                          >
+                            salvage
+                          </button>
+                          {hasSalvager && !locked && (
+                            <button
+                              type="button"
+                              style={queueSalvageBtnStyle}
+                              onClick={() => handleQueueSalvage(item.id)}
+                              title="Add to homestead salvage queue (Salvager companion will process it)"
+                              aria-label={`queue ${item.name} for homestead salvage`}
+                            >
+                              queue
+                            </button>
+                          )}
+                        </>
                       );
                     })()}
                   </span>

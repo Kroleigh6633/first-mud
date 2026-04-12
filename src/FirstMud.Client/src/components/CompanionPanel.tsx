@@ -388,7 +388,7 @@ export default function CompanionPanel({ companions, onActivate, onDeactivate, o
           const abilitiesForType = ABILITY_LABELS[companion.type] ?? ABILITY_LABELS.Wildfolk;
           const unlockedAbilities = abilitiesForType.slice(0, companion.currentLayer);
           const isOnDuty = !!companion.assignedDuty && !companion.isActive;
-          const canShowDutyPanel = !companion.isActive && !companion.IsPermanentlyGone;
+          const canShowDutyPanel = !companion.isActive;
 
           return (
             <div key={companion.id} style={cardStyle(companion.isActive, isOnDuty)}>

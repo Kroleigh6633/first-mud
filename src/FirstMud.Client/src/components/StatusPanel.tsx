@@ -4,6 +4,7 @@ interface Props {
   player: PlayerState | null;
   currentTile: ZoneTile | null;
   equipment?: EquipmentSlots;
+  companionRoster?: CompanionState[];
 }
 
 function Bar({ current, max, width, color }: { current: number; max: number; width: number; color: string }) {
@@ -108,7 +109,7 @@ function CompanionRow({ companion }: { companion: CompanionState }) {
   );
 }
 
-export default function StatusPanel({ player, currentTile, equipment }: Props) {
+export default function StatusPanel({ player, currentTile, equipment, companionRoster = [] }: Props) {
   const panelStyle: React.CSSProperties = {
     padding: '8px 10px',
     fontFamily: 'monospace',
@@ -243,6 +244,23 @@ export default function StatusPanel({ player, currentTile, equipment }: Props) {
           <CompanionRow key={companion.id} companion={companion} />
         ))
       )}
+
+      {/* Homestead companions */}
+      {(() => {
+        const homesteadCompanions = companionRoster.filter(c => c.assignedDuty && !c.isActive);
+        if (homesteadCompanions.length === 0) return null;
+        return (
+          <div style={{ marginTop: '4px', fontSize: '11px' }}>
+            <div style={{ color: '#555555', fontSize: '10px', marginBottom: '3px' }}>HOMESTEAD DUTY</div>
+            {homesteadCompanions.map(c => (
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <span style={{ color: '#aaaaaa' }}>{c.name}</span>
+                <span style={{ color: '#ccaa44' }}>{c.assignedDuty}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       <div style={sectionHeaderStyle}>Portals</div>
       {player.unlockedPortals.length === 0 ? (

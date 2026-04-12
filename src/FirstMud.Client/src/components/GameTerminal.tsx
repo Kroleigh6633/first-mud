@@ -83,6 +83,7 @@ export default function GameTerminal({
   const [showCharSheet, setShowCharSheet] = useState(false);
   const [showStorage, setShowStorage] = useState(false);
   const [showCompanions, setShowCompanions] = useState(false);
+  const [statusCollapsed, setStatusCollapsed] = useState(false);
 
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
@@ -281,7 +282,7 @@ export default function GameTerminal({
 
         {/* Status panel */}
         <div style={{ overflow: 'hidden' }}>
-          <StatusPanel player={worldState?.player ?? null} currentTile={currentTile} equipment={equipment} />
+          <StatusPanel player={worldState?.player ?? null} currentTile={currentTile} equipment={equipment} companionRoster={companionRoster} />
         </div>
       </div>
 
@@ -365,6 +366,7 @@ export default function GameTerminal({
           onClose={() => setShowInventory(false)}
           sendCommand={sendCommand}
           atHomestead={atHomestead}
+          hasSalvager={companionRoster.some(c => c.assignedDuty === 'Salvager')}
         />
       )}
       {showCharSheet && (
@@ -386,6 +388,7 @@ export default function GameTerminal({
           onActivate={(id) => sendCommand('activatecompanion', { companionId: id })}
           onDeactivate={(id) => sendCommand('deactivatecompanion', { companionId: id })}
           onClose={() => setShowCompanions(false)}
+          sendCommand={sendCommand}
         />
       )}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
