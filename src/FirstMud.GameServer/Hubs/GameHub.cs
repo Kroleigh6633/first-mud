@@ -183,7 +183,12 @@ public class GameHub : Hub
 
             "openstorage" => new OpenStorageCommand(playerId),
 
-            "autofarm" => new AutoFarmCommand(playerId),
+            "autofarm" => new AutoFarmCommand(
+                playerId,
+                TryGetNullableIntFromNested(payload, "targetZone", "x"),
+                TryGetNullableIntFromNested(payload, "targetZone", "y"),
+                TryGetInt(payload, "maxDanger") is int md and > 0 ? md : 10,
+                TryGetString(payload, "priority") is string pr and { Length: > 0 } ? pr : "balanced"),
 
             "equip" => new EquipCommand(
                 playerId,
@@ -250,6 +255,18 @@ public class GameHub : Hub
 
             _ => null
         };
+    }
+
+    private static int? TryGetNullableIntFromNested(object? payload, string outerKey, string innerKey)
+    {
+        if (payload is not System.Text.Json.JsonElement el
+            || el.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !el.TryGetProperty(outerKey, out var outer)
+            || outer.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !outer.TryGetProperty(innerKey, out var prop)
+            || !prop.TryGetInt32(out var val))
+            return null;
+        return val;
     }
 
     private static int TryGetInt(object? payload, string key)

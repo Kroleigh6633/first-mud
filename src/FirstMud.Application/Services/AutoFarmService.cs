@@ -8,7 +8,11 @@ public enum FarmEncounterOutcome { Victory, Fled, Defeat }
 public record AutoFarmSession(
     Guid PlayerId,
     DateTimeOffset StartedAt,
-    CancellationTokenSource Cts)
+    CancellationTokenSource Cts,
+    int? TargetX = null,
+    int? TargetY = null,
+    int MaxDanger = 10,
+    string Priority = "balanced")
 {
     public int Kills { get; set; }
     public int ItemsFound { get; set; }
@@ -56,7 +60,12 @@ public class AutoFarmService
 
     public bool IsActive(Guid playerId) => _sessions.ContainsKey(playerId);
 
-    public AutoFarmSession StartSession(Guid playerId)
+    public AutoFarmSession StartSession(
+        Guid playerId,
+        int? targetX = null,
+        int? targetY = null,
+        int maxDanger = 10,
+        string priority = "balanced")
     {
         // Cancel any existing session first
         if (_sessions.TryGetValue(playerId, out var existing))
@@ -66,7 +75,7 @@ public class AutoFarmService
         }
 
         var cts = new CancellationTokenSource();
-        var session = new AutoFarmSession(playerId, DateTimeOffset.UtcNow, cts);
+        var session = new AutoFarmSession(playerId, DateTimeOffset.UtcNow, cts, targetX, targetY, maxDanger, priority);
         _sessions[playerId] = session;
         return session;
     }
@@ -153,7 +162,9 @@ public class AutoFarmService
         if (session.SafeDangerCapOverride.HasValue)
             return session.SafeDangerCapOverride.Value;
 
-        return Math.Clamp(playerLevel + 2 + session.StreakBonus, 0, 10);
+        // Player-specified MaxDanger acts as a hard upper bound
+        int computed = Math.Clamp(playerLevel + 2 + session.StreakBonus, 0, 10);
+        return Math.Min(computed, session.MaxDanger);
     }
 }
 

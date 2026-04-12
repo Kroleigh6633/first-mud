@@ -30,12 +30,21 @@ public class AutoFarmCommandHandler(
         if (player is null)
             return new CommandResult(false, "Player not found.");
 
-        var session = autoFarmService.StartSession(cmd.PlayerId);
+        var session = autoFarmService.StartSession(
+            cmd.PlayerId,
+            cmd.TargetX,
+            cmd.TargetY,
+            cmd.MaxDanger,
+            cmd.Priority);
+
+        var settingsDesc = cmd.Priority != "balanced" || cmd.TargetX.HasValue
+            ? $" [{cmd.Priority}{(cmd.TargetX.HasValue ? $", heading to ({cmd.TargetX},{cmd.TargetY})" : "")}]"
+            : string.Empty;
 
         await notificationService.SendMessageAsync(
             cmd.PlayerId,
             "system",
-            "Auto-farm started. Runs until stopped. Press [F] again to stop.",
+            $"Auto-farm started{settingsDesc}. Runs until stopped. Press [F] again to stop.",
             ct);
 
         await notificationService.SendEventAsync(cmd.PlayerId, "AutoFarmStatus",

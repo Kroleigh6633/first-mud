@@ -14,6 +14,8 @@ import CharacterSheet from './CharacterSheet';
 import CombatPanel from './CombatPanel';
 import CompanionPanel from './CompanionPanel';
 import CraftingPanel from './CraftingPanel';
+import AutoFarmPicker from './AutoFarmPicker';
+import type { AutoFarmSettings } from './AutoFarmPicker';
 import { useKeyboard } from '../hooks/useKeyboard';
 
 interface Props {
@@ -130,6 +132,7 @@ export default function GameTerminal({
   const [showStorage, setShowStorage] = useState(false);
   const [showCompanions, setShowCompanions] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
+  const [showAutoFarmPicker, setShowAutoFarmPicker] = useState(false);
   const [statusCollapsed, setStatusCollapsed] = useState(false);
   const [autoNavigating, setAutoNavigating] = useState(false);
 
@@ -304,7 +307,13 @@ export default function GameTerminal({
         sendCommand('harvest', null);
         break;
       case 'autofarm':
-        sendCommand('autofarm', null);
+        if (autoFarmRef.current?.active) {
+          // Already running — stop it
+          sendCommand('autofarm', null);
+        } else {
+          // Show the picker panel instead of immediately starting
+          setShowAutoFarmPicker(true);
+        }
         break;
       case 'storage':
         if (!atHomesteadRef.current) {
@@ -362,6 +371,7 @@ export default function GameTerminal({
         setShowStorage(false);
         setShowCompanions(false);
         setShowCrafting(false);
+        setShowAutoFarmPicker(false);
         break;
       case 'pass':
         appendMessage({
@@ -374,6 +384,17 @@ export default function GameTerminal({
   // Only re-run when keyAction or the stable callbacks change — NOT when
   // atHomestead / autoFarmStatus / currentTile change (read via refs).
   }, [keyAction, sendCommand, fetchAvailableQuests, appendMessage]);
+
+  const handleAutoFarmStart = (settings: AutoFarmSettings) => {
+    setShowAutoFarmPicker(false);
+    sendCommand('autofarm', {
+      targetZone: settings.targetZone
+        ? { x: settings.targetZone.x, y: settings.targetZone.y }
+        : null,
+      maxDanger: settings.maxDanger,
+      priority: settings.priority,
+    });
+  };
 
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
@@ -687,6 +708,16 @@ export default function GameTerminal({
         />
       )}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
+      {showAutoFarmPicker && (
+        <AutoFarmPicker
+          zoneTiles={zoneTiles}
+          playerLevel={worldState?.player?.level ?? 1}
+          autoSalvageWeaponThreshold={inventory?.autoSalvageWeaponThreshold ?? 0}
+          autoSalvageArmorThreshold={inventory?.autoSalvageArmorThreshold ?? 0}
+          onStart={handleAutoFarmStart}
+          onCancel={() => setShowAutoFarmPicker(false)}
+        />
+      )}
     </div>
   );
 }

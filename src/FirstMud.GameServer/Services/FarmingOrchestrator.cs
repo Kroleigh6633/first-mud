@@ -311,6 +311,51 @@ public class FarmingOrchestrator(
                     originX = player.Position.X;
                     originY = player.Position.Y;
                     originSet = true;
+
+                    // If the player specified a target zone, navigate there first
+                    if (session.TargetX.HasValue && session.TargetY.HasValue)
+                    {
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category  = "system",
+                                text      = $"Auto-farm: heading to target zone ({session.TargetX}, {session.TargetY})..."
+                            }, farmCt);
+                    }
+                }
+
+                // --- TARGET ZONE NAVIGATION: step toward target until within 2 tiles ---
+                if (session.TargetX.HasValue && session.TargetY.HasValue)
+                {
+                    int distX = Math.Abs(session.TargetX.Value - player.Position.X);
+                    int distY = Math.Abs(session.TargetY.Value - player.Position.Y);
+                    if (distX > 2 || distY > 2)
+                    {
+                        // Walk directly toward target, ignoring spiral
+                        int tdx = Math.Sign(session.TargetX.Value - player.Position.X);
+                        int tdy = Math.Sign(session.TargetY.Value - player.Position.Y);
+                        var targetPos = new Position(
+                            player.Position.World,
+                            player.Position.ZoneId,
+                            player.Position.X + tdx,
+                            player.Position.Y + tdy);
+                        player.Move(targetPos);
+                        await playerRepo.UpdateAsync(player, farmCt);
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("PlayerMoved", new
+                            {
+                                player.Id,
+                                X = targetPos.X,
+                                Y = targetPos.Y,
+                                ZoneId = targetPos.ZoneId,
+                                World = targetPos.World.ToString()
+                            }, farmCt);
+                        await BroadcastStatusAsync(playerId, session, "walking", "path", 0, farmCt);
+                        continue;
+                    }
                 }
 
                 // --- WALK ONE STEP in the spiral (adaptive danger-aware) ---
@@ -416,7 +461,9 @@ public class FarmingOrchestrator(
                     await walkHelpers.UpdateCompanionUsageAsync(playerId, 1, farmCt);
                 }
 
-                // --- HARVEST resource nodes ---
+                // --- HARVEST resource nodes (skipped for combat-only priority) ---
+                if (session.Priority != "combat")
+                {
                 try
                 {
                     var harvestZones = await zoneRepo.GetByWorldAsync(newPos.World, farmCt);
@@ -475,8 +522,14 @@ public class FarmingOrchestrator(
                 {
                     logger.LogDebug(ex, "Auto-farm harvest skipped at ({X},{Y})", newPos.X, newPos.Y);
                 }
+                } // end harvest priority check
 
-                // --- ENCOUNTER ROLL ---
+                // --- ENCOUNTER ROLL (skipped for harvest-only priority) ---
+                if (session.Priority == "harvest")
+                {
+                    await BroadcastStatusAsync(playerId, session, "walking", "path", 0, farmCt);
+                    continue;
+                }
                 var allZones = await zoneRepo.GetByWorldAsync(newPos.World, farmCt);
                 var nearbyZone = ZoneProximity.FindNearby(allZones, newPos.X, newPos.Y);
 
