@@ -181,8 +181,6 @@ public class CommandDispatcher
         var encounter = await _combatService.StartEncounterAsync(
             playerId, Guid.NewGuid(), player, [], monsters, ct);
 
-        var dto = BuildCombatUpdateDto(encounter);
-
         // Narrate the encounter in the game log
         var monsterNames = string.Join(", ", monsters.Select(m => m.Name));
         await _hubContext.Clients
@@ -194,6 +192,10 @@ public class CommandDispatcher
                 text = $"Hostile creatures emerge from {nearbyZone.Name}! You face: {monsterNames}."
             }, ct);
 
+        // Auto-process any enemy turns that fire before the player
+        await ProcessEnemyTurnsAsync(playerId, encounter, ct);
+
+        var dto = BuildCombatUpdateDto(encounter);
         await _hubContext.Clients
             .Group(playerId.ToString())
             .SendAsync("CombatUpdate", dto, ct);
@@ -434,6 +436,10 @@ public class CommandDispatcher
         var encounter = await _combatService.StartEncounterAsync(
             cmd.PlayerId, cmd.ZoneId, player, [], monsters, ct);
 
+        // If the fastest combatant is an enemy, auto-run enemy turns
+        // until it's the player's turn.
+        await ProcessEnemyTurnsAsync(cmd.PlayerId, encounter, ct);
+
         var dto = BuildCombatUpdateDto(encounter);
 
         await _hubContext.Clients
@@ -465,6 +471,9 @@ public class CommandDispatcher
         if (!success || updated is null)
             return new CommandResult(false, message);
 
+        // After the player acts, enemies may be next — auto-run them.
+        await ProcessEnemyTurnsAsync(cmd.PlayerId, updated, ct);
+
         var dto = BuildCombatUpdateDto(updated);
 
         await _hubContext.Clients
@@ -495,36 +504,134 @@ public class CommandDispatcher
     }
 
     // -------------------------------------------------------------------------
+    // Enemy auto-turn processing
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// When the current actor is an enemy, automatically picks an ability
+    /// and a target, executes the action, narrates it, and advances the
+    /// turn — repeating until it's a player-side combatant's turn or the
+    /// encounter ends. This makes combat feel responsive: the player
+    /// always sees the panel on THEIR turn with results of enemy attacks.
+    /// </summary>
+    private async Task ProcessEnemyTurnsAsync(Guid playerId, Domain.Entities.Encounter encounter, CancellationToken ct)
+    {
+        var safety = 0;
+        while (encounter.State == EncounterState.InProgress && safety++ < 20)
+        {
+            var actor = encounter.CurrentActor;
+            if (actor is null || actor.IsPlayerSide) break;
+
+            // Pick a random ability
+            var abilities = actor.Abilities.Where(a => a.Category == AbilityCategory.Attack).ToList();
+            if (abilities.Count == 0) break;
+            var ability = abilities[Random.Shared.Next(abilities.Count)];
+
+            // Pick a random living player-side target
+            var targets = encounter.Combatants
+                .Where(c => c.IsPlayerSide && !c.IsDefeated)
+                .ToList();
+            if (targets.Count == 0) break;
+            var target = targets[Random.Shared.Next(targets.Count)];
+
+            // Execute
+            var (success, _, _) = await _combatService.ExecuteActionAsync(
+                encounter.Id, actor.Id, ability.Name, target.Id, ct);
+
+            if (!success) break;
+
+            // Narrate in the game log
+            int rawPower = ability.BasePower + actor.Level * 2;
+            float mult = ElementMatchup.GetMultiplier(ability.Element, target.Element);
+            int dmg = (int)(rawPower * mult);
+            var multLabel = mult > 1f ? " (super effective!)" : mult < 1f ? " (resisted)" : "";
+
+            await _hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("GameMessage", new
+                {
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    category = "combat",
+                    text = $"{actor.Name} uses {ability.Name} on {target.Name} for {dmg} damage{multLabel}."
+                }, ct);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Combat helpers
     // -------------------------------------------------------------------------
 
     private static List<MonsterTemplate> BuildMonsterPack(int dangerLevel)
     {
-        var basicSlash = new CombatAbility("Claw", 10, 0, MagicElement.Earth,
-            AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var fireBreath = new CombatAbility("Fire Breath", 20, 0, MagicElement.Fire,
-            AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var waterJet = new CombatAbility("Water Jet", 18, 0, MagicElement.Water,
-            AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        // Ability templates — power values are kept low so a level 1 player
+        // with 100 HP and ~20 damage/turn can actually win fights.
+        var claw      = new CombatAbility("Claw",        6, 0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        var bite      = new CombatAbility("Bite",        8, 0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        var fireSpit  = new CombatAbility("Fire Spit",  10, 0, MagicElement.Fire,  AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        var waterJet  = new CombatAbility("Water Jet",  10, 0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
+        var airSlash  = new CombatAbility("Air Slash",   9, 0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
 
-        return dangerLevel switch
+        // Monster pools per danger tier — randomly pick from the pool
+        // so the player doesn't always face the same pack.
+        MonsterTemplate[][] pools = [
+            // Danger 1-2: single weak creature
+            [
+                new("Cave Rat",      25, 5, 1, MagicElement.Earth, [claw]),
+                new("Marsh Bat",     20, 8, 1, MagicElement.Air,   [airSlash]),
+                new("Fire Beetle",   28, 4, 1, MagicElement.Fire,  [fireSpit]),
+                new("Stream Eel",    22, 7, 1, MagicElement.Water, [waterJet]),
+            ],
+            // Danger 3-4: one tougher creature or two weak ones
+            [
+                new("Thornwood Wolf", 35, 7, 2, MagicElement.Earth, [bite]),
+                new("Fire Imp",       30, 6, 2, MagicElement.Fire,  [fireSpit]),
+                new("Bog Wraith",     28, 8, 2, MagicElement.Water, [waterJet]),
+                new("Wind Sprite",    25, 9, 2, MagicElement.Air,   [airSlash]),
+            ],
+            // Danger 5-7: one strong creature
+            [
+                new("Grave Stalker", 50, 8, 3, MagicElement.Earth, [bite, claw]),
+                new("Ashlands Drake",55, 7, 3, MagicElement.Fire,  [fireSpit, bite]),
+                new("Tide Serpent",  45, 9, 3, MagicElement.Water, [waterJet, bite]),
+            ],
+            // Danger 8-10: one elite or two strong
+            [
+                new("Elder Drake",    70, 9, 4, MagicElement.Fire,  [fireSpit, bite]),
+                new("Deep Horror",    65, 8, 4, MagicElement.Water, [waterJet, bite]),
+                new("Wyrd Stalker",   60, 10, 4, MagicElement.Aether, [bite, claw]),
+            ],
+        ];
+
+        var tierIndex = dangerLevel switch
         {
-            1 => new List<MonsterTemplate>
-            {
-                new("Cave Rat", 40, 7, 1, MagicElement.Earth, new[] { basicSlash }),
-            },
-            2 => new List<MonsterTemplate>
-            {
-                new("Fire Imp", 60, 9, 2, MagicElement.Fire, new[] { fireBreath }),
-                new("Cave Rat", 40, 7, 1, MagicElement.Earth, new[] { basicSlash }),
-            },
-            _ => new List<MonsterTemplate>
-            {
-                new("Fire Drake", 90, 11, 4, MagicElement.Fire, new[] { fireBreath }),
-                new("Tide Serpent", 80, 10, 3, MagicElement.Water, new[] { waterJet }),
-                new("Cave Golem", 70, 6, 3, MagicElement.Earth, new[] { basicSlash }),
-            }
+            <= 2 => 0,
+            <= 4 => 1,
+            <= 7 => 2,
+            _    => 3,
         };
+
+        var pool = pools[tierIndex];
+        var pack = new List<MonsterTemplate>();
+
+        // Pick 1 monster for low danger, maybe 2 for mid, 2 for high
+        var primary = pool[Random.Shared.Next(pool.Length)];
+        pack.Add(primary);
+
+        // At danger 3+, 50% chance of a second (weaker) creature
+        if (dangerLevel >= 3 && Random.Shared.Next(2) == 0)
+        {
+            var weakPool = pools[Math.Max(0, tierIndex - 1)];
+            pack.Add(weakPool[Random.Shared.Next(weakPool.Length)]);
+        }
+
+        // At danger 7+, always add a second creature
+        if (dangerLevel >= 7 && pack.Count == 1)
+        {
+            var midPool = pools[Math.Max(0, tierIndex - 1)];
+            pack.Add(midPool[Random.Shared.Next(midPool.Length)]);
+        }
+
+        return pack;
     }
 
     private static CombatUpdateDto BuildCombatUpdateDto(Domain.Entities.Encounter encounter)

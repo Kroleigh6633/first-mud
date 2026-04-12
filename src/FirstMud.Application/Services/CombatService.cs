@@ -28,16 +28,15 @@ public class CombatService
         IReadOnlyList<MonsterTemplate> enemies,
         CancellationToken ct = default)
     {
+        var element = player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement;
         var playerAbilities = new List<CombatAbility>
         {
-            new("Strike", 15, 0, player.PrimaryElement == MagicElement.Fire ? MagicElement.Fire
-                : player.PrimaryElement == MagicElement.Water ? MagicElement.Water
-                : player.PrimaryElement == MagicElement.Earth ? MagicElement.Earth
-                : player.PrimaryElement == MagicElement.Air ? MagicElement.Air
-                : MagicElement.Aether,
+            new("Strike", 18, 0, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
-            new("Weave Bolt", 25, 10, player.PrimaryElement, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
-            new("Restore", 0, 5, MagicElement.Aether, AbilityTargetType.Self, AbilityCategory.Heal)
+            new("Weave Bolt", 30, 10, element,
+                AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
+            new("Restore", 30, 5, MagicElement.Aether,
+                AbilityTargetType.Self, AbilityCategory.Heal)
         };
 
         var playerCombatant = Combatant.Create(
