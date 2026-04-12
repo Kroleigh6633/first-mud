@@ -75,6 +75,17 @@ export default function GameTerminal({
   const [showCharSheet, setShowCharSheet] = useState(false);
   const [showStorage, setShowStorage] = useState(false);
 
+  // Use refs for values that the key handler reads but should NOT
+  // cause the effect to re-fire when they change. This prevents the
+  // portal infinite loop: atHomestead toggling → effect re-runs →
+  // sends opposite portal command → toggles again.
+  const atHomesteadRef = useRef(atHomestead);
+  atHomesteadRef.current = atHomestead;
+  const autoFarmRef = useRef(autoFarmStatus);
+  autoFarmRef.current = autoFarmStatus;
+  const currentTileRef = useRef(currentTile);
+  currentTileRef.current = currentTile;
+
   // Compute the zone tile the player is currently standing on, if any
   const currentTile = useMemo(() => {
     if (!worldState?.player) return null;
@@ -114,15 +125,13 @@ export default function GameTerminal({
         // Server-side MoveCommand expects `deltaX`/`deltaY`, not dx/dy.
         sendCommand('move', { deltaX: keyAction.dx, deltaY: keyAction.dy });
         break;
-      case 'interact':
-        // Describe what's at the player's feet. The server-side
-        // InteractCommand doesn't broadcast anything back yet, so do the
-        // feedback entirely on the client for now.
-        if (currentTile) {
+      case 'interact': {
+        const tile = currentTileRef.current;
+        if (tile) {
           appendMessage({
             timestamp: new Date().toISOString(),
             category: 'npc',
-            text: `You take stock of ${currentTile.name}. ${currentTile.description}`,
+            text: `You take stock of ${tile.name}. ${tile.description}`,
           });
         } else {
           appendMessage({
@@ -132,6 +141,7 @@ export default function GameTerminal({
           });
         }
         break;
+      }
       case 'inventory':
         // Ask the server for the latest inventory and open the panel.
         sendCommand('openinventory');
@@ -151,7 +161,7 @@ export default function GameTerminal({
         setShowHelp(prev => !prev);
         break;
       case 'portal':
-        if (atHomestead) {
+        if (atHomesteadRef.current) {
           sendCommand('portalback', null);
         } else {
           sendCommand('portalhome', null);
@@ -161,15 +171,10 @@ export default function GameTerminal({
         sendCommand('harvest', null);
         break;
       case 'autofarm':
-        if (autoFarmStatus?.active) {
-          // Toggle off — send autofarm to cancel
-          sendCommand('autofarm', { durationSeconds: 300 });
-        } else {
-          sendCommand('autofarm', { durationSeconds: 300 });
-        }
+        sendCommand('autofarm', { durationSeconds: 300 });
         break;
       case 'storage':
-        if (!atHomestead) {
+        if (!atHomesteadRef.current) {
           appendMessage({
             timestamp: new Date().toISOString(),
             category: 'system',
@@ -195,7 +200,9 @@ export default function GameTerminal({
         });
         break;
     }
-  }, [keyAction, sendCommand, fetchAvailableQuests, currentTile, appendMessage, atHomestead, autoFarmStatus]);
+  // Only re-run when keyAction or the stable callbacks change — NOT when
+  // atHomestead / autoFarmStatus / currentTile change (read via refs).
+  }, [keyAction, sendCommand, fetchAvailableQuests, appendMessage]);
 
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
