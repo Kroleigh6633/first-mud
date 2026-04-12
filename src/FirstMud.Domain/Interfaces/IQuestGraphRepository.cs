@@ -11,6 +11,12 @@ public interface IQuestGraphRepository
     Task<IReadOnlyList<QuestNode>> GetUnlockedByCompletionAsync(string completedQuestId, string outcome, CancellationToken cancellationToken = default);
     Task<bool> IsQuestAvailableAsync(Guid playerId, string questId, CancellationToken cancellationToken = default);
     Task MarkQuestInProgressAsync(Guid playerId, string questId, bool takenByAi = false, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns true when the given player has an active IN_PROGRESS relationship
+    /// to the quest — regardless of the takenByAi flag.
+    /// </summary>
+    Task<bool> IsQuestInProgressAsync(Guid playerId, string questId, CancellationToken cancellationToken = default);
 }
 
 public record QuestNode(

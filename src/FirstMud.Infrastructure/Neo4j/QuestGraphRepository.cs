@@ -269,6 +269,31 @@ public sealed class QuestGraphRepository : IQuestGraphRepository
     }
 
     // -------------------------------------------------------------------------
+    // IsQuestInProgressAsync
+    // -------------------------------------------------------------------------
+
+    public async Task<bool> IsQuestInProgressAsync(
+        Guid playerId,
+        string questId,
+        CancellationToken cancellationToken = default)
+    {
+        var playerIdStr = playerId.ToString();
+
+        return await _driver.ExecuteReadAsync(async tx =>
+        {
+            var cursor = await tx.RunAsync(
+                """
+                MATCH (p:Player {playerId: $playerId})-[:IN_PROGRESS]->(q:Quest {questId: $questId})
+                RETURN count(q) > 0 AS inProgress
+                """,
+                new { playerId = playerIdStr, questId });
+
+            if (!await cursor.FetchAsync()) return false;
+            return cursor.Current["inProgress"].As<bool>();
+        }, cancellationToken);
+    }
+
+    // -------------------------------------------------------------------------
     // MarkQuestInProgressAsync
     // -------------------------------------------------------------------------
 

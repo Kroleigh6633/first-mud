@@ -6,6 +6,7 @@ using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
 namespace FirstMud.GameServer.Handlers;
@@ -248,7 +249,8 @@ public class InteractQuestCommandHandler(
     QuestService questService,
     IQuestGraphRepository questGraphRepository,
     QuestProgressTracker progressTracker,
-    IHubContext<GameHub> hubContext) : ICommandHandler<InteractQuestCommand>
+    IHubContext<GameHub> hubContext,
+    ILogger<InteractQuestCommandHandler> logger) : ICommandHandler<InteractQuestCommand>
 {
     // Number of kills required before a kill quest is completable.
     // Quest description may embed a number like "defeat 5 bandits"; we try to parse it.
@@ -273,11 +275,27 @@ public class InteractQuestCommandHandler(
     public async Task<CommandResult> HandleAsync(InteractQuestCommand cmd, CancellationToken ct)
     {
         // ── 1. Validate quest is in-progress for this player ──────────────
+        logger.LogInformation(
+            "InteractQuest: player={PlayerId} questId={QuestId}",
+            cmd.PlayerId, cmd.QuestId);
+
         var quest = await questGraphRepository.GetQuestAsync(cmd.QuestId, ct);
         if (quest is null)
+        {
+            logger.LogWarning(
+                "InteractQuest: quest not found in Neo4j. player={PlayerId} questId={QuestId}",
+                cmd.PlayerId, cmd.QuestId);
             return new CommandResult(false, "Quest not found.");
+        }
 
-        if (!quest.IsTaken)
+        // Use a player-scoped IN_PROGRESS check rather than quest.IsTaken,
+        // which only reflects AI-taken state in GetQuestAsync.
+        var inProgress = await questGraphRepository.IsQuestInProgressAsync(cmd.PlayerId, cmd.QuestId, ct);
+        logger.LogInformation(
+            "InteractQuest: inProgress={InProgress} for player={PlayerId} questId={QuestId} questTitle={Title}",
+            inProgress, cmd.PlayerId, cmd.QuestId, quest.Title);
+
+        if (!inProgress)
             return new CommandResult(false, "You have not accepted this quest.");
 
         var firstOutcome = quest.PossibleOutcomes.FirstOrDefault() ?? "Success";
