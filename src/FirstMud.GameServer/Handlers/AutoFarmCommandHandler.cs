@@ -96,13 +96,34 @@ public class AutoFarmCommandHandler(
                 var zones = await zoneRepo.GetByWorldAsync(player.Position.World, farmCt);
                 var nearbyZone = ZoneProximity.FindNearby(zones, player.Position.X, player.Position.Y);
 
-                var dangerLevel = nearbyZone?.DangerLevel ?? 2;
-                var encounterChance = Math.Min(dangerLevel * 10, 70);
+                int dangerLevel;
+                int encounterChance;
+                string biome;
+
+                if (nearbyZone != null)
+                {
+                    // Named zone: existing behaviour.
+                    dangerLevel = nearbyZone.DangerLevel;
+                    encounterChance = Math.Min(dangerLevel * 10, 70);
+                    biome = CombatHelpers.GetBiome(nearbyZone);
+                }
+                else
+                {
+                    // Wilderness: danger from biome + distance from world centre.
+                    biome = CombatHelpers.GuessWildernessBiome(player.Position.X, player.Position.Y);
+                    dangerLevel = CombatHelpers.GetWildernessDanger(player.Position.X, player.Position.Y, biome);
+                    encounterChance = biome == "path" ? 2 : Math.Min(dangerLevel * 4, 40);
+                }
+
+                if (dangerLevel <= 0 && biome != "path")
+                {
+                    continue;
+                }
+
                 if (Random.Shared.Next(100) >= encounterChance)
                     continue;
 
                 // Start and auto-fight the encounter
-                var biome = CombatHelpers.GetBiome(nearbyZone);
                 var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
                 // Skip grey encounters — monsters too weak to bother fighting

@@ -197,10 +197,24 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
           </div>
         </div>
       ) : (
-        <div data-testid="current-tile-empty" style={{ color: '#666666', fontStyle: 'italic' }}>
+        <div data-testid="current-tile-empty">
           {(() => {
             const biome = getBiome(player.x, player.y);
-            return `${biome.name}. Nothing of note here.`;
+            return (
+              <>
+                <div style={{ marginBottom: '2px' }}>
+                  <span style={{ color: '#00ff41', fontWeight: 'bold' }}>{biome.name}</span>
+                  {' '}
+                  <span style={{ color: '#666666', fontStyle: 'italic' }}>[wilderness]</span>
+                </div>
+                <div style={{ marginBottom: '2px' }}>
+                  <span style={{ color: '#888888' }}>Danger: </span>
+                  <span style={{ color: dangerColor(biome.dangerEstimate) }}>
+                    {biome.dangerEstimate}/10
+                  </span>
+                </div>
+              </>
+            );
           })()}
         </div>
       )}

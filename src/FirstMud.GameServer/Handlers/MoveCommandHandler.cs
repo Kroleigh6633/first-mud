@@ -62,16 +62,42 @@ public class MoveCommandHandler(
         var zones = await zoneRepository.GetByWorldAsync(pos.World, ct);
         var nearbyZone = ZoneProximity.FindNearby(zones, pos.X, pos.Y);
 
-        if (nearbyZone is null || nearbyZone.DangerLevel <= 0) return;
+        int dangerLevel;
+        int chance;
+        string biome;
 
-        var chance = Math.Min(nearbyZone.DangerLevel * 8, 80);
+        if (nearbyZone != null)
+        {
+            // Named zone: use zone's own danger level and biome (existing behaviour).
+            if (nearbyZone.DangerLevel <= 0) return;
+            dangerLevel = nearbyZone.DangerLevel;
+            chance = Math.Min(dangerLevel * 8, 80);
+            biome = CombatHelpers.GetBiome(nearbyZone);
+        }
+        else
+        {
+            // Wilderness: compute danger from biome + distance from world centre.
+            biome = CombatHelpers.GuessWildernessBiome(pos.X, pos.Y);
+            dangerLevel = CombatHelpers.GetWildernessDanger(pos.X, pos.Y, biome);
+
+            if (biome == "path")
+            {
+                // Roads are mostly safe — occasional bandit.
+                chance = 2;
+            }
+            else
+            {
+                if (dangerLevel <= 0) return;
+                chance = Math.Min(dangerLevel * 4, 40);
+            }
+        }
+
         if (Random.Shared.Next(100) >= chance) return;
 
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
 
-        var biome = CombatHelpers.GetBiome(nearbyZone);
-        var monsters = CombatHelpers.BuildMonsterPack(nearbyZone.DangerLevel, player.Level, biome);
+        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
         // Aggro check: high-level players in low-level zones don't get bothered
         var avgMonsterLevel = monsters.Count > 0
