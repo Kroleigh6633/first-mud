@@ -397,7 +397,7 @@ public class CombatHelpers(
             // Captured monsters always start at Layer 1
             await companionRepository.AddAsync(companion, ct);
 
-            // Auto-activate if there's a free slot; otherwise just add to roster
+            // Auto-activate if there's a free slot; otherwise assign to best homestead duty
             var activated = player.TryAddActiveCompanion(companion.Id);
             if (activated)
             {
@@ -406,9 +406,27 @@ public class CombatHelpers(
             }
             await playerRepository.UpdateAsync(player, ct);
 
-            var slotNote = activated
-                ? "It has joined your active party."
-                : "Your party is full — it waits in your roster. Press [B] to manage companions.";
+            string slotNote;
+            if (activated)
+            {
+                slotNote = "It has joined your active party.";
+            }
+            else
+            {
+                // All combat slots full — assign to best homestead duty
+                var bestDuty = new[] { HomesteadDuty.Harvester, HomesteadDuty.Salvager, HomesteadDuty.Guard }
+                    .OrderByDescending(d => companion.GetAptitude(d))
+                    .First();
+
+                companion.AssignToHomestead(bestDuty);
+                await companionRepository.UpdateAsync(companion, ct);
+
+                await notificationService.SendMessageAsync(playerId, "system",
+                    $"{companion.Name} has been assigned to {bestDuty} duty at your homestead ({companion.GetAptitude(bestDuty)} star aptitude).",
+                    ct);
+
+                slotNote = $"Your party is full — {companion.Name} is contributing as a {bestDuty} at your homestead.";
+            }
 
             await notificationService.SendMessageAsync(playerId, "system",
                 $"You captured a {enemy.Name}! Named it '{companionName}'. " +
@@ -506,111 +524,15 @@ public class CombatHelpers(
     }
 
     // -------------------------------------------------------------------------
-    // Biome detection
+    // Biome detection — forwarding wrappers → BiomeService
+    // Kept here so callers don't need to change import namespaces.
     // -------------------------------------------------------------------------
 
-    public static string GetBiome(Zone? zone) => zone?.Name switch
-    {
-        "Caervorn Highlands" => "mountain",
-        "The Thornwood"      => "forest",
-        "Portmere (Compact)" => "plains",
-        "Gravenmarsh"        => "swamp",
-        "The Drowned Coast"  => "water",
-        "The Ashen Reach"    => "desert",
-        "Starting Road"      => "plains",
-        "Gravenhold"         => "mountain",
-        "The Maw Borderlands"=> "wyrd",
-        _                    => "plains",
-    };
-
-    /// <summary>
-    /// Returns the biome string for a given position.
-    /// If a named zone is nearby, defers to GetBiome(zone).
-    /// Otherwise approximates from proximity to known zone centres.
-    /// </summary>
-    public static string GetBiomeForPosition(Zone? nearbyZone, int x, int y)
-    {
-        if (nearbyZone != null) return GetBiome(nearbyZone);
-        return GuessWildernessBiome(x, y);
-    }
-
-    /// <summary>
-    /// Approximates a biome for a wilderness tile based on proximity to named zone centres.
-    /// Uses Manhattan distance to the nearest thematic zone; falls back to plains.
-    /// Zone centres match ZoneGridLayout.cs.
-    /// </summary>
-    public static string GuessWildernessBiome(int x, int y)
-    {
-        // (zoneCentreX, zoneCentreY, biome, influenceRadius)
-        (int cx, int cy, string biome, int radius)[] zoneThemes =
-        [
-            (8,  3,  "mountain", 10),   // Caervorn Highlands
-            (13, 5,  "forest",   10),   // The Thornwood
-            (24, 13, "plains",    8),   // Portmere Compact
-            (28, 9,  "swamp",    10),   // Gravenmarsh
-            (32, 15, "water",    10),   // The Drowned Coast
-            (34, 4,  "desert",   10),   // The Ashen Reach
-            (20, 10, "plains",    6),   // Starting Road
-            (26, 7,  "mountain",  8),   // Gravenhold
-            (36, 18, "wyrd",     10),   // The Maw Borderlands
-        ];
-
-        string closestBiome = "plains";
-        int closestDist = int.MaxValue;
-
-        foreach (var (cx, cy, biome, radius) in zoneThemes)
-        {
-            int dist = Math.Abs(x - cx) + Math.Abs(y - cy);
-            if (dist < radius && dist < closestDist)
-            {
-                closestDist = dist;
-                closestBiome = biome;
-            }
-        }
-
-        return closestBiome;
-    }
-
-    /// <summary>
-    /// Computes the danger level for a wilderness tile (no named zone nearby).
-    /// Combines Manhattan distance from the world centre (20, 10) with a biome modifier.
-    /// Returns a value in [0, 10].
-    /// </summary>
-    public static int GetWildernessDanger(int x, int y, string biome)
-    {
-        const int worldCentreX = 20;
-        const int worldCentreY = 10;
-        int distFromCenter = Math.Abs(x - worldCentreX) + Math.Abs(y - worldCentreY);
-        int wildernessBaseDanger = distFromCenter / 5;
-
-        int biomeDanger = biome switch
-        {
-            "forest"      => 2,
-            "denseForest" => 3,
-            "mountain"    => 3,
-            "snowMountain"=> 5,
-            "swamp"       => 3,
-            "water"       => 2,
-            "desert"      => 3,
-            "wyrd"        => 5,
-            "plains" or "grassland" => 1,
-            "path"        => 0,
-            _             => 1,
-        };
-
-        return Math.Clamp(wildernessBaseDanger + biomeDanger, 0, 10);
-    }
-
-    public static string GetBiomeNarration(string biome, string monsterNames) => biome switch
-    {
-        "mountain" => $"A {monsterNames} emerges from behind a boulder!",
-        "forest"   => $"{monsterNames} burst from the undergrowth!",
-        "water"    => $"Something rises from the depths... {monsterNames}!",
-        "desert"   => $"A {monsterNames} scuttles from beneath the dunes!",
-        "swamp"    => $"A {monsterNames} materializes from the mist!",
-        "wyrd"     => $"Reality tears open. A {monsterNames} steps through!",
-        _          => $"Hostile creatures emerge! You face: {monsterNames}.",
-    };
+    public static string GetBiome(Zone? zone)                               => BiomeService.GetBiome(zone);
+    public static string GetBiomeForPosition(Zone? nearbyZone, int x, int y) => BiomeService.GetBiomeForPosition(nearbyZone, x, y);
+    public static string GuessWildernessBiome(int x, int y)                 => BiomeService.GuessWildernessBiome(x, y);
+    public static int    GetWildernessDanger(int x, int y, string biome)    => BiomeService.GetWildernessDanger(x, y, biome);
+    public static string GetBiomeNarration(string biome, string monsterNames) => BiomeService.GetBiomeNarration(biome, monsterNames);
 
     /// <summary>
     /// Returns a message category string based on how hard the encounter is
@@ -627,302 +549,11 @@ public class CombatHelpers(
         };
 
     // -------------------------------------------------------------------------
-    // Monster pack builder
+    // Monster pack builder — forwarding wrapper → MonsterFactory
     // -------------------------------------------------------------------------
 
     public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains")
-    {
-        // ---- Shared ability definitions ----
-        // Generic
-        var claw      = new CombatAbility("Claw",          6,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var bite      = new CombatAbility("Bite",          8,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-
-        // Mountain abilities
-        var headbutt       = new CombatAbility("Headbutt",         7,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var rockThrow      = new CombatAbility("Rock Throw",       9,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var boulderThrow   = new CombatAbility("Boulder Throw",   14,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var regenerate     = new CombatAbility("Regenerate",      12,  0, MagicElement.Earth, AbilityTargetType.Self,        AbilityCategory.Heal);
-        var diveAttack     = new CombatAbility("Dive Attack",     16,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var windGust       = new CombatAbility("Wind Gust",        8,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var breathWeapon   = new CombatAbility("Breath Weapon",   14,  0, MagicElement.Fire,  AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var frostSlam      = new CombatAbility("Frost Slam",      16,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var glacialRoar    = new CombatAbility("Glacial Roar",     8,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var earthShatter   = new CombatAbility("Earth Shatter",   12,  0, MagicElement.Earth, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-
-        // Forest abilities
-        var pounce         = new CombatAbility("Pounce",           9,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var charge         = new CombatAbility("Charge",          10,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var web            = new CombatAbility("Web",              5,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var venomBite      = new CombatAbility("Venom Bite",      10,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var quickSlash     = new CombatAbility("Quick Slash",      9,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var maul           = new CombatAbility("Maul",            15,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var roar           = new CombatAbility("Roar",             5,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var branchSwipe    = new CombatAbility("Branch Swipe",    14,  0, MagicElement.Earth, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var rootStrike     = new CombatAbility("Root Strike",     10,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var wyldGore       = new CombatAbility("Wyld Gore",       18,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var thornBarrage   = new CombatAbility("Thorn Barrage",   14,  0, MagicElement.Earth, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-
-        // Desert abilities
-        var stingStrike    = new CombatAbility("Sting Strike",     8,  0, MagicElement.Fire,  AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var acidSpit       = new CombatAbility("Acid Spit",        9,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var fireLash       = new CombatAbility("Fire Lash",       10,  0, MagicElement.Fire,  AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var constrict      = new CombatAbility("Constrict",        9,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var burrow         = new CombatAbility("Burrow",           5,  0, MagicElement.Earth, AbilityTargetType.Self,        AbilityCategory.Buff);
-        var eruption       = new CombatAbility("Eruption",        12,  0, MagicElement.Earth, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var embersweep     = new CombatAbility("Ember Sweep",     12,  0, MagicElement.Fire,  AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var ashSurge       = new CombatAbility("Ash Surge",        9,  0, MagicElement.Fire,  AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var reviveFlame    = new CombatAbility("Revive Flame",    14,  0, MagicElement.Fire,  AbilityTargetType.Self,        AbilityCategory.Heal);
-        var infernoBreath  = new CombatAbility("Inferno Breath",  16,  0, MagicElement.Fire,  AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-
-        // Water abilities
-        var pinch          = new CombatAbility("Pinch",            7,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var waterJet       = new CombatAbility("Water Jet",       10,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var tidalSurge     = new CombatAbility("Tidal Surge",     11,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var snapJaw        = new CombatAbility("Snap Jaw",        12,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var tentacleLash   = new CombatAbility("Tentacle Lash",   13,  0, MagicElement.Water, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var inkCloud       = new CombatAbility("Ink Cloud",        6,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var crushingDepths = new CombatAbility("Crushing Depths",  18, 0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var drainTouch     = new CombatAbility("Drain Touch",     12,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Lifesteal);
-        var voidPulse      = new CombatAbility("Void Pulse",      15,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-
-        // Swamp abilities
-        var gnaw           = new CombatAbility("Gnaw",             7,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var leechDrain     = new CombatAbility("Leech Drain",      8,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Lifesteal);
-        var spectralTouch  = new CombatAbility("Spectral Touch",  10,  0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var mistVeil       = new CombatAbility("Mist Veil",        5,  0, MagicElement.Water, AbilityTargetType.Self,        AbilityCategory.Buff);
-        var mudSlap        = new CombatAbility("Mud Slap",         9,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var shadowStep     = new CombatAbility("Shadow Step",     11,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var phantomStrike  = new CombatAbility("Phantom Strike",   9,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var toxicSpray     = new CombatAbility("Toxic Spray",     10,  0, MagicElement.Water, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var debilitatingCroak = new CombatAbility("Debilitating Croak", 6, 0, MagicElement.Water, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var multiStrike    = new CombatAbility("Multi Strike",    12,  0, MagicElement.Water, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var graveDrain     = new CombatAbility("Grave Drain",     14,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Lifesteal);
-
-        // Plains abilities
-        var scratchScrape  = new CombatAbility("Scratch",          6,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var snarl          = new CombatAbility("Snarl",            7,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var dirtyBlow      = new CombatAbility("Dirty Blow",       9,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var trickSlash     = new CombatAbility("Trick Slash",      8,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var kickHooves     = new CombatAbility("Hoof Kick",       10,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var stampede       = new CombatAbility("Stampede",        11,  0, MagicElement.Air,   AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var shieldBash     = new CombatAbility("Shield Bash",     12,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var armorBreak     = new CombatAbility("Armor Break",      8,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var howl           = new CombatAbility("Howl",             6,  0, MagicElement.Earth, AbilityTargetType.Self,        AbilityCategory.Buff);
-        var packHunter     = new CombatAbility("Pack Hunter",     10,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var brutalSmash    = new CombatAbility("Brutal Smash",    16,  0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var groundPound    = new CombatAbility("Ground Pound",    12,  0, MagicElement.Earth, AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var cavalryCharge  = new CombatAbility("Cavalry Charge",  14,  0, MagicElement.Air,   AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var swiftBlow      = new CombatAbility("Swift Blow",      10,  0, MagicElement.Air,   AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-
-        // Wyrd abilities
-        var wyrdNip        = new CombatAbility("Wyrd Nip",         7,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var shadowPounce   = new CombatAbility("Shadow Pounce",    9,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var phaseStrike    = new CombatAbility("Phase Strike",    11,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var blink          = new CombatAbility("Blink",            5,  0, MagicElement.Aether,AbilityTargetType.Self,        AbilityCategory.Buff);
-        var wraitheTouch   = new CombatAbility("Wraith Touch",    10,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var nullField      = new CombatAbility("Null Field",       8,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Debuff);
-        var voidTear       = new CombatAbility("Void Tear",       13,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var realityShred   = new CombatAbility("Reality Shred",   14,  0, MagicElement.Aether,AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var wyrdBurst      = new CombatAbility("Wyrd Burst",      18,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
-        var weaveRend      = new CombatAbility("Weave Rend",      15,  0, MagicElement.Aether,AbilityTargetType.AllEnemies,  AbilityCategory.Attack);
-        var aetherDrain    = new CombatAbility("Aether Drain",    12,  0, MagicElement.Aether,AbilityTargetType.SingleEnemy, AbilityCategory.Lifesteal);
-
-        // ---- Per-biome tier pools ----
-        // Tiers 0-3 correspond to dangerLevel ranges: <=2, <=4, <=7, 8+
-        MonsterTemplate[][] mountainPools =
-        [
-            [
-                new("Mountain Goat",  22, 7, 1, MagicElement.Earth, [headbutt, charge]),
-                new("Rock Beetle",    26, 4, 1, MagicElement.Earth, [claw, rockThrow]),
-            ],
-            [
-                new("Stone Troll",    55, 4, 2, MagicElement.Earth, [boulderThrow, regenerate, earthShatter]),
-                new("Mountain Lion",  38, 9, 2, MagicElement.Air,   [pounce, quickSlash]),
-            ],
-            [
-                new("Wyvern",         60, 8, 3, MagicElement.Air,   [diveAttack, windGust, rockThrow]),
-                new("Rock Golem",     80, 3, 3, MagicElement.Earth, [boulderThrow, earthShatter, regenerate]),
-            ],
-            [
-                new("Dragon Whelp",   85, 7, 4, MagicElement.Fire,  [breathWeapon, diveAttack, embersweep]),
-                new("Frost Giant",    90, 3, 4, MagicElement.Water,  [frostSlam, glacialRoar, earthShatter]),
-            ],
-        ];
-
-        MonsterTemplate[][] forestPools =
-        [
-            [
-                new("Timber Wolf",    28, 8, 1, MagicElement.Earth, [bite, pounce]),
-                new("Wild Boar",      32, 6, 1, MagicElement.Earth, [charge, headbutt]),
-            ],
-            [
-                new("Thornweaver Spider", 35, 7, 2, MagicElement.Earth, [web, venomBite, claw]),
-                new("Forest Bandit",      30, 9, 2, MagicElement.Air,   [quickSlash, trickSlash]),
-            ],
-            [
-                new("Dire Bear",      65, 5, 3, MagicElement.Earth, [maul, roar, charge]),
-                new("Treant",         75, 3, 3, MagicElement.Earth, [branchSwipe, rootStrike, earthShatter]),
-            ],
-            [
-                new("Elder Stag",     75, 7, 4, MagicElement.Aether, [wyldGore, shadowStep, diveAttack]),
-                new("Thornwood Guardian", 95, 4, 4, MagicElement.Earth, [thornBarrage, maul, regenerate]),
-            ],
-        ];
-
-        MonsterTemplate[][] desertPools =
-        [
-            [
-                new("Sand Scorpion",  24, 7, 1, MagicElement.Fire,  [stingStrike, claw]),
-                new("Dust Viper",     22, 8, 1, MagicElement.Earth, [bite, constrict]),
-            ],
-            [
-                new("Fire Lizard",    36, 7, 2, MagicElement.Fire,  [fireLash, acidSpit]),
-                new("Giant Centipede",34, 6, 2, MagicElement.Earth, [constrict, bite, claw]),
-            ],
-            [
-                new("Sand Wurm",      65, 4, 3, MagicElement.Earth, [burrow, eruption, bite]),
-                new("Ash Golem",      70, 3, 3, MagicElement.Fire,  [ashSurge, embersweep, regenerate]),
-            ],
-            [
-                new("Phoenix Hatchling", 70, 8, 4, MagicElement.Fire, [infernoBreath, reviveFlame, diveAttack]),
-                new("Ember Drake",    85, 7, 4, MagicElement.Fire,  [infernoBreath, embersweep, breathWeapon]),
-            ],
-        ];
-
-        MonsterTemplate[][] waterPools =
-        [
-            [
-                new("Giant Crab",     26, 5, 1, MagicElement.Water, [pinch, claw]),
-                new("Mud Skipper",    22, 8, 1, MagicElement.Water, [waterJet, bite]),
-            ],
-            [
-                new("Tide Lurker",    35, 7, 2, MagicElement.Water, [tidalSurge, waterJet]),
-                new("Reef Shark",     32, 9, 2, MagicElement.Water, [snapJaw, charge]),
-            ],
-            [
-                new("Sea Serpent",    60, 6, 3, MagicElement.Water, [tentacleLash, tidalSurge, bite]),
-                new("Kraken Spawn",   65, 5, 3, MagicElement.Water, [tentacleLash, inkCloud, crushingDepths]),
-            ],
-            [
-                new("Deep Horror",    80, 5, 4, MagicElement.Aether, [voidPulse, crushingDepths, drainTouch]),
-                new("Drowned Revenant",75, 6, 4, MagicElement.Water, [drainTouch, tidalSurge, voidPulse]),
-            ],
-        ];
-
-        MonsterTemplate[][] swampPools =
-        [
-            [
-                new("Swamp Rat",      22, 7, 1, MagicElement.Earth, [gnaw, scratchScrape]),
-                new("Leech Swarm",    20, 6, 1, MagicElement.Water, [leechDrain, claw]),
-            ],
-            [
-                new("Bog Wraith",     32, 7, 2, MagicElement.Water, [spectralTouch, mistVeil, waterJet]),
-                new("Marsh Crawler",  36, 6, 2, MagicElement.Earth, [mudSlap, claw, constrict]),
-            ],
-            [
-                new("Moor Stalker",   55, 8, 3, MagicElement.Aether, [shadowStep, phantomStrike, nullField]),
-                new("Poison Toad",    52, 5, 3, MagicElement.Water,  [toxicSpray, debilitatingCroak, bite]),
-            ],
-            [
-                new("Swamp Hydra",    90, 5, 4, MagicElement.Water,  [multiStrike, tidalSurge, tentacleLash]),
-                new("Grave Wight",    78, 6, 4, MagicElement.Aether, [graveDrain, phantomStrike, nullField]),
-            ],
-        ];
-
-        MonsterTemplate[][] plainsPools =
-        [
-            [
-                new("Cave Rat",       24, 7, 1, MagicElement.Earth, [scratchScrape, gnaw]),
-                new("Stray Dog",      26, 8, 1, MagicElement.Earth, [snarl, bite]),
-            ],
-            [
-                new("Highway Bandit", 34, 8, 2, MagicElement.Air,   [dirtyBlow, trickSlash]),
-                new("Wild Horse",     36, 9, 2, MagicElement.Air,   [kickHooves, stampede]),
-            ],
-            [
-                new("Rogue Knight",   60, 6, 3, MagicElement.Earth, [shieldBash, armorBreak, brutalSmash]),
-                new("Pack Alpha Wolf",55, 7, 3, MagicElement.Earth, [howl, packHunter, maul]),
-            ],
-            [
-                new("Wandering Ogre", 88, 4, 4, MagicElement.Earth, [brutalSmash, groundPound, roar]),
-                new("Mounted Raider", 75, 9, 4, MagicElement.Air,   [cavalryCharge, swiftBlow, trickSlash]),
-            ],
-        ];
-
-        MonsterTemplate[][] wyrdPools =
-        [
-            [
-                new("Wyrd Hound",     25, 8, 1, MagicElement.Aether, [wyrdNip, phantomStrike]),
-                new("Shadow Cat",     22, 9, 1, MagicElement.Aether, [shadowPounce, claw]),
-            ],
-            [
-                new("Phase Spider",   32, 8, 2, MagicElement.Aether, [phaseStrike, blink, web]),
-                new("Wyrd Wraith",    30, 7, 2, MagicElement.Aether, [wraitheTouch, nullField]),
-            ],
-            [
-                new("Void Stalker",   58, 7, 3, MagicElement.Aether, [voidTear, shadowStep, nullField]),
-                new("Reality Shredder",55, 6, 3, MagicElement.Aether, [realityShred, phaseStrike, voidPulse]),
-            ],
-            [
-                new("Wyrd Abomination", 92, 5, 4, MagicElement.Aether, [wyrdBurst, realityShred, aetherDrain]),
-                new("Tear in the Weave", 80, 6, 4, MagicElement.Aether, [weaveRend, voidPulse, nullField]),
-            ],
-        ];
-
-        var biomePools = biome switch
-        {
-            "mountain" => mountainPools,
-            "forest"   => forestPools,
-            "desert"   => desertPools,
-            "water"    => waterPools,
-            "swamp"    => swampPools,
-            "wyrd"     => wyrdPools,
-            _          => plainsPools,
-        };
-
-        var tierIndex = dangerLevel switch
-        {
-            <= 2 => 0,
-            <= 4 => 1,
-            <= 7 => 2,
-            _    => 3,
-        };
-
-        var pool = biomePools[tierIndex];
-        var pack = new List<MonsterTemplate>();
-
-        var primary = pool[Random.Shared.Next(pool.Length)];
-        pack.Add(ScaleMonster(primary, dangerLevel, playerLevel));
-
-        if (dangerLevel >= 3 && Random.Shared.Next(2) == 0)
-        {
-            var weakPool = biomePools[Math.Max(0, tierIndex - 1)];
-            var extra = weakPool[Random.Shared.Next(weakPool.Length)];
-            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel));
-        }
-
-        if (dangerLevel >= 7 && pack.Count == 1)
-        {
-            var midPool = biomePools[Math.Max(0, tierIndex - 1)];
-            var extra = midPool[Random.Shared.Next(midPool.Length)];
-            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel));
-        }
-
-        return pack;
-    }
-
-    private static MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel)
-    {
-        // Base level: danger level +/- 1 for some variance
-        var variance = Random.Shared.Next(-1, 2); // -1, 0, or 1
-        var monsterLevel = Math.Max(1, dangerLevel + variance);
-
-        // Scale up if the player has significantly out-levelled the zone
-        if (playerLevel > dangerLevel * 2)
-            monsterLevel = Math.Max(monsterLevel, playerLevel - 2);
-
-        return template with { Level = monsterLevel };
-    }
+        => MonsterFactory.BuildMonsterPack(dangerLevel, playerLevel, biome);
 
     // -------------------------------------------------------------------------
     // DTO builder

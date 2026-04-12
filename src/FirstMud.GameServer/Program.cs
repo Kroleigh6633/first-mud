@@ -43,8 +43,9 @@ builder.Services.AddScoped<WorldStateService>();
 builder.Services.AddScoped<GameNotificationService>();
 builder.Services.AddScoped<StartupSeeder>();
 
-// Shared combat utilities
+// Shared combat utilities and farming orchestrator
 builder.Services.AddScoped<CombatHelpers>();
+builder.Services.AddScoped<FarmingOrchestrator>();
 
 // Command handlers — one per command type (ICommandHandler<TCommand>)
 builder.Services.AddScoped<ICommandHandler<MoveCommand>, MoveCommandHandler>();
