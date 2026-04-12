@@ -25,6 +25,8 @@ public class OpenInventoryCommandHandler(
             ActiveCompanionIds = player.ActiveCompanionIds.Select(id => id.ToString()).ToList(),
             CraftingSkill = player.CraftingSkill,
             SalvageSkill = player.SalvageSkill,
+            AutoSalvageWeaponThreshold = player.AutoSalvageWeaponThreshold,
+            AutoSalvageArmorThreshold = player.AutoSalvageArmorThreshold,
             Items = items.Select(i => new
             {
                 Id = i.Id.ToString(),

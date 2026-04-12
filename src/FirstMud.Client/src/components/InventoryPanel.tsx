@@ -117,6 +117,13 @@ const salvageBtnStyle: React.CSSProperties = {
   marginLeft: '6px',
 };
 
+const salvageBtnDisabledStyle: React.CSSProperties = {
+  ...salvageBtnStyle,
+  border: '1px solid #555555',
+  color: '#555555',
+  cursor: 'not-allowed',
+};
+
 const salvageAllBtnStyle: React.CSSProperties = {
   background: 'none',
   border: '1px solid #ff8800',
@@ -146,6 +153,14 @@ const slotsStyle: React.CSSProperties = {
   fontSize: '11px',
   padding: '4px 14px 8px',
 };
+
+/** Returns the max Workmanship the player can salvage given their SalvageSkill. */
+function maxSalvageableWorkmanship(skill: number): number {
+  if (skill <= 5) return 3;
+  if (skill <= 10) return 5;
+  if (skill <= 20) return 7;
+  return 10;
+}
 
 function isEquippable(category?: string): boolean {
   if (!category) return false;
@@ -177,6 +192,16 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
   const handleSalvageAll = (category: string) => {
     sendCommand('salvageall', { category });
   };
+
+  const handleAutoSalvageChange = (category: string, value: string) => {
+    const maxWorkmanship = parseInt(value, 10);
+    sendCommand('autosalvage', { category, maxWorkmanship });
+  };
+
+  const salvageSkill = snapshot?.salvageSkill ?? 1;
+  const maxSalvageable = maxSalvageableWorkmanship(salvageSkill);
+  const weaponThreshold = snapshot?.autoSalvageWeaponThreshold ?? 0;
+  const armorThreshold = snapshot?.autoSalvageArmorThreshold ?? 0;
 
   // Collect equipped item ids for display at the top
   const equippedItems = snapshot?.items.filter(i => isEquipped(i.id, equipment)) ?? [];
@@ -221,6 +246,49 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
           <div style={slotsStyle}>
             Slots: {slotsUsed}/{maxSlots} &nbsp;|&nbsp; Items: {totalItems}
           </div>
+        )}
+
+        {/* Auto-Salvage Settings */}
+        {snapshot && (
+          <>
+            <div style={sectionHeadingStyle}>
+              <span>Auto-Salvage Settings</span>
+            </div>
+            <div style={{ padding: '6px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#aaaaaa' }}>
+                <span>Auto-salvage weapons &le;</span>
+                <select
+                  value={weaponThreshold}
+                  onChange={(e) => handleAutoSalvageChange('weapon', e.target.value)}
+                  style={{ background: '#0d0d0d', border: '1px solid #1a3a1a', color: '#ff8800', fontFamily: 'monospace', fontSize: '11px', padding: '1px 4px' }}
+                  aria-label="auto-salvage weapon threshold"
+                >
+                  <option value={0}>Off</option>
+                  <option value={1}>W1</option>
+                  <option value={2}>W2</option>
+                  <option value={3}>W3</option>
+                  <option value={4}>W4</option>
+                  <option value={5}>W5</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#aaaaaa' }}>
+                <span>Auto-salvage armor &le;</span>
+                <select
+                  value={armorThreshold}
+                  onChange={(e) => handleAutoSalvageChange('armor', e.target.value)}
+                  style={{ background: '#0d0d0d', border: '1px solid #1a3a1a', color: '#ff8800', fontFamily: 'monospace', fontSize: '11px', padding: '1px 4px' }}
+                  aria-label="auto-salvage armor threshold"
+                >
+                  <option value={0}>Off</option>
+                  <option value={1}>W1</option>
+                  <option value={2}>W2</option>
+                  <option value={3}>W3</option>
+                  <option value={4}>W4</option>
+                  <option value={5}>W5</option>
+                </select>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Bulk salvage buttons */}
@@ -309,16 +377,21 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                       equip
                     </button>
                   )}
-                  {isSalvageable(item.category) && (
-                    <button
-                      type="button"
-                      style={salvageBtnStyle}
-                      onClick={() => handleSalvage(item.id)}
-                      aria-label={`salvage ${item.name}`}
-                    >
-                      salvage
-                    </button>
-                  )}
+                  {isSalvageable(item.category) && (() => {
+                    const tooHighSkill = (item.workmanship ?? 1) > maxSalvageable;
+                    return (
+                      <button
+                        type="button"
+                        style={tooHighSkill ? salvageBtnDisabledStyle : salvageBtnStyle}
+                        onClick={() => !tooHighSkill && handleSalvage(item.id)}
+                        disabled={tooHighSkill}
+                        title={tooHighSkill ? `Skill too low (need skill to reach W${item.workmanship})` : undefined}
+                        aria-label={`salvage ${item.name}`}
+                      >
+                        salvage
+                      </button>
+                    );
+                  })()}
                 </span>
               </div>
               {item.description && <div style={itemDescStyle}>{item.description}</div>}

@@ -30,6 +30,8 @@ public class Player
     public int Speed { get; private set; }
     public int CraftingSkill { get; private set; }
     public int SalvageSkill { get; private set; }
+    public int AutoSalvageWeaponThreshold { get; private set; }
+    public int AutoSalvageArmorThreshold { get; private set; }
 
     // Position
     public Position Position { get; private set; } = new(WorldId.Aeldran, 1, 0, 0);
@@ -261,6 +263,19 @@ public class Player
     public void GainSalvageSkillXp(int amount)
     {
         SalvageSkill = Math.Max(1, SalvageSkill + amount);
+    }
+
+    /// <summary>
+    /// Sets the auto-salvage threshold for the given category (weapon or armor).
+    /// A maxWorkmanship of 0 disables auto-salvage for that category.
+    /// </summary>
+    public void SetAutoSalvageThreshold(string category, int maxWorkmanship)
+    {
+        var clamped = Math.Clamp(maxWorkmanship, 0, 10);
+        if (string.Equals(category, "weapon", StringComparison.OrdinalIgnoreCase))
+            AutoSalvageWeaponThreshold = clamped;
+        else if (string.Equals(category, "armor", StringComparison.OrdinalIgnoreCase))
+            AutoSalvageArmorThreshold = clamped;
     }
 
     public ReputationTier GetReputationTier(FactionId factionId) =>

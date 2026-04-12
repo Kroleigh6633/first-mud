@@ -31,3 +31,4 @@ public record EquipCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record UnequipCommand(Guid PlayerId, string Slot) : IGameCommand;
 public record SalvageCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record SalvageAllCommand(Guid PlayerId, string Category) : IGameCommand;
+public record SetAutoSalvageCommand(Guid PlayerId, string Category, int MaxWorkmanship) : IGameCommand;

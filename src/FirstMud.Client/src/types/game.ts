@@ -148,6 +148,8 @@ export interface InventorySnapshot {
   name: string;
   craftingSkill: number;
   salvageSkill: number;
+  autoSalvageWeaponThreshold: number;
+  autoSalvageArmorThreshold: number;
   items: InventoryItem[];
   equippedWeaponId?: string;
   equippedArmorId?: string;

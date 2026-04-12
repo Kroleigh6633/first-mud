@@ -202,6 +202,11 @@ public class GameHub : Hub
                 playerId,
                 TryGetString(payload, "category") ?? "Weapon"),
 
+            "autosalvage" => new SetAutoSalvageCommand(
+                playerId,
+                TryGetString(payload, "category") ?? "weapon",
+                TryGetInt(payload, "maxWorkmanship")),
+
             _ => null
         };
     }

@@ -136,7 +136,8 @@ public class CombatHelpers(
             player.Position.World,
             ownedItems.Count,
             player.MaxInventorySlots,
-            ct);
+            ct,
+            player);
 
         if (!result.Dropped)
         {

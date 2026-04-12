@@ -56,6 +56,11 @@ public class SalvageService
         if (!item.IsSalvageable)
             return new SalvageResult(false, $"{item.Name} is broken and cannot be salvaged.", []);
 
+        // Skill gate: check SalvageSkill against item Workmanship
+        var skillCheckResult = CheckSalvageSkill(player.SalvageSkill, item);
+        if (!skillCheckResult.Allowed)
+            return new SalvageResult(false, skillCheckResult.Message, []);
+
         // Success chance: base 70% + 2% per SalvageSkill point (capped at 95%)
         var successChance = Math.Min(95, 70 + player.SalvageSkill * 2);
         if (Random.Shared.Next(100) >= successChance)
@@ -166,6 +171,67 @@ public class SalvageService
         return new SalvageResult(true, message, combinedYields);
     }
 
+    /// <summary>
+    /// Checks whether the item should be auto-salvaged based on the player's thresholds.
+    /// If so, salvages it immediately (without adding to inventory) and returns a summary message.
+    /// Returns null if the item should NOT be auto-salvaged.
+    /// </summary>
+    public async Task<string?> TryAutoSalvageAsync(
+        Player player,
+        Item item,
+        CancellationToken ct = default)
+    {
+        // Only weapons and armor are subject to auto-salvage
+        if (item.Category != ItemCategory.Weapon && item.Category != ItemCategory.Armor)
+            return null;
+
+        var threshold = item.Category == ItemCategory.Weapon
+            ? player.AutoSalvageWeaponThreshold
+            : player.AutoSalvageArmorThreshold;
+
+        if (threshold == 0 || item.Workmanship.Value > threshold)
+            return null;
+
+        // Skill gate still applies for auto-salvage
+        var skillCheck = CheckSalvageSkill(player.SalvageSkill, item);
+        if (!skillCheck.Allowed)
+            return null; // Too low to salvage — just drop it normally
+
+        // Perform the salvage (item is not yet in inventory)
+        var workValue = item.Workmanship.Value;
+        var yieldBonus = workValue / 3;
+        var skillBonus  = player.SalvageSkill / 10;
+        var yields = BuildYields(item.Category, yieldBonus + skillBonus);
+
+        foreach (var yield in yields)
+        {
+            var existing = await _items.GetByOwnerAndNameAsync(player.Id, yield.Name, ItemCategory.Component, ct);
+            if (existing is not null)
+            {
+                existing.AddQuantity(yield.Quantity);
+                await _items.UpdateAsync(existing, ct);
+            }
+            else
+            {
+                var newItem = Item.Create(
+                    yield.Name,
+                    $"A salvaged material: {yield.Name.ToLowerInvariant()}.",
+                    ItemCategory.Component,
+                    Workmanship.Of(1),
+                    item.OriginWorld);
+                newItem.SetOwner(player.Id);
+                newItem.AddQuantity(yield.Quantity - 1);
+                await _items.AddAsync(newItem, ct);
+            }
+        }
+
+        player.GainSalvageSkillXp(1);
+        await _players.UpdateAsync(player, ct);
+
+        var yieldSummary = BuildYieldSummary(yields);
+        return $"Auto-salvaged {item.Name} (W{workValue}) → {yieldSummary}";
+    }
+
     // ─── private helpers ────────────────────────────────────────────────────
 
     private static IReadOnlyList<SalvageYield> BuildYields(ItemCategory category, int bonus)
@@ -207,4 +273,57 @@ public class SalvageService
 
     private static string BuildYieldSummary(IReadOnlyList<SalvageYield> yields) =>
         string.Join(", ", yields.Select(y => $"{y.Name} x{y.Quantity}"));
+
+    /// <summary>
+    /// Returns the maximum Workmanship the player's SalvageSkill allows them to salvage.
+    /// Skill  1-5  → W3
+    /// Skill  6-10 → W5
+    /// Skill 11-20 → W7
+    /// Skill 21+   → W10
+    /// </summary>
+    public static int MaxWorkmanshipForSkill(int skill) => skill switch
+    {
+        <= 5  => 3,
+        <= 10 => 5,
+        <= 20 => 7,
+        _     => 10
+    };
+
+    /// <summary>
+    /// Returns the minimum SalvageSkill needed to salvage a given Workmanship level.
+    /// </summary>
+    private static int RequiredSkillForWorkmanship(int workmanship) => workmanship switch
+    {
+        <= 3  => 1,
+        <= 5  => 6,
+        <= 7  => 11,
+        _     => 21
+    };
+
+    private static readonly string[] HighTierMaterials = ["Mithril", "Dravenite", "Wyrd"];
+
+    private static SkillCheckResult CheckSalvageSkill(int skill, Item item)
+    {
+        var workmanship = item.Workmanship.Value;
+        var maxAllowed  = MaxWorkmanshipForSkill(skill);
+
+        if (workmanship > maxAllowed)
+        {
+            var needed = RequiredSkillForWorkmanship(workmanship);
+            return new SkillCheckResult(false,
+                $"Your salvage skill ({skill}) is too low to salvage this {item.Name} (W{workmanship}). Need skill {needed}.");
+        }
+
+        // High-tier material names require Skill 15+
+        foreach (var material in HighTierMaterials)
+        {
+            if (item.Name.Contains(material, StringComparison.OrdinalIgnoreCase) && skill < 15)
+                return new SkillCheckResult(false,
+                    $"Your salvage skill ({skill}) is too low to salvage {item.Name}. Need skill 15 for {material} materials.");
+        }
+
+        return new SkillCheckResult(true, string.Empty);
+    }
+
+    private readonly record struct SkillCheckResult(bool Allowed, string Message);
 }

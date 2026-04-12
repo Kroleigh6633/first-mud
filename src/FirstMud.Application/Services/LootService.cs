@@ -11,6 +11,7 @@ public record LootDropResult(bool Dropped, Item? Item, string Message);
 public class LootService
 {
     private readonly IItemRepository _itemRepository;
+    private readonly SalvageService _salvageService;
     private readonly ILogger<LootService> _logger;
 
     // -------------------------------------------------------------------------
@@ -35,9 +36,10 @@ public class LootService
         new("Wyrd Shard",       "A jagged shard of crystallised Wyrd-energy. Handle with care.",             ItemCategory.Reagent,   MinWork: 3, MaxWork: 7),
     ];
 
-    public LootService(IItemRepository itemRepository, ILogger<LootService> logger)
+    public LootService(IItemRepository itemRepository, SalvageService salvageService, ILogger<LootService> logger)
     {
         _itemRepository = itemRepository;
+        _salvageService = salvageService;
         _logger = logger;
     }
 
@@ -54,7 +56,8 @@ public class LootService
         WorldId originWorld,
         int currentInventoryCount,
         int maxInventorySlots,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Player? player = null)
     {
         // Inventory full check
         if (currentInventoryCount >= maxInventorySlots)
@@ -76,6 +79,18 @@ public class LootService
 
         var item = Item.Create(template.Name, template.Description, template.Category, workmanship, originWorld);
         item.SetOwner(ownerId);
+
+        // Auto-salvage check: if the player has a threshold set and this item qualifies, salvage immediately
+        if (player is not null)
+        {
+            var autoSalvageMessage = await _salvageService.TryAutoSalvageAsync(player, item, ct);
+            if (autoSalvageMessage is not null)
+            {
+                _logger.LogInformation("Auto-salvaged loot for player {PlayerId}: {ItemName} W{Workmanship}",
+                    ownerId, item.Name, workValue);
+                return new LootDropResult(true, item, autoSalvageMessage);
+            }
+        }
 
         // For stackable categories (Component/Reagent), merge into an existing stack if one exists
         if (item.IsStackable)

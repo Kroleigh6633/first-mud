@@ -68,6 +68,7 @@ builder.Services.AddScoped<ICommandHandler<OpenStorageCommand>, OpenStorageComma
 builder.Services.AddScoped<ICommandHandler<AutoFarmCommand>, AutoFarmCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SalvageCommand>, SalvageCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SalvageAllCommand>, SalvageAllCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<SetAutoSalvageCommand>, SetAutoSalvageCommandHandler>();
 
 var app = builder.Build();
 

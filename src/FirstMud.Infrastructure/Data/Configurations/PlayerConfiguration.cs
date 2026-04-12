@@ -46,6 +46,10 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.Speed);
         builder.Property(p => p.CraftingSkill);
         builder.Property(p => p.SalvageSkill);
+        builder.Property(p => p.AutoSalvageWeaponThreshold)
+            .HasDefaultValue(0);
+        builder.Property(p => p.AutoSalvageArmorThreshold)
+            .HasDefaultValue(0);
         builder.Property(p => p.CraftingSeed);
 
         builder.Property(p => p.CurrentHp);
