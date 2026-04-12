@@ -39,6 +39,16 @@ public class Recipe
 
     private Recipe() { }
 
+    /// <summary>
+    /// Replaces the ingredient list. Used by the startup seeder to correct
+    /// ingredient names on already-seeded recipes without dropping the table.
+    /// </summary>
+    public void ReplaceIngredients(IEnumerable<RecipeIngredient> ingredients)
+    {
+        _ingredients.Clear();
+        _ingredients.AddRange(ingredients);
+    }
+
     public static Recipe Create(
         string recipeId,
         string name,

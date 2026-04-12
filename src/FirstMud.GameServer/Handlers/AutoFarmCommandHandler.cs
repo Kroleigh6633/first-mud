@@ -431,6 +431,7 @@ public class AutoFarmCommandHandler(
 
         int originX = 0, originY = 0;
         bool originSet = false;
+        int stepCount = 0;
 
         var spiralEnumerator = SpiralSteps().GetEnumerator();
 
@@ -563,6 +564,15 @@ public class AutoFarmCommandHandler(
                         ZoneId = newPos.ZoneId,
                         World = newPos.World.ToString()
                     }, farmCt);
+
+                // Active companions gain 1 usage point every 10 steps while travelling
+                stepCount++;
+                if (stepCount % 10 == 0)
+                {
+                    await using var walkScope = scopeFactory.CreateAsyncScope();
+                    var walkHelpers = walkScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+                    await walkHelpers.UpdateCompanionUsageAsync(playerId, 1, farmCt);
+                }
 
                 // --- HARVEST resource nodes ---
                 try
@@ -840,6 +850,13 @@ public class AutoFarmCommandHandler(
                     // Record defeat: lower the safe danger cap to currentDanger - 1
                     autoFarmService.RecordEncounterOutcome(playerId, FarmEncounterOutcome.Defeat, dangerLevel);
 
+                    // Companions still gain usage for the fight even on defeat
+                    await using (var defeatCompScope = scopeFactory.CreateAsyncScope())
+                    {
+                        var defeatCompHelpers = defeatCompScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+                        await defeatCompHelpers.UpdateCompanionUsageAsync(playerId, 10, farmCt);
+                    }
+
                     var defPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                     if (defPlayer is not null)
                     {
@@ -891,6 +908,13 @@ public class AutoFarmCommandHandler(
                     // Record flee: if 2+ in last 5, the cap will be reduced
                     autoFarmService.RecordEncounterOutcome(playerId, FarmEncounterOutcome.Fled, dangerLevel);
                     int newCap = autoFarmService.GetSafeDangerCap(playerId, player.Level);
+
+                    // Companions gain usage even when fleeing
+                    await using (var fledCompScope = scopeFactory.CreateAsyncScope())
+                    {
+                        var fledCompHelpers = fledCompScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+                        await fledCompHelpers.UpdateCompanionUsageAsync(playerId, 10, farmCt);
+                    }
 
                     await hubContext.Clients
                         .Group(playerId.ToString())
@@ -984,6 +1008,11 @@ public class AutoFarmCommandHandler(
                     await using var xpScope = scopeFactory.CreateAsyncScope();
                     var combatHelpers = xpScope.ServiceProvider.GetRequiredService<CombatHelpers>();
                     await combatHelpers.AwardCombatXpAsync(playerId, encounter, farmCt, isAutoFarm: true);
+
+                    // Companion usage — 10 points per combat (same as manual)
+                    await using var compScope = scopeFactory.CreateAsyncScope();
+                    var compHelpers = compScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+                    await compHelpers.UpdateCompanionUsageAsync(playerId, 10, farmCt);
 
                     // Loot — check inventory full before rolling
                     var currentItems = await itemRepo.GetByOwnerAsync(playerId, farmCt);

@@ -47,6 +47,18 @@ public class Companion
     private static readonly float DriftRatePerHour = 0.5f;
     private static readonly int MaxIgnoredWarnings = 3;
 
+    /// <summary>
+    /// The UsageCounter value required to reach the next layer (or 0 if already at max layer).
+    /// </summary>
+    public int NextLayerThreshold
+    {
+        get
+        {
+            if (CurrentLayer >= 6) return 0;
+            return LayerThresholds[Type][CurrentLayer];
+        }
+    }
+
     private Companion() { }
 
     public static Companion Create(Guid ownerId, string name, CompanionType type, MagicElement element) => new()

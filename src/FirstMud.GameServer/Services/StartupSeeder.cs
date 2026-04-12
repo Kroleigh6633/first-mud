@@ -21,6 +21,7 @@ public class StartupSeeder(
         await FixTrailingCommaEquippedItemsJsonAsync(ct);
         await FixMisassignedEquipmentSlotsAsync(ct);
         await FixFlatStartingStatsAsync(ct);
+        await MergeDuplicateStorageStacksAsync(ct);
         await SeedDevPlayerAsync(ct);
         await SeedNeo4jLoreAsync(ct);
         await SeedAeldranZonesAsync(ct);
@@ -212,6 +213,77 @@ public class StartupSeeder(
     }
 
     // -------------------------------------------------------------------------
+    // Storage stack consolidation fixup
+    // -------------------------------------------------------------------------
+
+    // Merges duplicate storage stacks that accumulated before the deposit handler
+    // started enforcing stack-merge logic. Any two (or more) Items in the same
+    // homestead storage vault that share the same Name, Category, and stackable flag
+    // are collapsed into a single row whose Quantity is the sum of all duplicates.
+    // The extra Item rows are deleted. Safe to run on every startup — idempotent.
+    private async Task MergeDuplicateStorageStacksAsync(CancellationToken ct)
+    {
+        var homesteads = await db.Homesteads.ToListAsync(ct);
+        var totalMerged = 0;
+
+        foreach (var homestead in homesteads)
+        {
+            var storageEntries = await db.HomesteadStorageItems
+                .Where(s => s.HomesteadId == homestead.Id)
+                .ToListAsync(ct);
+
+            if (storageEntries.Count == 0) continue;
+
+            var itemIds = storageEntries.Select(s => s.ItemId).ToList();
+            var items = await db.Items
+                .Where(i => itemIds.Contains(i.Id))
+                .ToListAsync(ct);
+
+            // Group stackable items by Name + Category
+            var groups = items
+                .Where(i => i.IsStackable)
+                .GroupBy(i => (i.Name, i.Category))
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            foreach (var group in groups)
+            {
+                var ordered = group.OrderBy(i => i.Id).ToList(); // deterministic primary pick
+                var primary = ordered[0];
+                var duplicates = ordered.Skip(1).ToList();
+
+                // Sum all duplicate quantities into the primary
+                var extraQty = duplicates.Sum(d => d.Quantity);
+                primary.AddQuantity(extraQty);
+                db.Items.Update(primary);
+
+                // Remove the HomesteadStorageItem rows for the duplicates
+                foreach (var dup in duplicates)
+                {
+                    var entry = storageEntries.FirstOrDefault(s => s.ItemId == dup.Id);
+                    if (entry is not null)
+                        db.HomesteadStorageItems.Remove(entry);
+
+                    db.Items.Remove(dup);
+                    totalMerged++;
+                }
+            }
+        }
+
+        if (totalMerged > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger.LogWarning(
+                "MergeDuplicateStorageStacks: collapsed {Count} duplicate storage item row(s) across all homesteads.",
+                totalMerged);
+        }
+        else
+        {
+            logger.LogInformation("MergeDuplicateStorageStacks: no duplicate storage stacks found.");
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Dev player
     // -------------------------------------------------------------------------
 
@@ -328,13 +400,14 @@ public class StartupSeeder(
 
         var recipes = new[]
         {
+            // Iron Ore (common loot drop) + Wood (harvest) → Iron Sword
             Recipe.Create(
                 recipeId: "IRON_SWORD_001",
                 name: "Iron Sword",
                 ingredients:
                 [
                     RecipeIngredient.Create(ItemCategory.Component, "Iron Ore", 3),
-                    RecipeIngredient.Create(ItemCategory.Component, "Leather Strip", 1),
+                    RecipeIngredient.Create(ItemCategory.Component, "Wood", 1),
                 ],
                 resultCategory: ItemCategory.Weapon,
                 resultItemName: "Iron Sword",
@@ -345,13 +418,14 @@ public class StartupSeeder(
                 requiredCraftingSkill: 1,
                 isDiscoverable: false),
 
+            // Leather (common loot drop) + Sinew (common loot drop) → Leather Armor
             Recipe.Create(
                 recipeId: "LEATHER_ARMOR_001",
                 name: "Leather Armor",
                 ingredients:
                 [
-                    RecipeIngredient.Create(ItemCategory.Component, "Beast Hide", 4),
-                    RecipeIngredient.Create(ItemCategory.Component, "Sinew", 2),
+                    RecipeIngredient.Create(ItemCategory.Component, "Leather", 4),
+                    RecipeIngredient.Create(ItemCategory.Component, "Sinew", 1),
                 ],
                 resultCategory: ItemCategory.Armor,
                 resultItemName: "Leather Armor",
@@ -362,13 +436,14 @@ public class StartupSeeder(
                 requiredCraftingSkill: 1,
                 isDiscoverable: false),
 
+            // Herbs (harvest) + Bone Fragment (common loot drop) → Healing Draught
             Recipe.Create(
                 recipeId: "HEALING_DRAUGHT_001",
                 name: "Healing Draught",
                 ingredients:
                 [
-                    RecipeIngredient.Create(ItemCategory.Reagent, "Thornwood Herb", 2),
-                    RecipeIngredient.Create(ItemCategory.Reagent, "Pure Water", 1),
+                    RecipeIngredient.Create(ItemCategory.Component, "Herbs", 3),
+                    RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 1),
                 ],
                 resultCategory: ItemCategory.Consumable,
                 resultItemName: "Healing Draught",
@@ -379,13 +454,14 @@ public class StartupSeeder(
                 requiredCraftingSkill: 1,
                 isDiscoverable: false),
 
+            // Dravenite Dust (wyrd biome loot) + Iron Ore (common loot) → Rough Focus Stone
             Recipe.Create(
                 recipeId: "FOCUS_STONE_001",
                 name: "Rough Focus Stone",
                 ingredients:
                 [
-                    RecipeIngredient.Create(ItemCategory.Component, "Dravenite Dust", 5),
-                    RecipeIngredient.Create(ItemCategory.Component, "Iron Wire", 1),
+                    RecipeIngredient.Create(ItemCategory.Reagent, "Dravenite Dust", 3),
+                    RecipeIngredient.Create(ItemCategory.Component, "Iron Ore", 2),
                 ],
                 resultCategory: ItemCategory.Accessory,
                 resultItemName: "Rough Focus Stone",
@@ -396,13 +472,14 @@ public class StartupSeeder(
                 requiredCraftingSkill: 2,
                 isDiscoverable: false),
 
+            // Sinew (common loot) + Herbs (harvest) → Shaping Taper
             Recipe.Create(
                 recipeId: "TAPER_SHAPING_001",
                 name: "Shaping Taper",
                 ingredients:
                 [
-                    RecipeIngredient.Create(ItemCategory.Component, "Wildfolk Essence", 1),
-                    RecipeIngredient.Create(ItemCategory.Reagent, "Candle Wax", 2),
+                    RecipeIngredient.Create(ItemCategory.Component, "Sinew", 2),
+                    RecipeIngredient.Create(ItemCategory.Component, "Herbs", 3),
                 ],
                 resultCategory: ItemCategory.Reagent,
                 resultItemName: "Shaping Taper",

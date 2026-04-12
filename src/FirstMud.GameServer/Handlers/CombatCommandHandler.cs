@@ -81,14 +81,17 @@ public class UseCombatAbilityCommandHandler(
             await combatHelpers.SyncPlayerHpAfterCombatAsync(cmd.PlayerId, updated, ct);
             await combatHelpers.TryRollLootAsync(cmd.PlayerId, updated.ZoneId, ct);
             await combatHelpers.TryCaptureCompanionAsync(cmd.PlayerId, updated, ct);
+            await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
         }
         else if (updated.State == EncounterState.Defeat)
         {
             await combatHelpers.HandlePlayerDefeatAsync(cmd.PlayerId, ct);
+            await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
         }
         else if (updated.State == EncounterState.Fled)
         {
             await combatHelpers.SyncPlayerHpAfterCombatAsync(cmd.PlayerId, updated, ct);
+            await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
         }
 
         var dto = CombatHelpers.BuildCombatUpdateDto(updated, message);

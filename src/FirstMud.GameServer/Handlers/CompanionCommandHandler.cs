@@ -266,6 +266,7 @@ internal static class CompanionDtoHelpers
         c.Level,
         c.CurrentLayer,
         c.UsageCounter,
+        c.NextLayerThreshold,
         c.DriftAccumulator,
         c.IsActive,
         c.RelationshipDepth,
@@ -294,6 +295,8 @@ internal static class CompanionDtoHelpers
 
 /// <summary>
 /// DTO for broadcasting companion state to the client.
+/// NextLayerThreshold is the UsageCounter value needed to advance to the next layer
+/// (0 when already at max layer 6). The client uses this to render the progress bar.
 /// </summary>
 public record CompanionDto(
     Guid Id,
@@ -303,6 +306,7 @@ public record CompanionDto(
     int Level,
     int CurrentLayer,
     int UsageCounter,
+    int NextLayerThreshold,
     float DriftAccumulator,
     bool IsActive,
     int RelationshipDepth,

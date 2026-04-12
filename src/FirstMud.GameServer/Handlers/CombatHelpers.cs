@@ -426,6 +426,60 @@ public class CombatHelpers(
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Companion usage / leveling after combat
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Records usage points for every active companion that participated in the encounter,
+    /// persists the update, and broadcasts a layer-up message if TryAdvanceLayer fires.
+    /// Call this after every combat resolution (Victory, Fled, or Defeat).
+    /// </summary>
+    public async Task UpdateCompanionUsageAsync(Guid playerId, int usagePoints, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(playerId, ct);
+        if (player is null) return;
+
+        foreach (var companionId in player.ActiveCompanionIds)
+        {
+            var companion = await companionRepository.GetByIdAsync(companionId, ct);
+            if (companion is null || companion.IsPermanentlyGone) continue;
+
+            var layerBefore = companion.CurrentLayer;
+            companion.RecordUsage(usagePoints);
+            await companionRepository.UpdateAsync(companion, ct);
+
+            // Broadcast layer-up events raised by RecordUsage → TryAdvanceLayer
+            foreach (var evt in companion.DomainEvents)
+            {
+                if (evt is CompanionLayerUnlockedEvent layerEvt)
+                {
+                    await notificationService.SendMessageAsync(playerId, "system",
+                        $"{companion.Name} has advanced to Layer {layerEvt.NewLayer}! New abilities unlocked.",
+                        ct);
+
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("CompanionLayerUp", new
+                        {
+                            CompanionId = companion.Id,
+                            companion.Name,
+                            NewLayer    = layerEvt.NewLayer,
+                        }, ct);
+                }
+            }
+            companion.ClearDomainEvents();
+
+            logger.LogDebug(
+                "Companion {Name} ({Id}) usage +{Points} → {Counter}/{Threshold} (Layer {Layer})",
+                companion.Name, companion.Id, usagePoints,
+                companion.UsageCounter, companion.NextLayerThreshold, companion.CurrentLayer);
+        }
+
+        // Refresh the companion panel on the client
+        await CompanionDtoHelpers.BroadcastCompanionListAsync(playerId, companionRepository, hubContext, ct);
+    }
+
     /// <summary>
     /// Generates a flavourful name for a newly captured monster using element-themed syllables.
     /// </summary>

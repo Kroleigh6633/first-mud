@@ -16,6 +16,7 @@ public class GameLoopService : BackgroundService
     private const int ResourceRegenIntervalSeconds = 60;     // Resource node regen every 60 seconds
     private const int WeaveRegenIntervalSeconds = 10;        // Out-of-combat Weave regen: 1 point every 10 seconds
     private const int HomesteadCompanionIntervalSeconds = 60; // Homestead companion duties every 60 seconds
+    private const int CompanionDriftIntervalSeconds = 60;    // Companion drift accumulation every 60 seconds
 
     private readonly ConcurrentQueue<IGameCommand> _commandQueue = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -99,6 +100,11 @@ public class GameLoopService : BackgroundService
         var ticksPerHomesteadCompanion = (long)(HomesteadCompanionIntervalSeconds * 1000.0 / TickIntervalMs);
         if (_tickCount % ticksPerHomesteadCompanion == 0 && _tickCount > 0)
             await ProcessHomesteadCompanionsAsync(ct);
+
+        // 8. Every 60 seconds: accumulate drift for inactive companions not on homestead duty
+        var ticksPerDrift = (long)(CompanionDriftIntervalSeconds * 1000.0 / TickIntervalMs);
+        if (_tickCount % ticksPerDrift == 0 && _tickCount > 0)
+            await ProcessCompanionDriftAsync(ct);
     }
 
     private async Task ProcessCommandsAsync(CancellationToken ct)
@@ -273,6 +279,59 @@ public class GameLoopService : BackgroundService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error in homestead companion tick.");
+        }
+    }
+
+    /// <summary>
+    /// Accumulates drift for companions that are not active and not on homestead duty.
+    /// Called every 60 seconds; passes 1/60th of an hour (≈ 0.0167) so drift is in hours.
+    /// Active companions accumulate drift at 10% of the passive rate (handled inside AccumulateDrift).
+    /// If drift reaches 50 the companion drops a layer — this is a soft penalty for neglect.
+    /// </summary>
+    private async Task ProcessCompanionDriftAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var companionRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.ICompanionRepository>();
+            var hubContext    = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+
+            // Fetch all players so we know which companions are idle (not active, not on duty)
+            var playerRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.IPlayerRepository>();
+            var players    = await playerRepo.GetActivePlayersAsync(ct);
+
+            foreach (var player in players)
+            {
+                var companions = await companionRepo.GetByOwnerAsync(player.Id, ct);
+                foreach (var companion in companions)
+                {
+                    if (companion.IsPermanentlyGone) continue;
+                    // Skip companions on homestead duty — they are productively occupied
+                    if (companion.AssignedDuty.HasValue && companion.AssignedDuty != FirstMud.Domain.Enums.HomesteadDuty.None) continue;
+
+                    var layerBefore = companion.CurrentLayer;
+                    // 1 tick = 60 seconds = 1/60 of an hour
+                    companion.AccumulateDrift(1f / 60f);
+                    await companionRepo.UpdateAsync(companion, ct);
+
+                    // Notify player if the companion drifted down a layer
+                    if (companion.CurrentLayer < layerBefore)
+                    {
+                        await hubContext.Clients
+                            .Group(player.Id.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category  = "system",
+                                text      = $"{companion.Name} has drifted to Layer {companion.CurrentLayer} due to inactivity. Bring them on an adventure!"
+                            }, ct);
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in companion drift tick.");
         }
     }
 

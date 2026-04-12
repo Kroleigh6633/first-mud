@@ -19,7 +19,7 @@ const quietSignalRLogger: signalR.ILogger = {
   log(logLevel: signalR.LogLevel, message: string) {
     if (logLevel < signalR.LogLevel.Warning) return;
 
-    const benign = /stopped during negotiation|abort(?:ed|error)/i.test(message);
+    const benign = /stopped during negotiation|abort(?:ed|error)|bad gateway|502|status code/i.test(message);
     if (benign) return;
 
     switch (logLevel) {
@@ -453,6 +453,21 @@ export function useGameConnection(): GameConnectionResult {
       }
     });
 
+    // Server acknowledgment after every SendCommand — no client action needed.
+    connection.on('CommandReceived', () => { /* ack — no action needed */ });
+
+    // Companion advanced to a new layer — server also sends a GameMessage, so
+    // just refresh the companion roster to pick up the new abilities.
+    connection.on('CompanionLayerUp', (payload: { companionId: string; name: string; newLayer: number }) => {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'system',
+        text: `${payload.name} has advanced to Layer ${payload.newLayer}! New abilities unlocked.`,
+      });
+      // Refresh companion roster so the UI reflects the updated layer
+      sendCommand('listcompanions');
+    });
+
     connection.onreconnecting(() => {
       setConnectionState('connecting');
       appendMessage({
@@ -502,7 +517,7 @@ export function useGameConnection(): GameConnectionResult {
         // user-visible error.
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err);
-        if (/stopped during negotiation|abort/i.test(msg)) {
+        if (/stopped during negotiation|abort|bad gateway|502|status code/i.test(msg)) {
           return;
         }
         console.error('Connection failed:', err);

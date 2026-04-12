@@ -151,8 +151,8 @@ public class WorldStateService
             .Where(c => c.IsActive && !c.IsPermanentlyGone)
             .Select(c => new CompanionDto(
                 c.Id, c.Name, c.Type.ToString(), c.Element.ToString(),
-                c.Level, c.CurrentLayer, c.UsageCounter, c.DriftAccumulator,
-                c.IsActive, c.RelationshipDepth))
+                c.Level, c.CurrentLayer, c.UsageCounter, c.NextLayerThreshold,
+                c.DriftAccumulator, c.IsActive, c.RelationshipDepth))
             .ToList();
 
         var playerDto = new PlayerStateDto(
