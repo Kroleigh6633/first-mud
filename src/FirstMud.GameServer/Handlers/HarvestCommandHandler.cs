@@ -43,13 +43,20 @@ public class HarvestCommandHandler(
             biome = CombatHelpers.GetBiomeForPosition(nearbyZone, player.Position.X, player.Position.Y);
             harvestType = biome switch
             {
-                "forest" or "denseForest" => ResourceType.Wood,
-                "mountain" or "snowMountain" => ResourceType.Stone,
-                "water" => Random.Shared.Next(2) == 0 ? ResourceType.Sand : ResourceType.Herbs,
-                "sand" or "desert" => ResourceType.Sand,
-                "swamp" => ResourceType.Herbs,
+                "forest" or "denseForest"
+                    => Random.Shared.Next(4) == 0 ? ResourceType.Herbs : ResourceType.Wood,
+                "mountain" or "snowMountain"
+                    => Random.Shared.Next(3) == 0 ? ResourceType.Metal : ResourceType.Stone,
+                "water"
+                    => Random.Shared.Next(3) == 0 ? ResourceType.Herbs : ResourceType.Sand,
+                "sand" or "desert"
+                    => Random.Shared.Next(4) == 0 ? ResourceType.Metal : ResourceType.Sand,
+                "swamp"
+                    => Random.Shared.Next(5) == 0 ? ResourceType.Wood : ResourceType.Herbs,
                 "grassland" or "plains" => ResourceType.Herbs,
-                "path" => ResourceType.Stone,
+                "path"                  => ResourceType.Stone,
+                "wyrd"
+                    => Random.Shared.Next(3) == 0 ? ResourceType.Metal : ResourceType.Herbs,
                 _ => ResourceType.Wood,
             };
             harvestAmount = Random.Shared.Next(1, 3); // wilderness yields 1-2
@@ -79,8 +86,55 @@ public class HarvestCommandHandler(
             actual = harvestAmount;
         }
 
-        var resourceName = harvestType.ToString();
-        var itemName = resourceName; // e.g. "Wood", "Stone", "Metal"
+        // Compute danger level for this position so we can pick the right specific item
+        int dangerLevel = nearbyZone is not null
+            ? nearbyZone.DangerLevel
+            : BiomeService.GetWildernessDanger(player.Position.X, player.Position.Y, biome);
+
+        var itemName = (biome, harvestType, dangerLevel) switch
+        {
+            // Mountains
+            ("mountain" or "snowMountain", ResourceType.Metal, <= 3) => "Copper Ore",
+            ("mountain" or "snowMountain", ResourceType.Metal, <= 5) => "Iron Ore",
+            ("mountain" or "snowMountain", ResourceType.Metal, <= 7) => "Silver Ore",
+            ("mountain" or "snowMountain", ResourceType.Metal, _)    => "Mithril Ore",
+            ("mountain" or "snowMountain", ResourceType.Stone, <= 4) => "Stone",
+            ("mountain" or "snowMountain", ResourceType.Stone, _)    => "Granite Block",
+            ("mountain" or "snowMountain", ResourceType.Herbs, _)    => "Mountain Herbs",
+            // Forests
+            ("forest" or "denseForest", ResourceType.Wood, <= 3) => "Oak Wood",
+            ("forest" or "denseForest", ResourceType.Wood, <= 6) => "Thornwood",
+            ("forest" or "denseForest", ResourceType.Wood, _)    => "Ashwood",
+            ("forest" or "denseForest", ResourceType.Herbs, _)   => "Forest Herbs",
+            // Plains
+            ("grassland" or "plains", ResourceType.Herbs, <= 4) => "Meadow Herbs",
+            ("grassland" or "plains", ResourceType.Herbs, _)    => "Wild Herbs",
+            ("grassland" or "plains", ResourceType.Metal, <= 4) => "Tin Nugget",
+            ("grassland" or "plains", ResourceType.Metal, _)    => "Copper Ore",
+            // Swamp
+            ("swamp", ResourceType.Herbs, <= 4) => "Swamp Herbs",
+            ("swamp", ResourceType.Herbs, <= 7) => "Toad Gland",
+            ("swamp", ResourceType.Herbs, _)    => "Marsh Gas Crystal",
+            ("swamp", ResourceType.Wood, _)     => "Bogwood",
+            ("swamp", ResourceType.Metal, _)    => "Bog Iron",
+            // Coast / water
+            ("water", ResourceType.Sand, _)  => "Sand",
+            ("water", ResourceType.Stone, _) => "Coral Fragment",
+            ("water", ResourceType.Herbs, _) => "Sea Kelp",
+            // Desert
+            ("sand" or "desert", ResourceType.Sand, _)        => "Sand",
+            ("sand" or "desert", ResourceType.Metal, <= 5)    => "Iron Ore",
+            ("sand" or "desert", ResourceType.Metal, _)       => "Obsidian Shard",
+            // Wyrd
+            ("wyrd", ResourceType.Metal, _)  => "Dravenite Dust",
+            ("wyrd", ResourceType.Stone, _)  => "Wyrdstone",
+            ("wyrd", ResourceType.Herbs, _)  => "Wyrd Bloom",
+            // Path
+            ("path", ResourceType.Stone, _) => "Gravel",
+            // Fallback: never return the generic enum name "Metal"
+            (_, ResourceType.Metal, _) => "Copper Ore",
+            _ => harvestType.ToString(),
+        };
 
         // Check for an existing stack and merge, otherwise create new
         var existingStack = await itemRepository.GetByOwnerAndNameAsync(
@@ -97,7 +151,7 @@ public class HarvestCommandHandler(
         {
             resourceItem = Item.Create(
                 itemName,
-                $"A resource gathered from the wilds: {resourceName.ToLowerInvariant()}.",
+                $"A resource gathered from the wilds: {itemName.ToLowerInvariant()}.",
                 ItemCategory.Component,
                 Workmanship.Of(1),
                 player.Position.World);
@@ -109,24 +163,25 @@ public class HarvestCommandHandler(
         var biomeLabel = biome switch
         {
             "forest" or "denseForest" => "the dense forest",
-            "mountain" or "snowMountain" => "the mountain slopes",
-            "water" => "the shoreline",
-            "sand" or "desert" => "the arid wastes",
-            "swamp" => "the boggy marsh",
-            "grassland" or "plains" => "the open meadow",
-            "path" => "the roadside gravel",
-            "wyrd" => "the wyrd-touched ground",
-            _ => "the wilderness",
+            "mountain"                => "the mountain slopes",
+            "snowMountain"            => "the snow-capped peaks",
+            "water"                   => "the shoreline",
+            "sand" or "desert"        => "the arid wastes",
+            "swamp"                   => "the boggy marsh",
+            "grassland" or "plains"   => "the open meadow",
+            "path"                    => "the roadside gravel",
+            "wyrd"                    => "the wyrd-touched ground",
+            _                         => "the wilderness",
         };
         var verb = harvestType switch
         {
-            ResourceType.Wood => "cut",
+            ResourceType.Wood                     => "cut",
             ResourceType.Stone or ResourceType.Metal => "collected",
-            ResourceType.Sand => "scooped",
-            ResourceType.Herbs => "gathered",
-            _ => "harvested",
+            ResourceType.Sand                     => "scooped",
+            ResourceType.Herbs                    => "gathered",
+            _                                     => "harvested",
         };
-        var message = $"You {verb} {actual} {resourceName} from {biomeLabel}.";
+        var message = $"You {verb} {actual} {itemName} from {biomeLabel}.";
         await notificationService.SendMessageAsync(cmd.PlayerId, "loot", message, ct);
 
         await hubContext.Clients
