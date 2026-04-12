@@ -13,6 +13,8 @@ public static class ServiceExtensions
         services.AddScoped<QuestService>();
         services.AddScoped<AutomationService>();
         services.AddSingleton<CombatService>();
+        services.AddScoped<LootService>();
+        services.AddSingleton<AutoFarmService>();
         return services;
     }
 }

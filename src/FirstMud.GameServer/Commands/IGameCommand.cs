@@ -20,3 +20,10 @@ public record UseCombatAbilityCommand(Guid PlayerId, Guid EncounterId, string Ab
 public record FleeCombatCommand(Guid PlayerId, Guid EncounterId) : IGameCommand;
 public record GetAvailableQuestsCommand(Guid PlayerId) : IGameCommand;
 public record EnterZoneCommand(Guid PlayerId, int WorldId, Guid ZoneId) : IGameCommand;
+public record PortalHomeCommand(Guid PlayerId) : IGameCommand;
+public record PortalBackCommand(Guid PlayerId) : IGameCommand;
+public record HarvestCommand(Guid PlayerId) : IGameCommand;
+public record DepositCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
+public record WithdrawCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
+public record OpenStorageCommand(Guid PlayerId) : IGameCommand;
+public record AutoFarmCommand(Guid PlayerId, int DurationSeconds) : IGameCommand;

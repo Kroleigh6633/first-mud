@@ -60,10 +60,10 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.DiscoveredByPlayerName)
             .HasMaxLength(100);
 
-        // OwnerId — nullable, null means world loot
-        builder.Property<Guid?>("OwnerId")
+        // OwnerId — nullable, null means world loot or homestead storage
+        builder.Property(i => i.OwnerId)
             .HasColumnName("OwnerId");
 
-        builder.HasIndex("OwnerId");
+        builder.HasIndex(i => i.OwnerId);
     }
 }

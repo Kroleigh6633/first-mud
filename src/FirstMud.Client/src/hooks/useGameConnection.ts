@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -64,6 +64,9 @@ export interface GameConnectionResult {
   combat: CombatUpdate | null;
   needsPlayerCreation: boolean;
   playerId: string | null;
+  atHomestead: boolean;
+  storageView: StorageViewSnapshot | null;
+  autoFarmStatus: AutoFarmStatus | null;
 }
 
 export function useGameConnection(): GameConnectionResult {
@@ -79,6 +82,9 @@ export function useGameConnection(): GameConnectionResult {
   const [combat, setCombat] = useState<CombatUpdate | null>(null);
   const [needsPlayerCreation, setNeedsPlayerCreation] = useState<boolean>(resolvedPlayerId === null);
   const [playerId] = useState<string | null>(resolvedPlayerId);
+  const [atHomestead, setAtHomestead] = useState<boolean>(false);
+  const [storageView, setStorageView] = useState<StorageViewSnapshot | null>(null);
+  const [autoFarmStatus, setAutoFarmStatus] = useState<AutoFarmStatus | null>(null);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
@@ -232,6 +238,57 @@ export function useGameConnection(): GameConnectionResult {
       }
     });
 
+    connection.on('AtHomestead', () => {
+      setAtHomestead(true);
+    });
+
+    connection.on('LeftHomestead', () => {
+      setAtHomestead(false);
+      setStorageView(null);
+    });
+
+    connection.on('StorageView', (snapshot: StorageViewSnapshot) => {
+      setStorageView(snapshot);
+    });
+
+    connection.on('StorageUpdated', () => {
+      // Signal that storage changed — GameTerminal will re-fetch if panel is open
+    });
+
+    connection.on('LootDropped', (loot: { id: string; name: string; description: string; workmanship: number; category: string }) => {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'loot',
+        text: `You found: ${loot.name} [Workmanship ${loot.workmanship}]!`,
+      });
+    });
+
+    connection.on('HarvestComplete', (payload: { itemId?: string; name?: string; amount?: number; resourceType?: string }) => {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'loot',
+        text: `You harvested ${payload.amount ?? 1} unit(s) of ${payload.resourceType ?? 'resources'}.`,
+      });
+    });
+
+    connection.on('AutoFarmStatus', (status: AutoFarmStatus) => {
+      setAutoFarmStatus(status.active ? status : null);
+    });
+
+    connection.on('PlayerHealed', (payload: { id: string; currentHp: number; maxHp: number }) => {
+      setWorldState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          player: {
+            ...prev.player,
+            currentHp: payload.currentHp,
+            maxHp: payload.maxHp,
+          },
+        };
+      });
+    });
+
     connection.onreconnecting(() => {
       setConnectionState('connecting');
       appendMessage({
@@ -336,5 +393,8 @@ export function useGameConnection(): GameConnectionResult {
     combat,
     needsPlayerCreation,
     playerId,
+    atHomestead,
+    storageView,
+    autoFarmStatus,
   };
 }

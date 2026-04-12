@@ -96,6 +96,21 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
                 v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
                 v => v.ToHashSet()));
 
+        builder.Property(p => p.MaxInventorySlots)
+            .HasColumnName("MaxInventorySlots")
+            .HasDefaultValue(20);
+
+        // SavedReturnPosition owned type — nullable, stored as 4 nullable columns
+        builder.OwnsOne(p => p.SavedReturnPosition, pos =>
+        {
+            pos.Property(p => p.World)
+                .HasColumnName("SavedReturnWorldId")
+                .HasConversion<int>();
+            pos.Property(p => p.ZoneId).HasColumnName("SavedReturnZoneId");
+            pos.Property(p => p.X).HasColumnName("SavedReturnPosX");
+            pos.Property(p => p.Y).HasColumnName("SavedReturnPosY");
+        });
+
         // Shadow property for last seen timestamp
         builder.Property<DateTime>("LastSeenAt")
             .HasDefaultValueSql("GETUTCDATE()");

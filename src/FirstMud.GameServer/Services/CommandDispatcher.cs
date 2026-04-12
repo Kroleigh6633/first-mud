@@ -1,5 +1,6 @@
 using FirstMud.Application;
 using FirstMud.Application.Services;
+using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
 using FirstMud.Domain.Interfaces;
@@ -8,6 +9,7 @@ using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Dtos;
 using FirstMud.GameServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FirstMud.GameServer.Services;
 
@@ -32,12 +34,17 @@ public class CommandDispatcher
     private readonly IItemRepository _itemRepository;
     private readonly IQuestGraphRepository _questGraphRepository;
     private readonly IZoneRepository _zoneRepository;
+    private readonly IHomesteadRepository _homesteadRepository;
+    private readonly IResourceNodeRepository _resourceNodeRepository;
     private readonly QuestService _questService;
     private readonly CombatService _combatService;
+    private readonly LootService _lootService;
+    private readonly AutoFarmService _autoFarmService;
     private readonly WorldStateService _worldStateService;
     private readonly GameNotificationService _notificationService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly ILogger<CommandDispatcher> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private readonly Dictionary<Type, Func<IGameCommand, CancellationToken, Task<CommandResult>>> _handlers;
 
@@ -46,23 +53,33 @@ public class CommandDispatcher
         IItemRepository itemRepository,
         IQuestGraphRepository questGraphRepository,
         IZoneRepository zoneRepository,
+        IHomesteadRepository homesteadRepository,
+        IResourceNodeRepository resourceNodeRepository,
         QuestService questService,
         CombatService combatService,
+        LootService lootService,
+        AutoFarmService autoFarmService,
         WorldStateService worldStateService,
         GameNotificationService notificationService,
         IHubContext<GameHub> hubContext,
-        ILogger<CommandDispatcher> logger)
+        ILogger<CommandDispatcher> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _playerRepository = playerRepository;
         _itemRepository = itemRepository;
         _questGraphRepository = questGraphRepository;
         _zoneRepository = zoneRepository;
+        _homesteadRepository = homesteadRepository;
+        _resourceNodeRepository = resourceNodeRepository;
         _questService = questService;
         _combatService = combatService;
+        _lootService = lootService;
+        _autoFarmService = autoFarmService;
         _worldStateService = worldStateService;
         _notificationService = notificationService;
         _hubContext = hubContext;
         _logger = logger;
+        _scopeFactory = scopeFactory;
 
         _handlers = new Dictionary<Type, Func<IGameCommand, CancellationToken, Task<CommandResult>>>
         {
@@ -82,6 +99,13 @@ public class CommandDispatcher
             [typeof(StartCombatCommand)]        = (cmd, ct) => HandleStartCombatAsync((StartCombatCommand)cmd, ct),
             [typeof(UseCombatAbilityCommand)]   = (cmd, ct) => HandleUseCombatAbilityAsync((UseCombatAbilityCommand)cmd, ct),
             [typeof(FleeCombatCommand)]         = (cmd, ct) => HandleFleeCombatAsync((FleeCombatCommand)cmd, ct),
+            [typeof(PortalHomeCommand)]         = (cmd, ct) => HandlePortalHomeAsync((PortalHomeCommand)cmd, ct),
+            [typeof(PortalBackCommand)]         = (cmd, ct) => HandlePortalBackAsync((PortalBackCommand)cmd, ct),
+            [typeof(HarvestCommand)]            = (cmd, ct) => HandleHarvestAsync((HarvestCommand)cmd, ct),
+            [typeof(DepositCommand)]            = (cmd, ct) => HandleDepositAsync((DepositCommand)cmd, ct),
+            [typeof(WithdrawCommand)]           = (cmd, ct) => HandleWithdrawAsync((WithdrawCommand)cmd, ct),
+            [typeof(OpenStorageCommand)]        = (cmd, ct) => HandleOpenStorageAsync((OpenStorageCommand)cmd, ct),
+            [typeof(AutoFarmCommand)]           = (cmd, ct) => HandleAutoFarmAsync((AutoFarmCommand)cmd, ct),
         };
     }
 
@@ -474,6 +498,10 @@ public class CommandDispatcher
         // After the player acts, enemies may be next — auto-run them.
         await ProcessEnemyTurnsAsync(cmd.PlayerId, updated, ct);
 
+        // On Victory — roll for loot drop
+        if (updated.State == EncounterState.Victory)
+            await TryRollLootAsync(cmd.PlayerId, updated.ZoneId, ct);
+
         var dto = BuildCombatUpdateDto(updated);
 
         await _hubContext.Clients
@@ -501,6 +529,633 @@ public class CommandDispatcher
             .SendAsync("CombatUpdate", dto, ct);
 
         return new CommandResult(true, message, dto);
+    }
+
+    // -------------------------------------------------------------------------
+    // TryRollLootAsync — called after combat Victory
+    // -------------------------------------------------------------------------
+
+    private async Task TryRollLootAsync(Guid playerId, Guid zoneId, CancellationToken ct)
+    {
+        // Determine danger level from the zone if available, fall back to a deterministic value
+        var zones = await _zoneRepository.GetByWorldAsync(Domain.Enums.WorldId.Aeldran, ct);
+        var zone = zones.FirstOrDefault(z => z.Id == zoneId);
+        var dangerLevel = zone?.DangerLevel ?? 2;
+
+        var items = await _itemRepository.GetByOwnerAsync(playerId, ct);
+        var player = await _playerRepository.GetByIdAsync(playerId, ct);
+        if (player is null) return;
+
+        var result = await _lootService.RollLootDropAsync(
+            dangerLevel,
+            playerId,
+            player.Position.World,
+            items.Count,
+            player.MaxInventorySlots,
+            ct);
+
+        if (!result.Dropped)
+        {
+            if (!string.IsNullOrEmpty(result.Message))
+            {
+                await _hubContext.Clients
+                    .Group(playerId.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category = "loot",
+                        text = result.Message
+                    }, ct);
+            }
+            return;
+        }
+
+        var item = result.Item!;
+        var lootPayload = new
+        {
+            item.Id,
+            item.Name,
+            item.Description,
+            Workmanship = item.Workmanship.Value,
+            Category = item.Category.ToString()
+        };
+
+        await _hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "loot",
+                text = result.Message
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("LootDropped", lootPayload, ct);
+    }
+
+    // -------------------------------------------------------------------------
+    // PortalHomeCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandlePortalHomeAsync(PortalHomeCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        // Homestead is located at a fixed "sanctuary" coordinate outside normal map
+        var homesteadPos = new Position(player.Position.World, 0, -100, -100);
+        player.PortalHome(homesteadPos);
+        await _playerRepository.UpdateAsync(player, ct);
+
+        var posPayload = new
+        {
+            player.Id,
+            X = homesteadPos.X,
+            Y = homesteadPos.Y,
+            ZoneId = homesteadPos.ZoneId,
+            World = homesteadPos.World.ToString()
+        };
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("PlayerMoved", posPayload, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "system",
+                text = "You step through the portal and arrive at your homestead. The world is quiet here."
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("AtHomestead", new { playerId = cmd.PlayerId }, ct);
+
+        return new CommandResult(true, "Portaled home.", posPayload);
+    }
+
+    // -------------------------------------------------------------------------
+    // PortalBackCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandlePortalBackAsync(PortalBackCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        if (player.SavedReturnPosition is null)
+            return new CommandResult(false, "No saved return position. Explore the world first.");
+
+        player.PortalBack();
+        await _playerRepository.UpdateAsync(player, ct);
+
+        var posPayload = new
+        {
+            player.Id,
+            player.Position.X,
+            player.Position.Y,
+            ZoneId = player.Position.ZoneId,
+            World = player.Position.World.ToString()
+        };
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("PlayerMoved", posPayload, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "system",
+                text = "You step back through the portal and return to where you were."
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("LeftHomestead", new { playerId = cmd.PlayerId }, ct);
+
+        return new CommandResult(true, "Portaled back.", posPayload);
+    }
+
+    // -------------------------------------------------------------------------
+    // HarvestCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleHarvestAsync(HarvestCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        // Find zones near the player to identify current zone
+        var zones = await _zoneRepository.GetByWorldAsync(player.Position.World, ct);
+        Domain.Entities.Zone? nearbyZone = null;
+        foreach (var z in zones)
+        {
+            var known = ZoneGridLayout.GetKnownPosition(z.WorldId, z.ZoneId);
+            var (zx, zy) = known ?? ZoneGridLayout.GetPosition(z.Id);
+            if (Math.Abs(zx - player.Position.X) <= 1 && Math.Abs(zy - player.Position.Y) <= 1)
+            {
+                nearbyZone = z;
+                break;
+            }
+        }
+
+        if (nearbyZone is null)
+            return new CommandResult(false, "There is nothing to harvest here.");
+
+        var nodes = await _resourceNodeRepository.GetByZoneIdAsync(nearbyZone.Id, ct);
+        if (nodes.Count == 0)
+            return new CommandResult(false, "No resource nodes in this area.");
+
+        // Pick the first node with remaining yield
+        var node = nodes.FirstOrDefault(n => n.RemainingYield > 0);
+        if (node is null)
+            return new CommandResult(false, "The resources here are depleted. Return later.");
+
+        // Check carry capacity
+        var currentItems = await _itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        if (!player.CanCarryMore(currentItems.Count))
+        {
+            await _hubContext.Clients
+                .Group(cmd.PlayerId.ToString())
+                .SendAsync("GameMessage", new
+                {
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    category = "system",
+                    text = "Your inventory is full!"
+                }, ct);
+            return new CommandResult(false, "Inventory full.");
+        }
+
+        var harvestAmount = Random.Shared.Next(1, 4); // 1-3 units
+        var actual = node.Harvest(harvestAmount);
+        await _resourceNodeRepository.UpdateAsync(node, ct);
+
+        // Create a resource item in the player's inventory
+        var resourceName = node.ResourceType.ToString();
+        var resourceItem = Domain.Entities.Item.Create(
+            $"{resourceName} Bundle",
+            $"A bundle of {actual} unit(s) of {resourceName.ToLowerInvariant()} gathered from the wilds.",
+            ItemCategory.Component,
+            Domain.ValueObjects.Workmanship.Of(1),
+            player.Position.World);
+        resourceItem.SetOwner(cmd.PlayerId);
+
+        await _itemRepository.AddAsync(resourceItem, ct);
+
+        var message = $"You harvested {actual} unit(s) of {resourceName}.";
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "loot",
+                text = message
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("HarvestComplete", new
+            {
+                ItemId = resourceItem.Id,
+                resourceItem.Name,
+                Amount = actual,
+                ResourceType = node.ResourceType.ToString()
+            }, ct);
+
+        return new CommandResult(true, message);
+    }
+
+    // -------------------------------------------------------------------------
+    // DepositCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleDepositAsync(DepositCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        // Must be at homestead
+        if (player.Position.X != -100 || player.Position.Y != -100)
+            return new CommandResult(false, "You must be at your homestead to deposit items.");
+
+        var homestead = await _homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is null)
+            return new CommandResult(false, "Homestead not found.");
+
+        var item = await _itemRepository.GetByIdAsync(cmd.ItemId, ct);
+        if (item is null || item.OwnerId != cmd.PlayerId)
+            return new CommandResult(false, "Item not found in your inventory.");
+
+        // Check storage capacity
+        var storageItems = await _homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
+        if (storageItems.Count >= homestead.StorageSlots)
+            return new CommandResult(false, "Homestead storage is full.");
+
+        // Move item: clear owner, create storage entry
+        item.SetOwner(null);
+        await _itemRepository.UpdateAsync(item, ct);
+
+        var storageItem = Domain.Entities.HomesteadStorageItem.Create(homestead.Id, item.Id);
+        await _homesteadRepository.AddStorageItemAsync(storageItem, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "system",
+                text = $"Deposited {item.Name} into homestead storage."
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("StorageUpdated", new { homesteadId = homestead.Id }, ct);
+
+        return new CommandResult(true, $"Deposited {item.Name}.");
+    }
+
+    // -------------------------------------------------------------------------
+    // WithdrawCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleWithdrawAsync(WithdrawCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        if (player.Position.X != -100 || player.Position.Y != -100)
+            return new CommandResult(false, "You must be at your homestead to withdraw items.");
+
+        var homestead = await _homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is null)
+            return new CommandResult(false, "Homestead not found.");
+
+        var storageItems = await _homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
+        var storageEntry = storageItems.FirstOrDefault(s => s.ItemId == cmd.ItemId);
+        if (storageEntry is null)
+            return new CommandResult(false, "Item not found in storage.");
+
+        var inventoryItems = await _itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        if (!player.CanCarryMore(inventoryItems.Count))
+            return new CommandResult(false, "Your inventory is full!");
+
+        var item = await _itemRepository.GetByIdAsync(cmd.ItemId, ct);
+        if (item is null)
+            return new CommandResult(false, "Item not found.");
+
+        // Move item back to player
+        item.SetOwner(cmd.PlayerId);
+        await _itemRepository.UpdateAsync(item, ct);
+        await _homesteadRepository.RemoveStorageItemAsync(homestead.Id, cmd.ItemId, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "system",
+                text = $"Withdrew {item.Name} from homestead storage."
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("StorageUpdated", new { homesteadId = homestead.Id }, ct);
+
+        return new CommandResult(true, $"Withdrew {item.Name}.");
+    }
+
+    // -------------------------------------------------------------------------
+    // OpenStorageCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleOpenStorageAsync(OpenStorageCommand cmd, CancellationToken ct)
+    {
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        if (player.Position.X != -100 || player.Position.Y != -100)
+            return new CommandResult(false, "You must be at your homestead to open storage.");
+
+        var homestead = await _homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is null)
+            return new CommandResult(false, "Homestead not found.");
+
+        var storageEntries = await _homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
+        var itemIds = storageEntries.Select(s => s.ItemId).ToList();
+        var items = await _itemRepository.GetByIdsAsync(itemIds, ct);
+
+        var payload = new
+        {
+            HomesteadId = homestead.Id,
+            homestead.Name,
+            homestead.StorageSlots,
+            UsedSlots = storageEntries.Count,
+            Items = items.Select(i => new
+            {
+                Id = i.Id.ToString(),
+                i.Name,
+                i.Description,
+                Category = i.Category.ToString(),
+                Workmanship = i.Workmanship.Value
+            }).ToList()
+        };
+
+        await _notificationService.SendEventAsync(cmd.PlayerId, "StorageView", payload, ct);
+
+        return new CommandResult(true, "Storage opened.", payload);
+    }
+
+    // -------------------------------------------------------------------------
+    // AutoFarmCommand
+    // -------------------------------------------------------------------------
+
+    private async Task<CommandResult> HandleAutoFarmAsync(AutoFarmCommand cmd, CancellationToken ct)
+    {
+        // Cancel any existing session
+        if (_autoFarmService.IsActive(cmd.PlayerId))
+        {
+            _autoFarmService.EndSession(cmd.PlayerId);
+            await _hubContext.Clients
+                .Group(cmd.PlayerId.ToString())
+                .SendAsync("GameMessage", new
+                {
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    category = "system",
+                    text = "Auto-farm cancelled."
+                }, ct);
+            await _hubContext.Clients
+                .Group(cmd.PlayerId.ToString())
+                .SendAsync("AutoFarmStatus", new { active = false }, ct);
+            return new CommandResult(true, "Auto-farm cancelled.");
+        }
+
+        var player = await _playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        var session = _autoFarmService.StartSession(cmd.PlayerId, cmd.DurationSeconds);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "system",
+                text = $"Auto-farm started. Duration: {cmd.DurationSeconds / 60} minute(s). Press [F] again to stop."
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("AutoFarmStatus", new { active = true, durationSeconds = cmd.DurationSeconds }, ct);
+
+        // Run the farm loop in the background (fire-and-forget with its own scope)
+        _ = Task.Run(async () =>
+        {
+            await RunAutoFarmLoopAsync(cmd.PlayerId, session, ct);
+        }, CancellationToken.None);
+
+        return new CommandResult(true, "Auto-farm started.");
+    }
+
+    private async Task RunAutoFarmLoopAsync(Guid playerId, AutoFarmSession session, CancellationToken serverCt)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(serverCt, session.Cts.Token);
+        var farmCt = linked.Token;
+
+        var endTime = session.StartedAt.AddSeconds(session.DurationSeconds);
+        var intervalMs = 3000;
+
+        try
+        {
+            while (!farmCt.IsCancellationRequested && DateTimeOffset.UtcNow < endTime)
+            {
+                await Task.Delay(intervalMs, farmCt);
+                if (farmCt.IsCancellationRequested) break;
+
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+                var itemRepo = scope.ServiceProvider.GetRequiredService<IItemRepository>();
+                var zoneRepo = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
+                var lootSvc = scope.ServiceProvider.GetRequiredService<LootService>();
+
+                var player = await playerRepo.GetByIdAsync(playerId, farmCt);
+                if (player is null) break;
+
+                // Periodic update
+                var elapsed = DateTimeOffset.UtcNow - session.StartedAt;
+                var remaining = endTime - DateTimeOffset.UtcNow;
+                var remainingMin = Math.Max(0, (int)remaining.TotalMinutes);
+                var remainingSec = Math.Max(0, (int)remaining.TotalSeconds % 60);
+
+                await _hubContext.Clients
+                    .Group(playerId.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category = "system",
+                        text = $"Auto-farming... {remainingMin}m {remainingSec}s left. Kills: {session.Kills}. Items: {session.ItemsFound}."
+                    }, farmCt);
+
+                // Roll for encounter
+                var zones = await zoneRepo.GetByWorldAsync(player.Position.World, farmCt);
+                Domain.Entities.Zone? nearbyZone = null;
+                foreach (var z in zones)
+                {
+                    var known = ZoneGridLayout.GetKnownPosition(z.WorldId, z.ZoneId);
+                    var (zx, zy) = known ?? ZoneGridLayout.GetPosition(z.Id);
+                    if (Math.Abs(zx - player.Position.X) <= 1 && Math.Abs(zy - player.Position.Y) <= 1)
+                    {
+                        nearbyZone = z;
+                        break;
+                    }
+                }
+
+                var dangerLevel = nearbyZone?.DangerLevel ?? 2;
+                var encounterChance = Math.Min(dangerLevel * 10, 70);
+                if (Random.Shared.Next(100) >= encounterChance)
+                    continue;
+
+                // Start and auto-fight the encounter
+                var monsters = BuildMonsterPack(dangerLevel);
+                var combatSvc = scope.ServiceProvider.GetRequiredService<CombatService>();
+
+                var encounter = await combatSvc.StartEncounterAsync(
+                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), player, [], monsters, farmCt);
+
+                await _hubContext.Clients
+                    .Group(playerId.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category = "combat",
+                        text = $"[Auto-farm] Encounter! {string.Join(", ", monsters.Select(m => m.Name))}."
+                    }, farmCt);
+
+                // Auto-fight until victory or defeat
+                var safety = 0;
+                while (encounter.State == EncounterState.InProgress && safety++ < 50)
+                {
+                    var actor = encounter.CurrentActor;
+                    if (actor is null) break;
+
+                    if (actor.IsPlayerSide)
+                    {
+                        // Auto-attack: use Strike on a random enemy
+                        var enemies = encounter.Combatants
+                            .Where(c => !c.IsPlayerSide && !c.IsDefeated)
+                            .ToList();
+                        if (enemies.Count == 0) break;
+                        var target = enemies[Random.Shared.Next(enemies.Count)];
+                        await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, "Strike", target.Id, farmCt);
+                    }
+                    else
+                    {
+                        // Enemy turn — auto-select ability and target
+                        var abilities = actor.Abilities.Where(a => a.Category == AbilityCategory.Attack).ToList();
+                        if (abilities.Count == 0) break;
+                        var ability = abilities[Random.Shared.Next(abilities.Count)];
+                        var allies = encounter.Combatants.Where(c => c.IsPlayerSide && !c.IsDefeated).ToList();
+                        if (allies.Count == 0) break;
+                        var target = allies[Random.Shared.Next(allies.Count)];
+                        await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, ability.Name, target.Id, farmCt);
+                    }
+
+                    encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
+                }
+
+                if (encounter.State == EncounterState.Defeat)
+                {
+                    _autoFarmService.EndSession(playerId);
+                    await _hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("GameMessage", new
+                        {
+                            timestamp = DateTime.UtcNow.ToString("O"),
+                            category = "combat",
+                            text = "Auto-farm ended: you were defeated."
+                        }, serverCt);
+                    await _hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("AutoFarmStatus", new { active = false, reason = "defeat" }, serverCt);
+                    return;
+                }
+
+                if (encounter.State == EncounterState.Victory)
+                {
+                    _autoFarmService.RecordKill(playerId);
+
+                    // Auto-loot
+                    var currentItems = await itemRepo.GetByOwnerAsync(playerId, farmCt);
+                    var lootResult = await lootSvc.RollLootDropAsync(
+                        dangerLevel, playerId, player.Position.World,
+                        currentItems.Count, player.MaxInventorySlots, farmCt);
+
+                    if (lootResult.Dropped)
+                    {
+                        _autoFarmService.RecordItem(playerId);
+                        await _hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category = "loot",
+                                text = $"[Auto-farm] {lootResult.Message}"
+                            }, farmCt);
+                        if (lootResult.Item is not null)
+                            await _hubContext.Clients
+                                .Group(playerId.ToString())
+                                .SendAsync("LootDropped", new
+                                {
+                                    lootResult.Item.Id,
+                                    lootResult.Item.Name,
+                                    lootResult.Item.Description,
+                                    Workmanship = lootResult.Item.Workmanship.Value,
+                                    Category = lootResult.Item.Category.ToString()
+                                }, farmCt);
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled — normal exit
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Auto-farm loop error for player {PlayerId}", playerId);
+        }
+        finally
+        {
+            var finalSession = _autoFarmService.GetSession(playerId);
+            var kills = finalSession?.Kills ?? session.Kills;
+            var items = finalSession?.ItemsFound ?? session.ItemsFound;
+            _autoFarmService.EndSession(playerId);
+
+            await _hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("GameMessage", new
+                {
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    category = "system",
+                    text = $"Auto-farm complete: {kills} kill(s), {items} item(s) found."
+                }, serverCt);
+
+            await _hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("AutoFarmStatus", new { active = false, kills, items }, serverCt);
+        }
     }
 
     // -------------------------------------------------------------------------

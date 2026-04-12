@@ -1,13 +1,18 @@
 using System.Collections.Concurrent;
+using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
+using Microsoft.AspNetCore.SignalR;
+using FirstMud.GameServer.Hubs;
 
 namespace FirstMud.GameServer.Services;
 
 public class GameLoopService : BackgroundService
 {
-    private const int TickIntervalMs = 100;              // 10 ticks per second
-    private const int AiTickIntervalSeconds = 60;        // AI player tick every 60 seconds
-    private const int AutomationTickIntervalSeconds = 300; // Automation upkeep every 300 seconds
+    private const int TickIntervalMs = 100;                  // 10 ticks per second
+    private const int AiTickIntervalSeconds = 60;            // AI player tick every 60 seconds
+    private const int AutomationTickIntervalSeconds = 300;   // Automation upkeep every 300 seconds
+    private const int HomesteadHealIntervalSeconds = 1;      // Homestead healing: 10 HP per second
+    private const int ResourceRegenIntervalSeconds = 60;     // Resource node regen every 60 seconds
 
     private readonly ConcurrentQueue<IGameCommand> _commandQueue = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -71,6 +76,16 @@ public class GameLoopService : BackgroundService
         var ticksPerAutomationCycle = (long)(AutomationTickIntervalSeconds * 1000.0 / TickIntervalMs);
         if (_tickCount % ticksPerAutomationCycle == 0 && _tickCount > 0)
             await ProcessAutomationTickAsync(ct);
+
+        // 4. Every 1 second: heal players at homestead (10 HP/s)
+        var ticksPerHealCycle = (long)(HomesteadHealIntervalSeconds * 1000.0 / TickIntervalMs);
+        if (_tickCount % ticksPerHealCycle == 0 && _tickCount > 0)
+            await ProcessHomesteadHealAsync(ct);
+
+        // 5. Every 60 seconds: regenerate resource nodes
+        var ticksPerRegenCycle = (long)(ResourceRegenIntervalSeconds * 1000.0 / TickIntervalMs);
+        if (_tickCount % ticksPerRegenCycle == 0 && _tickCount > 0)
+            await ProcessResourceRegenAsync(ct);
     }
 
     private async Task ProcessCommandsAsync(CancellationToken ct)
@@ -102,8 +117,83 @@ public class GameLoopService : BackgroundService
 
     private Task ProcessAutomationTickAsync(CancellationToken ct)
     {
-        // TODO: Wire up base/asset automation upkeep when Application.AutomationService is available
         _logger.LogDebug("Running automation upkeep tick at game tick {TickCount}.", _tickCount);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Heals players who are at the homestead (position -100,-100) by 10 HP per second.
+    /// Broadcasts a WorldState update so the status panel reflects the change.
+    /// </summary>
+    private async Task ProcessHomesteadHealAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+
+            var players = await playerRepo.GetActivePlayersAsync(ct);
+            foreach (var player in players)
+            {
+                // Homestead is at the sentinel coordinate -100,-100
+                if (player.Position.X != -100 || player.Position.Y != -100) continue;
+                if (player.CurrentHp >= player.MaxHp) continue;
+
+                player.HealHp(10);
+                await playerRepo.UpdateAsync(player, ct);
+
+                // Notify the player of the heal
+                await hubContext.Clients
+                    .Group(player.Id.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category = "system",
+                        text = $"Homestead sanctuary heals you. HP: {player.CurrentHp}/{player.MaxHp}."
+                    }, ct);
+
+                // Push an updated HP reading via a lightweight event
+                await hubContext.Clients
+                    .Group(player.Id.ToString())
+                    .SendAsync("PlayerHealed", new
+                    {
+                        player.Id,
+                        player.CurrentHp,
+                        player.MaxHp
+                    }, ct);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in homestead heal tick.");
+        }
+    }
+
+    /// <summary>
+    /// Adds RegenerationRate to each resource node's RemainingYield, capped at MaxYield.
+    /// </summary>
+    private async Task ProcessResourceRegenAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var nodeRepo = scope.ServiceProvider.GetRequiredService<IResourceNodeRepository>();
+
+            var nodes = await nodeRepo.GetAllAsync(ct);
+            foreach (var node in nodes)
+            {
+                if (node.RemainingYield >= node.MaxYield) continue;
+                node.Regenerate();
+                await nodeRepo.UpdateAsync(node, ct);
+            }
+
+            _logger.LogDebug("Resource node regen tick complete. Nodes updated: {Count}",
+                nodes.Count(n => n.RemainingYield < n.MaxYield));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in resource node regen tick.");
+        }
     }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
@@ -8,6 +8,7 @@ import QuestLog from './QuestLog';
 import PlayerCreation from './PlayerCreation';
 import HelpOverlay from './HelpOverlay';
 import InventoryPanel from './InventoryPanel';
+import StoragePanel from './StoragePanel';
 import CharacterSheet from './CharacterSheet';
 import CombatPanel from './CombatPanel';
 import { useKeyboard } from '../hooks/useKeyboard';
@@ -25,6 +26,9 @@ interface Props {
   combat: CombatUpdate | null;
   needsPlayerCreation: boolean;
   playerId: string | null;
+  atHomestead: boolean;
+  storageView: StorageViewSnapshot | null;
+  autoFarmStatus: AutoFarmStatus | null;
 }
 
 /**
@@ -60,12 +64,16 @@ export default function GameTerminal({
   inventory,
   combat,
   needsPlayerCreation,
+  atHomestead,
+  storageView,
+  autoFarmStatus,
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showCharSheet, setShowCharSheet] = useState(false);
+  const [showStorage, setShowStorage] = useState(false);
 
   // Compute the zone tile the player is currently standing on, if any
   const currentTile = useMemo(() => {
@@ -142,11 +150,42 @@ export default function GameTerminal({
       case 'help':
         setShowHelp(prev => !prev);
         break;
+      case 'portal':
+        if (atHomestead) {
+          sendCommand('portalback', null);
+        } else {
+          sendCommand('portalhome', null);
+        }
+        break;
+      case 'harvest':
+        sendCommand('harvest', null);
+        break;
+      case 'autofarm':
+        if (autoFarmStatus?.active) {
+          // Toggle off — send autofarm to cancel
+          sendCommand('autofarm', { durationSeconds: 300 });
+        } else {
+          sendCommand('autofarm', { durationSeconds: 300 });
+        }
+        break;
+      case 'storage':
+        if (!atHomestead) {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'You must be at your homestead to access storage. Press [P] to portal home.',
+          });
+        } else {
+          sendCommand('openstorage', null);
+          setShowStorage(prev => !prev);
+        }
+        break;
       case 'escape':
         setShowHelp(false);
         setShowQuestLog(false);
         setShowInventory(false);
         setShowCharSheet(false);
+        setShowStorage(false);
         break;
       case 'pass':
         appendMessage({
@@ -156,7 +195,7 @@ export default function GameTerminal({
         });
         break;
     }
-  }, [keyAction, sendCommand, fetchAvailableQuests, currentTile, appendMessage]);
+  }, [keyAction, sendCommand, fetchAvailableQuests, currentTile, appendMessage, atHomestead, autoFarmStatus]);
 
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
@@ -165,6 +204,23 @@ export default function GameTerminal({
   const handleCompleteQuest = (questId: string, outcome: string) => {
     // Server parses `chosenOutcome`, not `outcome`.
     sendCommand('completequest', { questId, chosenOutcome: outcome });
+  };
+
+  const handleDeposit = (itemId: string) => {
+    sendCommand('deposit', { itemId });
+    // Re-fetch storage and inventory after deposit
+    setTimeout(() => {
+      sendCommand('openstorage', null);
+      sendCommand('openinventory', null);
+    }, 300);
+  };
+
+  const handleWithdraw = (itemId: string) => {
+    sendCommand('withdraw', { itemId });
+    setTimeout(() => {
+      sendCommand('openstorage', null);
+      sendCommand('openinventory', null);
+    }, 300);
   };
 
   return (
@@ -229,6 +285,46 @@ export default function GameTerminal({
         press [?] for help
       </div>
 
+      {/* Homestead indicator */}
+      {atHomestead && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '186px',
+            left: '10px',
+            color: '#ccff88',
+            fontSize: '11px',
+            letterSpacing: '0.05em',
+            pointerEvents: 'none',
+            fontFamily: 'monospace',
+          }}
+        >
+          ◈ Homestead — healing +10 HP/s · [V] storage · [P] portal back
+        </div>
+      )}
+
+      {/* Auto-farm status bar */}
+      {autoFarmStatus?.active && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '4px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#0d1a0d',
+            border: '1px solid #00aa33',
+            color: '#00ff41',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            padding: '3px 14px',
+            letterSpacing: '0.08em',
+            pointerEvents: 'none',
+          }}
+        >
+          AUTO-FARM ACTIVE · Press [F] to stop
+        </div>
+      )}
+
       {/* Modals */}
       {needsPlayerCreation && (
         <PlayerCreation onCreated={() => { /* reload handled inside PlayerCreation */ }} />
@@ -248,6 +344,15 @@ export default function GameTerminal({
         <CharacterSheet player={worldState?.player ?? null} onClose={() => setShowCharSheet(false)} />
       )}
       {combat && <CombatPanel combat={combat} sendCommand={sendCommand} />}
+      {showStorage && atHomestead && (
+        <StoragePanel
+          snapshot={storageView}
+          inventoryItems={inventory?.items ?? []}
+          onDeposit={handleDeposit}
+          onWithdraw={handleWithdraw}
+          onClose={() => setShowStorage(false)}
+        />
+      )}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
     </div>
   );

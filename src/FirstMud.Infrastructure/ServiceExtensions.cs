@@ -24,6 +24,8 @@ public static class ServiceExtensions
         services.AddScoped<IZoneRepository, ZoneRepository>();
         services.AddScoped<IRecipeRepository, RecipeRepository>();
         services.AddScoped<IBaseAssetRepository, BaseAssetRepository>();
+        services.AddScoped<IHomesteadRepository, HomesteadRepository>();
+        services.AddScoped<IResourceNodeRepository, ResourceNodeRepository>();
 
         return services;
     }

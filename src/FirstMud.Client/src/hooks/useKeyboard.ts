@@ -9,6 +9,10 @@ export type KeyAction =
   | { type: 'help' }
   | { type: 'escape' }
   | { type: 'pass' }
+  | { type: 'portal' }
+  | { type: 'harvest' }
+  | { type: 'autofarm' }
+  | { type: 'storage' }
   | null;
 
 export function useKeyboard(): KeyAction {
@@ -66,6 +70,22 @@ export function useKeyboard(): KeyAction {
         case 'h':
         case 'H':
           next = { type: 'help' };
+          break;
+        case 'p':
+        case 'P':
+          next = { type: 'portal' };
+          break;
+        case 'e':
+        case 'E':
+          next = { type: 'harvest' };
+          break;
+        case 'f':
+        case 'F':
+          next = { type: 'autofarm' };
+          break;
+        case 'v':
+        case 'V':
+          next = { type: 'storage' };
           break;
         case 'Escape':
           next = { type: 'escape' };

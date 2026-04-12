@@ -22,6 +22,8 @@ public class StartupSeeder(
         await SeedNeo4jLoreAsync(ct);
         await SeedAeldranZonesAsync(ct);
         await SeedStarterRecipesAsync(ct);
+        await SeedHomesteadsAsync(ct);
+        await SeedResourceNodesAsync(ct);
     }
 
     // -------------------------------------------------------------------------
@@ -230,5 +232,70 @@ public class StartupSeeder(
         await db.Recipes.AddRangeAsync(recipes, ct);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded {Count} starter recipes.", recipes.Length);
+    }
+
+    // -------------------------------------------------------------------------
+    // Homesteads — one per player
+    // -------------------------------------------------------------------------
+
+    private async Task SeedHomesteadsAsync(CancellationToken ct)
+    {
+        var players = await db.Players.ToListAsync(ct);
+        foreach (var player in players)
+        {
+            var exists = await db.Homesteads.AnyAsync(h => h.PlayerId == player.Id, ct);
+            if (!exists)
+            {
+                var homestead = Homestead.Create(player.Id, $"{player.Name}'s Homestead");
+                await db.Homesteads.AddAsync(homestead, ct);
+                logger.LogInformation("Created homestead for player {Name} ({Id})", player.Name, player.Id);
+            }
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
+    // -------------------------------------------------------------------------
+    // Resource nodes — 2-3 per zone
+    // -------------------------------------------------------------------------
+
+    private async Task SeedResourceNodesAsync(CancellationToken ct)
+    {
+        if (await db.ResourceNodes.AnyAsync(ct))
+        {
+            logger.LogInformation("ResourceNodes already seeded — skipping.");
+            return;
+        }
+
+        var zones = await db.Zones.ToListAsync(ct);
+        var nodes = new List<ResourceNode>();
+
+        // Assign resource types by zone name/danger
+        foreach (var zone in zones)
+        {
+            var (type1, type2) = zone.Name switch
+            {
+                "Caervorn Highlands"   => (ResourceType.Stone, ResourceType.Herbs),
+                "The Thornwood"        => (ResourceType.Wood, ResourceType.Herbs),
+                "Portmere (Compact)"   => (ResourceType.Metal, ResourceType.Sand),
+                "Gravenmarsh"          => (ResourceType.Herbs, ResourceType.Stone),
+                "The Drowned Coast"    => (ResourceType.Sand, ResourceType.Stone),
+                "The Ashen Reach"      => (ResourceType.Metal, ResourceType.Stone),
+                "Starting Road"        => (ResourceType.Wood, ResourceType.Herbs),
+                "Gravenhold"           => (ResourceType.Metal, ResourceType.Stone),
+                "The Maw Borderlands"  => (ResourceType.Metal, ResourceType.Herbs),
+                _                      => (ResourceType.Wood, ResourceType.Stone),
+            };
+
+            nodes.Add(ResourceNode.Create(zone.Id, type1, maxYield: 20, regenerationRate: 2));
+            nodes.Add(ResourceNode.Create(zone.Id, type2, maxYield: 15, regenerationRate: 1));
+
+            // Third node for high-danger zones
+            if (zone.DangerLevel >= 5)
+                nodes.Add(ResourceNode.Create(zone.Id, ResourceType.Metal, maxYield: 10, regenerationRate: 1));
+        }
+
+        await db.ResourceNodes.AddRangeAsync(nodes, ct);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seeded {Count} resource nodes across {ZoneCount} zones.", nodes.Count, zones.Count);
     }
 }

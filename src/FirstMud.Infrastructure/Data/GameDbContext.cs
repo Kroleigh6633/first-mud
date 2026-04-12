@@ -15,6 +15,9 @@ public class GameDbContext : DbContext
     public DbSet<Zone> Zones => Set<Zone>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<BaseAsset> BaseAssets => Set<BaseAsset>();
+    public DbSet<Homestead> Homesteads => Set<Homestead>();
+    public DbSet<HomesteadStorageItem> HomesteadStorageItems => Set<HomesteadStorageItem>();
+    public DbSet<ResourceNode> ResourceNodes => Set<ResourceNode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,5 +30,8 @@ public class GameDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ZoneConfiguration());
         modelBuilder.ApplyConfiguration(new RecipeConfiguration());
         modelBuilder.ApplyConfiguration(new BaseAssetConfiguration());
+        modelBuilder.ApplyConfiguration(new HomesteadConfiguration());
+        modelBuilder.ApplyConfiguration(new HomesteadStorageItemConfiguration());
+        modelBuilder.ApplyConfiguration(new ResourceNodeConfiguration());
     }
 }

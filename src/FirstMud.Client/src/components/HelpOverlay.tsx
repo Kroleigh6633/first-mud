@@ -29,6 +29,9 @@ const SECTIONS: Section[] = [
     bindings: [
       { keys: ['Enter'], description: 'interact with adjacent tile / NPC' },
       { keys: ['Space'], description: 'wait / pass turn' },
+      { keys: ['E'], description: 'harvest resource at current zone' },
+      { keys: ['P'], description: 'portal home (or portal back when at homestead)' },
+      { keys: ['F'], description: 'start / stop auto-farm (5 min default)' },
     ],
   },
   {
@@ -37,8 +40,9 @@ const SECTIONS: Section[] = [
       { keys: ['Q'], description: 'open / close quest log' },
       { keys: ['I'], description: 'open inventory' },
       { keys: ['C'], description: 'character sheet' },
+      { keys: ['V'], description: 'open homestead storage vault (at homestead only)' },
       { keys: ['?', 'H'], description: 'open / close this help menu' },
-      { keys: ['Esc'], description: 'close any open panel' },
+      { keys: ['Esc'], description: 'close any open panel / cancel auto-farm' },
     ],
   },
 ];

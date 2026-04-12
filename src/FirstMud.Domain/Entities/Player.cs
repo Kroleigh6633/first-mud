@@ -34,6 +34,13 @@ public class Player
     // Position
     public Position Position { get; private set; } = new(WorldId.Aeldran, 1, 0, 0);
 
+    // Portal home — saved position to return to after visiting homestead
+    public Position? SavedReturnPosition { get; private set; }
+
+    // Carry capacity
+    private int _maxInventorySlots = 20;
+    public int MaxInventorySlots => _maxInventorySlots;
+
     // Per-player crafting seed (never exposed to client directly)
     public int CraftingSeed { get; private set; }
 
@@ -144,6 +151,30 @@ public class Player
     }
 
     public void Move(Position newPosition) => Position = newPosition;
+
+    /// <summary>Checks whether the player can carry one more item.</summary>
+    public bool CanCarryMore(int currentItemCount) => currentItemCount < _maxInventorySlots;
+
+    /// <summary>Saves current position and teleports player to the homestead world position.</summary>
+    public void PortalHome(Position homesteadPosition)
+    {
+        SavedReturnPosition = Position;
+        Position = homesteadPosition;
+    }
+
+    /// <summary>Restores saved return position. Clears SavedReturnPosition.</summary>
+    public void PortalBack()
+    {
+        if (SavedReturnPosition is null) return;
+        Position = SavedReturnPosition;
+        SavedReturnPosition = null;
+    }
+
+    /// <summary>Heals the player by the given amount, capped at MaxHp.</summary>
+    public void HealHp(int amount)
+    {
+        CurrentHp = Math.Min(MaxHp, CurrentHp + amount);
+    }
 
     public void UnlockPortal(WorldId worldId)
     {

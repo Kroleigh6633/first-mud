@@ -166,6 +166,26 @@ public class GameHub : Hub
                 TryGetInt(payload, "worldId"),
                 TryGetGuid(payload, "zoneId")),
 
+            "portalhome" => new PortalHomeCommand(playerId),
+
+            "portalback" => new PortalBackCommand(playerId),
+
+            "harvest" => new HarvestCommand(playerId),
+
+            "deposit" => new DepositCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
+            "withdraw" => new WithdrawCommand(
+                playerId,
+                TryGetGuid(payload, "itemId")),
+
+            "openstorage" => new OpenStorageCommand(playerId),
+
+            "autofarm" => new AutoFarmCommand(
+                playerId,
+                TryGetInt(payload, "durationSeconds") is int d && d > 0 ? d : 300),
+
             _ => null
         };
     }

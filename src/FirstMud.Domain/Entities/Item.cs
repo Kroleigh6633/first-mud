@@ -24,6 +24,9 @@ public class Item
     // Discovery tracking — first player to craft this variant
     public string? DiscoveredByPlayerName { get; private set; }
 
+    // Ownership — null means world loot / homestead storage
+    public Guid? OwnerId { get; private set; }
+
     private Item() { }
 
     public static Item Create(
@@ -60,6 +63,8 @@ public class Item
     }
 
     public void MarkDiscoveredBy(string playerName) => DiscoveredByPlayerName = playerName;
+
+    public void SetOwner(Guid? ownerId) => OwnerId = ownerId;
 
     public void Degrade(int amount)
     {

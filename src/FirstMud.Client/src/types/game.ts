@@ -138,3 +138,35 @@ export interface InventorySnapshot {
   salvageSkill: number;
   items: InventoryItem[];
 }
+
+export interface StorageItem {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  workmanship: number;
+}
+
+export interface StorageViewSnapshot {
+  homesteadId: string;
+  name: string;
+  storageSlots: number;
+  usedSlots: number;
+  items: StorageItem[];
+}
+
+export interface LootDropEvent {
+  id: string;
+  name: string;
+  description: string;
+  workmanship: number;
+  category: string;
+}
+
+export interface AutoFarmStatus {
+  active: boolean;
+  durationSeconds?: number;
+  kills?: number;
+  items?: number;
+  reason?: string;
+}

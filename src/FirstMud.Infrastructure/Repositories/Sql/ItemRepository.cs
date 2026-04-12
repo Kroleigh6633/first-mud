@@ -31,7 +31,7 @@ internal sealed class ItemRepository : IItemRepository
     public async Task<IReadOnlyList<Item>> GetByOwnerAsync(Guid ownerId, CancellationToken ct = default)
     {
         return await _context.Items
-            .Where(i => EF.Property<Guid?>(i, "OwnerId") == ownerId)
+            .Where(i => i.OwnerId == ownerId)
             .ToListAsync(ct);
     }
 
