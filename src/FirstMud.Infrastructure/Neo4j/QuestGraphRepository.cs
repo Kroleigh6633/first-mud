@@ -114,8 +114,8 @@ public sealed class QuestGraphRepository : IQuestGraphRepository
                   }
                 )
 
-                OPTIONAL MATCH (ai:Player)-[ip:IN_PROGRESS {takenByAi: true}]->(q)
-                RETURN q, ai IS NOT NULL AS isTaken
+                OPTIONAL MATCH (p:Player {playerId: $playerId})-[pip:IN_PROGRESS]->(q)
+                RETURN q, pip IS NOT NULL AS isTaken
                 """;
 
             var cursor = await tx.RunAsync(query, parameters);

@@ -121,8 +121,21 @@ public class GameLoopService : BackgroundService
             var result = await dispatcher.DispatchAsync(command, ct);
 
             if (!result.Success)
+            {
                 _logger.LogWarning("Command {CommandType} for player {PlayerId} failed: {Message}",
                     command.GetType().Name, command.PlayerId, result.Message);
+
+                // Broadcast the failure reason to the player so it's not a silent no-op.
+                try
+                {
+                    var notificationService = scope.ServiceProvider.GetRequiredService<GameNotificationService>();
+                    await notificationService.SendMessageAsync(command.PlayerId, "error", result.Message, ct);
+                }
+                catch (Exception broadcastEx) when (broadcastEx is not OperationCanceledException)
+                {
+                    _logger.LogError(broadcastEx, "Failed to broadcast command error to player {PlayerId}.", command.PlayerId);
+                }
+            }
 
             processed++;
         }

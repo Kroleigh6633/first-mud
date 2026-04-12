@@ -173,6 +173,9 @@ export function useGameConnection(): GameConnectionResult {
         category: 'quest',
         text: `Quest accepted: ${questId}`,
       });
+      // Refresh the quest list so the accepted quest shows isTaken: true
+      // (and the Accept button is replaced by Complete buttons).
+      sendCommand('getquests');
     });
 
     connection.on('QuestCompleted', (result: QuestCompleteResult) => {
