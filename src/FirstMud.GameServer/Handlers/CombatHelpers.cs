@@ -80,17 +80,49 @@ public class CombatHelpers(
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
 
-        var baseXp = encounter.Combatants
+        var defeatedEnemies = encounter.Combatants
             .Where(c => !c.IsPlayerSide && c.IsDefeated)
-            .Sum(c => c.Level * 20);
+            .ToList();
 
-        if (baseXp <= 0) return;
+        if (defeatedEnemies.Count == 0) return;
 
-        player.GainExperience(baseXp);
-        await playerRepository.UpdateAsync(player, ct);
-        logger.LogDebug("Awarded {Xp} XP to player {PlayerId}", baseXp, playerId);
+        var breakdown = new List<string>();
+        var totalXp = 0;
 
-        await notificationService.SendMessageAsync(playerId, "combat", $"You gained {baseXp} experience!", ct);
+        foreach (var enemy in defeatedEnemies)
+        {
+            var levelDiff = enemy.Level - player.Level;
+            var multiplier = levelDiff switch
+            {
+                >= 2  => 1.00f,
+                1     => 0.90f,
+                0     => 0.75f,
+                -1    => 0.50f,
+                -2    => 0.25f,
+                -3    => 0.10f,
+                _     => 0.00f,   // <= -4: grey mob
+            };
+
+            const int baseXp = 20;
+            var xpGained = (int)(baseXp * multiplier);
+            totalXp += xpGained;
+
+            var label = multiplier == 0f ? $"{enemy.Name}: 0 XP [grey]" : $"{enemy.Name}: {xpGained} XP";
+            breakdown.Add(label);
+        }
+
+        if (totalXp > 0)
+        {
+            player.GainExperience(totalXp);
+            await playerRepository.UpdateAsync(player, ct);
+            logger.LogDebug("Awarded {Xp} XP to player {PlayerId}", totalXp, playerId);
+        }
+
+        var detail = string.Join(", ", breakdown);
+        await notificationService.SendMessageAsync(
+            playerId, "combat",
+            $"You gained {totalXp} experience! ({detail})",
+            ct);
 
         await BroadcastLevelUpEventsAsync(playerId, player, ct);
         player.ClearDomainEvents();
@@ -241,7 +273,7 @@ public class CombatHelpers(
     // Monster pack builder
     // -------------------------------------------------------------------------
 
-    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel)
+    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1)
     {
         var claw     = new CombatAbility("Claw",       6, 0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
         var bite     = new CombatAbility("Bite",       8, 0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack);
@@ -287,21 +319,36 @@ public class CombatHelpers(
         var pack = new List<MonsterTemplate>();
 
         var primary = pool[Random.Shared.Next(pool.Length)];
-        pack.Add(primary);
+        pack.Add(ScaleMonster(primary, dangerLevel, playerLevel));
 
         if (dangerLevel >= 3 && Random.Shared.Next(2) == 0)
         {
             var weakPool = pools[Math.Max(0, tierIndex - 1)];
-            pack.Add(weakPool[Random.Shared.Next(weakPool.Length)]);
+            var extra = weakPool[Random.Shared.Next(weakPool.Length)];
+            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel));
         }
 
         if (dangerLevel >= 7 && pack.Count == 1)
         {
             var midPool = pools[Math.Max(0, tierIndex - 1)];
-            pack.Add(midPool[Random.Shared.Next(midPool.Length)]);
+            var extra = midPool[Random.Shared.Next(midPool.Length)];
+            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel));
         }
 
         return pack;
+    }
+
+    private static MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel)
+    {
+        // Base level: danger level +/- 1 for some variance
+        var variance = Random.Shared.Next(-1, 2); // -1, 0, or 1
+        var monsterLevel = Math.Max(1, dangerLevel + variance);
+
+        // Scale up if the player has significantly out-levelled the zone
+        if (playerLevel > dangerLevel * 2)
+            monsterLevel = Math.Max(monsterLevel, playerLevel - 2);
+
+        return template with { Level = monsterLevel };
     }
 
     // -------------------------------------------------------------------------

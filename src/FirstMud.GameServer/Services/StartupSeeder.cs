@@ -76,13 +76,39 @@ public class StartupSeeder(
     private static readonly Dictionary<string, EquipmentSlot> CanonicalItemSlots = new(StringComparer.OrdinalIgnoreCase)
     {
         // Ranged weapons
-        ["Thornwood Bow"]     = EquipmentSlot.RangedWeapon,
-        ["Hunter's Crossbow"] = EquipmentSlot.RangedWeapon,
-        ["Sling"]             = EquipmentSlot.RangedWeapon,
+        ["Thornwood Bow"]       = EquipmentSlot.RangedWeapon,
+        ["Hunter's Crossbow"]   = EquipmentSlot.RangedWeapon,
+        ["Sling"]               = EquipmentSlot.RangedWeapon,
         // Focus weapons
-        ["Oak Wand"]          = EquipmentSlot.Focus,
-        ["Crystal Focus"]     = EquipmentSlot.Focus,
-        ["Ashwood Staff"]     = EquipmentSlot.Focus,
+        ["Oak Wand"]            = EquipmentSlot.Focus,
+        ["Crystal Focus"]       = EquipmentSlot.Focus,
+        ["Ashwood Staff"]       = EquipmentSlot.Focus,
+        // Head armor
+        ["Leather Cap"]         = EquipmentSlot.Head,
+        ["Scale Coif"]          = EquipmentSlot.Head,
+        ["Iron Helm"]           = EquipmentSlot.Head,
+        ["Fur Hood"]            = EquipmentSlot.Head,
+        // Chest armor
+        ["Leather Vest"]        = EquipmentSlot.Chest,
+        ["Iron Buckler"]        = EquipmentSlot.Chest,
+        ["Padded Gambeson"]     = EquipmentSlot.Chest,
+        ["Chain Shirt"]         = EquipmentSlot.Chest,
+        // Legs armor
+        ["Leather Leggings"]    = EquipmentSlot.Legs,
+        ["Iron Greaves"]        = EquipmentSlot.Legs,
+        ["Padded Trousers"]     = EquipmentSlot.Legs,
+        // Hands armor
+        ["Leather Gloves"]      = EquipmentSlot.Hands,
+        ["Iron Vambraces"]      = EquipmentSlot.Hands,
+        ["Wrapped Handguards"]  = EquipmentSlot.Hands,
+        // Feet armor
+        ["Leather Boots"]       = EquipmentSlot.Feet,
+        ["Iron Sabatons"]       = EquipmentSlot.Feet,
+        ["Traveler's Sandals"]  = EquipmentSlot.Feet,
+        // Accessories
+        ["Bone Ring"]           = EquipmentSlot.Accessory,
+        ["Silver Amulet"]       = EquipmentSlot.Accessory,
+        ["Wyrd Charm"]          = EquipmentSlot.Accessory,
     };
 
     private async Task FixMisassignedEquipmentSlotsAsync(CancellationToken ct)

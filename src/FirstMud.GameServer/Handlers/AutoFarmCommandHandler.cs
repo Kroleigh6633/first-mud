@@ -102,7 +102,26 @@ public class AutoFarmCommandHandler(
                     continue;
 
                 // Start and auto-fight the encounter
-                var monsters = CombatHelpers.BuildMonsterPack(dangerLevel);
+                var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level);
+
+                // Skip grey encounters — monsters too weak to bother fighting
+                var avgMonsterLevel = monsters.Count > 0
+                    ? (int)Math.Round(monsters.Average(m => (double)m.Level))
+                    : 1;
+                var levelGap = player.Level - avgMonsterLevel;
+
+                if (levelGap >= 4)
+                {
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("GameMessage", new
+                        {
+                            timestamp = DateTime.UtcNow.ToString("O"),
+                            category = "system",
+                            text = "Auto-farm: skipped encounter (enemies too weak)."
+                        }, farmCt);
+                    continue;
+                }
 
                 var encounter = await combatSvc.StartEncounterAsync(
                     playerId, nearbyZone?.Id ?? Guid.NewGuid(), player, [], monsters, ct: farmCt);

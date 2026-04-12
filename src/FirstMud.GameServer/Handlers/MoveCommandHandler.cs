@@ -70,7 +70,32 @@ public class MoveCommandHandler(
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
 
-        var monsters = CombatHelpers.BuildMonsterPack(nearbyZone.DangerLevel);
+        var monsters = CombatHelpers.BuildMonsterPack(nearbyZone.DangerLevel, player.Level);
+
+        // Aggro check: high-level players in low-level zones don't get bothered
+        var avgMonsterLevel = monsters.Count > 0
+            ? (int)Math.Round(monsters.Average(m => (double)m.Level))
+            : 1;
+        var levelGap = player.Level - avgMonsterLevel;
+
+        if (levelGap >= 4)
+        {
+            await notificationService.SendMessageAsync(
+                playerId, "combat",
+                "The creatures here sense your power and keep their distance.",
+                ct);
+            return;
+        }
+
+        if (levelGap == 3 && Random.Shared.Next(2) == 0)
+        {
+            var fleeingName = monsters[0].Name;
+            await notificationService.SendMessageAsync(
+                playerId, "combat",
+                $"A {fleeingName} scurries away at the sight of you.",
+                ct);
+            return;
+        }
 
         var encounter = await combatService.StartEncounterAsync(
             playerId, Guid.NewGuid(), player, [], monsters, ct: ct);

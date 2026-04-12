@@ -350,7 +350,7 @@ export function useGameConnection(): GameConnectionResult {
           // without needing to join against inventory (names are set via Inventory event)
         }));
         // Request a fresh inventory to get updated item names for equipment display
-        connection.invoke('SendCommand', 'inventory', null).catch(() => {/* ignore */});
+        connection.invoke('SendCommand', 'openinventory', null).catch(() => {/* ignore */});
       } else {
         // Legacy three-slot update
         setEquipment({

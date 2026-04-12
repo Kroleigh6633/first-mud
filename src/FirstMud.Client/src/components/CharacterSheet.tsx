@@ -120,7 +120,7 @@ export default function CharacterSheet({ player, equipment, onClose }: Props) {
           <span style={{ color: '#aaa' }}>{player.experience ?? 0} / {player.level * player.level * 100}</span>
         </div>
         <div style={hintStyle}>
-          Earned from combat (+20 per enemy level), quests, and harvesting [E] (+5 each).
+          Earned from combat (scaled by level difference), quests, and harvesting [E] (+5 each). Grey enemies (4+ levels below you) give no XP.
         </div>
 
         <div style={sectionStyle}>Attributes</div>
