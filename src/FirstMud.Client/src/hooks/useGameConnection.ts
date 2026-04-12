@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -61,6 +61,7 @@ export interface GameConnectionResult {
   fetchAvailableQuests: () => void;
   zoneTiles: ZoneTile[];
   inventory: InventorySnapshot | null;
+  combat: CombatUpdate | null;
   needsPlayerCreation: boolean;
   playerId: string | null;
 }
@@ -75,6 +76,7 @@ export function useGameConnection(): GameConnectionResult {
   const [availableQuests, setAvailableQuests] = useState<QuestNode[]>([]);
   const [zoneTiles, setZoneTiles] = useState<ZoneTile[]>([]);
   const [inventory, setInventory] = useState<InventorySnapshot | null>(null);
+  const [combat, setCombat] = useState<CombatUpdate | null>(null);
   const [needsPlayerCreation, setNeedsPlayerCreation] = useState<boolean>(resolvedPlayerId === null);
   const [playerId] = useState<string | null>(resolvedPlayerId);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
@@ -222,6 +224,14 @@ export function useGameConnection(): GameConnectionResult {
       setInventory(snapshot);
     });
 
+    connection.on('CombatUpdate', (update: CombatUpdate) => {
+      setCombat(update);
+      // Auto-clear combat state when encounter ends
+      if (update.state === 'Victory' || update.state === 'Defeat' || update.state === 'Fled') {
+        setTimeout(() => setCombat(null), 5000);
+      }
+    });
+
     connection.onreconnecting(() => {
       setConnectionState('connecting');
       appendMessage({
@@ -323,6 +333,7 @@ export function useGameConnection(): GameConnectionResult {
     fetchAvailableQuests,
     zoneTiles,
     inventory,
+    combat,
     needsPlayerCreation,
     playerId,
   };

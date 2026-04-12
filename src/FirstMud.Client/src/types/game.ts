@@ -8,13 +8,28 @@ export interface PlayerState {
   id: string;
   name: string;
   level: number;
+  experience: number;
   currentHp: number;
   maxHp: number;
+  actionPoints: number;
+  maxActionPoints: number;
   weavePercent: number;
   weaveState: WeaveState;
   x: number;
   y: number;
   world: WorldId;
+  strength: number;
+  agility: number;
+  intellect: number;
+  fortitude: number;
+  speed: number;
+  craftingSkill: number;
+  salvageSkill: number;
+  primaryElement: MagicElement;
+  polarity: MagicPolarity;
+  elementRevealed: boolean;
+  polarityRevealed: boolean;
+  wyrdTangle: number;
   factionTiers: Record<string, ReputationTier>;
   activeCompanionIds: string[];
   unlockedPortals: WorldId[];
@@ -85,6 +100,26 @@ export interface InventoryItem {
   name: string;
   description: string;
   workmanship: number;
+}
+
+export interface CombatantState {
+  id: string;
+  name: string;
+  combatantType: string;
+  currentHp: number;
+  maxHp: number;
+  speed: number;
+  element: string;
+  isPlayerSide: boolean;
+  isDefeated: boolean;
+}
+
+export interface CombatUpdate {
+  encounterId: string;
+  state: string; // NotStarted, InProgress, Victory, Defeat, Fled
+  combatants: CombatantState[];
+  currentActorId: string;
+  round: number;
 }
 
 export interface InventorySnapshot {

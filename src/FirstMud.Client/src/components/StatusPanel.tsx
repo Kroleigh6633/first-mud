@@ -95,7 +95,9 @@ export default function StatusPanel({ player, currentTile }: Props) {
         <span style={{ color: '#888888' }}> {player.currentHp}/{player.maxHp}</span>
       </div>
       <div style={{ marginBottom: '2px' }}>
-        <span style={{ color: '#888888' }}>Weave: </span>
+        <span style={{ color: '#888888' }}>Weave </span>
+        <span style={{ color: '#555555', fontSize: '10px' }}>(mana)</span>
+        <span style={{ color: '#888888' }}>: </span>
         <span style={{ color: weaveColor(player.weaveState) }}>{weaveBar}</span>
         <span style={{ color: '#888888' }}> {player.weavePercent}%</span>
       </div>

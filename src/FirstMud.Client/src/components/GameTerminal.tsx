@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate } from '../types/game';
 import WorldMap from './WorldMap';
 import StatusPanel from './StatusPanel';
 import MessageLog from './MessageLog';
@@ -8,6 +8,8 @@ import QuestLog from './QuestLog';
 import PlayerCreation from './PlayerCreation';
 import HelpOverlay from './HelpOverlay';
 import InventoryPanel from './InventoryPanel';
+import CharacterSheet from './CharacterSheet';
+import CombatPanel from './CombatPanel';
 import { useKeyboard } from '../hooks/useKeyboard';
 
 interface Props {
@@ -20,6 +22,7 @@ interface Props {
   fetchAvailableQuests: () => void;
   zoneTiles: ZoneTile[];
   inventory: InventorySnapshot | null;
+  combat: CombatUpdate | null;
   needsPlayerCreation: boolean;
   playerId: string | null;
 }
@@ -55,12 +58,14 @@ export default function GameTerminal({
   fetchAvailableQuests,
   zoneTiles,
   inventory,
+  combat,
   needsPlayerCreation,
 }: Props) {
   const keyAction = useKeyboard();
   const [showQuestLog, setShowQuestLog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
+  const [showCharSheet, setShowCharSheet] = useState(false);
 
   // Compute the zone tile the player is currently standing on, if any
   const currentTile = useMemo(() => {
@@ -125,7 +130,7 @@ export default function GameTerminal({
         setShowInventory(prev => !prev);
         break;
       case 'character':
-        // No server-side CharacterCommand yet — silently ignore.
+        setShowCharSheet(prev => !prev);
         break;
       case 'quest':
         setShowQuestLog(prev => {
@@ -141,9 +146,14 @@ export default function GameTerminal({
         setShowHelp(false);
         setShowQuestLog(false);
         setShowInventory(false);
+        setShowCharSheet(false);
         break;
       case 'pass':
-        // No server-side PassCommand yet — silently ignore.
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: 'You wait. The world continues around you.',
+        });
         break;
     }
   }, [keyAction, sendCommand, fetchAvailableQuests, currentTile, appendMessage]);
@@ -234,6 +244,10 @@ export default function GameTerminal({
       {showInventory && (
         <InventoryPanel snapshot={inventory} onClose={() => setShowInventory(false)} />
       )}
+      {showCharSheet && (
+        <CharacterSheet player={worldState?.player ?? null} onClose={() => setShowCharSheet(false)} />
+      )}
+      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} />}
       {showHelp && <HelpOverlay onClose={() => setShowHelp(false)} />}
     </div>
   );

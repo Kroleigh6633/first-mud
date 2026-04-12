@@ -145,7 +145,58 @@ public class CommandDispatcher
             .Group(cmd.PlayerId.ToString())
             .SendAsync("PlayerMoved", positionPayload, ct);
 
+        // Random encounter check — if the player is near a dangerous zone
+        // there's a (dangerLevel * 8)% chance an encounter fires each step.
+        await TryTriggerEncounterAsync(cmd.PlayerId, newPosition, ct);
+
         return new CommandResult(true, $"Moved to ({newPosition.X}, {newPosition.Y}).", positionPayload);
+    }
+
+    private async Task TryTriggerEncounterAsync(Guid playerId, Position pos, CancellationToken ct)
+    {
+        var zones = await _zoneRepository.GetByWorldAsync(pos.World, ct);
+        Domain.Entities.Zone? nearbyZone = null;
+        foreach (var z in zones)
+        {
+            var known = ZoneGridLayout.GetKnownPosition(z.WorldId, z.ZoneId);
+            var (zx, zy) = known ?? ZoneGridLayout.GetPosition(z.Id);
+            if (Math.Abs(zx - pos.X) <= 1 && Math.Abs(zy - pos.Y) <= 1)
+            {
+                nearbyZone = z;
+                break;
+            }
+        }
+
+        if (nearbyZone is null || nearbyZone.DangerLevel <= 0) return;
+
+        // Roll: dangerLevel * 8% chance per step, capped at 80%
+        var chance = Math.Min(nearbyZone.DangerLevel * 8, 80);
+        if (Random.Shared.Next(100) >= chance) return;
+
+        // Trigger encounter!
+        var player = await _playerRepository.GetByIdAsync(playerId, ct);
+        if (player is null) return;
+
+        var monsters = BuildMonsterPack(nearbyZone.DangerLevel);
+        var encounter = await _combatService.StartEncounterAsync(
+            playerId, Guid.NewGuid(), player, [], monsters, ct);
+
+        var dto = BuildCombatUpdateDto(encounter);
+
+        // Narrate the encounter in the game log
+        var monsterNames = string.Join(", ", monsters.Select(m => m.Name));
+        await _hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("GameMessage", new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                category = "combat",
+                text = $"Hostile creatures emerge from {nearbyZone.Name}! You face: {monsterNames}."
+            }, ct);
+
+        await _hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("CombatUpdate", dto, ct);
     }
 
     // -------------------------------------------------------------------------
