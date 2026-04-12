@@ -263,26 +263,88 @@ export default function GameTerminal({
       {/* Top row: map + status */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '560px 1fr',
+        gridTemplateColumns: statusCollapsed ? '1fr 40px' : '1fr 320px',
         overflow: 'hidden',
         borderBottom: '1px solid #1a3a1a',
+        transition: 'grid-template-columns 0.15s ease',
       }}>
-        {/* Map panel */}
+        {/* Map panel — fills remaining space */}
         <div style={{
           borderRight: '1px solid #1a3a1a',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'flex-start',
           overflow: 'hidden',
-          padding: '4px',
-          boxSizing: 'border-box',
+          position: 'relative',
         }}>
           <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} />
         </div>
 
-        {/* Status panel */}
-        <div style={{ overflow: 'hidden' }}>
-          <StatusPanel player={worldState?.player ?? null} currentTile={currentTile} equipment={equipment} companionRoster={companionRoster} />
+        {/* Status panel — collapsible */}
+        <div style={{
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+        }}>
+          {/* Collapse/expand toggle */}
+          <button
+            onClick={() => setStatusCollapsed(c => !c)}
+            style={{
+              position: 'absolute',
+              top: '4px',
+              left: statusCollapsed ? '4px' : '4px',
+              zIndex: 10,
+              background: '#111',
+              border: '1px solid #1a3a1a',
+              color: '#00ff41',
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: '2px 5px',
+              userSelect: 'none',
+            }}
+            title={statusCollapsed ? 'Expand status panel' : 'Collapse status panel'}
+          >
+            {statusCollapsed ? '\u00bb' : '\u00ab'}
+          </button>
+
+          {statusCollapsed ? (
+            /* Collapsed: thin bar with HP + Weave mini-bars */
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              paddingTop: '28px',
+              gap: '6px',
+            }}>
+              {/* HP mini-bar */}
+              <div style={{ position: 'relative', width: '20px', height: '80px', background: '#1a0a0a', border: '1px solid #3a1a1a' }}>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  width: '100%',
+                  height: `${worldState?.player ? (worldState.player.currentHp / worldState.player.maxHp) * 100 : 0}%`,
+                  background: '#aa2200',
+                }} />
+              </div>
+              {/* Weave mini-bar */}
+              <div style={{ position: 'relative', width: '20px', height: '80px', background: '#0a0a1a', border: '1px solid #1a1a3a' }}>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  width: '100%',
+                  height: `${worldState?.player?.weavePercent ?? 0}%`,
+                  background: '#2255aa',
+                }} />
+              </div>
+            </div>
+          ) : (
+            <StatusPanel
+              player={worldState?.player ?? null}
+              currentTile={currentTile}
+              equipment={equipment}
+              companionRoster={companionRoster}
+            />
+          )}
         </div>
       </div>
 
