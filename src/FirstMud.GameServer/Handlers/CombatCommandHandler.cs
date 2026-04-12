@@ -2,6 +2,7 @@ using FirstMud.Application.Services;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
+using FirstMud.Domain.Entities;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -12,6 +13,7 @@ public class StartCombatCommandHandler(
     IPlayerRepository playerRepository,
     IItemRepository itemRepository,
     IZoneRepository zoneRepository,
+    ICompanionRepository companionRepository,
     CombatService combatService,
     CombatHelpers combatHelpers,
     IHubContext<GameHub> hubContext) : ICommandHandler<StartCombatCommand>
@@ -37,8 +39,16 @@ public class StartCombatCommandHandler(
                 equippedItems[slot] = equippedItem;
         }
 
+        var activeCompanions = new List<Domain.Entities.Companion>();
+        foreach (var compId in player.ActiveCompanionIds)
+        {
+            var comp = await companionRepository.GetByIdAsync(compId, ct);
+            if (comp != null && !comp.IsPermanentlyGone)
+                activeCompanions.Add(comp);
+        }
+
         var encounter = await combatService.StartEncounterAsync(
-            cmd.PlayerId, cmd.ZoneId, player, [], monsters, equippedItems, ct);
+            cmd.PlayerId, cmd.ZoneId, player, activeCompanions, monsters, equippedItems, ct);
 
         await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, encounter, ct);
 

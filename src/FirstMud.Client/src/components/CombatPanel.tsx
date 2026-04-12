@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { CombatUpdate, CombatantState } from '../types/game';
 
 interface Props {
@@ -117,22 +117,20 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
   const targetName = enemySide.find(c => c.id === targetId)?.name ?? '???';
 
   const [autoCombat, setAutoCombat] = useState(false);
-  // Track whether the auto-combat effect has already fired for the current turn
-  const autoFiredRef = useRef<string | null>(null);
 
-  // Auto-combat: fire when it's the player's turn and autoCombat is on
+  // Auto-combat: fire whenever combat state changes and it's the player's turn.
+  // Watches the entire combat object so the effect re-triggers on every
+  // CombatUpdate — including after enemy turns that land back on the player
+  // with the same currentActorId. The 300ms timeout + cleanup prevents
+  // double-firing if the component re-renders mid-delay.
   useEffect(() => {
     if (!autoCombat || !isPlayerTurn || isOver) return;
-    // Prevent double-firing for the same actor turn
-    if (autoFiredRef.current === combat.currentActorId) return;
 
     if (!firstLivingEnemy) {
       // No valid targets — stop auto-combat
       setAutoCombat(false);
       return;
     }
-
-    autoFiredRef.current = combat.currentActorId;
 
     const abilities = currentActor?.abilities ?? [];
     const hpPct = currentActor
@@ -160,7 +158,7 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [autoCombat, combat.currentActorId, isPlayerTurn, isOver]);
+  }, [autoCombat, isPlayerTurn, isOver, combat]);
 
   // Stop auto-combat when encounter ends
   useEffect(() => {
@@ -168,13 +166,6 @@ export default function CombatPanel({ combat, sendCommand }: Props) {
       setAutoCombat(false);
     }
   }, [isOver]);
-
-  // Reset the fired-ref when the actor changes so the next turn can fire
-  useEffect(() => {
-    if (!isPlayerTurn) {
-      autoFiredRef.current = null;
-    }
-  }, [combat.currentActorId, isPlayerTurn]);
 
   // Keyboard shortcut 'a' to toggle auto-combat during combat
   useEffect(() => {

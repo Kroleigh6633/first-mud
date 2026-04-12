@@ -12,6 +12,7 @@ namespace FirstMud.GameServer.Handlers;
 public class MoveCommandHandler(
     IPlayerRepository playerRepository,
     IZoneRepository zoneRepository,
+    ICompanionRepository companionRepository,
     CombatService combatService,
     CombatHelpers combatHelpers,
     GameNotificationService notificationService,
@@ -99,6 +100,14 @@ public class MoveCommandHandler(
 
         var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
+        var activeCompanions = new List<Domain.Entities.Companion>();
+        foreach (var compId in player.ActiveCompanionIds)
+        {
+            var comp = await companionRepository.GetByIdAsync(compId, ct);
+            if (comp != null && !comp.IsPermanentlyGone)
+                activeCompanions.Add(comp);
+        }
+
         // Aggro check: high-level players in low-level zones don't get bothered
         var avgMonsterLevel = monsters.Count > 0
             ? (int)Math.Round(monsters.Average(m => (double)m.Level))
@@ -125,7 +134,7 @@ public class MoveCommandHandler(
         }
 
         var encounter = await combatService.StartEncounterAsync(
-            playerId, Guid.NewGuid(), player, [], monsters, ct: ct);
+            playerId, Guid.NewGuid(), player, activeCompanions, monsters, ct: ct);
 
         var combatCategory = CombatHelpers.GetCombatDifficultyCategory(avgMonsterLevel, player.Level);
 

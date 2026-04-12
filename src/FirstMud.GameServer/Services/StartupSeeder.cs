@@ -392,9 +392,57 @@ public class StartupSeeder(
 
     private async Task SeedStarterRecipesAsync(CancellationToken ct)
     {
-        if (await db.Recipes.AnyAsync(ct))
+        // Canonical ingredient list keyed by RecipeId — used for both initial
+        // seeding and fixup of already-seeded rows with wrong ingredient names.
+        static RecipeIngredient[] IngredientsFor(string recipeId) => recipeId switch
         {
-            logger.LogInformation("Recipes table already has data — skipping recipe seed.");
+            "IRON_SWORD_001"     => [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore", 3),
+                                     RecipeIngredient.Create(ItemCategory.Component, "Wood",     1)],
+            "LEATHER_ARMOR_001"  => [RecipeIngredient.Create(ItemCategory.Component, "Leather",       4),
+                                     RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
+            "HEALING_DRAUGHT_001"=> [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+                                     RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 1)],
+            "FOCUS_STONE_001"    => [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
+                                     RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      2)],
+            "TAPER_SHAPING_001"  => [RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2),
+                                     RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3)],
+            _                    => []
+        };
+
+        // Fix any existing recipes whose ingredients haven't been updated yet
+        var existingRecipes = await db.Recipes
+            .Where(r => new[] { "IRON_SWORD_001", "LEATHER_ARMOR_001", "HEALING_DRAUGHT_001",
+                                "FOCUS_STONE_001", "TAPER_SHAPING_001" }.Contains(r.RecipeId))
+            .ToListAsync(ct);
+
+        var recipeFixCount = 0;
+        foreach (var existing in existingRecipes)
+        {
+            var canonical = IngredientsFor(existing.RecipeId);
+            if (canonical.Length == 0) continue;
+
+            // Compare ingredient names; replace if any don't match
+            var needsUpdate = existing.Ingredients.Count != canonical.Length
+                || existing.Ingredients.Zip(canonical).Any(p => p.First.IngredientName != p.Second.IngredientName
+                                                                  || p.First.BaseQuantity  != p.Second.BaseQuantity);
+            if (needsUpdate)
+            {
+                existing.ReplaceIngredients(canonical);
+                db.Recipes.Update(existing);
+                recipeFixCount++;
+                logger.LogWarning(
+                    "SeedStarterRecipes: updated ingredients for recipe {RecipeId} ({Name}).",
+                    existing.RecipeId, existing.Name);
+            }
+        }
+
+        if (recipeFixCount > 0)
+            await db.SaveChangesAsync(ct);
+
+        if (existingRecipes.Count > 0)
+        {
+            logger.LogInformation(
+                "Recipes already seeded — verified ingredients ({Fixed} updated).", recipeFixCount);
             return;
         }
 
