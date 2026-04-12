@@ -460,40 +460,95 @@ public class AutoFarmCommandHandler(
                     originSet = true;
                 }
 
-                // --- WALK ONE STEP in the spiral ---
+                // --- WALK ONE STEP in the spiral (adaptive danger-aware) ---
                 autoFarmService.SetState(playerId, "walking");
 
                 spiralEnumerator.MoveNext();
                 var (dx, dy) = spiralEnumerator.Current;
 
-                var newPos = new Position(
-                    player.Position.World,
-                    player.Position.ZoneId,
-                    player.Position.X + dx,
-                    player.Position.Y + dy);
+                // Collect all four cardinal directions so we can try alternates
+                // when the spiral step lands in a danger zone.
+                (int dx, int dy)[] cardinals = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+                var zonesForDanger = await zoneRepo.GetByWorldAsync(player.Position.World, farmCt);
 
-                // Danger check: if 4+ levels above player, retreat toward origin
-                var zonesForDanger = await zoneRepo.GetByWorldAsync(newPos.World, farmCt);
-                var newZone = ZoneProximity.FindNearby(zonesForDanger, newPos.X, newPos.Y);
-                var newDanger = newZone?.DangerLevel
-                    ?? CombatHelpers.GetWildernessDanger(newPos.X, newPos.Y,
-                        CombatHelpers.GuessWildernessBiome(newPos.X, newPos.Y));
+                int safeCap = autoFarmService.GetSafeDangerCap(playerId, player.Level);
 
-                if (newDanger > player.Level + 4)
+                // Helper: compute danger for a candidate position
+                int DangerAt(int cx, int cy)
                 {
+                    var cZone = ZoneProximity.FindNearby(zonesForDanger, cx, cy);
+                    return cZone?.DangerLevel
+                        ?? CombatHelpers.GetWildernessDanger(cx, cy,
+                            CombatHelpers.GuessWildernessBiome(cx, cy));
+                }
+
+                // Build candidate list: spiral step first, then other cardinals,
+                // preferring unvisited tiles within the safe cap.
+                var candidates = new List<(int ddx, int ddy)> { (dx, dy) };
+                foreach (var (cdx, cdy) in cardinals)
+                    if ((cdx, cdy) != (dx, dy))
+                        candidates.Add((cdx, cdy));
+
+                // Sort: unvisited + safe → visited + safe → anything safe → none
+                var farmSession = autoFarmService.GetSession(playerId);
+                candidates.Sort((a, b) =>
+                {
+                    int ax = player.Position.X + a.ddx, ay = player.Position.Y + a.ddy;
+                    int bx = player.Position.X + b.ddx, by = player.Position.Y + b.ddy;
+                    bool aSafe = DangerAt(ax, ay) <= safeCap;
+                    bool bSafe = DangerAt(bx, by) <= safeCap;
+                    if (aSafe != bSafe) return aSafe ? -1 : 1;
+                    bool aVisited = farmSession?.VisitedTiles.Contains((ax, ay)) ?? false;
+                    bool bVisited = farmSession?.VisitedTiles.Contains((bx, by)) ?? false;
+                    if (aVisited != bVisited) return aVisited ? 1 : -1; // unvisited first
+                    return 0;
+                });
+
+                // Pick best candidate
+                var chosen = candidates[0];
+                int chosenX = player.Position.X + chosen.ddx;
+                int chosenY = player.Position.Y + chosen.ddy;
+                int chosenDanger = DangerAt(chosenX, chosenY);
+
+                Position newPos;
+                if (chosenDanger > safeCap)
+                {
+                    // All directions are too dangerous — stay on current tile and farm it
+                    newPos = player.Position;
                     await hubContext.Clients
                         .Group(playerId.ToString())
                         .SendAsync("GameMessage", new
                         {
                             timestamp = DateTime.UtcNow.ToString("O"),
-                            category = "system",
-                            text = "Auto-farm: area ahead is too dangerous — turning back."
+                            category  = "system",
+                            text      = $"Auto-farm: avoiding dangerous terrain (Danger {chosenDanger}) — farming current tile."
                         }, farmCt);
-
-                    int retX = player.Position.X + Math.Sign(originX - player.Position.X);
-                    int retY = player.Position.Y + Math.Sign(originY - player.Position.Y);
-                    newPos = new Position(player.Position.World, player.Position.ZoneId, retX, retY);
                 }
+                else
+                {
+                    // Warn if we had to deviate from the spiral direction
+                    if (chosen != (dx, dy) && DangerAt(player.Position.X + dx, player.Position.Y + dy) > safeCap)
+                    {
+                        int skippedDanger = DangerAt(player.Position.X + dx, player.Position.Y + dy);
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category  = "system",
+                                text      = $"Auto-farm: avoiding dangerous terrain (Danger {skippedDanger}) — taking alternate route."
+                            }, farmCt);
+                    }
+
+                    newPos = new Position(
+                        player.Position.World,
+                        player.Position.ZoneId,
+                        chosenX,
+                        chosenY);
+                }
+
+                // Mark tile as visited
+                farmSession?.VisitedTiles.Add((newPos.X, newPos.Y));
 
                 player.Move(newPos);
                 await playerRepo.UpdateAsync(player, farmCt);
@@ -693,6 +748,9 @@ public class AutoFarmCommandHandler(
 
                 if (encounter.State == EncounterState.Defeat)
                 {
+                    // Record defeat: lower the safe danger cap to currentDanger - 1
+                    autoFarmService.RecordEncounterOutcome(playerId, FarmEncounterOutcome.Defeat, dangerLevel);
+
                     var defPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                     if (defPlayer is not null)
                     {
@@ -739,8 +797,39 @@ public class AutoFarmCommandHandler(
                     return;
                 }
 
+                if (encounter.State == EncounterState.Fled)
+                {
+                    // Record flee: if 2+ in last 5, the cap will be reduced
+                    autoFarmService.RecordEncounterOutcome(playerId, FarmEncounterOutcome.Fled, dangerLevel);
+                    int newCap = autoFarmService.GetSafeDangerCap(playerId, player.Level);
+
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("GameMessage", new
+                        {
+                            timestamp = DateTime.UtcNow.ToString("O"),
+                            category  = "combat",
+                            text      = $"Auto-farm: fled encounter (Danger {dangerLevel}). Safe cap now {newCap}."
+                        }, farmCt);
+                }
+
                 if (encounter.State == EncounterState.Victory)
                 {
+                    // Record victory: consistent wins will raise the safe danger cap
+                    autoFarmService.RecordEncounterOutcome(playerId, FarmEncounterOutcome.Victory, dangerLevel);
+                    int newCap = autoFarmService.GetSafeDangerCap(playerId, player.Level);
+                    if (newCap > player.Level + 2)
+                    {
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category  = "system",
+                                text      = $"Auto-farm: winning streak — exploring up to Danger {newCap}."
+                            }, farmCt);
+                    }
+
                     // Sync HP after combat
                     var winPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                     if (winPlayer is not null)

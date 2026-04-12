@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CombatUpdate, CombatantState } from '../types/game';
 
 interface Props {
