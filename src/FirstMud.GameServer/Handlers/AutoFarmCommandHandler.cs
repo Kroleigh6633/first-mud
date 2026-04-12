@@ -443,13 +443,14 @@ public class AutoFarmCommandHandler(
                 if (farmCt.IsCancellationRequested) break;
 
                 await using var scope = scopeFactory.CreateAsyncScope();
-                var playerRepo       = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
-                var itemRepo         = scope.ServiceProvider.GetRequiredService<IItemRepository>();
-                var zoneRepo         = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
-                var lootSvc          = scope.ServiceProvider.GetRequiredService<LootService>();
-                var combatSvc        = scope.ServiceProvider.GetRequiredService<CombatService>();
-                var resourceNodeRepo = scope.ServiceProvider.GetRequiredService<IResourceNodeRepository>();
-                var homesteadRepo    = scope.ServiceProvider.GetRequiredService<IHomesteadRepository>();
+                var playerRepo        = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+                var itemRepo          = scope.ServiceProvider.GetRequiredService<IItemRepository>();
+                var zoneRepo          = scope.ServiceProvider.GetRequiredService<IZoneRepository>();
+                var lootSvc           = scope.ServiceProvider.GetRequiredService<LootService>();
+                var combatSvc         = scope.ServiceProvider.GetRequiredService<CombatService>();
+                var resourceNodeRepo  = scope.ServiceProvider.GetRequiredService<IResourceNodeRepository>();
+                var homesteadRepo     = scope.ServiceProvider.GetRequiredService<IHomesteadRepository>();
+                var companionRepo     = scope.ServiceProvider.GetRequiredService<ICompanionRepository>();
 
                 var player = await playerRepo.GetByIdAsync(playerId, farmCt);
                 if (player is null) break;
