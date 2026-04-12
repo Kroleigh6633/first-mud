@@ -16,11 +16,11 @@ public class SalvageService
     private readonly ILogger<SalvageService> _logger;
 
     // Component names that match ResourceType enum values and standard salvage materials
-    private static readonly string[] WeaponMetalComponents = ["Metal"];
+    private static readonly string[] WeaponMetalComponents = ["Iron Ore"];
     private static readonly string[] WeaponWoodComponents  = ["Wood"];
     private static readonly string[] ArmorLeatherComponents = ["Leather"];
-    private static readonly string[] ArmorMetalComponents  = ["Metal"];
-    private static readonly string[] ConsumableComponents  = ["Stone", "Wood", "Metal", "Leather", "Sand", "Herbs"];
+    private static readonly string[] ArmorMetalComponents  = ["Iron Ore"];
+    private static readonly string[] ConsumableComponents  = ["Stone", "Wood", "Iron Ore", "Leather", "Sand", "Herbs"];
 
     public SalvageService(
         IPlayerRepository players,
@@ -316,7 +316,7 @@ public class SalvageService
             ItemCategory.Weapon => BuildWeaponYields(bonus),
             ItemCategory.Armor  => BuildArmorYields(bonus),
             ItemCategory.Consumable => BuildConsumableYields(),
-            _ => [new SalvageYield("Metal", 1)]
+            _ => [new SalvageYield("Iron Ore", 1)]
         };
     }
 
@@ -324,14 +324,14 @@ public class SalvageService
     {
         var metal  = Math.Clamp(2 + bonus, 2, 5);
         var wood   = Math.Clamp(1 + bonus / 2, 1, 3);
-        return [new SalvageYield("Metal", metal), new SalvageYield("Wood", wood)];
+        return [new SalvageYield("Iron Ore", metal), new SalvageYield("Wood", wood)];
     }
 
     private static IReadOnlyList<SalvageYield> BuildArmorYields(int bonus)
     {
         var leather = Math.Clamp(2 + bonus, 2, 5);
         var metal   = Math.Clamp(1 + bonus / 2, 1, 3);
-        return [new SalvageYield("Leather", leather), new SalvageYield("Metal", metal)];
+        return [new SalvageYield("Leather", leather), new SalvageYield("Iron Ore", metal)];
     }
 
     private static IReadOnlyList<SalvageYield> BuildConsumableYields()

@@ -163,9 +163,9 @@ public class HomesteadCompanionService
         var workValue = item.Workmanship.Value;
         var baseYield = item.Category switch
         {
-            ItemCategory.Weapon => (material: "Metal", qty: Math.Max(1, (int)(2 * multiplier))),
+            ItemCategory.Weapon => (material: "Iron Ore", qty: Math.Max(1, (int)(2 * multiplier))),
             ItemCategory.Armor  => (material: "Leather", qty: Math.Max(1, (int)(2 * multiplier))),
-            _                   => (material: "Metal", qty: 1)
+            _                   => (material: "Iron Ore", qty: 1)
         };
 
         var itemName = item.Name;
