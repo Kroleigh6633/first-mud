@@ -75,23 +75,44 @@ public class Player
 
     private Player() { }
 
+    /// <summary>
+    /// Returns the starting stats (Str, Agi, Int, Fort, Spd, MaxHp) for a given element archetype.
+    /// Total attribute points are ~55 for every element.
+    /// </summary>
+    public static (int Str, int Agi, int Int, int Fort, int Spd, int MaxHp) GetArchetypeStats(MagicElement element) =>
+        element switch
+        {
+            MagicElement.Fire   => (14, 10,  8, 12, 11, 100),
+            MagicElement.Water  => ( 8, 12, 14, 10, 11,  90),
+            MagicElement.Earth  => (12,  8, 10, 14,  6, 120),
+            MagicElement.Air    => ( 8, 14, 12,  8, 13,  85),
+            MagicElement.Aether => (10, 10, 13, 10, 12,  95),
+            _                   => (10, 10, 10, 10, 10, 100),
+        };
+
     public static Player Create(string name, int craftingSeed)
     {
+        // Randomly assign a primary element so every new character has a distinct archetype.
+        var elements = Enum.GetValues<MagicElement>();
+        var element = elements[Random.Shared.Next(elements.Length)];
+        var (str, agi, intel, fort, spd, maxHp) = GetArchetypeStats(element);
+
         var player = new Player
         {
             Id = Guid.NewGuid(),
             Name = name,
             Level = 1,
             Experience = 0,
-            Strength = 10,
-            Agility = 10,
-            Intellect = 10,
-            Fortitude = 10,
-            Speed = 10,
+            PrimaryElement = element,
+            Strength = str,
+            Agility = agi,
+            Intellect = intel,
+            Fortitude = fort,
+            Speed = spd,
             CraftingSkill = 1,
             SalvageSkill = 1,
-            MaxHp = 100,
-            CurrentHp = 100,
+            MaxHp = maxHp,
+            CurrentHp = maxHp,
             MaxActionPoints = 10,
             ActionPoints = 10,
             CraftingSeed = craftingSeed,
@@ -269,16 +290,34 @@ public class Player
     public ReputationTier GetReputationTier(FactionId factionId) =>
         _reputations.FirstOrDefault(r => r.FactionId == factionId)?.Score.Tier ?? ReputationTier.Unknown;
 
+    /// <summary>
+    /// Returns the per-level stat gains (Str, Agi, Int, Fort, Spd, MaxHp) for a given element archetype.
+    /// Gains are weighted to reinforce each archetype's strengths.
+    /// </summary>
+    public static (int Str, int Agi, int Int, int Fort, int Spd, int MaxHp) GetArchetypeLevelGains(MagicElement element) =>
+        element switch
+        {
+            MagicElement.Fire   => (2, 1, 1, 2, 1, 12),
+            MagicElement.Water  => (1, 1, 2, 1, 1,  8),
+            MagicElement.Earth  => (2, 1, 1, 2, 0, 15),
+            MagicElement.Air    => (1, 2, 1, 1, 2,  7),
+            MagicElement.Aether => (1, 1, 2, 1, 1, 10),
+            _                   => (1, 1, 1, 1, 1, 10),
+        };
+
     private void ApplyLevelUp()
     {
-        MaxHp += 10;
+        var (strGain, agiGain, intGain, fortGain, spdGain, hpGain) =
+            GetArchetypeLevelGains(PrimaryElement == default ? MagicElement.Aether : PrimaryElement);
+
+        MaxHp += hpGain;
         CurrentHp = MaxHp;
         Weave = Weave.ExpandMaximum(5).RestoreFull();
-        Strength += 1;
-        Agility += 1;
-        Intellect += 1;
-        Fortitude += 1;
-        Speed += 1;
+        Strength += strGain;
+        Agility += agiGain;
+        Intellect += intGain;
+        Fortitude += fortGain;
+        Speed += spdGain;
         MaxActionPoints += 2;
         ActionPoints = MaxActionPoints;
     }

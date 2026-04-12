@@ -28,6 +28,12 @@ public class OpenInventoryCommandHandler(
             SalvageSkill = player.SalvageSkill,
             AutoSalvageWeaponThreshold = player.AutoSalvageWeaponThreshold,
             AutoSalvageArmorThreshold = player.AutoSalvageArmorThreshold,
+            // Include the full equipment map so the client can restore equipped state
+            // on every inventory open, without depending on EquipmentChanged being
+            // re-sent.
+            EquippedItems = player.EquippedItems.ToDictionary(
+                kv => kv.Key.ToString(),
+                kv => kv.Value.ToString()),
             Items = items.Select(i => new
             {
                 Id = i.Id.ToString(),
@@ -118,6 +124,9 @@ public class LockItemCommandHandler(
             SalvageSkill = player.SalvageSkill,
             AutoSalvageWeaponThreshold = player.AutoSalvageWeaponThreshold,
             AutoSalvageArmorThreshold = player.AutoSalvageArmorThreshold,
+            EquippedItems = player.EquippedItems.ToDictionary(
+                kv => kv.Key.ToString(),
+                kv => kv.Value.ToString()),
             Items = items.Select(i => new
             {
                 Id = i.Id.ToString(),

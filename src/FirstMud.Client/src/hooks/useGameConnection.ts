@@ -240,11 +240,15 @@ export function useGameConnection(): GameConnectionResult {
       setZoneTiles(view.tiles ?? []);
     });
 
-    connection.on('Inventory', (snapshot: InventorySnapshot) => {
+    connection.on('Inventory', (snapshot: InventorySnapshot & { equippedItems?: Record<string, string> }) => {
       setInventory(snapshot);
-      // Derive equipment names from the equipped items map so StatusPanel/CharacterSheet display correctly
+      // The server now sends equippedItems in the Inventory payload so the client
+      // always has the authoritative equipment state when the panel is (re)opened,
+      // without depending solely on EquipmentChanged events.
       setEquipment(prev => {
-        const equipped = prev.equippedItems ?? {};
+        // Prefer the fresh equippedItems from the Inventory payload; fall back to
+        // whatever was stored from the last EquipmentChanged event.
+        const equipped = snapshot.equippedItems ?? prev.equippedItems ?? {};
         const findName = (slotKey: string) => {
           const itemId = equipped[slotKey];
           if (!itemId) return undefined;
@@ -252,6 +256,8 @@ export function useGameConnection(): GameConnectionResult {
         };
         return {
           ...prev,
+          // Always overwrite equippedItems with the freshest known state
+          equippedItems: equipped,
           meleeWeaponName:  findName('MeleeWeapon'),
           rangedWeaponName: findName('RangedWeapon'),
           focusName:        findName('Focus'),

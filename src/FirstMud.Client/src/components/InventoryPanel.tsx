@@ -232,6 +232,9 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
 
   const handleStore = (itemId: string) => {
     sendCommand('deposit', { itemId });
+    // Re-request inventory after a short delay so the deposited item disappears
+    // from the panel without the player needing to open Storage (V) first.
+    setTimeout(() => sendCommand('inventory', null), 400);
   };
 
   const handleToggleLock = (itemId: string) => {
