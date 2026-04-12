@@ -194,12 +194,6 @@ const imbueBtnStyle: React.CSSProperties = {
   marginLeft: '6px',
 };
 
-const imbueBtnDisabledStyle: React.CSSProperties = {
-  ...imbueBtnStyle,
-  border: '1px solid #555555',
-  color: '#555555',
-  cursor: 'not-allowed',
-};
 
 const imbuePanelStyle: React.CSSProperties = {
   background: '#0a0a1a',
@@ -220,7 +214,7 @@ const imbueTypeColors: Record<string, string> = {
   Restoration: '#44ff88',
 };
 
-function imbueSymbol(type: string): string {
+function imbueSymbol(_type: string): string {
   return '✦';
 }
 
@@ -543,9 +537,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                         equip
                       </button>
                     )}
-                    {isImbueable && (() => {
-                      const canImbue = hasOpenSlot || true; // allow overimbuing (risky)
-                      return (
+                    {isImbueable && (
                         <button
                           type="button"
                           style={isShowingImbuePanel ? { ...imbueBtnStyle, background: '#1a0a2a' } : imbueBtnStyle}
@@ -555,8 +547,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                         >
                           imbue
                         </button>
-                      );
-                    })()}
+                    )}
                     {atHomestead && (
                       <button
                         type="button"
