@@ -61,10 +61,13 @@ WHERE EquippedWeaponId IS NOT NULL
    OR EquippedAccessoryId IS NOT NULL;
 ");
 
-            // Step 5 — Remove the trailing comma before the closing brace (SQL Server compatible)
+            // Step 5 — Remove the trailing comma before the closing brace (SQL Server compatible).
+            // The generated JSON looks like {"1":"guid","5":"guid",} so we must strip 2 characters
+            // (the trailing comma AND the closing brace) then re-append just the closing brace.
+            // Using LEN()-1 was a bug: it only removed the } and added it back, leaving the comma.
             migrationBuilder.Sql(@"
 UPDATE Players
-SET EquippedItemsJson = LEFT(EquippedItemsJson, LEN(EquippedItemsJson) - 1) + '}'
+SET EquippedItemsJson = LEFT(EquippedItemsJson, LEN(EquippedItemsJson) - 2) + '}'
 WHERE EquippedItemsJson LIKE '%,}'
   AND EquippedItemsJson <> '{}';
 ");

@@ -18,12 +18,45 @@ public class StartupSeeder(
 {
     public async Task SeedAsync(CancellationToken ct)
     {
+        await FixTrailingCommaEquippedItemsJsonAsync(ct);
         await SeedDevPlayerAsync(ct);
         await SeedNeo4jLoreAsync(ct);
         await SeedAeldranZonesAsync(ct);
         await SeedStarterRecipesAsync(ct);
         await SeedHomesteadsAsync(ct);
         await SeedResourceNodesAsync(ct);
+    }
+
+    // -------------------------------------------------------------------------
+    // Data fixups
+    // -------------------------------------------------------------------------
+
+    // The EquipmentSlotOverhaul migration contained an off-by-one error in its
+    // trailing-comma cleanup step (LEN-1 instead of LEN-2), which could leave
+    // EquippedItemsJson values like {"1":"guid","5":"guid",} in the database.
+    // This fixup repairs any such rows on every startup so that the EF Core
+    // value converter never encounters malformed JSON, even on databases that
+    // ran the migration before the SQL was corrected.
+    private async Task FixTrailingCommaEquippedItemsJsonAsync(CancellationToken ct)
+    {
+        // Use raw ADO.NET because EF's ExecuteSqlRawAsync interprets braces
+        // in SQL strings as format parameter placeholders, and our SQL
+        // contains literal '}' characters.
+        var conn = db.Database.GetDbConnection();
+        await conn.OpenAsync(ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "UPDATE Players SET EquippedItemsJson = LEFT(EquippedItemsJson, LEN(EquippedItemsJson) - 2) + '}' WHERE EquippedItemsJson LIKE '%,}' AND LEN(EquippedItemsJson) > 2";
+            var affected = await cmd.ExecuteNonQueryAsync(ct);
+            if (affected > 0)
+                logger.LogWarning("Fixed trailing-comma JSON in EquippedItemsJson for {Count} player row(s).", affected);
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
     }
 
     // -------------------------------------------------------------------------

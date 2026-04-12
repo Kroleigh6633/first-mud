@@ -57,7 +57,14 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.ActionPoints);
         builder.Property(p => p.MaxActionPoints);
 
-        // Equipment — 9-slot dictionary stored as JSON
+        // Equipment — 9-slot dictionary stored as JSON.
+        // AllowTrailingCommas = true makes the deserializer resilient to JSON
+        // rows that were written with a trailing comma by the EquipmentSlotOverhaul
+        // migration before its cleanup step ran (e.g. {"1":"guid","5":"guid",}).
+        var equippedItemsReadOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            AllowTrailingCommas = true,
+        };
         builder.Property(p => p.EquippedItems)
             .HasColumnName("EquippedItemsJson")
             .HasColumnType("nvarchar(max)")
@@ -66,7 +73,7 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
                     v.ToDictionary(kv => (int)kv.Key, kv => kv.Value),
                     (System.Text.Json.JsonSerializerOptions?)null),
                 v => System.Text.Json.JsonSerializer
-                        .Deserialize<Dictionary<int, Guid>>(v, (System.Text.Json.JsonSerializerOptions?)null)!
+                        .Deserialize<Dictionary<int, Guid>>(v, equippedItemsReadOptions)!
                         .ToDictionary(kv => (EquipmentSlot)kv.Key, kv => kv.Value))
             .Metadata.SetValueComparer(new ValueComparer<Dictionary<EquipmentSlot, Guid>>(
                 (a, b) => a != null && b != null && a.Count == b.Count &&
