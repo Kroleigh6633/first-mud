@@ -95,14 +95,13 @@ public class UseCombatAbilityCommandHandler(
             await combatHelpers.TryCaptureCompanionAsync(cmd.PlayerId, updated, ct);
             await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
 
-            // Auto-rotate maxed companions every 5th manual combat victory
+            // Auto-rotate maxed companions on every manual combat victory
             var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
             if (player is not null && player.AutoRotateMaxedCompanions)
             {
-                var shouldRotate = player.RecordCombatVictory();
+                player.RecordCombatVictory();
                 await playerRepository.UpdateAsync(player, ct);
-                if (shouldRotate)
-                    await combatHelpers.TryRotateMaxedCompanionsAsync(cmd.PlayerId, ct);
+                await combatHelpers.TryRotateMaxedCompanionsAsync(cmd.PlayerId, ct);
             }
         }
         else if (updated.State == EncounterState.Defeat)

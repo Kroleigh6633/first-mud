@@ -3,6 +3,7 @@ import type { CompanionState, CompanionType, MagicElement, HomesteadDuty } from 
 
 interface Props {
   companions: CompanionState[];
+  activeCompanionIds: string[];
   onActivate: (id: string) => void;
   onDeactivate: (id: string) => void;
   onClose: () => void;
@@ -316,6 +317,7 @@ function HomesteadAssignPanel({
 function CompanionCard({
   companion,
   activeCount,
+  isInActiveParty,
   onActivate,
   onDeactivate,
   onAssign,
@@ -324,6 +326,7 @@ function CompanionCard({
 }: {
   companion: CompanionState;
   activeCount: number;
+  isInActiveParty: boolean;
   onActivate: () => void;
   onDeactivate: () => void;
   onAssign: (duty: HomesteadDuty) => void;
@@ -335,8 +338,9 @@ function CompanionCard({
   const drift = driftLabel(companion.driftAccumulator);
   const abilitiesForType = ABILITY_LABELS[companion.type] ?? ABILITY_LABELS.Wildfolk;
   const unlockedAbilities = abilitiesForType.slice(0, companion.currentLayer);
-  const isOnDuty = !!companion.assignedDuty && !companion.isActive;
-  const isIdleInactive = !companion.isActive && !companion.assignedDuty;
+  // Use player's activeCompanionIds as ground truth — not the stale isActive flag on the DTO
+  const isOnDuty = !!companion.assignedDuty && !isInActiveParty;
+  const isIdleInactive = !isInActiveParty && !companion.assignedDuty;
 
   const handleDeactivateClick = () => {
     setShowDeactivatePicker(true);
@@ -353,17 +357,17 @@ function CompanionCard({
   };
 
   return (
-    <div style={cardStyle(companion.isActive, isOnDuty)}>
+    <div style={cardStyle(isInActiveParty, isOnDuty)}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
         <div>
           <span style={{ color: elementColor(companion.element), fontWeight: 'bold', marginRight: '6px' }}>
             [{typeIcon(companion.type)}]
           </span>
-          <span style={{ color: companion.isActive ? '#00ccff' : isOnDuty ? '#ccaa44' : '#cccccc', fontWeight: 'bold' }}>
+          <span style={{ color: isInActiveParty ? '#00ccff' : isOnDuty ? '#ccaa44' : '#cccccc', fontWeight: 'bold' }}>
             {companion.name}
           </span>
-          {companion.isActive && (
+          {isInActiveParty && (
             <span style={{ color: '#00ccff', fontSize: '10px', marginLeft: '8px' }}>ACTIVE</span>
           )}
           {isOnDuty && (
@@ -381,7 +385,7 @@ function CompanionCard({
           )}
         </div>
         <div>
-          {companion.isActive ? (
+          {isInActiveParty ? (
             <button
               type="button"
               style={actionBtnStyle(showDeactivatePicker ? '#ff4444' : '#ff8800')}
@@ -438,7 +442,7 @@ function CompanionCard({
           <span style={{ color: driftColor(companion.driftAccumulator) }}>
             {companion.driftAccumulator.toFixed(1)}/50.0
           </span>
-          {!companion.isActive && (
+          {!isInActiveParty && (
             <span style={{ color: '#555555', marginLeft: '6px' }}>(idle companions drift — assign duty to pause drift)</span>
           )}
         </div>
@@ -461,7 +465,7 @@ function CompanionCard({
       )}
 
       {/* Deactivate choice picker — inline prompt after clicking Deactivate */}
-      {companion.isActive && showDeactivatePicker && (
+      {isInActiveParty && showDeactivatePicker && (
         <DeactivateChoicePicker
           companion={companion}
           onRest={handleRest}
@@ -471,7 +475,7 @@ function CompanionCard({
       )}
 
       {/* Homestead assignment panel — shown for all inactive companions */}
-      {!companion.isActive && (
+      {!isInActiveParty && (
         <HomesteadAssignPanel
           companion={companion}
           onAssign={onAssign}
@@ -630,10 +634,11 @@ const cancelPickerBtnStyle: React.CSSProperties = {
   marginLeft: '4px',
 };
 
-export default function CompanionPanel({ companions, onActivate, onDeactivate, onClose, sendCommand }: Props) {
-  const activeCompanions    = companions.filter(c => c.isActive);
-  const dutyCompanions      = companions.filter(c => !c.isActive && !!c.assignedDuty);
-  const idleCompanions      = companions.filter(c => !c.isActive && !c.assignedDuty);
+export default function CompanionPanel({ companions, activeCompanionIds, onActivate, onDeactivate, onClose, sendCommand }: Props) {
+  // Use player.activeCompanionIds as ground truth, not companion.isActive (which can be stale)
+  const activeCompanions    = companions.filter(c => activeCompanionIds.includes(c.id));
+  const dutyCompanions      = companions.filter(c => !activeCompanionIds.includes(c.id) && !!c.assignedDuty);
+  const idleCompanions      = companions.filter(c => !activeCompanionIds.includes(c.id) && !c.assignedDuty);
   const activeCount         = activeCompanions.length;
 
   const handleAssign = (companionId: string, duty: HomesteadDuty) => {
@@ -657,6 +662,7 @@ export default function CompanionPanel({ companions, onActivate, onDeactivate, o
       key={companion.id}
       companion={companion}
       activeCount={activeCount}
+      isInActiveParty={activeCompanionIds.includes(companion.id)}
       onActivate={() => onActivate(companion.id)}
       onDeactivate={() => onDeactivate(companion.id)}
       onAssign={(duty) => handleAssign(companion.id, duty)}

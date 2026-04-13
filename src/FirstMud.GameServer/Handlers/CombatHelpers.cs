@@ -615,27 +615,59 @@ public class CombatHelpers(
     {
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
-        if (!player.AutoRotateMaxedCompanions) return;
+        if (!player.AutoRotateMaxedCompanions)
+        {
+            logger.LogDebug("Rotation check skipped: AutoRotateMaxedCompanions is OFF for player {PlayerId}", playerId);
+            return;
+        }
 
         var allCompanions = await companionRepository.GetByOwnerAsync(playerId, ct);
 
-        // Active companions that have hit the bond cap
+        // Active companions that have hit the bond cap — use player.ActiveCompanionIds as ground truth
         var maxedActive = allCompanions
-            .Where(c => !c.IsPermanentlyGone && c.IsActive && c.CurrentLayer >= 6)
+            .Where(c => !c.IsPermanentlyGone
+                     && player.ActiveCompanionIds.Contains(c.Id)
+                     && c.CurrentLayer >= 6)
             .ToList();
 
-        if (maxedActive.Count == 0) return;
+        if (maxedActive.Count == 0)
+        {
+            logger.LogDebug(
+                "Rotation check: no maxed active companions for player {PlayerId}. Active slots: [{Ids}]",
+                playerId,
+                string.Join(", ", player.ActiveCompanionIds));
+            return;
+        }
 
-        // Idle companions (not active, not on any homestead duty) that can still grow
+        // Growable candidates: not active, not permanently gone, below bond cap.
+        // Include companions assigned to homestead duty — they will be recalled.
         var growableInactive = allCompanions
             .Where(c => !c.IsPermanentlyGone
-                     && !c.IsActive
-                     && (c.AssignedDuty is null || c.AssignedDuty == Domain.Enums.HomesteadDuty.None)
+                     && !player.ActiveCompanionIds.Contains(c.Id)
                      && c.CurrentLayer < 6)
             .OrderBy(c => c.CurrentLayer)   // lowest bond first — most benefit from XP
+            .ThenBy(c => c.UsageCounter)    // least-progressed within same layer
             .ToList();
 
-        if (growableInactive.Count == 0) return;
+        if (growableInactive.Count == 0)
+        {
+            logger.LogInformation(
+                "Rotation check: {Count} maxed companion(s) active but NO growable replacements available for player {PlayerId}. " +
+                "Maxed: [{Names}]",
+                maxedActive.Count,
+                playerId,
+                string.Join(", ", maxedActive.Select(c => $"{c.Name} L{c.CurrentLayer}")));
+            return;
+        }
+
+        logger.LogInformation(
+            "Rotation check: {MaxedCount} maxed active, {GrowCount} growable candidates for player {PlayerId}. " +
+            "Maxed: [{Maxed}] Candidates: [{Grow}]",
+            maxedActive.Count,
+            growableInactive.Count,
+            playerId,
+            string.Join(", ", maxedActive.Select(c => $"{c.Name} L{c.CurrentLayer}")),
+            string.Join(", ", growableInactive.Take(5).Select(c => $"{c.Name} L{c.CurrentLayer}")));
 
         var rotated = false;
 

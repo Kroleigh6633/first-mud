@@ -236,7 +236,8 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+      position: 'fixed', top: 0, left: 0, right: '320px', bottom: '180px',
+      background: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 160,
     }} data-testid="combat-panel">
       <div style={{

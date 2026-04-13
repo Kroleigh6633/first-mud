@@ -1251,6 +1251,7 @@ export default function GameTerminal({
       {showCompanions && (
         <CompanionPanel
           companions={companionRoster}
+          activeCompanionIds={worldState?.player?.activeCompanionIds ?? []}
           onActivate={(id) => sendCommand('activatecompanion', { companionId: id })}
           onDeactivate={(id) => sendCommand('deactivatecompanion', { companionId: id })}
           onClose={() => setShowCompanions(false)}
