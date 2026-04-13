@@ -48,6 +48,7 @@ dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario f
 | `faction-state`   | scaffold | `--at <marker>`                                    |
 | `encounter-sim`   | full     | `--monster <id>` (repeatable) `--party <L:elem,...>` `--rolls <N>` `--player-level <L>` `--player-element <E>` `--seed <S>` `--danger-level <0..10>` |
 | `economy-sim`     | scaffold | `--hours <N>` `--scenario <name>`                  |
+| `progression-sim` | full     | `--hours <N>` `--seed <S>` `--playstyle <name>` `--player-archetype fire\|water\|earth\|balanced` `--starting-zone <id>` `--all-playstyles` `--report-pass <N>` |
 
 ## Input formats
 
@@ -244,6 +245,101 @@ flag is doing real work:
 unscaled: Wins 99.8%   Avg rounds 4.2   Damage taken med 65   Difficulty trivial
 danger=5: Wins  0.4%   Avg rounds 4.6   Damage taken med 171  Difficulty punishing
 ```
+
+## progression-sim
+
+Full progression curve simulator. Builds on `encounter-sim`'s combat math but
+models a whole N-hour play session: fresh character, starter companions,
+playstyle-weighted action loop (combat / harvest / craft / salvage), per-hour
+snapshots, and an end-of-run bottleneck report.
+
+```bash
+# Single playstyle, 40h run
+dotnet run --project FirstMud.DesignTools -- progression-sim \
+    --hours 40 --seed 42 --playstyle balanced
+
+# All playstyles side-by-side + written markdown report
+dotnet run --project FirstMud.DesignTools -- progression-sim \
+    --hours 40 --seed 42 --all-playstyles --report-pass 1
+```
+
+### Playstyles
+
+| name                 | weights (combat / harvest / craft / salvage) | intent                                        |
+|----------------------|-----------------------------------------------|-----------------------------------------------|
+| `balanced`           | 40 / 25 / 25 / 10                             | mixed play — the default progression yardstick |
+| `combat-heavy`       | 80 /  5 / 10 /  5                             | farm XP + loot, minimal crafting               |
+| `craft-heavy`        | 10 / 45 / 35 / 10                             | harvest + craft loop, combat only when forced |
+| `enchanting-focused` | 45 / 30 / 15 / 10                             | prioritise enchanting-mat drops + tapers       |
+
+### Sample output (balanced, seed 42)
+
+```
+Hour | Lvl | Craft | Salv | CompAvg | EnchMat | Gold | TopGear | Danger
+-----+-----+-------+------+---------+---------+------+---------+-------
+   1 |   1 |     1 |    1 |    1.00 |       0 |    0 |       0 | d4
+   5 |   2 |     4 |    6 |    2.00 |       6 |    0 |       1 | d6
+  10 |   3 |    12 |   14 |    2.00 |      23 |    0 |       2 | d6
+  15 |   3 |    22 |   21 |    3.00 |      42 |    0 |       2 | d8
+  20 |   4 |    24 |   25 |    3.00 |      65 |    0 |       2 | d8
+  30 |   4 |    30 |   37 |    4.00 |     119 |    0 |       2 | d9
+  40 |   5 |    34 |   47 |    4.00 |     171 |    0 |       2 | d10
+```
+
+**Columns**: player level, crafting skill, salvage skill, avg companion bond
+layer, enchanting-mat pool, gold, top equipped-gear workmanship, and the
+highest danger tier the current party can reliably clear (≥60% win rate across
+12 probe rolls against a tier-appropriate pack).
+
+### Outputs
+
+- **stdout**: per-hour summary table, one per playstyle.
+- **JSON**: `docs/design/sim-logs/progression-sim-<ts>.json` — full action
+  log, material ledger, companion snapshot, per-hour decomposition.
+- **Markdown**: appended daily journal line in `docs/design/sim-logs/YYYY-MM-DD.md`.
+- **Report** (when `--report-pass N`): `docs/design/sim-reports/progression-pass-N.md`
+  — summary table, bottleneck detection, proposed data tunes.
+
+### Bottleneck detection
+
+Each run's report flags specific scarcity walls:
+
+- **enchanting-materials** — enchanting-mat pool (Dravenite Dust, Wyrd Shard,
+  Moonbloom Petal, Fire Crystal, etc.) never reaches 5 units.
+- **workmanship-5-gear** — no equipped item reaches workmanship 5.
+- **companion-layer-3** — average active-party bond layer stays below 3.
+- **danger-5-ceiling** — reliable danger never reaches 5 (the user's Pass-13
+  reported ceiling).
+
+### Proposed data tune format
+
+Every bottleneck produces one or more candidate tunes shaped like content PRs:
+
+```
+loot-tables.json: bump Dravenite Dust and Wyrd Shard drop weight
+                  from 1 to 3 in biome-forest, biome-wyrd, biome-swamp pools.
+CraftingService.CalculateWorkmanship: divisor craftingSkill/20 → craftingSkill/10.
+combat-curves.json: reduce monsterScaling.hpPerDanger from 0.4 to 0.3.
+```
+
+The creative agent should treat the list as the next iteration's candidate
+patches — pick one, apply it, re-run, verify the bottleneck moved or cleared,
+and promote the diff.
+
+### Simplifications
+
+The sim is deliberately **not** a full game replay. See the class-level docs
+on `ProgressionSimulator` for the full list. The big ones:
+
+- No auto-farm / buildings / food economy / hirelings (Phase-2).
+- Travel + downtime are modelled as a constant fudge (real numbers will be
+  10–20% slower than sim).
+- Salvage yields are simplified to a single-component return.
+- Enchanting-mat tracking is bucket-only — no imbue recipe resolution.
+
+These hold for aggregate pacing conclusions but will lie about any specific
+number to ±20%. Use the sim for *relative* comparisons across playstyles and
+tunes, not absolute balance targets.
 
 ## Isolation
 
