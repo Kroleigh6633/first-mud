@@ -1,5 +1,4 @@
 using FirstMud.Application.Content;
-using FirstMud.Application.Events;
 using FirstMud.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,7 +19,8 @@ public static class ServiceExtensions
             return new ContentProvider(root, logger);
         });
 
-        services.AddScoped<IGameEventPublisher, GameEventPublisher>();
+        // IGameEventPublisher is registered by FirstMud.Engine's
+        // EngineServiceExtensions.AddEngineEvents() — do not double-register here.
         services.AddScoped<CraftingService>();
         services.AddScoped<CompanionService>();
         services.AddScoped<ReputationService>();

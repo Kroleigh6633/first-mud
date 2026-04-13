@@ -4,11 +4,14 @@ using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Interfaces;
 using FirstMud.Engine.Commands;
+using FirstMud.Engine.DependencyInjection;
+using FirstMud.Engine.Events;
 using FirstMud.Engine.Messaging;
 using FirstMud.Engine.Tick;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Handlers;
 using FirstMud.GameServer.Hubs;
+using FirstMud.GameServer.Hubs.Parsers;
 using FirstMud.GameServer.Services;
 using FirstMud.GameServer.Services.EventOrchestrators;
 using FirstMud.GameServer.Services.Snapshots;
@@ -39,13 +42,16 @@ builder.Services.AddNeo4j(builder.Configuration);
 // Application layer services
 builder.Services.AddApplicationServices();
 
+// Engine: high-level composition. IGameNotifier is registered below by the host
+// because it needs SignalR (which the Engine project doesn't reference).
+builder.Services
+    .AddEngineMessaging()
+    .AddEngineEvents()
+    .AddEngineCommandPipeline()
+    .AddEngineTickLoop();
+
 // Game services
 builder.Services.AddSingleton<AiPlayerService>();
-
-// Engine: generic command dispatcher + tick loop
-builder.Services.AddScoped<CommandDispatcher>();
-builder.Services.AddSingleton<GameLoopService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
 
 builder.Services.AddSingleton<DungeonMasterService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DungeonMasterService>());
@@ -140,6 +146,59 @@ builder.Services.AddScoped<ICommandHandler<UnassignBuilderCommand>, UnassignBuil
 builder.Services.AddScoped<ICommandHandler<ViewCityCommand>, ViewCityCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<BuildStaffEverythingCommand>, BuildStaffEverythingCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<PracticeEnchantingCommand>, PracticeEnchantingCommandHandler>();
+
+// SignalR command parsing: one ICommandParser per command name, plus the
+// registry-based dispatcher. Add a new command = add one parser + one line here.
+// (No Scrutor: explicit registrations keep the dep surface lean.)
+builder.Services.AddSingleton<ICommandParser, MoveCommandParser>();
+builder.Services.AddSingleton<ICommandParser, AttackCommandParser>();
+builder.Services.AddSingleton<ICommandParser, UseSkillCommandParser>();
+builder.Services.AddSingleton<ICommandParser, InteractCommandParser>();
+builder.Services.AddSingleton<ICommandParser, PickupItemCommandParser>();
+builder.Services.AddSingleton<ICommandParser, OpenInventoryCommandParser>();
+builder.Services.AddSingleton<ICommandParser, CraftCommandParser>();
+builder.Services.AddSingleton<ICommandParser, AcceptQuestCommandParser>();
+builder.Services.AddSingleton<ICommandParser, CompleteQuestCommandParser>();
+builder.Services.AddSingleton<ICommandParser, UsePortalCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ManageBaseAssetCommandParser>();
+builder.Services.AddSingleton<ICommandParser, StartCombatCommandParser>();
+builder.Services.AddSingleton<ICommandParser, UseCombatAbilityCommandParser>();
+builder.Services.AddSingleton<ICommandParser, FleeCombatCommandParser>();
+builder.Services.AddSingleton<ICommandParser, GetAvailableQuestsCommandParser>();
+builder.Services.AddSingleton<ICommandParser, EnterZoneCommandParser>();
+builder.Services.AddSingleton<ICommandParser, PortalHomeCommandParser>();
+builder.Services.AddSingleton<ICommandParser, PortalBackCommandParser>();
+builder.Services.AddSingleton<ICommandParser, HarvestCommandParser>();
+builder.Services.AddSingleton<ICommandParser, DepositCommandParser>();
+builder.Services.AddSingleton<ICommandParser, WithdrawCommandParser>();
+builder.Services.AddSingleton<ICommandParser, OpenStorageCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ExpandStorageCommandParser>();
+builder.Services.AddSingleton<ICommandParser, AutoFarmCommandParser>();
+builder.Services.AddSingleton<ICommandParser, EquipCommandParser>();
+builder.Services.AddSingleton<ICommandParser, UnequipCommandParser>();
+builder.Services.AddSingleton<ICommandParser, SalvageCommandParser>();
+builder.Services.AddSingleton<ICommandParser, SalvageAllCommandParser>();
+builder.Services.AddSingleton<ICommandParser, SetAutoSalvageCommandParser>();
+builder.Services.AddSingleton<ICommandParser, LockItemCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ViewCompanionsCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ActivateCompanionCommandParser>();
+builder.Services.AddSingleton<ICommandParser, DeactivateCompanionCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ImbueCommandParser>();
+builder.Services.AddSingleton<ICommandParser, AssignCompanionDutyCommandParser>();
+builder.Services.AddSingleton<ICommandParser, RecallCompanionCommandParser>();
+builder.Services.AddSingleton<ICommandParser, QueueSalvageCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ViewRecipesCommandParser>();
+builder.Services.AddSingleton<ICommandParser, UseConsumableCommandParser>();
+builder.Services.AddSingleton<ICommandParser, InteractQuestCommandParser>();
+builder.Services.AddSingleton<ICommandParser, SmeltCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ToggleCompanionAutoRotateCommandParser>();
+builder.Services.AddSingleton<ICommandParser, PlaceBuildingCommandParser>();
+builder.Services.AddSingleton<ICommandParser, AssignBuilderCommandParser>();
+builder.Services.AddSingleton<ICommandParser, UnassignBuilderCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ViewCityCommandParser>();
+builder.Services.AddSingleton<ICommandParser, BuildStaffEverythingCommandParser>();
+builder.Services.AddSingleton<ICommandParser, PracticeEnchantingCommandParser>();
+builder.Services.AddSingleton<GameServerCommandFactory>();
 
 var app = builder.Build();
 

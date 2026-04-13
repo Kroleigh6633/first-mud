@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Buildings",
+  "description": "Data-driven homestead building definitions for first-mud. Loaded at startup by ContentProvider.",
+  "type": "object",
+  "required": ["buildings"],
+  "properties": {
+    "buildings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "constructionCost", "workerCapacity", "isHousing"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "Forge", "Fletcher", "Tannery", "EnchantingTower", "AlchemistHut",
+              "Stoneworker", "Woodworker", "MarketStall", "Farm", "Mine",
+              "Barracks", "Library", "Warehouse", "Hut", "Greenhouse"
+            ]
+          },
+          "constructionCost": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["material", "quantity"],
+              "properties": {
+                "material": { "type": "string", "minLength": 1 },
+                "quantity": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "duty": {
+            "type": ["string", "null"],
+            "enum": ["Harvester", "Salvager", "Guard", "Crafter", null],
+            "description": "The HomesteadDuty auto-assigned to workers at this building. Null for housing buildings."
+          },
+          "workerCapacity": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Max number of companions that can be assigned as workers. 0 for housing buildings."
+          },
+          "isHousing": {
+            "type": "boolean",
+            "description": "True if this is residential housing (holds residents, not workers). When true, hutCapacityByTier must be present."
+          },
+          "hutCapacityByTier": {
+            "type": ["array", "null"],
+            "items": { "type": "integer", "minimum": 1 },
+            "minItems": 1,
+            "description": "Resident capacity per tier. Index 0 = tier 1, index 1 = tier 2, etc. Required when isHousing=true."
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "isHousing": { "const": true } } },
+            "then": { "required": ["hutCapacityByTier"] }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-namespace FirstMud.Application.Events;
+namespace FirstMud.Engine.Events;
 
 /// <summary>
 /// Marker for cross-cutting integration events published to the in-process event bus

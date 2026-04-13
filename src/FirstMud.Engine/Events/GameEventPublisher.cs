@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace FirstMud.Application.Events;
+namespace FirstMud.Engine.Events;
 
 /// <summary>
 /// Default in-process event bus. Resolves all IGameEventSubscriber&lt;TEvent&gt; from DI and

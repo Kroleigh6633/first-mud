@@ -1,0 +1,157 @@
+{
+  "$schema": "./schemas/buildings.schema.json",
+  "buildings": [
+    {
+      "type": "Forge",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 10 },
+        { "material": "Stone", "quantity": 5 },
+        { "material": "Iron Ore", "quantity": 5 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "Fletcher",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 10 },
+        { "material": "Sinew", "quantity": 3 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "Tannery",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 8 },
+        { "material": "Leather", "quantity": 5 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "EnchantingTower",
+      "constructionCost": [
+        { "material": "Stone", "quantity": 10 },
+        { "material": "Dravenite Dust", "quantity": 3 },
+        { "material": "Wood", "quantity": 5 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 1,
+      "isHousing": false
+    },
+    {
+      "type": "AlchemistHut",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 8 },
+        { "material": "Herbs", "quantity": 3 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "Stoneworker",
+      "constructionCost": [
+        { "material": "Stone", "quantity": 10 },
+        { "material": "Wood", "quantity": 5 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "Woodworker",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 10 }
+      ],
+      "duty": "Harvester",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "MarketStall",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 8 }
+      ],
+      "duty": "Crafter",
+      "workerCapacity": 1,
+      "isHousing": false
+    },
+    {
+      "type": "Farm",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 8 },
+        { "material": "Stone", "quantity": 3 }
+      ],
+      "duty": "Harvester",
+      "workerCapacity": 3,
+      "isHousing": false
+    },
+    {
+      "type": "Mine",
+      "constructionCost": [
+        { "material": "Stone", "quantity": 10 },
+        { "material": "Wood", "quantity": 5 }
+      ],
+      "duty": "Harvester",
+      "workerCapacity": 3,
+      "isHousing": false
+    },
+    {
+      "type": "Barracks",
+      "constructionCost": [
+        { "material": "Stone", "quantity": 8 },
+        { "material": "Wood", "quantity": 5 }
+      ],
+      "duty": "Guard",
+      "workerCapacity": 5,
+      "isHousing": false
+    },
+    {
+      "type": "Library",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 10 },
+        { "material": "Stone", "quantity": 5 }
+      ],
+      "duty": "Salvager",
+      "workerCapacity": 1,
+      "isHousing": false
+    },
+    {
+      "type": "Warehouse",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 12 },
+        { "material": "Stone", "quantity": 5 }
+      ],
+      "duty": "Guard",
+      "workerCapacity": 1,
+      "isHousing": false
+    },
+    {
+      "type": "Greenhouse",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 8 },
+        { "material": "Stone", "quantity": 5 },
+        { "material": "Sand", "quantity": 3 }
+      ],
+      "duty": "Harvester",
+      "workerCapacity": 2,
+      "isHousing": false
+    },
+    {
+      "type": "Hut",
+      "constructionCost": [
+        { "material": "Wood", "quantity": 5 },
+        { "material": "Stone", "quantity": 3 }
+      ],
+      "duty": null,
+      "workerCapacity": 0,
+      "isHousing": true,
+      "hutCapacityByTier": [3, 5, 8]
+    }
+  ]
+}

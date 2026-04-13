@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -15,6 +16,7 @@ public class PortalHomeCommandHandler(
     IHomesteadBuildingRepository buildingRepository,
     ICompanionRepository companionRepository,
     BuildingService buildingService,
+    IContentProvider contentProvider,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<PortalHomeCommand>
 {
@@ -75,7 +77,7 @@ public class PortalHomeCommandHandler(
             // Reload after auto-assign and use shared CityViewBuilder for DTO construction
             buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
             var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-            var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
+            var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, contentProvider, ct);
 
             var cityViewPayload = new
             {

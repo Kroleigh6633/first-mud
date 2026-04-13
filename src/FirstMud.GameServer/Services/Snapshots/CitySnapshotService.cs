@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Handlers;
 
@@ -11,6 +12,7 @@ public class CitySnapshotService(
     IHomesteadRepository homesteadRepository,
     IHomesteadBuildingRepository buildingRepository,
     ICompanionRepository companionRepository,
+    IContentProvider contentProvider,
     GameNotificationService notificationService)
 {
     public async Task<bool> BroadcastAsync(Guid playerId, CancellationToken ct)
@@ -20,7 +22,7 @@ public class CitySnapshotService(
 
         var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
         var allCompanions = await companionRepository.GetByOwnerAsync(playerId, ct);
-        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
+        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, contentProvider, ct);
 
         var payload = new
         {

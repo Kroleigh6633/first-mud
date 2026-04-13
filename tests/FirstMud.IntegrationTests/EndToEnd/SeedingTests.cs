@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Enums;
 using FirstMud.GameServer.Services;
 using FirstMud.Infrastructure.Neo4j;
@@ -29,8 +30,9 @@ public sealed class SeedingTests
         var questRepo = new QuestGraphRepository(driverWrapper);
         var loreSeeder = new LoreSeeder(driverWrapper);
         var logger = NullLogger<StartupSeeder>.Instance;
+        var content = new ContentProvider(ContentRootResolver.Resolve());
 
-        return new StartupSeeder(db, questRepo, loreSeeder, logger);
+        return new StartupSeeder(db, questRepo, loreSeeder, content, logger);
     }
 
     [Fact]

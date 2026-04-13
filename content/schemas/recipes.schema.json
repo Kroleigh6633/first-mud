@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipes",
+  "description": "Data-driven crafting recipes for first-mud. Loaded at startup by ContentProvider and used to seed the Recipes table.",
+  "type": "object",
+  "required": ["recipes"],
+  "properties": {
+    "recipes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "recipeId", "name", "resultItemName", "resultCategory",
+          "requiredCraftingSkill", "requiredWorld",
+          "baseWorkmanshipMin", "baseWorkmanshipMax",
+          "isDiscoverable", "ingredients"
+        ],
+        "properties": {
+          "recipeId": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "resultItemName": { "type": "string", "minLength": 1 },
+          "resultCategory": {
+            "type": "string",
+            "enum": ["Weapon", "Armor", "Accessory", "Reagent", "Component", "Consumable", "QuestItem", "Artifact", "AutomationPart"]
+          },
+          "requiredCraftingSkill": { "type": "integer", "minimum": 0 },
+          "requiredWorld": {
+            "type": "string",
+            "enum": ["Aeldran", "ArdweldRemnant", "FairgeanDeep", "GolvariDeeps", "WyrdPaths", "TheDream"]
+          },
+          "requiredTaperType": {
+            "type": ["string", "null"],
+            "enum": ["Shaping", "Unmaking", "Wyrd", "Ardweld", "Deep", "Tide", null]
+          },
+          "baseWorkmanshipMin": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "baseWorkmanshipMax": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "isDiscoverable": { "type": "boolean" },
+          "ingredients": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["category", "name", "baseQuantity"],
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": ["Weapon", "Armor", "Accessory", "Reagent", "Component", "Consumable", "QuestItem", "Artifact", "AutomationPart"]
+                },
+                "name": { "type": "string", "minLength": 1 },
+                "baseQuantity": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

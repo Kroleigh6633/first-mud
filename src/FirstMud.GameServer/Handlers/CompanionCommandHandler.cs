@@ -1,4 +1,5 @@
 using FirstMud.Application.Events;
+using FirstMud.Engine.Events;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;

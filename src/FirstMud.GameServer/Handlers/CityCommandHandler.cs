@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -18,6 +19,7 @@ public class PlaceBuildingCommandHandler(
     IHomesteadRepository homesteadRepository,
     IHomesteadBuildingRepository buildingRepository,
     ICompanionRepository companionRepository,
+    IContentProvider contentProvider,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<PlaceBuildingCommand>
 {
@@ -30,7 +32,7 @@ public class PlaceBuildingCommandHandler(
         if (homestead is null)
             return new CommandResult(false, "You don't have a homestead yet.");
 
-        var cost = BuildingService.GetConstructionCost(buildingType);
+        var cost = buildingService.GetConstructionCost(buildingType);
         var costDesc = string.Join(", ", cost.Select(c => $"{c.Qty}× {c.Material}"));
 
         // Always use auto-positioning — the client no longer needs to specify coordinates
@@ -54,7 +56,7 @@ public class PlaceBuildingCommandHandler(
         // Push a fresh CityView so the panel updates immediately
         var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
         var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
+        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, contentProvider, ct);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
@@ -117,6 +119,7 @@ public class BuildStaffEverythingCommandHandler(
     IHomesteadRepository homesteadRepository,
     IHomesteadBuildingRepository buildingRepository,
     ICompanionRepository companionRepository,
+    IContentProvider contentProvider,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<BuildStaffEverythingCommand>
 {
@@ -137,7 +140,7 @@ public class BuildStaffEverythingCommandHandler(
         {
             var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
             var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-            var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
+            var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, contentProvider, ct);
 
             var cityViewPayload = new
             {
@@ -161,6 +164,7 @@ public class ViewCityCommandHandler(
     IHomesteadRepository homesteadRepository,
     IHomesteadBuildingRepository buildingRepository,
     ICompanionRepository companionRepository,
+    IContentProvider contentProvider,
     IHubContext<GameHub> hubContext) : ICommandHandler<ViewCityCommand>
 {
     public async Task<CommandResult> HandleAsync(ViewCityCommand cmd, CancellationToken ct)
@@ -172,7 +176,7 @@ public class ViewCityCommandHandler(
         var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
         var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
 
-        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
+        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, contentProvider, ct);
 
         var payload = new
         {
@@ -201,6 +205,7 @@ public static class CityViewBuilder
         IReadOnlyList<FirstMud.Domain.Entities.HomesteadBuilding> buildings,
         IReadOnlyList<FirstMud.Domain.Entities.Companion> allCompanions,
         ICompanionRepository companionRepository,
+        IContentProvider contentProvider,
         CancellationToken ct)
     {
         var dtos = new List<object>();
@@ -214,7 +219,7 @@ public static class CityViewBuilder
                     .Select(c => new { id = c.Id, name = c.Name })
                     .ToList<object>();
 
-                var capacity = BuildingService.GetHutCapacity(b.Tier);
+                var capacity = contentProvider.GetHutCapacity(b.Type, b.Tier);
 
                 // For under-construction huts, also show builder info
                 var builders = new List<object>();
@@ -279,7 +284,7 @@ public static class CityViewBuilder
                     assignedCompanionId  = b.AssignedCompanionId,
                     assignedCompanionName= workers.Count > 0 ? ((dynamic)workers[0]).name : null,
                     workers,
-                    workerCapacity       = FirstMud.Application.Services.BuildingService.GetWorkerCapacity(b.Type),
+                    workerCapacity       = contentProvider.GetBuilding(b.Type)?.WorkerCapacity ?? 1,
                     residents            = (object?)null,
                     residentCapacity     = 0,
                 });

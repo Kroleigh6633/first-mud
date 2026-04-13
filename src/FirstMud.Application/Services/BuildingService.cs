@@ -1,4 +1,6 @@
+using FirstMud.Application.Content;
 using FirstMud.Application.Events;
+using FirstMud.Engine.Events;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -9,6 +11,10 @@ namespace FirstMud.Application.Services;
 /// <summary>
 /// Handles homestead building placement, construction progress, companion assignment,
 /// and seeding starter buildings on first visit.
+///
+/// Construction costs, worker capacities, duty mappings, and hut tier capacities
+/// are defined in <c>content/buildings.json</c> and resolved through
+/// <see cref="IContentProvider"/>. See <see cref="BuildingDefinition"/>.
 /// </summary>
 public class BuildingService
 {
@@ -17,86 +23,39 @@ public class BuildingService
     private readonly ICompanionRepository _companions;
     private readonly IItemRepository _items;
     private readonly IGameEventPublisher _events;
+    private readonly IContentProvider _content;
     private readonly ILogger<BuildingService> _logger;
 
-    // Construction cost in (material-name, quantity) pairs per building type.
-    // Material names match the canonical resource names used in HomesteadStorageItems.
-    private static readonly Dictionary<BuildingType, (string Material, int Qty)[]> ConstructionCosts = new()
-    {
-        [BuildingType.Forge]          = [("Wood", 10), ("Stone", 5), ("Iron Ore", 5)],
-        [BuildingType.Fletcher]       = [("Wood", 10), ("Sinew", 3)],
-        [BuildingType.Tannery]        = [("Wood", 8),  ("Leather", 5)],
-        [BuildingType.EnchantingTower]= [("Stone", 10), ("Dravenite Dust", 3), ("Wood", 5)],
-        [BuildingType.AlchemistHut]   = [("Wood", 8),  ("Herbs", 3)],
-        [BuildingType.Stoneworker]    = [("Stone", 10), ("Wood", 5)],
-        [BuildingType.Woodworker]     = [("Wood", 10)],
-        [BuildingType.MarketStall]    = [("Wood", 8)],
-        [BuildingType.Farm]           = [("Wood", 8),  ("Stone", 3)],
-        [BuildingType.Mine]           = [("Stone", 10), ("Wood", 5)],
-        [BuildingType.Barracks]       = [("Stone", 8),  ("Wood", 5)],
-        [BuildingType.Library]        = [("Wood", 10), ("Stone", 5)],
-        [BuildingType.Warehouse]      = [("Wood", 12), ("Stone", 5)],
-        [BuildingType.Hut]            = [("Wood",  5), ("Stone",  3)],
-        [BuildingType.Greenhouse]     = [("Wood",  8), ("Stone",  5), ("Sand",  3)],
-    };
-
-    // Best HomesteadDuty for each production building type — used for auto-assignment.
-    // Hut is intentionally absent: huts are housing, not workstations.
-    private static readonly Dictionary<BuildingType, HomesteadDuty> BuildingDuty = new()
-    {
-        [BuildingType.Forge]          = HomesteadDuty.Crafter,
-        [BuildingType.Fletcher]       = HomesteadDuty.Crafter,
-        [BuildingType.Tannery]        = HomesteadDuty.Crafter,
-        [BuildingType.EnchantingTower]= HomesteadDuty.Crafter,
-        [BuildingType.AlchemistHut]   = HomesteadDuty.Crafter,
-        [BuildingType.Stoneworker]    = HomesteadDuty.Crafter,
-        [BuildingType.Woodworker]     = HomesteadDuty.Harvester,
-        [BuildingType.MarketStall]    = HomesteadDuty.Crafter,
-        [BuildingType.Farm]           = HomesteadDuty.Harvester,
-        [BuildingType.Mine]           = HomesteadDuty.Harvester,
-        [BuildingType.Barracks]       = HomesteadDuty.Guard,
-        [BuildingType.Library]        = HomesteadDuty.Salvager,
-        [BuildingType.Warehouse]      = HomesteadDuty.Guard,
-        [BuildingType.Greenhouse]     = HomesteadDuty.Harvester,
-    };
-
-    // Worker capacity per building type (how many companions can work there)
-    private static readonly Dictionary<BuildingType, int> WorkerCapacity = new()
-    {
-        [BuildingType.Forge]          = 2,
-        [BuildingType.Tannery]        = 2,
-        [BuildingType.Farm]           = 3,
-        [BuildingType.Mine]           = 3,
-        [BuildingType.Woodworker]     = 2,
-        [BuildingType.AlchemistHut]   = 2,
-        [BuildingType.Stoneworker]    = 2,
-        [BuildingType.EnchantingTower]= 1,
-        [BuildingType.MarketStall]    = 1,
-        [BuildingType.Library]        = 1,
-        [BuildingType.Barracks]       = 5,
-        [BuildingType.Warehouse]      = 1,
-        [BuildingType.Fletcher]       = 2,
-        [BuildingType.Greenhouse]     = 2,
-    };
-
-    /// <summary>Returns the max worker count for a building type.</summary>
-    public static int GetWorkerCapacity(BuildingType type) =>
-        WorkerCapacity.TryGetValue(type, out var cap) ? cap : 1;
-
-    /// <summary>Returns true if this building type is residential housing (holds residents, not workers).</summary>
+    /// <summary>
+    /// Returns true if this building type is residential housing (holds residents,
+    /// not workers). Shape-of-the-game check; kept as a pure static helper because
+    /// callers shouldn't need an <see cref="IContentProvider"/> to know a Hut is a hut.
+    /// </summary>
     public static bool IsHousingType(BuildingType type) => type == BuildingType.Hut;
 
-    /// <summary>Returns true if this building type is a production building (holds a single worker).</summary>
+    /// <summary>Returns true if this building type is a production building (holds workers).</summary>
     public static bool IsProductionType(BuildingType type) => !IsHousingType(type);
 
-    /// <summary>Returns the resident capacity of a hut by tier.</summary>
-    public static int GetHutCapacity(int tier) => tier switch
+    /// <summary>Returns the max worker count for a building type, from content/buildings.json.</summary>
+    public int GetWorkerCapacity(BuildingType type) =>
+        _content.GetBuilding(type)?.WorkerCapacity ?? 1;
+
+    /// <summary>Returns the resident capacity of a Hut at the given tier, from content/buildings.json.</summary>
+    public int GetHutCapacity(int tier) => _content.GetHutCapacity(BuildingType.Hut, tier);
+
+    /// <summary>Returns the HomesteadDuty mapped to a production building type, or null for housing.</summary>
+    public HomesteadDuty? GetBuildingDuty(BuildingType type) =>
+        _content.GetBuilding(type)?.Duty;
+
+    /// <summary>Returns all construction costs for the given building type.</summary>
+    public IReadOnlyList<(string Material, int Qty)> GetConstructionCost(BuildingType type)
     {
-        1 => 3,
-        2 => 5,
-        3 => 8,
-        _ => 3,
-    };
+        var def = _content.GetBuilding(type);
+        if (def is null) return Array.Empty<(string, int)>();
+        return def.ConstructionCost
+            .Select(c => (c.Material, c.Quantity))
+            .ToList();
+    }
 
     // Starter buildings placed (free, already constructed) on first homestead visit.
     // Each tuple: (type, gridX, gridY, alreadyConstructed, constructionProgress)
@@ -130,6 +89,7 @@ public class BuildingService
         ICompanionRepository companions,
         IItemRepository items,
         IGameEventPublisher events,
+        IContentProvider content,
         ILogger<BuildingService> logger)
     {
         _buildings  = buildings;
@@ -137,20 +97,11 @@ public class BuildingService
         _companions = companions;
         _items      = items;
         _events     = events;
+        _content    = content;
         _logger     = logger;
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Returns all construction costs for a given building type.
-    /// </summary>
-    public static IReadOnlyList<(string Material, int Qty)> GetConstructionCost(BuildingType type)
-    {
-        return ConstructionCosts.TryGetValue(type, out var costs)
-            ? costs
-            : Array.Empty<(string, int)>();
-    }
 
     /// <summary>
     /// Places a new building plot on the homestead grid.
@@ -175,7 +126,8 @@ public class BuildingService
             return (false, "No homestead found.", null);
 
         // ── 1. Check construction cost ────────────────────────────────────────────
-        if (ConstructionCosts.TryGetValue(buildingType, out var costs))
+        var costs = GetConstructionCost(buildingType);
+        if (costs.Count > 0)
         {
             foreach (var (material, required) in costs)
             {
@@ -316,7 +268,7 @@ public class BuildingService
 
         // Determine duty: buildings under construction use Crafter; completed buildings use their proper duty
         var duty = building.IsConstructed
-            ? (BuildingDuty.TryGetValue(building.Type, out var d) ? d : HomesteadDuty.Crafter)
+            ? (GetBuildingDuty(building.Type) ?? HomesteadDuty.Crafter)
             : HomesteadDuty.Crafter;
 
         companion.AssignToHomestead(duty);
@@ -385,7 +337,9 @@ public class BuildingService
         if (!building.IsConstructed) return null;
         // Huts are housing — they don't take workers via this method
         if (IsHousingType(building.Type)) return null;
-        if (!BuildingDuty.TryGetValue(building.Type, out var duty)) return null;
+        var maybeDuty = GetBuildingDuty(building.Type);
+        if (maybeDuty is null) return null;
+        var duty = maybeDuty.Value;
 
         var companions = await _companions.GetByOwnerAsync(playerId, ct);
         var activeIds = playerActiveCompanionIds ?? [];
@@ -662,7 +616,9 @@ public class BuildingService
 
         foreach (var building in understaffedProduction)
         {
-            if (!BuildingDuty.TryGetValue(building.Type, out var duty)) continue;
+            var maybeDuty = GetBuildingDuty(building.Type);
+            if (maybeDuty is null) continue;
+            var duty = maybeDuty.Value;
             int vacancies = GetWorkerCapacity(building.Type) - building.WorkerCount;
 
             for (int i = 0; i < vacancies; i++)

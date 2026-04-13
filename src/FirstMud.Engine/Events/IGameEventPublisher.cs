@@ -1,4 +1,4 @@
-namespace FirstMud.Application.Events;
+namespace FirstMud.Engine.Events;
 
 public interface IGameEventPublisher
 {

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FirstMud.Domain\FirstMud.Domain.csproj" />
+    <ProjectReference Include="..\FirstMud.Engine\FirstMud.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>

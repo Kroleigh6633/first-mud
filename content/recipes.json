@@ -1,0 +1,322 @@
+{
+  "$schema": "./schemas/recipes.schema.json",
+  "recipes": [
+    { "recipeId": "IRON_SWORD_001", "name": "Iron Sword", "resultItemName": "Iron Sword", "resultCategory": "Weapon", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 },
+        { "category": "Component", "name": "Wood", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "LEATHER_ARMOR_001", "name": "Leather Armor", "resultItemName": "Leather Armor", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 5, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Leather", "baseQuantity": 4 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "HEALING_DRAUGHT_001", "name": "Healing Draught", "resultItemName": "Healing Draught", "resultCategory": "Consumable", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
+        { "category": "Component", "name": "Bone Fragment", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "LEATHER_CAP_001", "name": "Leather Cap", "resultItemName": "Leather Cap", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "LEATHER_BOOTS_001", "name": "Leather Boots", "resultItemName": "Leather Boots", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Leather", "baseQuantity": 3 },
+        { "category": "Component", "name": "Wood", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "STONE_AXE_001", "name": "Stone Axe", "resultItemName": "Stone Axe", "resultCategory": "Weapon", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Stone", "baseQuantity": 3 },
+        { "category": "Component", "name": "Wood", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "SINEW_CRAFT_001", "name": "Sinew", "resultItemName": "Sinew", "resultCategory": "Component", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 2, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Bone Fragment", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "THORNWOOD_BOW_001", "name": "Thornwood Bow", "resultItemName": "Thornwood Bow", "resultCategory": "Weapon", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 5, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Wood", "baseQuantity": 3 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "WAR_PICK_001", "name": "War Pick", "resultItemName": "War Pick", "resultCategory": "Weapon", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 4 },
+        { "category": "Component", "name": "Wood", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "LEATHER_LEGGINGS_001", "name": "Leather Leggings", "resultItemName": "Leather Leggings", "resultCategory": "Armor", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Leather", "baseQuantity": 3 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "LEATHER_GLOVES_001", "name": "Leather Gloves", "resultItemName": "Leather Gloves", "resultCategory": "Armor", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "LEATHER_CRAFT_001", "name": "Leather", "resultItemName": "Leather", "resultCategory": "Component", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 2, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Beast Hide", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "OAK_WAND_001", "name": "Oak Wand", "resultItemName": "Oak Wand", "resultCategory": "Weapon", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 5, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Wood", "baseQuantity": 2 },
+        { "category": "Component", "name": "Herbs", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "IRON_BUCKLER_001", "name": "Iron Buckler", "resultItemName": "Iron Buckler", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "IRON_HELM_001", "name": "Iron Helm", "resultItemName": "Iron Helm", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "IRON_GREAVES_001", "name": "Iron Greaves", "resultItemName": "Iron Greaves", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 4 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "IRON_VAMBRACES_001", "name": "Iron Vambraces", "resultItemName": "Iron Vambraces", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 2 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "BONE_RING_001", "name": "Bone Ring", "resultItemName": "Bone Ring", "resultCategory": "Accessory", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Bone Fragment", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "WYRD_CHARM_001", "name": "Wyrd Charm", "resultItemName": "Wyrd Charm", "resultCategory": "Accessory", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 5, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Wyrd Shard", "baseQuantity": 1 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "FOCUS_STONE_001", "name": "Rough Focus Stone", "resultItemName": "Rough Focus Stone", "resultCategory": "Accessory", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 5, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 3 },
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_SHAPING_001", "name": "Shaping Taper", "resultItemName": "Shaping Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Sinew", "baseQuantity": 2 },
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "HEALING_POTION_001", "name": "Healing Potion", "resultItemName": "Healing Potion", "resultCategory": "Consumable", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 5 },
+        { "category": "Component", "name": "Bone Fragment", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "WEAVE_TINCTURE_001", "name": "Weave Tincture", "resultItemName": "Weave Tincture", "resultCategory": "Consumable", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 4 },
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "FORTITUDE_BREW_001", "name": "Fortitude Brew", "resultItemName": "Fortitude Brew", "resultCategory": "Consumable", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 2, "baseWorkmanshipMax": 5, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "IRON_SABATONS_001", "name": "Iron Sabatons", "resultItemName": "Iron Sabatons", "resultCategory": "Armor", "requiredCraftingSkill": 15, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 4 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "IRON_GAUNTLETS_001", "name": "Iron Gauntlets", "resultItemName": "Iron Gauntlets", "resultCategory": "Armor", "requiredCraftingSkill": 15, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "STEEL_SWORD_001", "name": "Steel Sword", "resultItemName": "Steel Sword", "resultCategory": "Weapon", "requiredCraftingSkill": 10, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 5 },
+        { "category": "Component", "name": "Stone", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "REINFORCED_LEATHER_001", "name": "Reinforced Leather Armor", "resultItemName": "Reinforced Leather Armor", "resultCategory": "Armor", "requiredCraftingSkill": 10, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Leather", "baseQuantity": 6 },
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "CHAIN_SHIRT_001", "name": "Chain Shirt", "resultItemName": "Chain Shirt", "resultCategory": "Armor", "requiredCraftingSkill": 15, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 5, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 8 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "THORNWOOD_LONGBOW_001", "name": "Thornwood Longbow", "resultItemName": "Thornwood Longbow", "resultCategory": "Weapon", "requiredCraftingSkill": 12, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Wood", "baseQuantity": 4 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "CRYSTAL_WAND_001", "name": "Crystal Wand", "resultItemName": "Crystal Wand", "resultCategory": "Weapon", "requiredCraftingSkill": 15, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 3 },
+        { "category": "Component", "name": "Wood", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "GREATER_HEALING_POTION_001", "name": "Greater Healing Potion", "resultItemName": "Greater Healing Potion", "resultCategory": "Consumable", "requiredCraftingSkill": 15, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 8 },
+        { "category": "Component", "name": "Bone Fragment", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "THORNWOOD_TREADS_001", "name": "Thornwood Treads", "resultItemName": "Thornwood Treads", "resultCategory": "Armor", "requiredCraftingSkill": 25, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Wood", "baseQuantity": 3 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "CHAIN_LEGGINGS_001", "name": "Chain Leggings", "resultItemName": "Chain Leggings", "resultCategory": "Armor", "requiredCraftingSkill": 25, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 6 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "SILVER_BLADE_001", "name": "Silver Blade", "resultItemName": "Silver Blade", "resultCategory": "Weapon", "requiredCraftingSkill": 25, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 6, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Silver Ore", "baseQuantity": 4 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "OBSIDIAN_EDGE_001", "name": "Obsidian Edge", "resultItemName": "Obsidian Edge", "resultCategory": "Weapon", "requiredCraftingSkill": 30, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 6, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Obsidian Shard", "baseQuantity": 5 },
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "SCALE_MAIL_001", "name": "Scale Mail", "resultItemName": "Scale Mail", "resultCategory": "Armor", "requiredCraftingSkill": 30, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 6, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Sea Scale", "baseQuantity": 6 },
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 4 }
+      ] },
+    { "recipeId": "SPIDER_SILK_VEST_001", "name": "Spider Silk Vest", "resultItemName": "Spider Silk Vest", "resultCategory": "Armor", "requiredCraftingSkill": 25, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 5, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Spider Silk", "baseQuantity": 5 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "MITHRIL_HELM_001", "name": "Mithril Helm", "resultItemName": "Mithril Helm", "resultCategory": "Armor", "requiredCraftingSkill": 40, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 7, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 3 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "CORAL_FOCUS_001", "name": "Coral Focus", "resultItemName": "Coral Focus", "resultCategory": "Weapon", "requiredCraftingSkill": 35, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 6, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Coral Fragment", "baseQuantity": 4 },
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "WEAVE_ELIXIR_001", "name": "Weave Elixir", "resultItemName": "Weave Elixir", "resultCategory": "Consumable", "requiredCraftingSkill": 30, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 3 },
+        { "category": "Component", "name": "Herbs", "baseQuantity": 5 }
+      ] },
+    { "recipeId": "MITHRIL_BOOTS_001", "name": "Mithril Boots", "resultItemName": "Mithril Boots", "resultCategory": "Armor", "requiredCraftingSkill": 50, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 7, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 4 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "MITHRIL_VAMBRACES_001", "name": "Mithril Vambraces", "resultItemName": "Mithril Vambraces", "resultCategory": "Armor", "requiredCraftingSkill": 50, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 7, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 3 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "MITHRIL_GREAVES_001", "name": "Mithril Greaves", "resultItemName": "Mithril Greaves", "resultCategory": "Armor", "requiredCraftingSkill": 50, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 7, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 5 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "MITHRIL_SWORD_001", "name": "Mithril Sword", "resultItemName": "Mithril Sword", "resultCategory": "Weapon", "requiredCraftingSkill": 50, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 8, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 6 },
+        { "category": "Reagent", "name": "Diamond Shard", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "MITHRIL_PLATE_001", "name": "Mithril Plate", "resultItemName": "Mithril Plate", "resultCategory": "Armor", "requiredCraftingSkill": 60, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 8, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 8 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 4 }
+      ] },
+    { "recipeId": "DIAMOND_RING_001", "name": "Diamond Ring", "resultItemName": "Diamond Ring", "resultCategory": "Accessory", "requiredCraftingSkill": 55, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 7, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Diamond Shard", "baseQuantity": 3 },
+        { "category": "Component", "name": "Silver Ore", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "ASHWOOD_STAFF_001", "name": "Ashwood Staff", "resultItemName": "Ashwood Staff", "resultCategory": "Weapon", "requiredCraftingSkill": 50, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 7, "baseWorkmanshipMax": 9, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Ashwood", "baseQuantity": 5 },
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "WYRD_WARD_001", "name": "Wyrd Ward", "resultItemName": "Wyrd Ward", "resultCategory": "Accessory", "requiredCraftingSkill": 65, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 8, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Wyrd Shard", "baseQuantity": 3 },
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "VOID_BLADE_001", "name": "Void Blade", "resultItemName": "Void Blade", "resultCategory": "Weapon", "requiredCraftingSkill": 80, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 9, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Void Essence", "baseQuantity": 3 },
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 5 }
+      ] },
+    { "recipeId": "PHASE_BOW_001", "name": "Phase Bow", "resultItemName": "Phase Bow", "resultCategory": "Weapon", "requiredCraftingSkill": 85, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 9, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Phase Thread", "baseQuantity": 4 },
+        { "category": "Component", "name": "Ashwood", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "TEAR_FRAGMENT_RING_001", "name": "Tear Fragment Ring", "resultItemName": "Tear Fragment Ring", "resultCategory": "Accessory", "requiredCraftingSkill": 90, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 9, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Tear Fragment", "baseQuantity": 2 },
+        { "category": "Reagent", "name": "Diamond Shard", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "WYRD_ARMOR_001", "name": "Wyrd Armor", "resultItemName": "Wyrd Armor", "resultCategory": "Armor", "requiredCraftingSkill": 95, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 9, "baseWorkmanshipMax": 10, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Wyrd Shard", "baseQuantity": 5 },
+        { "category": "Component", "name": "Mithril Ore", "baseQuantity": 4 }
+      ] },
+    { "recipeId": "MASTERS_TONIC_001", "name": "Master's Tonic", "resultItemName": "Master's Tonic", "resultCategory": "Consumable", "requiredCraftingSkill": 100, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Reagent", "name": "Void Essence", "baseQuantity": 1 },
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 5 },
+        { "category": "Component", "name": "Herbs", "baseQuantity": 10 }
+      ] },
+    { "recipeId": "PRACTICE_WAND_001", "name": "Oak Wand (Practice)", "resultItemName": "Oak Wand (Practice)", "resultCategory": "Weapon", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 3, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Wood", "baseQuantity": 2 },
+        { "category": "Component", "name": "Herbs", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "PRACTICE_CHARM_001", "name": "Bone Charm", "resultItemName": "Bone Charm", "resultCategory": "Accessory", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 3, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Sinew", "baseQuantity": 2 },
+        { "category": "Component", "name": "Stone", "baseQuantity": 1 }
+      ] },
+    { "recipeId": "TAPER_FIRE_001", "name": "Fire Shaping Taper", "resultItemName": "Fire Shaping Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
+        { "category": "Component", "name": "Sulphur", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_WATER_001", "name": "Water Shaping Taper", "resultItemName": "Water Shaping Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
+        { "category": "Component", "name": "Coral", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_EARTH_001", "name": "Earth Shaping Taper", "resultItemName": "Earth Shaping Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
+        { "category": "Component", "name": "Stone", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_AIR_001", "name": "Air Shaping Taper", "resultItemName": "Air Shaping Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 5, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
+        { "category": "Component", "name": "Feather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_FORT_001", "name": "Fortitude Taper", "resultItemName": "Fortitude Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 10, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 4 },
+        { "category": "Component", "name": "Iron Ore", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_WARD_001", "name": "Warding Taper", "resultItemName": "Warding Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 10, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 4 },
+        { "category": "Component", "name": "Leather", "baseQuantity": 2 }
+      ] },
+    { "recipeId": "TAPER_WYRD_001", "name": "Wyrd Shard Taper", "resultItemName": "Wyrd Shard Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 20, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 5, "baseWorkmanshipMax": 8, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 5 },
+        { "category": "Reagent", "name": "Dravenite Dust", "baseQuantity": 3 }
+      ] },
+    { "recipeId": "TAPER_REST_001", "name": "Dravenite Dust Taper", "resultItemName": "Dravenite Dust Taper", "resultCategory": "Reagent", "requiredCraftingSkill": 15, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+      "ingredients": [
+        { "category": "Component", "name": "Herbs", "baseQuantity": 5 },
+        { "category": "Component", "name": "Sinew", "baseQuantity": 3 }
+      ] }
+  ]
+}

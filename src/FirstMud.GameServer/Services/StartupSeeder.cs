@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -13,6 +14,7 @@ public class StartupSeeder(
     GameDbContext db,
     IQuestGraphRepository questGraph,
     LoreSeeder loreSeed,
+    IContentProvider content,
     ILogger<StartupSeeder> logger)
 #pragma warning restore CS9113
 {
@@ -507,352 +509,16 @@ public class StartupSeeder(
     // Starter recipes
     // -------------------------------------------------------------------------
 
-    // Full canonical recipe set — keyed by RecipeId.
-    // Upsert pattern: missing recipes are inserted; existing ones have their
-    // ingredients verified and corrected.  Add new entries here and they are
-    // picked up automatically on the next startup without any DB migration.
-    private static readonly (
-        string RecipeId,
-        string Name,
-        RecipeIngredient[] Ingredients,
-        ItemCategory ResultCategory,
-        string ResultItemName,
-        int WorkMin,
-        int WorkMax,
-        int SkillRequired)[] AllRecipeDefinitions =
-    [
-        // ── Skill 1: starter basics ───────────────────────────────────────────
-        ("IRON_SWORD_001",       "Iron Sword",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      3),
-             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
-            ItemCategory.Weapon,     "Iron Sword",        2, 6, 1),
-
-        ("LEATHER_ARMOR_001",    "Leather Armor",
-            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       4),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
-            ItemCategory.Armor,      "Leather Armor",     2, 5, 1),
-
-        ("HEALING_DRAUGHT_001",  "Healing Draught",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 1)],
-            ItemCategory.Consumable, "Healing Draught",   3, 7, 1),
-
-        ("LEATHER_CAP_001",      "Leather Cap",
-            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       2),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
-            ItemCategory.Armor,      "Leather Cap",       1, 4, 1),
-
-        ("LEATHER_BOOTS_001",    "Leather Boots",
-            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       3),
-             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
-            ItemCategory.Armor,      "Leather Boots",     1, 4, 1),
-
-        ("STONE_AXE_001",        "Stone Axe",
-            [RecipeIngredient.Create(ItemCategory.Component, "Stone",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
-            ItemCategory.Weapon,     "Stone Axe",         1, 4, 1),
-
-        ("SINEW_CRAFT_001",      "Sinew",
-            [RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 2)],
-            ItemCategory.Component,  "Sinew",             1, 2, 1),
-
-        // ── Skill 2: iron weapons + leather full set ──────────────────────────
-        ("THORNWOOD_BOW_001",    "Thornwood Bow",
-            [RecipeIngredient.Create(ItemCategory.Component, "Wood",          3),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2)],
-            ItemCategory.Weapon,     "Thornwood Bow",     2, 5, 2),
-
-        ("WAR_PICK_001",         "War Pick",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      4),
-             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
-            ItemCategory.Weapon,     "War Pick",          2, 6, 2),
-
-        ("LEATHER_LEGGINGS_001", "Leather Leggings",
-            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       3),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
-            ItemCategory.Armor,      "Leather Leggings",  1, 4, 2),
-
-        ("LEATHER_GLOVES_001",   "Leather Gloves",
-            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       2)],
-            ItemCategory.Armor,      "Leather Gloves",    1, 4, 2),
-
-        ("LEATHER_CRAFT_001",    "Leather",
-            [RecipeIngredient.Create(ItemCategory.Component, "Beast Hide",    3)],
-            ItemCategory.Component,  "Leather",           1, 2, 2),
-
-        // ── Skill 3: iron armor + accessories ─────────────────────────────────
-        ("OAK_WAND_001",         "Oak Wand",
-            [RecipeIngredient.Create(ItemCategory.Component, "Wood",          2),
-             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         1)],
-            ItemCategory.Weapon,     "Oak Wand",          2, 5, 3),
-
-        ("IRON_BUCKLER_001",     "Iron Buckler",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      3),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
-            ItemCategory.Armor,      "Iron Buckler",      3, 6, 3),
-
-        ("IRON_HELM_001",        "Iron Helm",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      3),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
-            ItemCategory.Armor,      "Iron Helm",         3, 6, 3),
-
-        ("IRON_GREAVES_001",     "Iron Greaves",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      4),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
-            ItemCategory.Armor,      "Iron Greaves",      3, 7, 3),
-
-        ("IRON_VAMBRACES_001",   "Iron Vambraces",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      2),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
-            ItemCategory.Armor,      "Iron Vambraces",    3, 6, 3),
-
-        ("BONE_RING_001",        "Bone Ring",
-            [RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 3)],
-            ItemCategory.Accessory,  "Bone Ring",         1, 4, 3),
-
-        ("WYRD_CHARM_001",       "Wyrd Charm",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Wyrd Shard",   1),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
-            ItemCategory.Accessory,  "Wyrd Charm",        2, 5, 3),
-
-        ("FOCUS_STONE_001",      "Rough Focus Stone",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
-             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       2)],
-            ItemCategory.Accessory,  "Rough Focus Stone", 2, 5, 3),
-
-        ("TAPER_SHAPING_001",    "Shaping Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2),
-             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3)],
-            ItemCategory.Reagent,    "Shaping Taper",     4, 8, 3),
-
-        // ── Skill 5: advanced consumables ─────────────────────────────────────
-        ("HEALING_POTION_001",   "Healing Potion",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         5),
-             RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 2)],
-            ItemCategory.Consumable, "Healing Potion",    3, 7, 5),
-
-        ("WEAVE_TINCTURE_001",   "Weave Tincture",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         4),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 1)],
-            ItemCategory.Consumable, "Weave Tincture",    3, 6, 5),
-
-        ("FORTITUDE_BREW_001",   "Fortitude Brew",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      1)],
-            ItemCategory.Consumable, "Fortitude Brew",    2, 5, 5),
-
-        // ── Skill 10-20: Journeyman ───────────────────────────────────────────
-        ("IRON_SABATONS_001",        "Iron Sabatons",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       4),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Iron Sabatons",        3, 6, 15),
-
-        ("IRON_GAUNTLETS_001",       "Iron Gauntlets",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       3),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        1)],
-            ItemCategory.Armor,       "Iron Gauntlets",       3, 6, 15),
-
-        ("STEEL_SWORD_001",          "Steel Sword",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       5),
-             RecipeIngredient.Create(ItemCategory.Component, "Stone",          2)],
-            ItemCategory.Weapon,      "Steel Sword",          4, 7, 10),
-
-        ("REINFORCED_LEATHER_001",   "Reinforced Leather Armor",
-            [RecipeIngredient.Create(ItemCategory.Component, "Leather",        6),
-             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       2)],
-            ItemCategory.Armor,       "Reinforced Leather Armor", 4, 7, 10),
-
-        ("CHAIN_SHIRT_001",          "Chain Shirt",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       8),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Chain Shirt",          5, 8, 15),
-
-        ("THORNWOOD_LONGBOW_001",    "Thornwood Longbow",
-            [RecipeIngredient.Create(ItemCategory.Component, "Wood",           4),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",          3)],
-            ItemCategory.Weapon,      "Thornwood Longbow",    4, 7, 12),
-
-        ("CRYSTAL_WAND_001",         "Crystal Wand",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
-             RecipeIngredient.Create(ItemCategory.Component, "Wood",           2)],
-            ItemCategory.Weapon,      "Crystal Wand",         4, 7, 15),
-
-        ("GREATER_HEALING_POTION_001","Greater Healing Potion",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",          8),
-             RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment",  3)],
-            ItemCategory.Consumable,  "Greater Healing Potion", 3, 7, 15),
-
-        // ── Skill 25-50: Expert ───────────────────────────────────────────────
-        ("THORNWOOD_TREADS_001",     "Thornwood Treads",
-            [RecipeIngredient.Create(ItemCategory.Component, "Wood",           3),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Thornwood Treads",     4, 7, 25),
-
-        ("CHAIN_LEGGINGS_001",       "Chain Leggings",
-            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       6),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Chain Leggings",       4, 7, 25),
-
-        ("SILVER_BLADE_001",         "Silver Blade",
-            [RecipeIngredient.Create(ItemCategory.Component, "Silver Ore",     4),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Weapon,      "Silver Blade",         6, 8, 25),
-
-        ("OBSIDIAN_EDGE_001",        "Obsidian Edge",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Obsidian Shard", 5),
-             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       3)],
-            ItemCategory.Weapon,      "Obsidian Edge",        6, 9, 30),
-
-        ("SCALE_MAIL_001",           "Scale Mail",
-            [RecipeIngredient.Create(ItemCategory.Component, "Sea Scale",      6),
-             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       4)],
-            ItemCategory.Armor,       "Scale Mail",           6, 8, 30),
-
-        ("SPIDER_SILK_VEST_001",     "Spider Silk Vest",
-            [RecipeIngredient.Create(ItemCategory.Component, "Spider Silk",    5),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",          3)],
-            ItemCategory.Armor,       "Spider Silk Vest",     5, 8, 25),
-
-        ("MITHRIL_HELM_001",         "Mithril Helm",
-            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    3),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Mithril Helm",         7, 9, 40),
-
-        ("CORAL_FOCUS_001",          "Coral Focus",
-            [RecipeIngredient.Create(ItemCategory.Component, "Coral Fragment", 4),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 2)],
-            ItemCategory.Weapon,      "Coral Focus",          6, 8, 35),
-
-        ("WEAVE_ELIXIR_001",         "Weave Elixir",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
-             RecipeIngredient.Create(ItemCategory.Component, "Herbs",          5)],
-            ItemCategory.Consumable,  "Weave Elixir",         3, 7, 30),
-
-        // ── Skill 50-75: Artisan ──────────────────────────────────────────────
-        ("MITHRIL_BOOTS_001",        "Mithril Boots",
-            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    4),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Mithril Boots",        7, 9, 50),
-
-        ("MITHRIL_VAMBRACES_001",    "Mithril Vambraces",
-            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    3),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Mithril Vambraces",    7, 9, 50),
-
-        ("MITHRIL_GREAVES_001",      "Mithril Greaves",
-            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    5),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
-            ItemCategory.Armor,       "Mithril Greaves",      7, 9, 50),
-
-        ("MITHRIL_SWORD_001",        "Mithril Sword",
-            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    6),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  2)],
-            ItemCategory.Weapon,      "Mithril Sword",        8, 10, 50),
-
-        ("MITHRIL_PLATE_001",        "Mithril Plate",
-            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    8),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",        4)],
-            ItemCategory.Armor,       "Mithril Plate",        8, 10, 60),
-
-        ("DIAMOND_RING_001",         "Diamond Ring",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  3),
-             RecipeIngredient.Create(ItemCategory.Component, "Silver Ore",     2)],
-            ItemCategory.Accessory,   "Diamond Ring",         7, 9, 55),
-
-        ("ASHWOOD_STAFF_001",        "Ashwood Staff",
-            [RecipeIngredient.Create(ItemCategory.Component, "Ashwood",        5),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3)],
-            ItemCategory.Weapon,      "Ashwood Staff",        7, 9, 50),
-
-        ("WYRD_WARD_001",            "Wyrd Ward",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Wyrd Shard",     3),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 2)],
-            ItemCategory.Accessory,   "Wyrd Ward",            8, 10, 65),
-
-        // ── Skill 75-100: Master ──────────────────────────────────────────────
-        ("VOID_BLADE_001",           "Void Blade",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Void Essence",   3),
-             RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    5)],
-            ItemCategory.Weapon,      "Void Blade",           9, 10, 80),
-
-        ("PHASE_BOW_001",            "Phase Bow",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Phase Thread",   4),
-             RecipeIngredient.Create(ItemCategory.Component, "Ashwood",        3)],
-            ItemCategory.Weapon,      "Phase Bow",            9, 10, 85),
-
-        ("TEAR_FRAGMENT_RING_001",   "Tear Fragment Ring",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Tear Fragment",  2),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  3)],
-            ItemCategory.Accessory,   "Tear Fragment Ring",   9, 10, 90),
-
-        ("WYRD_ARMOR_001",           "Wyrd Armor",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Wyrd Shard",     5),
-             RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    4)],
-            ItemCategory.Armor,       "Wyrd Armor",           9, 10, 95),
-
-        ("MASTERS_TONIC_001",        "Master's Tonic",
-            [RecipeIngredient.Create(ItemCategory.Reagent,   "Void Essence",   1),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 5),
-             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         10)],
-            ItemCategory.Consumable,  "Master's Tonic",       4, 8, 100),
-
-        // ── Skill 1: practice items ──────────────────────────────────────────
-        ("PRACTICE_WAND_001",        "Oak Wand (Practice)",
-            [RecipeIngredient.Create(ItemCategory.Component, "Wood",          2),
-             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         1)],
-            ItemCategory.Weapon,      "Oak Wand (Practice)",  1, 3, 1),
-
-        ("PRACTICE_CHARM_001",       "Bone Charm",
-            [RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2),
-             RecipeIngredient.Create(ItemCategory.Component, "Stone",         1)],
-            ItemCategory.Accessory,   "Bone Charm",           1, 3, 1),
-
-        // ── Elemental Taper recipes — crafted at Greenhouse or Alchemist ────
-        ("TAPER_FIRE_001",           "Fire Shaping Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Sulphur",       2)],
-            ItemCategory.Reagent,     "Fire Shaping Taper",   3, 6, 5),
-
-        ("TAPER_WATER_001",          "Water Shaping Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Coral",         2)],
-            ItemCategory.Reagent,     "Water Shaping Taper",  3, 6, 5),
-
-        ("TAPER_EARTH_001",          "Earth Shaping Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Stone",         2)],
-            ItemCategory.Reagent,     "Earth Shaping Taper",  3, 6, 5),
-
-        ("TAPER_AIR_001",            "Air Shaping Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-             RecipeIngredient.Create(ItemCategory.Component, "Feather",       2)],
-            ItemCategory.Reagent,     "Air Shaping Taper",    3, 6, 5),
-
-        ("TAPER_FORT_001",           "Fortitude Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         4),
-             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      2)],
-            ItemCategory.Reagent,     "Fortitude Taper",      4, 7, 10),
-
-        ("TAPER_WARD_001",           "Warding Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         4),
-             RecipeIngredient.Create(ItemCategory.Component, "Leather",       2)],
-            ItemCategory.Reagent,     "Warding Taper",        4, 7, 10),
-
-        ("TAPER_WYRD_001",           "Wyrd Shard Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         5),
-             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3)],
-            ItemCategory.Reagent,     "Wyrd Shard Taper",     5, 8, 20),
-
-        ("TAPER_REST_001",           "Dravenite Dust Taper",
-            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         5),
-             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         3)],
-            ItemCategory.Reagent,     "Dravenite Dust Taper", 4, 7, 15),
-    ];
-
+    // Recipe definitions are data-driven — authored in content/recipes.json
+    // and loaded via IContentProvider. Upsert pattern: missing recipes are
+    // inserted; existing ones have their ingredients verified and corrected.
+    // Add new entries to the JSON and they are picked up on the next startup
+    // without any DB migration.
     private async Task SeedStarterRecipesAsync(CancellationToken ct)
     {
-        // Load all recipe IDs that already exist in the DB
-        var allDefinedIds = AllRecipeDefinitions.Select(r => r.RecipeId).ToList();
+        var definitions = content.AllRecipes();
+
+        var allDefinedIds = definitions.Select(r => r.RecipeId).ToList();
         var existingRecipes = await db.Recipes
             .Where(r => allDefinedIds.Contains(r.RecipeId))
             .ToListAsync(ct);
@@ -861,10 +527,13 @@ public class StartupSeeder(
         var toAdd        = new List<Recipe>();
         var fixCount     = 0;
 
-        foreach (var (recipeId, name, ingredients, resultCategory, resultItemName,
-                      workMin, workMax, skillRequired) in AllRecipeDefinitions)
+        foreach (var def in definitions)
         {
-            if (existingById.TryGetValue(recipeId, out var existing))
+            var ingredients = def.Ingredients
+                .Select(i => RecipeIngredient.Create(i.Category, i.Name, i.BaseQuantity))
+                .ToArray();
+
+            if (existingById.TryGetValue(def.RecipeId, out var existing))
             {
                 // Verify and correct ingredients on already-seeded rows
                 var needsUpdate = existing.Ingredients.Count != ingredients.Length
@@ -879,24 +548,24 @@ public class StartupSeeder(
                     fixCount++;
                     logger.LogWarning(
                         "SeedStarterRecipes: corrected ingredients for {RecipeId} ({Name}).",
-                        recipeId, name);
+                        def.RecipeId, def.Name);
                 }
             }
             else
             {
                 // Recipe not yet in DB — queue for insert
                 toAdd.Add(Recipe.Create(
-                    recipeId:              recipeId,
-                    name:                  name,
+                    recipeId:              def.RecipeId,
+                    name:                  def.Name,
                     ingredients:           ingredients,
-                    resultCategory:        resultCategory,
-                    resultItemName:        resultItemName,
-                    baseWorkmanshipMin:    workMin,
-                    baseWorkmanshipMax:    workMax,
-                    requiredTaperType:     null,
-                    requiredWorld:         WorldId.Aeldran,
-                    requiredCraftingSkill: skillRequired,
-                    isDiscoverable:        false));
+                    resultCategory:        def.ResultCategory,
+                    resultItemName:        def.ResultItemName,
+                    baseWorkmanshipMin:    def.BaseWorkmanshipMin,
+                    baseWorkmanshipMax:    def.BaseWorkmanshipMax,
+                    requiredTaperType:     def.RequiredTaperType,
+                    requiredWorld:         def.RequiredWorld,
+                    requiredCraftingSkill: def.RequiredCraftingSkill,
+                    isDiscoverable:        def.IsDiscoverable));
             }
         }
 
@@ -908,8 +577,9 @@ public class StartupSeeder(
 
         logger.LogInformation(
             "SeedStarterRecipes: {Added} new recipe(s) inserted, {Fixed} ingredient set(s) corrected. Total defined: {Total}.",
-            toAdd.Count, fixCount, AllRecipeDefinitions.Length);
+            toAdd.Count, fixCount, definitions.Count);
     }
+
 
     // -------------------------------------------------------------------------
     // Homesteads — one per player
@@ -1122,8 +792,17 @@ public class StartupSeeder(
                 if (replacement.AssignedDuty.HasValue && replacement.AssignedDuty != HomesteadDuty.None)
                 {
                     replacement.RecallFromHomestead();
-                    // Clear building reference so building doesn't retain a ghost worker
-                    var assignedBuilding = db.HomesteadBuildings
+                    // Clear building reference so building doesn't retain a ghost worker.
+                    // NOTE: HasCompanion() isn't SQL-translatable (reads from JSON column),
+                    // so we filter client-side after a cheap pre-filter on the JSON text.
+                    var replacementIdString = replacement.Id.ToString();
+                    var candidateBuildings = db.HomesteadBuildings
+                        .Where(b => b.AssignedCompanionIdsJson != null
+                                 && b.AssignedCompanionIdsJson != "[]"
+                                 && b.AssignedCompanionIdsJson != ""
+                                 && b.AssignedCompanionIdsJson.Contains(replacementIdString))
+                        .ToList();
+                    var assignedBuilding = candidateBuildings
                         .FirstOrDefault(b => b.HasCompanion(replacement.Id));
                     if (assignedBuilding is not null)
                     {

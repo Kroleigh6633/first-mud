@@ -1,4 +1,5 @@
 using FirstMud.Application.Events;
+using FirstMud.Engine.Events;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

@@ -1,0 +1,42 @@
+<Project>
+  <!--
+    Exclude agent worktrees from the default MSBuild globs. These live under
+    .claude/worktrees/ and contain full copies of the source tree, which would
+    otherwise cause duplicate type definitions (CS0101/CS0246 "ambiguous or
+    missing" errors) and break `dotnet watch`'s polling file watcher with
+    "An item with the same key has already been added" when the whole repo is
+    volume-mounted into the dev container.
+
+    THE WORKTREE QUIRK.
+    Git worktrees for agents live at .claude/worktrees/agent-xxx/ — physically
+    BELOW this repo root. When an agent runs `dotnet build` inside its
+    worktree, MSBuild walks UP from each project toward the drive root
+    looking for Directory.Build.props. Because the worktree has no props
+    file of its own, the walk lands on THIS file (the main tree's root).
+
+    Anchoring paths with $(MSBuildThisFileDirectory) is NOT enough: that
+    resolves to the main tree's root, and the worktree's source files live
+    at main-tree-root/.claude/worktrees/agent-xxx/src/**, which still
+    matches ".claude/**". The exclusion would wipe the worktree's own src.
+
+    FIX.
+    We gate the exclusion on an IsInsideAgentWorktree sniff: if the project
+    being built sits under .claude/worktrees/, this props file does NOTHING
+    (worktree builds get plain defaults). Otherwise (main-tree builds) the
+    exclusion applies normally and keeps .claude/worktrees/** out of the
+    compile globs.
+  -->
+  <PropertyGroup>
+    <IsInsideAgentWorktree Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').Replace('\','/').Contains('/.claude/worktrees/'))">true</IsInsideAgentWorktree>
+    <IsInsideAgentWorktree Condition="'$(IsInsideAgentWorktree)' == ''">false</IsInsideAgentWorktree>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsInsideAgentWorktree)' == 'false'">
+    <Compile Remove="$(MSBuildThisFileDirectory).claude/**/*.cs" />
+    <None Remove="$(MSBuildThisFileDirectory).claude/**" />
+    <EmbeddedResource Remove="$(MSBuildThisFileDirectory).claude/**" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(IsInsideAgentWorktree)' == 'false'">
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildThisFileDirectory).claude/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

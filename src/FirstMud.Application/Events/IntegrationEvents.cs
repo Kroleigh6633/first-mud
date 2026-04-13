@@ -1,3 +1,5 @@
+using FirstMud.Engine.Events;
+
 namespace FirstMud.Application.Events;
 
 /// <summary>
