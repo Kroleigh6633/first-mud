@@ -83,11 +83,16 @@ Requires: `flags[]`, `items[{key,amount}]`, `reputation{faction: min}`.
   "nodes": [
     { "id": "greet", "text": "...", "options": [
         { "text": "...", "next": "work" },
-        { "text": "...", "next": "insider", "requiresReputation": { "faction": "wytchwood", "min": 25 } } ] },
-    { "id": "work", "text": "...", "terminal": true }
+        { "text": "...", "next": "insider", "requiresReputation":    { "faction": "wytchwood", "min": 25 } },
+        { "text": "...", "next": "stranger", "requiresReputationMax": { "faction": "wytchwood", "max": 10 } } ] },
+    { "id": "work", "text": "...", "terminal": true, "effects": { "wytchwood": 5 } }
   ]
 }
 ```
+
+See `tools/design/docs/dialogue-spec.md` for the full field reference and lint
+rules (including `requiresReputationMax`, node `effects`, and reachability
+analysis for low-rep branches).
 
 ## Outputs
 
@@ -103,6 +108,22 @@ Every run writes:
 3. Run `dialogue-lint --fixture <path>` to catch orphans, unreachable gates.
 4. Read the generated markdown in `docs/design/sim-logs/` — that's the daily design journal.
 5. When the spec stabilises, promote it into the game-content pipeline.
+
+## Known rough edges
+
+- `SimLog.WriteJson` stamps filenames as `yyyyMMdd-HHmmss` (local-ish compact)
+  rather than ISO-8601 (`yyyy-MM-ddTHH-mm-ssZ`). The timestamp is UTC but not
+  self-describing in the filename.
+- `SimLog.AppendMarkdown` appends `title` and `body` verbatim — a caller that
+  passes a `\n` in `title` will break the `## ...` header line, and a `body`
+  containing triple-backticks can escape an embedded fence. Consumers currently
+  pass fixed strings, so this hasn't bitten us, but it's worth sanitizing.
+- JSON payloads written by `WriteJson` use `WriteIndented = true` with default
+  escaping; string fields with newlines serialize as `\n` escapes correctly,
+  but the Markdown sibling writes raw newlines which can interact oddly with
+  daily-log collation tools.
+
+None of these are fixed in this change — just documented.
 
 ## Isolation
 

@@ -76,4 +76,102 @@ public class DialogueLinterTests
         var r = new DialogueLinter().Lint(tree);
         Assert.Contains(r.Warnings, w => w.Contains("rep") || w.Contains("w>=50"));
     }
+
+    [Fact]
+    public void Flags_low_rep_branch_made_unreachable_by_prior_rep_gain()
+    {
+        // a --(effect +50 wytchwood)--> b has a rep<=10 gate. Player's worst
+        // reachable rep at b is 50, so the low-rep branch is unreachable.
+        var tree = new DialogueTree
+        {
+            NpcId = "x", Roots = new() { "a" },
+            StartingReputation = new() { ["wytchwood"] = 0 },
+            Nodes = new()
+            {
+                new()
+                {
+                    Id = "a", Text = "",
+                    Effects = new() { ["wytchwood"] = 50 },
+                    Options = new() { new() { Text = "onward", Next = "b" } },
+                },
+                new()
+                {
+                    Id = "b", Text = "",
+                    Options = new()
+                    {
+                        new()
+                        {
+                            Text = "you don't know us",
+                            Next = "c",
+                            RequiresReputationMax = new() { Faction = "wytchwood", Max = 10 },
+                        },
+                    },
+                },
+                new() { Id = "c", Text = "", Terminal = true },
+            },
+        };
+        var r = new DialogueLinter().Lint(tree);
+        Assert.Empty(r.Errors);
+        Assert.Contains(r.Warnings, w => w.Contains("<=10") && w.Contains("unreachable"));
+    }
+
+    [Fact]
+    public void Errors_when_min_exceeds_max_on_same_option()
+    {
+        var tree = new DialogueTree
+        {
+            NpcId = "x", Roots = new() { "a" },
+            StartingReputation = new() { ["w"] = 0 },
+            Nodes = new()
+            {
+                new()
+                {
+                    Id = "a", Text = "",
+                    Options = new()
+                    {
+                        new()
+                        {
+                            Text = "impossible",
+                            Next = "b",
+                            RequiresReputation = new() { Faction = "w", Min = 50 },
+                            RequiresReputationMax = new() { Faction = "w", Max = 10 },
+                        },
+                    },
+                },
+                new() { Id = "b", Text = "", Terminal = true },
+            },
+        };
+        var r = new DialogueLinter().Lint(tree);
+        Assert.Contains(r.Errors, e => e.Contains("min") || e.Contains("Min") || e.Contains(">"));
+    }
+
+    [Fact]
+    public void Low_rep_branch_with_no_prior_rep_gain_is_reachable()
+    {
+        var tree = new DialogueTree
+        {
+            NpcId = "x", Roots = new() { "a" },
+            StartingReputation = new() { ["w"] = 0 },
+            Nodes = new()
+            {
+                new()
+                {
+                    Id = "a", Text = "",
+                    Options = new()
+                    {
+                        new()
+                        {
+                            Text = "stranger",
+                            Next = "b",
+                            RequiresReputationMax = new() { Faction = "w", Max = 10 },
+                        },
+                    },
+                },
+                new() { Id = "b", Text = "", Terminal = true },
+            },
+        };
+        var r = new DialogueLinter().Lint(tree);
+        Assert.Empty(r.Errors);
+        Assert.DoesNotContain(r.Warnings, w => w.Contains("unreachable"));
+    }
 }
