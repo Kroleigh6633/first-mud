@@ -273,6 +273,16 @@ public class PlaybookRunnerTests
 
         foreach (var f in files)
         {
+            // Economy-analytical playbooks (forge-throughput, leather-flow) are design
+            // specs, not combat sim inputs — they're validated by EconomyPlaybookTests.
+            var rawJson = File.ReadAllText(f);
+            using (var probe = JsonDocument.Parse(rawJson))
+            {
+                if (probe.RootElement.TryGetProperty("kind", out var kindEl) &&
+                    kindEl.GetString() == "economy-analytical")
+                    continue;
+            }
+
             var pb = PlaybookRunnerCommand.LoadPlaybook(f);
             Assert.False(string.IsNullOrWhiteSpace(pb.Id), $"{f}: id missing");
             Assert.NotEmpty(pb.Axes);

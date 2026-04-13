@@ -1,0 +1,38 @@
+{
+  "id": "forge-throughput",
+  "displayName": "Forge auto-smelt throughput",
+  "kind": "economy-analytical",
+  "description": "Measures Metal-units-per-tick a Forge processes as a function of companion layer and forge tier. Each 60-second tick, one Crafter companion assigned to a constructed Forge smelts `ForgeThroughput(layer, tier)` units of Metal. Units are rolled into specific ores (Iron/Copper/Tin/Silver/Mithril) via `RollForgeOre`. One tick = 60s, so tick-rate × 60 = per-hour rate.",
+  "model": {
+    "tickSeconds": 60,
+    "throughputFormula": "max(1, layer/2) + max(0, (tier-1) * layer / 5)",
+    "oreDistribution": {
+      "layerShiftsPerStep": 2,
+      "baselineIron": 50,
+      "baselineCopper": 25,
+      "baselineTin": 15,
+      "baselineSilver": 8,
+      "baselineMithril": 2
+    }
+  },
+  "axes": [
+    { "name": "companionLayer", "values": [1, 2, 3, 4, 5, 6] },
+    { "name": "forgeTier",      "values": [1, 2, 3] }
+  ],
+  "expectedBands": {
+    "unitsPerHour": {
+      "low":      [30,  90],
+      "moderate": [90,  180],
+      "high":     [180, 360]
+    }
+  },
+  "expectedCells": [
+    { "companionLayer": 1, "forgeTier": 1, "unitsPerTick": 1, "unitsPerHour": 60,  "band": "low" },
+    { "companionLayer": 3, "forgeTier": 1, "unitsPerTick": 1, "unitsPerHour": 60,  "band": "low" },
+    { "companionLayer": 3, "forgeTier": 2, "unitsPerTick": 1, "unitsPerHour": 60,  "band": "low" },
+    { "companionLayer": 5, "forgeTier": 2, "unitsPerTick": 3, "unitsPerHour": 180, "band": "moderate" },
+    { "companionLayer": 5, "forgeTier": 3, "unitsPerTick": 4, "unitsPerHour": 240, "band": "high" },
+    { "companionLayer": 6, "forgeTier": 3, "unitsPerTick": 5, "unitsPerHour": 300, "band": "high" }
+  ],
+  "designIntent": "A mid-game Layer-3 companion at a basic tier-1 Forge produces 1 Metal/tick = 60/hour — enough to convert the ambient drip of salvage Metal without hoarding. Late-game (layer 6, tier 3) achieves 5/tick = 300/hour, matching or exceeding realistic salvage supply. Throughput is deliberately linear-ish rather than exponential so that the Forge is an automation quality-of-life improvement, not a resource printer."
+}

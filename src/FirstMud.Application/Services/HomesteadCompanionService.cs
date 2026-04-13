@@ -16,6 +16,7 @@ public class HomesteadCompanionService
 {
     private readonly ICompanionRepository _companions;
     private readonly IHomesteadRepository _homesteads;
+    private readonly IHomesteadBuildingRepository _buildings;
     private readonly IItemRepository _items;
     private readonly IGameEventPublisher _events;
     private readonly ILogger<HomesteadCompanionService> _logger;
@@ -30,12 +31,14 @@ public class HomesteadCompanionService
     public HomesteadCompanionService(
         ICompanionRepository companions,
         IHomesteadRepository homesteads,
+        IHomesteadBuildingRepository buildings,
         IItemRepository items,
         IGameEventPublisher events,
         ILogger<HomesteadCompanionService> logger)
     {
         _companions = companions;
         _homesteads = homesteads;
+        _buildings = buildings;
         _items = items;
         _events = events;
         _logger = logger;
@@ -74,7 +77,7 @@ public class HomesteadCompanionService
                         HomesteadDuty.Harvester => await ProcessHarvesterAsync(companion, homestead, ct),
                         HomesteadDuty.Salvager  => await ProcessSalvagerAsync(companion, homestead, ct),
                         HomesteadDuty.Guard     => ProcessGuard(companion),
-                        HomesteadDuty.Crafter   => ProcessCrafter(companion),
+                        HomesteadDuty.Crafter   => await ProcessCrafterAsync(companion, homestead, ct),
                         _ => null
                     };
 
@@ -238,20 +241,154 @@ public class HomesteadCompanionService
         return null;
     }
 
-    private static string? ProcessCrafter(Companion companion)
+    /// <summary>
+    /// Crafter duty handler. Today the only automated craft is Forge smelting
+    /// (Metal → specific ores). If the crafter companion is assigned to a
+    /// constructed Forge, smelting runs; otherwise crafter duty is a no-op
+    /// (other crafting buildings will be wired through here in future).
+    /// </summary>
+    private async Task<string?> ProcessCrafterAsync(Companion companion, Homestead homestead, CancellationToken ct)
     {
-        _craftLogOnce(companion);
+        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        var forge = buildings.FirstOrDefault(b =>
+            b.IsConstructed &&
+            b.Type == BuildingType.Forge &&
+            b.HasCompanion(companion.Id));
+
+        if (forge is not null)
+            return await ProcessSmelterAsync(companion, homestead, forge, ct);
+
         return null;
     }
 
-    // Log crafter placeholder only occasionally so the log isn't spammed
-    private static readonly HashSet<Guid> _craftLoggedIds = [];
-    private static void _craftLogOnce(Companion c)
+    // ─── Smelter (Forge) duty ────────────────────────────────────────────────
+
+    // Per-unit ore roll distribution. Mirrors SmeltService.RollOre but keyed on
+    // the companion's layer (1–6) rather than the player's CraftingSkill.
+    // Each layer above 1 shifts 2% from Iron into rarer results.
+    public static string RollForgeOre(int companionLayer, Random rng)
     {
-        if (_craftLoggedIds.Add(c.Id))
+        var shifts = Math.Clamp(companionLayer - 1, 0, 10); // layer 1 = 0 shifts, layer 6 = 5 shifts (≤10 cap)
+        var iron    = 50 - shifts * 2;        // 50% → 40% at layer 6
+        var copper  = 25;
+        var tin     = 15 + shifts;            // 15% → 20%
+        var silver  =  8 + shifts / 2;        //  8% → 10%
+        var mithril = 100 - iron - copper - tin - silver; // 2% → 5%
+
+        var roll = rng.Next(100);
+        if (roll < iron) return "Iron Ore";
+        if (roll < iron + copper) return "Copper Nugget";
+        if (roll < iron + copper + tin) return "Tin";
+        if (roll < iron + copper + tin + silver) return "Silver Ore";
+        return "Mithril Ore";
+    }
+
+    /// <summary>
+    /// Throughput (units of Metal consumed per tick) given companion layer
+    /// and forge tier. Higher layer + higher tier = more units processed.
+    ///
+    ///   base units     = max(1, layer / 2)    // layer 1-2 → 1; 3-4 → 2; 5-6 → 3
+    ///   tier bonus     = (tier - 1) * layer / 5    // tier 2 l=5 → +1, tier 3 l=5 → +2
+    ///
+    /// A typical mid-game forge (tier 1, layer 3 companion): 1 unit/tick.
+    /// Late-game (tier 3, layer 5 companion): 3 + 2 = 5 units/tick.
+    /// </summary>
+    public static int ForgeThroughput(int companionLayer, int forgeTier)
+    {
+        var baseUnits = Math.Max(1, companionLayer / 2);
+        var tierBonus = Math.Max(0, (forgeTier - 1) * companionLayer / 5);
+        return baseUnits + tierBonus;
+    }
+
+    private async Task<string?> ProcessSmelterAsync(
+        Companion companion,
+        Homestead homestead,
+        HomesteadBuilding forge,
+        CancellationToken ct)
+    {
+        // Locate "Metal" in homestead storage (produced by salvage / auto-salvage).
+        var metalEntry = await _homesteads.GetStorageItemByNameAsync(homestead.Id, "Metal", ct);
+        if (metalEntry is null) return null;
+
+        var metal = await _items.GetByIdAsync(metalEntry.ItemId, ct);
+        if (metal is null || metal.Quantity <= 0) return null;
+
+        // Throughput: companion layer × forge tier.
+        var throughput = ForgeThroughput(companion.CurrentLayer, forge.Tier);
+        var toSmelt = Math.Min(throughput, metal.Quantity);
+        if (toSmelt <= 0) return null;
+
+        // Check storage capacity — we may need new ore stacks.
+        var guardBondLevels = await GetGuardBondLevelsAsync(homestead.PlayerId, ct);
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardBondLevels);
+        var storageItems = await _homesteads.GetStorageItemsAsync(homestead.Id, ct);
+
+        // Consume Metal first.
+        if (metal.Quantity == toSmelt)
         {
-            // First time — nothing to log externally, just track
+            await _items.DeleteAsync(metal.Id, ct);
+            await _homesteads.RemoveStorageItemAsync(homestead.Id, metal.Id, ct);
         }
+        else
+        {
+            metal.TryRemoveQuantity(toSmelt, out _);
+            await _items.UpdateAsync(metal, ct);
+        }
+
+        // Roll outputs.
+        var tally = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < toSmelt; i++)
+        {
+            var ore = RollForgeOre(companion.CurrentLayer, Random.Shared);
+            tally.TryGetValue(ore, out var current);
+            tally[ore] = current + 1;
+        }
+
+        // Deposit outputs, respecting storage capacity for new stacks.
+        // Existing stacks always absorb; new stacks only if a slot is free.
+        var freeSlots = effectiveSlots - storageItems.Count + (metal.Quantity == toSmelt ? 1 : 0);
+        foreach (var (oreName, qty) in tally)
+        {
+            var existingEntry = await _homesteads.GetStorageItemByNameAsync(homestead.Id, oreName, ct);
+            if (existingEntry is not null)
+            {
+                var existing = await _items.GetByIdAsync(existingEntry.ItemId, ct);
+                if (existing is not null)
+                {
+                    existing.AddQuantity(qty);
+                    await _items.UpdateAsync(existing, ct);
+                    continue;
+                }
+            }
+
+            if (freeSlots <= 0)
+            {
+                _logger.LogDebug(
+                    "Forge smelted {Qty}x {Ore} but homestead storage is full; discarded.",
+                    qty, oreName);
+                continue;
+            }
+
+            var newItem = Item.Create(
+                oreName,
+                $"An ore smelted at the forge by {companion.Name}.",
+                ItemCategory.Component,
+                Workmanship.Of(1),
+                WorldId.Aeldran);
+            newItem.SetOwner(null);
+            if (qty > 1) newItem.AddQuantity(qty - 1);
+            await _items.AddAsync(newItem, ct);
+
+            var entry = HomesteadStorageItem.Create(homestead.Id, newItem.Id);
+            await _homesteads.AddStorageItemAsync(entry, ct);
+            freeSlots--;
+        }
+
+        await _events.PublishAsync(homestead.PlayerId,
+            new StorageChangedEvent(homestead.Id), ct);
+
+        var summary = string.Join(", ", tally.Select(kv => $"{kv.Key} x{kv.Value}"));
+        return $"Your forge smelted: {summary} — by {companion.Name}-L{companion.CurrentLayer} (tier {forge.Tier}).";
     }
 
     private async Task<IEnumerable<int>> GetGuardBondLevelsAsync(Guid playerId, CancellationToken ct)
