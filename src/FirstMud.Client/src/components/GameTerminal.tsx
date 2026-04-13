@@ -249,6 +249,15 @@ export default function GameTerminal({
   const autoQuestInteractFailedRef = useRef(false);
   // Set of quest indices that were skipped this run (incomplete, not failed permanently)
   const autoQuestSkippedIndicesRef = useRef<Set<number>>(new Set());
+  // Timestamp (ms) before which portal commands are suppressed.
+  // Set to Date.now() + 2000 whenever any portal command fires so that rapid
+  // re-presses (or auto-quest ticks) cannot immediately toggle back.
+  const portalCooldownUntilRef = useRef<number>(0);
+  // Set to true by the auto-quest navigate phase when it has already sent a
+  // portalback for the current homestead exit, so successive 300 ms ticks
+  // don't spam duplicate commands while waiting for the player to arrive on
+  // the world map.
+  const autoQuestPortalSentRef = useRef(false);
 
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
@@ -445,6 +454,9 @@ export default function GameTerminal({
         setShowHelp(prev => !prev);
         break;
       case 'portal':
+        // Ignore rapid re-presses for 2 s after any portal command fires
+        if (Date.now() < portalCooldownUntilRef.current) break;
+        portalCooldownUntilRef.current = Date.now() + 2000;
         if (atHomesteadRef.current) {
           sendCommand('portalback', null);
         } else {
@@ -699,6 +711,7 @@ export default function GameTerminal({
       acceptWaitTicksRef.current = 0;
       autoQuestInteractFailedRef.current = false;
       autoQuestSkippedIndicesRef.current = new Set();
+      autoQuestPortalSentRef.current = false;
       setAutoNavigating(false);
       return;
     }
@@ -901,11 +914,19 @@ export default function GameTerminal({
         }
 
         // ── Homestead check: must portal back before navigating ────────
-        if (player.x === -100 && player.y === -100) {
-          console.log('[autoquest navigate] Player is at homestead — sending portalback before navigating');
-          sendCommand('portalback', null);
-          return; // next tick will see the new position and start navigating
+        // Use atHomesteadRef (the authoritative flag) rather than raw coords
+        // so the check stays consistent with the P key handler.
+        if (atHomesteadRef.current) {
+          if (!autoQuestPortalSentRef.current && Date.now() >= portalCooldownUntilRef.current) {
+            console.log('[autoquest navigate] Player is at homestead — sending portalback before navigating');
+            autoQuestPortalSentRef.current = true;
+            portalCooldownUntilRef.current = Date.now() + 2000;
+            sendCommand('portalback', null);
+          }
+          return; // wait for next tick when player has arrived on the world map
         }
+        // Reset the portal-sent flag once we're back on the world map
+        autoQuestPortalSentRef.current = false;
 
         const distX = Math.abs(wp.targetX - player.x);
         const distY = Math.abs(wp.targetY - player.y);
