@@ -77,6 +77,11 @@ public sealed class ContentProvider : IContentProvider
     private IReadOnlyList<WorldEventDefinition> _events = Array.Empty<WorldEventDefinition>();
     private Dictionary<string, WorldEventDefinition> _eventsById = new(StringComparer.Ordinal);
 
+    private ItemValuesDefinition _itemValues = EmptyItemValues();
+    private TradeCurvesDefinition _tradeCurves = DefaultTradeCurves();
+    private IReadOnlyList<VendorDefinition> _vendors = Array.Empty<VendorDefinition>();
+    private Dictionary<string, VendorDefinition> _vendorsByNpcId = new(StringComparer.Ordinal);
+
     private static readonly HashSet<string> ValidReputationTierNames =
         new(Enum.GetNames<ReputationTier>(), StringComparer.Ordinal);
 
@@ -232,6 +237,13 @@ public sealed class ContentProvider : IContentProvider
     public WorldEventDefinition? GetEvent(string id) =>
         !string.IsNullOrEmpty(id) && _eventsById.TryGetValue(id, out var def) ? def : null;
 
+    public ItemValuesDefinition ItemValues => _itemValues;
+    public TradeCurvesDefinition TradeCurves => _tradeCurves;
+    public IReadOnlyList<VendorDefinition> AllVendors() => _vendors;
+    public VendorDefinition? GetVendor(string npcId) =>
+        string.IsNullOrEmpty(npcId) ? null
+        : _vendorsByNpcId.TryGetValue(npcId, out var def) ? def : null;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -277,6 +289,13 @@ public sealed class ContentProvider : IContentProvider
         // validation against those registries can run.
         _events = LoadWorldEvents();
         _eventsById = _events.ToDictionary(e => e.Id, StringComparer.Ordinal);
+
+        // Trade layer — depends on NPCs and zones being loaded so vendor
+        // cross-refs + zone-number resolution can validate.
+        _itemValues = LoadItemValues();
+        _tradeCurves = LoadTradeCurves();
+        _vendors = LoadVendors();
+        _vendorsByNpcId = _vendors.ToDictionary(v => v.NpcId, StringComparer.Ordinal);
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
@@ -2410,6 +2429,207 @@ public sealed class ContentProvider : IContentProvider
         public int? Days { get; set; }
         public int? Minutes { get; set; }
         public bool Permanent { get; set; }
+    }
+
+    // ─── Trade loaders ─────────────────────────────────────────────────────
+
+    private static ItemValuesDefinition EmptyItemValues() =>
+        new(new Dictionary<ItemCategory, int>(), 0.25, new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+
+    private static TradeCurvesDefinition DefaultTradeCurves() =>
+        new(1.5, 0.5, 1, 1, new GoldCurveDefinition(15, 0.25, 45, 3, 4));
+
+    private ItemValuesDefinition LoadItemValues()
+    {
+        var path = Path.Combine(_contentRoot, "item-values.json");
+        if (!File.Exists(path))
+            return EmptyItemValues();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<ItemValuesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Defaults is null)
+            throw new InvalidDataException($"{path}: missing defaults.");
+
+        var byCategory = new Dictionary<ItemCategory, int>();
+        if (doc.Defaults.ByCategory is not null)
+        {
+            foreach (var kv in doc.Defaults.ByCategory)
+            {
+                if (!Enum.TryParse<ItemCategory>(kv.Key, ignoreCase: false, out var cat))
+                    throw new InvalidDataException($"{path}: defaults.byCategory has invalid category '{kv.Key}'.");
+                if (kv.Value < 0)
+                    throw new InvalidDataException($"{path}: defaults.byCategory[{kv.Key}] must be >= 0.");
+                byCategory[cat] = kv.Value;
+            }
+        }
+
+        var wMult = doc.Defaults.WorkmanshipMultiplier ?? 0.25;
+        if (wMult < 0) throw new InvalidDataException($"{path}: workmanshipMultiplier must be >= 0.");
+
+        var byName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (doc.Items is not null)
+        {
+            foreach (var entry in doc.Items)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Name))
+                    throw new InvalidDataException($"{path}: item entry missing name.");
+                if (entry.BaseValue < 0)
+                    throw new InvalidDataException($"{path}: item '{entry.Name}' baseValue must be >= 0.");
+                byName[entry.Name] = entry.BaseValue;
+            }
+        }
+
+        return new ItemValuesDefinition(byCategory, wMult, byName);
+    }
+
+    private TradeCurvesDefinition LoadTradeCurves()
+    {
+        var path = Path.Combine(_contentRoot, "trade-curves.json");
+        if (!File.Exists(path))
+            return DefaultTradeCurves();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<TradeCurvesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        var buy = doc.BuyMultiplier ?? 1.5;
+        var sell = doc.SellMultiplier ?? 0.5;
+        if (buy < 1.0) throw new InvalidDataException($"{path}: buyMultiplier must be >= 1.0.");
+        if (sell < 0.0 || sell > 1.0) throw new InvalidDataException($"{path}: sellMultiplier must be in [0,1].");
+
+        var g = doc.Gold ?? new GoldRaw();
+        var gold = new GoldCurveDefinition(
+            g.QuestRewardBase ?? 15,
+            g.QuestRewardPerReputationPoint ?? 0.25,
+            g.LootDropChancePercent ?? 45,
+            g.LootDropBase ?? 3,
+            g.LootDropPerDangerLevel ?? 4);
+
+        return new TradeCurvesDefinition(buy, sell, doc.MinBuyPrice ?? 1, doc.MinSellPrice ?? 1, gold);
+    }
+
+    private IReadOnlyList<VendorDefinition> LoadVendors()
+    {
+        var path = Path.Combine(_contentRoot, "vendors.json");
+        if (!File.Exists(path))
+            return Array.Empty<VendorDefinition>();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<VendorsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        var list = new List<VendorDefinition>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        if (doc.Vendors is null) return list;
+
+        foreach (var raw in doc.Vendors)
+        {
+            if (string.IsNullOrWhiteSpace(raw.NpcId))
+                throw new InvalidDataException($"{path}: vendor entry missing npcId.");
+            if (!seen.Add(raw.NpcId))
+                throw new InvalidDataException($"{path}: duplicate vendor npcId '{raw.NpcId}'.");
+
+            if (!_npcsById.TryGetValue(raw.NpcId, out var npc))
+                throw new InvalidDataException($"{path}: vendor npcId '{raw.NpcId}' is not a known NPC.");
+            if (npc.Role != NpcRole.Shopkeeper)
+                throw new InvalidDataException($"{path}: vendor npcId '{raw.NpcId}' has role {npc.Role}; shopkeeper required.");
+            if (!_zonesById.TryGetValue(npc.HomeZoneId, out var zone))
+                throw new InvalidDataException($"{path}: vendor '{raw.NpcId}' homeZoneId '{npc.HomeZoneId}' not found in zones.");
+
+            var buys = new List<ItemCategory>();
+            if (raw.BuysCategories is not null)
+            {
+                foreach (var cat in raw.BuysCategories)
+                {
+                    if (!Enum.TryParse<ItemCategory>(cat, ignoreCase: false, out var parsed))
+                        throw new InvalidDataException($"{path}: vendor '{raw.NpcId}' invalid buysCategories entry '{cat}'.");
+                    buys.Add(parsed);
+                }
+            }
+
+            var stock = new List<VendorStockEntry>();
+            if (raw.Stock is not null)
+            {
+                foreach (var s in raw.Stock)
+                {
+                    if (string.IsNullOrWhiteSpace(s.ItemName))
+                        throw new InvalidDataException($"{path}: vendor '{raw.NpcId}' stock entry missing itemName.");
+                    if (!Enum.TryParse<ItemCategory>(s.Category, ignoreCase: false, out var scat))
+                        throw new InvalidDataException($"{path}: vendor '{raw.NpcId}' stock '{s.ItemName}' invalid category '{s.Category}'.");
+                    if (s.Quantity < 0)
+                        throw new InvalidDataException($"{path}: vendor '{raw.NpcId}' stock '{s.ItemName}' quantity < 0.");
+                    var work = s.Workmanship ?? 1;
+                    if (work < 1 || work > 10)
+                        throw new InvalidDataException($"{path}: vendor '{raw.NpcId}' stock '{s.ItemName}' workmanship must be 1-10.");
+                    stock.Add(new VendorStockEntry(s.ItemName, scat, s.Quantity, work));
+                }
+            }
+
+            list.Add(new VendorDefinition(
+                NpcId: raw.NpcId,
+                DisplayName: string.IsNullOrWhiteSpace(raw.DisplayName) ? npc.DisplayName : raw.DisplayName!,
+                World: zone.World,
+                ZoneNumber: zone.ZoneNumber,
+                BuysCategories: buys,
+                Stock: stock));
+        }
+
+        return list;
+    }
+
+    private sealed class ItemValuesFile
+    {
+        [JsonPropertyName("defaults")] public ItemValueDefaultsRaw? Defaults { get; set; }
+        [JsonPropertyName("items")] public List<ItemValueEntryRaw>? Items { get; set; }
+    }
+    private sealed class ItemValueDefaultsRaw
+    {
+        [JsonPropertyName("byCategory")] public Dictionary<string, int>? ByCategory { get; set; }
+        [JsonPropertyName("workmanshipMultiplier")] public double? WorkmanshipMultiplier { get; set; }
+    }
+    private sealed class ItemValueEntryRaw
+    {
+        [JsonPropertyName("name")] public string? Name { get; set; }
+        [JsonPropertyName("baseValue")] public int BaseValue { get; set; }
+    }
+
+    private sealed class TradeCurvesFile
+    {
+        [JsonPropertyName("buyMultiplier")] public double? BuyMultiplier { get; set; }
+        [JsonPropertyName("sellMultiplier")] public double? SellMultiplier { get; set; }
+        [JsonPropertyName("minBuyPrice")] public int? MinBuyPrice { get; set; }
+        [JsonPropertyName("minSellPrice")] public int? MinSellPrice { get; set; }
+        [JsonPropertyName("gold")] public GoldRaw? Gold { get; set; }
+    }
+    private sealed class GoldRaw
+    {
+        [JsonPropertyName("questRewardBase")] public double? QuestRewardBase { get; set; }
+        [JsonPropertyName("questRewardPerReputationPoint")] public double? QuestRewardPerReputationPoint { get; set; }
+        [JsonPropertyName("lootDropChancePercent")] public int? LootDropChancePercent { get; set; }
+        [JsonPropertyName("lootDropBase")] public int? LootDropBase { get; set; }
+        [JsonPropertyName("lootDropPerDangerLevel")] public int? LootDropPerDangerLevel { get; set; }
+    }
+
+    private sealed class VendorsFile
+    {
+        [JsonPropertyName("vendors")] public List<VendorRaw>? Vendors { get; set; }
+    }
+    private sealed class VendorRaw
+    {
+        [JsonPropertyName("npcId")] public string? NpcId { get; set; }
+        [JsonPropertyName("displayName")] public string? DisplayName { get; set; }
+        [JsonPropertyName("buysCategories")] public List<string>? BuysCategories { get; set; }
+        [JsonPropertyName("stock")] public List<VendorStockRaw>? Stock { get; set; }
+    }
+    private sealed class VendorStockRaw
+    {
+        [JsonPropertyName("itemName")] public string ItemName { get; set; } = "";
+        [JsonPropertyName("category")] public string Category { get; set; } = "Component";
+        [JsonPropertyName("quantity")] public int Quantity { get; set; }
+        [JsonPropertyName("workmanship")] public int? Workmanship { get; set; }
     }
 
     private sealed class RawWorldEventEffect

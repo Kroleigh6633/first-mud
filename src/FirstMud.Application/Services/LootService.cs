@@ -219,6 +219,28 @@ public class LootService
         return new LootDropResult(true, rolledItem, message);
     }
 
+    /// <summary>
+    /// Rolls a post-combat gold drop. Returns the amount credited (0 if no drop).
+    /// Scales with zone danger level per content/trade-curves.json gold block.
+    /// Does not persist — caller is responsible for calling <see cref="Player.AddGold"/>
+    /// on the player entity and saving.
+    /// </summary>
+    public int RollGoldDrop(int dangerLevel, bool isAutoFarm = false)
+    {
+        var g = _content.TradeCurves.Gold;
+        if (g.LootDropChancePercent <= 0) return 0;
+
+        var chance = g.LootDropChancePercent;
+        if (isAutoFarm) chance = (int)(chance * _content.LootTables.DropChance.AutoFarmMultiplier);
+        if (Random.Shared.Next(100) >= chance) return 0;
+
+        var baseAmt = g.LootDropBase + dangerLevel * g.LootDropPerDangerLevel;
+        // ±30% variance
+        var variance = (int)(baseAmt * 0.3);
+        var amount = baseAmt + Random.Shared.Next(-variance, variance + 1);
+        return Math.Max(1, amount);
+    }
+
     // ─── Biome helpers ────────────────────────────────────────────────────
 
     private string GetBiome(string? zoneName)

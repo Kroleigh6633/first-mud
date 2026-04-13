@@ -59,3 +59,8 @@ public record ViewCityCommand(Guid PlayerId) : IGameCommand;
 public record BuildStaffEverythingCommand(Guid PlayerId) : IGameCommand;
 /// <summary>Imbue all eligible items with available tapers, then auto-salvage fully imbued items.</summary>
 public record PracticeEnchantingCommand(Guid PlayerId) : IGameCommand;
+
+// Trade (stage 1)
+public record ViewVendorCommand(Guid PlayerId, string NpcId) : IGameCommand;
+public record BuyItemCommand(Guid PlayerId, string NpcId, string ItemName, int Quantity) : IGameCommand;
+public record SellItemCommand(Guid PlayerId, string NpcId, string ItemName, int Quantity) : IGameCommand;

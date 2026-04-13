@@ -117,6 +117,11 @@ export interface GameCommands {
   combatUse: (payload: CombatUsePayload) => void;
   combatFlee: (payload: { encounterId: string }) => void;
 
+  // Trade (stage 1)
+  viewVendor: (payload: { npcId: string }) => void;
+  buyItem: (payload: { npcId: string; itemName: string; quantity: number }) => void;
+  sellItem: (payload: { npcId: string; itemName: string; quantity: number }) => void;
+
   /**
    * Legacy shorthand kept for the auto-quest runner. Sends the bare `"flee"`
    * command — the server does NOT currently parse this; prefer `combatFlee`
@@ -181,6 +186,10 @@ export function useGameCommands(sendCommand: SendCommandFn): GameCommands {
 
     combatUse: (p) => sendCommand('combat use', p),
     combatFlee: (p) => sendCommand('combat flee', p),
+
+    viewVendor: (p) => sendCommand('viewvendor', p),
+    buyItem: (p) => sendCommand('buyitem', p),
+    sellItem: (p) => sendCommand('sellitem', p),
 
     flee: () => sendCommand('flee', null),
   }), [sendCommand]);

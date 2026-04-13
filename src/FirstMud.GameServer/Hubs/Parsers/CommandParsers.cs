@@ -376,3 +376,38 @@ public sealed class PracticeEnchantingCommandParser : ICommandParser
     public string CommandName => "practiceenchanting";
     public IGameCommand? Parse(JsonElement payload, Guid playerId) => new PracticeEnchantingCommand(playerId);
 }
+
+public sealed class ViewVendorCommandParser : ICommandParser
+{
+    public string CommandName => "viewvendor";
+    public IGameCommand? Parse(JsonElement payload, Guid playerId)
+        => new ViewVendorCommand(playerId, payload.TryGetString("npcId") ?? string.Empty);
+}
+
+public sealed class BuyItemCommandParser : ICommandParser
+{
+    public string CommandName => "buyitem";
+    public IGameCommand? Parse(JsonElement payload, Guid playerId)
+    {
+        var qty = payload.TryGetInt("quantity");
+        return new BuyItemCommand(
+            playerId,
+            payload.TryGetString("npcId") ?? string.Empty,
+            payload.TryGetString("itemName") ?? string.Empty,
+            qty > 0 ? qty : 1);
+    }
+}
+
+public sealed class SellItemCommandParser : ICommandParser
+{
+    public string CommandName => "sellitem";
+    public IGameCommand? Parse(JsonElement payload, Guid playerId)
+    {
+        var qty = payload.TryGetInt("quantity");
+        return new SellItemCommand(
+            playerId,
+            payload.TryGetString("npcId") ?? string.Empty,
+            payload.TryGetString("itemName") ?? string.Empty,
+            qty > 0 ? qty : 1);
+    }
+}

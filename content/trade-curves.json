@@ -1,0 +1,15 @@
+{
+  "$schema": "./schemas/trade-curves.schema.json",
+  "_comment": "Stage-1 trade coefficients. Vendor sells to player at buyMultiplier x baseValue; buys from player at sellMultiplier x baseValue.",
+  "buyMultiplier": 1.5,
+  "sellMultiplier": 0.5,
+  "minBuyPrice": 1,
+  "minSellPrice": 1,
+  "gold": {
+    "questRewardBase": 15,
+    "questRewardPerReputationPoint": 0.25,
+    "lootDropChancePercent": 45,
+    "lootDropBase": 3,
+    "lootDropPerDangerLevel": 4
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "./schemas/vendors.schema.json",
+  "_comment": "Stage-1 vendor roster. Each vendor is tied to a shopkeeper NPC (must have role=shopkeeper in npcs.json) and a fixed initial stock. Dynamic stock is stage 2.",
+  "vendors": [
+    {
+      "npcId": "maren",
+      "displayName": "Maren (Red Market)",
+      "buysCategories": ["Component", "Reagent", "Consumable", "Weapon", "Armor", "Accessory"],
+      "stock": [
+        { "itemName": "Minor Healing Draught", "category": "Consumable", "quantity": 5, "workmanship": 2 },
+        { "itemName": "Weave Tincture",        "category": "Consumable", "quantity": 3, "workmanship": 2 },
+        { "itemName": "Air Shaping Taper",     "category": "Reagent",    "quantity": 3, "workmanship": 2 },
+        { "itemName": "Wood",                  "category": "Component",  "quantity": 20, "workmanship": 1 }
+      ]
+    },
+    {
+      "npcId": "tarrin-vale",
+      "displayName": "Tarrin Vale's Goods",
+      "buysCategories": ["Component", "Reagent", "Consumable", "Weapon", "Armor", "Accessory"],
+      "stock": [
+        { "itemName": "Iron Ore",              "category": "Component",  "quantity": 15, "workmanship": 1 },
+        { "itemName": "Leather",               "category": "Component",  "quantity": 15, "workmanship": 1 },
+        { "itemName": "Healing Potion",        "category": "Consumable", "quantity": 4, "workmanship": 3 },
+        { "itemName": "Fortitude Brew",        "category": "Consumable", "quantity": 3, "workmanship": 2 },
+        { "itemName": "Water Shaping Taper",   "category": "Reagent",    "quantity": 2, "workmanship": 2 }
+      ]
+    },
+    {
+      "npcId": "ormund-gresh",
+      "displayName": "Ormund's Quartermaster Stall",
+      "buysCategories": ["Component", "Reagent", "Weapon", "Armor"],
+      "stock": [
+        { "itemName": "Iron Ore",              "category": "Component",  "quantity": 30, "workmanship": 2 },
+        { "itemName": "Granite Block",         "category": "Component",  "quantity": 10, "workmanship": 2 },
+        { "itemName": "Copper Nugget",         "category": "Component",  "quantity": 12, "workmanship": 2 },
+        { "itemName": "Earth Shaping Taper",   "category": "Reagent",    "quantity": 3, "workmanship": 3 },
+        { "itemName": "Mountain Herb",         "category": "Reagent",    "quantity": 6, "workmanship": 2 }
+      ]
+    },
+    {
+      "npcId": "sable-meir",
+      "displayName": "Sable Meir's Herb Stall",
+      "buysCategories": ["Reagent", "Component", "Consumable"],
+      "stock": [
+        { "itemName": "Thornwood Herb",        "category": "Reagent",    "quantity": 10, "workmanship": 2 },
+        { "itemName": "Amber Resin",           "category": "Reagent",    "quantity": 6, "workmanship": 2 },
+        { "itemName": "Moonbloom Petal",       "category": "Reagent",    "quantity": 2, "workmanship": 4 },
+        { "itemName": "Dravenite Dust",        "category": "Reagent",    "quantity": 2, "workmanship": 4 },
+        { "itemName": "Weave Elixir",          "category": "Consumable", "quantity": 3, "workmanship": 3 }
+      ]
+    }
+  ]
+}

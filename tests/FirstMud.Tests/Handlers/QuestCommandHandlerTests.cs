@@ -283,7 +283,7 @@ public class QuestCommandHandlerTests
 
         var reputationSvc = new ReputationService(players, TestContent.Shared);
         var questService = new QuestService(questGraph, reputationSvc, players);
-        var handler = new CompleteQuestCommandHandler(players, questService, hub);
+        var handler = new CompleteQuestCommandHandler(players, questService, TestContent.Shared, hub);
 
         // Act
         var result = await handler.HandleAsync(

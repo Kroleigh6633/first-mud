@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "trade-curves",
+  "type": "object",
+  "required": ["buyMultiplier", "sellMultiplier"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "buyMultiplier": { "type": "number", "minimum": 1.0 },
+    "sellMultiplier": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "minBuyPrice": { "type": "integer", "minimum": 0 },
+    "minSellPrice": { "type": "integer", "minimum": 0 },
+    "gold": {
+      "type": "object",
+      "properties": {
+        "questRewardBase": { "type": "number", "minimum": 0 },
+        "questRewardPerReputationPoint": { "type": "number", "minimum": 0 },
+        "lootDropChancePercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "lootDropBase": { "type": "integer", "minimum": 0 },
+        "lootDropPerDangerLevel": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

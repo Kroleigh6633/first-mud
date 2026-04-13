@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "item-values",
+  "type": "object",
+  "required": ["defaults", "items"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "defaults": {
+      "type": "object",
+      "required": ["byCategory", "workmanshipMultiplier"],
+      "properties": {
+        "byCategory": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "workmanshipMultiplier": { "type": "number", "minimum": 0 }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "baseValue"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "baseValue": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

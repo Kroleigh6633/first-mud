@@ -147,6 +147,9 @@ builder.Services.AddScoped<ICommandHandler<UnassignBuilderCommand>, UnassignBuil
 builder.Services.AddScoped<ICommandHandler<ViewCityCommand>, ViewCityCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<BuildStaffEverythingCommand>, BuildStaffEverythingCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<PracticeEnchantingCommand>, PracticeEnchantingCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ViewVendorCommand>, ViewVendorCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<BuyItemCommand>, BuyItemCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<SellItemCommand>, SellItemCommandHandler>();
 
 // SignalR command parsing: one ICommandParser per command name, plus the
 // registry-based dispatcher. Add a new command = add one parser + one line here.
@@ -199,6 +202,9 @@ builder.Services.AddSingleton<ICommandParser, UnassignBuilderCommandParser>();
 builder.Services.AddSingleton<ICommandParser, ViewCityCommandParser>();
 builder.Services.AddSingleton<ICommandParser, BuildStaffEverythingCommandParser>();
 builder.Services.AddSingleton<ICommandParser, PracticeEnchantingCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ViewVendorCommandParser>();
+builder.Services.AddSingleton<ICommandParser, BuyItemCommandParser>();
+builder.Services.AddSingleton<ICommandParser, SellItemCommandParser>();
 builder.Services.AddSingleton<GameServerCommandFactory>();
 
 var app = builder.Build();
