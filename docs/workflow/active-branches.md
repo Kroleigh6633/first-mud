@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | creative-pass-7 | ready-to-merge | content-layer-pilot | Creative pass #7: playbook balance sweep + combat-curves tune + playbook spec rewrites | - | content/combat-curves.json, tools/design/playbooks, docs/design, tests/FirstMud.Tests | 2026-04-13 |
+| worktree-agent-a28b3adf | ready-to-merge | main | Auto-quest completion flow playbook + flow evaluator + AutoQuestSimulationService + ASHEN_001 startingZoneId tune | - | tools/design, content/quests.json, docs/design/sim-reports | 2026-04-13 |
 <!-- agents add rows above this line -->

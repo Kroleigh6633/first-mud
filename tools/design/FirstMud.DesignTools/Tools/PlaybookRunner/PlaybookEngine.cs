@@ -47,10 +47,13 @@ public sealed class PlaybookEngine
 
     public PlaybookRunResult Execute(Playbook playbook, int? seedOverride = null)
     {
+        if (string.Equals(playbook.Kind, "flow", StringComparison.OrdinalIgnoreCase))
+            return new AutoQuestFlow.FlowCellEvaluator(_content).Execute(playbook, seedOverride);
+
         var seed = seedOverride ?? playbook.Seed;
         var cells = new List<CellResult>();
 
-        foreach (var combo in Cartesian(playbook.Axes))
+        foreach (var combo in CartesianInt(playbook.Axes))
         {
             var summary = RunCell(playbook, combo, seed);
             var actual  = Classify(summary.WinRate, playbook.ToleranceBands);
@@ -188,14 +191,40 @@ public sealed class PlaybookEngine
 
     // ─── Cartesian product ─────────────────────────────────────────────────
 
-    public static IEnumerable<IReadOnlyDictionary<string, int>> Cartesian(IReadOnlyList<Axis> axes)
+    public static IEnumerable<IReadOnlyDictionary<string, int>> CartesianInt(IReadOnlyList<Axis> axes)
     {
         if (axes.Count == 0) { yield return new Dictionary<string, int>(); yield break; }
         var idx = new int[axes.Count];
         while (true)
         {
             var dict = new Dictionary<string, int>(axes.Count);
-            for (int a = 0; a < axes.Count; a++) dict[axes[a].Name] = axes[a].Values[idx[a]];
+            for (int a = 0; a < axes.Count; a++) dict[axes[a].Name] = axes[a].Values.Ints[idx[a]];
+            yield return dict;
+            int k = axes.Count - 1;
+            while (k >= 0)
+            {
+                idx[k]++;
+                if (idx[k] < axes[k].Values.Length) break;
+                idx[k] = 0; k--;
+            }
+            if (k < 0) yield break;
+        }
+    }
+
+    // Preserved public name for callers that may have relied on the old API.
+    public static IEnumerable<IReadOnlyDictionary<string, int>> Cartesian(IReadOnlyList<Axis> axes)
+        => CartesianInt(axes);
+
+    /// <summary>Cartesian product where axis values may be ints OR strings.
+    /// Cells are dictionaries of axisName → boxed value (int or string).</summary>
+    public static IEnumerable<IReadOnlyDictionary<string, object>> CartesianAny(IReadOnlyList<Axis> axes)
+    {
+        if (axes.Count == 0) { yield return new Dictionary<string, object>(); yield break; }
+        var idx = new int[axes.Count];
+        while (true)
+        {
+            var dict = new Dictionary<string, object>(axes.Count);
+            for (int a = 0; a < axes.Count; a++) dict[axes[a].Name] = axes[a].Values.Get(idx[a]);
             yield return dict;
             int k = axes.Count - 1;
             while (k >= 0)

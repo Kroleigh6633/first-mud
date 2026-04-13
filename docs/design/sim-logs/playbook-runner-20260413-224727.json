@@ -1,0 +1,217 @@
+{
+  "playbookId": "auto-quest-completion",
+  "displayName": "Auto-quest completion stress test",
+  "seed": 42,
+  "rolls": 1,
+  "cells": [
+    {
+      "axis": {
+        "startZoneId": 77417,
+        "questPoolSize": 1
+      },
+      "winRate": 0,
+      "avgRounds": 0,
+      "avgHpPct": 1,
+      "actual": "blocked",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 77417,
+        "questPoolSize": 3
+      },
+      "winRate": 0.6666666666666666,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.3333333333333333,
+      "actual": "broken",
+      "expected": "healthy",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "startZoneId": 77417,
+        "questPoolSize": 10
+      },
+      "winRate": 0.9,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.1,
+      "actual": "rough",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 41717,
+        "questPoolSize": 1
+      },
+      "winRate": 1,
+      "avgRounds": 2.6,
+      "avgHpPct": 0,
+      "actual": "healthy",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 41717,
+        "questPoolSize": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.6,
+      "avgHpPct": 0,
+      "actual": "healthy",
+      "expected": "healthy",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 41717,
+        "questPoolSize": 10
+      },
+      "winRate": 0.9,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.1,
+      "actual": "rough",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 71101,
+        "questPoolSize": 1
+      },
+      "winRate": 1,
+      "avgRounds": 2.6,
+      "avgHpPct": 0,
+      "actual": "healthy",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 71101,
+        "questPoolSize": 3
+      },
+      "winRate": 0.6666666666666666,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.3333333333333333,
+      "actual": "broken",
+      "expected": "healthy",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "startZoneId": 71101,
+        "questPoolSize": 10
+      },
+      "winRate": 0.9,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.1,
+      "actual": "rough",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 2791,
+        "questPoolSize": 1
+      },
+      "winRate": 0,
+      "avgRounds": 0,
+      "avgHpPct": 1,
+      "actual": "blocked",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 2791,
+        "questPoolSize": 3
+      },
+      "winRate": 0.6666666666666666,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.3333333333333333,
+      "actual": "broken",
+      "expected": "healthy",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "startZoneId": 2791,
+        "questPoolSize": 10
+      },
+      "winRate": 0.9,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.1,
+      "actual": "rough",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 23943,
+        "questPoolSize": 1
+      },
+      "winRate": 1,
+      "avgRounds": 2.6,
+      "avgHpPct": 0,
+      "actual": "healthy",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 23943,
+        "questPoolSize": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.6,
+      "avgHpPct": 0,
+      "actual": "healthy",
+      "expected": "healthy",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "startZoneId": 23943,
+        "questPoolSize": 10
+      },
+      "winRate": 0.9,
+      "avgRounds": 2.6,
+      "avgHpPct": 0.1,
+      "actual": "rough",
+      "expected": "",
+      "divergent": false
+    }
+  ],
+  "divergences": [
+    {
+      "axis": {
+        "startZoneId": 77417,
+        "questPoolSize": 3
+      },
+      "expected": "healthy",
+      "actual": "broken",
+      "winRate": 0.6666666666666666
+    },
+    {
+      "axis": {
+        "startZoneId": 71101,
+        "questPoolSize": 3
+      },
+      "expected": "healthy",
+      "actual": "broken",
+      "winRate": 0.6666666666666666
+    },
+    {
+      "axis": {
+        "startZoneId": 2791,
+        "questPoolSize": 3
+      },
+      "expected": "healthy",
+      "actual": "broken",
+      "winRate": 0.6666666666666666
+    }
+  ]
+}
