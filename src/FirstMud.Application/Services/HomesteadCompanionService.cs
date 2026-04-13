@@ -102,8 +102,8 @@ public class HomesteadCompanionService
         var resourceName = resourceType.ToString(); // "Wood", "Stone", etc.
 
         // Check storage capacity (guards increase effective slots)
-        var guardCount = await CountGuardsAsync(homestead.PlayerId, ct);
-        var effectiveSlots = homestead.EffectiveStorageSlots(guardCount);
+        var guardBondLevels = await GetGuardBondLevelsAsync(homestead.PlayerId, ct);
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardBondLevels);
         var storageItems = await _homesteads.GetStorageItemsAsync(homestead.Id, ct);
         if (storageItems.Count >= effectiveSlots)
         {
@@ -172,8 +172,8 @@ public class HomesteadCompanionService
         var itemWorkStr = $"W{workValue}";
 
         // Check storage capacity
-        var guardCount = await CountGuardsAsync(homestead.PlayerId, ct);
-        var effectiveSlots = homestead.EffectiveStorageSlots(guardCount);
+        var guardBondLevels = await GetGuardBondLevelsAsync(homestead.PlayerId, ct);
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardBondLevels);
         var storageItems = await _homesteads.GetStorageItemsAsync(homestead.Id, ct);
 
         // Delete the original item
@@ -215,7 +215,7 @@ public class HomesteadCompanionService
 
     private static string? ProcessGuard(Companion companion)
     {
-        // Guard duty effect (storage bonus) is computed dynamically via CountGuardsAsync.
+        // Guard duty effect (storage bonus) is computed dynamically via GetGuardBondLevelsAsync.
         // No per-tick broadcast needed — assignment message was sent at assignment time.
         return null;
     }
@@ -236,10 +236,12 @@ public class HomesteadCompanionService
         }
     }
 
-    private async Task<int> CountGuardsAsync(Guid playerId, CancellationToken ct)
+    private async Task<IEnumerable<int>> GetGuardBondLevelsAsync(Guid playerId, CancellationToken ct)
     {
         var companions = await _companions.GetByOwnerAsync(playerId, ct);
-        return companions.Count(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone);
+        return companions
+            .Where(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone)
+            .Select(c => c.CurrentLayer);
     }
 }
 
