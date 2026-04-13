@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
@@ -216,6 +217,7 @@ public class FarmingOrchestrator(
                 var resourceNodeRepo  = scope.ServiceProvider.GetRequiredService<IResourceNodeRepository>();
                 var homesteadRepo     = scope.ServiceProvider.GetRequiredService<IHomesteadRepository>();
                 var companionRepo     = scope.ServiceProvider.GetRequiredService<ICompanionRepository>();
+                var content           = scope.ServiceProvider.GetRequiredService<IContentProvider>();
 
                 var player = await playerRepo.GetByIdAsync(playerId, farmCt);
                 if (player is null) break;
@@ -696,12 +698,12 @@ public class FarmingOrchestrator(
                 if (dangerLevel >= 7)
                 {
                     var preInventory = await itemRepo.GetByOwnerAsync(playerId, farmCt);
-                    foreach (var buffName in ConsumableHelper.BuffNames)
+                    foreach (var buffName in ConsumableHelper.BuffNames(content))
                     {
                         var buff = ConsumableHelper.FindBest(preInventory, [buffName]);
                         if (buff is not null)
                         {
-                            var msg = await ConsumableHelper.ApplyAndConsumeAsync(freshPlayer, buff, playerRepo, itemRepo, farmCt);
+                            var msg = await ConsumableHelper.ApplyAndConsumeAsync(freshPlayer, buff, playerRepo, itemRepo, content, farmCt);
                             if (msg is not null)
                                 await hubContext.Clients
                                     .Group(playerId.ToString())
@@ -969,10 +971,10 @@ public class FarmingOrchestrator(
 
                         if (winPlayer.CurrentHp < winPlayer.MaxHp / 2)
                         {
-                            var healer = ConsumableHelper.FindBest(postInventory, ConsumableHelper.HealingPriority);
+                            var healer = ConsumableHelper.FindBest(postInventory, ConsumableHelper.HealingPriority(content));
                             if (healer is not null)
                             {
-                                var msg = await ConsumableHelper.ApplyAndConsumeAsync(winPlayer, healer, playerRepo, itemRepo, farmCt);
+                                var msg = await ConsumableHelper.ApplyAndConsumeAsync(winPlayer, healer, playerRepo, itemRepo, content, farmCt);
                                 if (msg is not null)
                                     await hubContext.Clients
                                         .Group(playerId.ToString())
@@ -993,10 +995,10 @@ public class FarmingOrchestrator(
                         if (winPlayer is not null && winPlayer.Weave.Percentage < 20)
                         {
                             var postInventory2 = await itemRepo.GetByOwnerAsync(playerId, farmCt);
-                            var weaveCons = ConsumableHelper.FindBest(postInventory2, ConsumableHelper.WeavePriority);
+                            var weaveCons = ConsumableHelper.FindBest(postInventory2, ConsumableHelper.WeavePriority(content));
                             if (weaveCons is not null)
                             {
-                                var msg = await ConsumableHelper.ApplyAndConsumeAsync(winPlayer, weaveCons, playerRepo, itemRepo, farmCt);
+                                var msg = await ConsumableHelper.ApplyAndConsumeAsync(winPlayer, weaveCons, playerRepo, itemRepo, content, farmCt);
                                 if (msg is not null)
                                     await hubContext.Clients
                                         .Group(playerId.ToString())

@@ -490,7 +490,7 @@ function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCom
             return (
               <span key={c.material}>
                 {i > 0 && <span style={{ color: '#444444' }}>, </span>}
-                <span style={{ color: ok ? '#00cc88' : '#cc4444' }}>
+                <span style={{ color: ok ? '#00cc88' : '#cc4444' }} title={ok ? 'Available' : `Need ${c.qty - have} more`}>
                   {c.material} {have}/{c.qty}
                 </span>
               </span>

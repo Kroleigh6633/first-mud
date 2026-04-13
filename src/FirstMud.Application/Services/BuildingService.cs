@@ -1,3 +1,4 @@
+using FirstMud.Application.Events;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -15,6 +16,7 @@ public class BuildingService
     private readonly IHomesteadRepository _homesteads;
     private readonly ICompanionRepository _companions;
     private readonly IItemRepository _items;
+    private readonly IGameEventPublisher _events;
     private readonly ILogger<BuildingService> _logger;
 
     // Construction cost in (material-name, quantity) pairs per building type.
@@ -127,12 +129,14 @@ public class BuildingService
         IHomesteadRepository homesteads,
         ICompanionRepository companions,
         IItemRepository items,
+        IGameEventPublisher events,
         ILogger<BuildingService> logger)
     {
         _buildings  = buildings;
         _homesteads = homesteads;
         _companions = companions;
         _items      = items;
+        _events     = events;
         _logger     = logger;
     }
 
@@ -473,6 +477,8 @@ public class BuildingService
     {
         var results = new List<BuildingConstructionResult>();
         var underConstruction = await _buildings.GetUnderConstructionAsync(ct);
+        var ownerByHomestead = new Dictionary<Guid, Guid>();
+        var touchedPlayers = new HashSet<Guid>();
 
         foreach (var building in underConstruction)
         {
@@ -485,10 +491,19 @@ public class BuildingService
             bool completed = building.AdvanceConstruction(progressDelta);
             await _buildings.UpdateAsync(building, ct);
 
+            // Track owning player (batched per homestead) for post-loop city refresh publish.
+            if (!ownerByHomestead.TryGetValue(building.HomesteadId, out var owner))
+            {
+                owner = await GetHomesteadOwnerAsync(building.HomesteadId, ct);
+                ownerByHomestead[building.HomesteadId] = owner;
+            }
+            if (owner != Guid.Empty)
+                touchedPlayers.Add(owner);
+
             if (completed)
             {
-                // Look up homestead owner for the notification
-                Guid playerId = await GetHomesteadOwnerAsync(building.HomesteadId, ct);
+                // Reuse the cached homestead owner lookup from above.
+                Guid playerId = owner;
 
                 if (playerId != Guid.Empty)
                 {
@@ -533,6 +548,10 @@ public class BuildingService
                 }
             }
         }
+
+        // MINOR #9: per-player city refresh for any homestead whose construction advanced.
+        foreach (var playerId in touchedPlayers)
+            await _events.PublishAsync(playerId, new CityStateChangedEvent("ConstructionTick"), ct);
 
         return results;
     }
@@ -781,7 +800,11 @@ public class BuildingService
         }
 
         if (changes > 0)
+        {
             _logger.LogInformation("AutoAssign for {PlayerId}: {Count} companion assignment(s) changed.", playerId, changes);
+            await _events.PublishAsync(playerId, new CompanionStateChangedEvent(Guid.Empty, "AutoAssign"), ct);
+            await _events.PublishAsync(playerId, new CityStateChangedEvent("AutoAssign"), ct);
+        }
 
         return changes;
     }
@@ -802,6 +825,8 @@ public class BuildingService
         {
             assigned.RemoveCompanion(companionId);
             await _buildings.UpdateAsync(assigned, ct);
+            await _events.PublishAsync(playerId, new CityStateChangedEvent("ClearCompanion"), ct);
+            await _events.PublishAsync(playerId, new CompanionStateChangedEvent(companionId, "ClearedFromBuilding"), ct);
         }
     }
 

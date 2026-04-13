@@ -262,9 +262,20 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
   const totalMetal = storageMetal + inventoryMetal;
   const canSmelt = atHomestead && totalMetal > 0 && !!onSmelt;
 
-  const filteredStorageItems = snapshot
-    ? snapshot.items.filter(i => activeTab === 'All' || i.category === activeTab)
+  // Merge smelt tally into storage items so ore counts tick up during animation
+  const mergedStorageItems = snapshot
+    ? snapshot.items.map(i => {
+        if (smeltTally.size > 0) {
+          const bonus = smeltTally.get(i.name) ?? 0;
+          if (bonus > 0) return { ...i, quantity: (i.quantity ?? 1) + bonus };
+        }
+        return i;
+      })
     : [];
+
+  const filteredStorageItems = mergedStorageItems.filter(
+    i => activeTab === 'All' || i.category === activeTab
+  );
 
   const groupedStorageItems = groupItems(filteredStorageItems);
 

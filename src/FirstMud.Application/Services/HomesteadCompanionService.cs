@@ -1,3 +1,4 @@
+using FirstMud.Application.Events;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -15,6 +16,7 @@ public class HomesteadCompanionService
     private readonly ICompanionRepository _companions;
     private readonly IHomesteadRepository _homesteads;
     private readonly IItemRepository _items;
+    private readonly IGameEventPublisher _events;
     private readonly ILogger<HomesteadCompanionService> _logger;
 
     // Resource types available for Aeldran harvesting
@@ -28,11 +30,13 @@ public class HomesteadCompanionService
         ICompanionRepository companions,
         IHomesteadRepository homesteads,
         IItemRepository items,
+        IGameEventPublisher events,
         ILogger<HomesteadCompanionService> logger)
     {
         _companions = companions;
         _homesteads = homesteads;
         _items = items;
+        _events = events;
         _logger = logger;
     }
 
@@ -77,6 +81,10 @@ public class HomesteadCompanionService
                     companion.RecordUsage(3);
                     await _companions.UpdateAsync(companion, ct);
 
+                    // Companion usage/layer progression changed — refresh Companion panel
+                    await _events.PublishAsync(playerId,
+                        new CompanionStateChangedEvent(companion.Id, "DutyTick"), ct);
+
                     if (msg is not null)
                         results.Add(new HomesteadDutyResult(playerId, companion.Name, companion.AssignedDuty.Value, msg));
                 }
@@ -120,6 +128,8 @@ public class HomesteadCompanionService
             {
                 existing.AddQuantity(yield);
                 await _items.UpdateAsync(existing, ct);
+                await _events.PublishAsync(homestead.PlayerId,
+                    new StorageChangedEvent(homestead.Id), ct);
                 return $"Your companion {companion.Name} harvested {resourceName} x{yield} (stored in homestead).";
             }
         }
@@ -137,6 +147,9 @@ public class HomesteadCompanionService
 
         var storageEntry = HomesteadStorageItem.Create(homestead.Id, newItem.Id);
         await _homesteads.AddStorageItemAsync(storageEntry, ct);
+
+        await _events.PublishAsync(homestead.PlayerId,
+            new StorageChangedEvent(homestead.Id), ct);
 
         return $"Your companion {companion.Name} harvested {resourceName} x{yield} (stored in homestead).";
     }
@@ -208,6 +221,10 @@ public class HomesteadCompanionService
                 await _homesteads.AddStorageItemAsync(storageEntry, ct);
             }
         }
+
+        // Salvager removed an item and added yield — storage contents shifted either way.
+        await _events.PublishAsync(homestead.PlayerId,
+            new StorageChangedEvent(homestead.Id), ct);
 
         // No salvage XP — companion does the work
         return $"Your companion {companion.Name} salvaged {itemName} {itemWorkStr} → {baseYield.material} x{baseYield.qty} (stored in homestead).";

@@ -1,4 +1,5 @@
 using FirstMud.Application;
+using FirstMud.Application.Events;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Interfaces;
@@ -6,6 +7,8 @@ using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Handlers;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
+using FirstMud.GameServer.Services.EventOrchestrators;
+using FirstMud.GameServer.Services.Snapshots;
 using FirstMud.Infrastructure;
 using FirstMud.Infrastructure.Data;
 using FirstMud.Infrastructure.Neo4j;
@@ -42,6 +45,26 @@ builder.Services.AddScoped<CommandDispatcher>();
 builder.Services.AddScoped<WorldStateService>();
 builder.Services.AddScoped<GameNotificationService>();
 builder.Services.AddScoped<StartupSeeder>();
+
+// Snapshot services — single source of truth for building Inventory/Storage/City/Companion payloads
+builder.Services.AddScoped<InventorySnapshotService>();
+builder.Services.AddScoped<StorageSnapshotService>();
+builder.Services.AddScoped<CitySnapshotService>();
+builder.Services.AddScoped<CompanionListSnapshotService>();
+
+// Event bus orchestrators — subscribe to integration events and broadcast refreshed snapshots
+builder.Services.AddScoped<InventoryRefreshOrchestrator>();
+builder.Services.AddScoped<StorageRefreshOrchestrator>();
+builder.Services.AddScoped<CompanionListOrchestrator>();
+builder.Services.AddScoped<CityRefreshOrchestrator>();
+builder.Services.AddScoped<IGameEventSubscriber<ItemConsumedEvent>>(sp => sp.GetRequiredService<InventoryRefreshOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<ItemAddedToInventoryEvent>>(sp => sp.GetRequiredService<InventoryRefreshOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<EquipmentChangedEvent>>(sp => sp.GetRequiredService<InventoryRefreshOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<ItemConsumedEvent>>(sp => sp.GetRequiredService<StorageRefreshOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<StorageChangedEvent>>(sp => sp.GetRequiredService<StorageRefreshOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<CompanionStateChangedEvent>>(sp => sp.GetRequiredService<CompanionListOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<CompanionStateChangedEvent>>(sp => sp.GetRequiredService<CityRefreshOrchestrator>());
+builder.Services.AddScoped<IGameEventSubscriber<CityStateChangedEvent>>(sp => sp.GetRequiredService<CityRefreshOrchestrator>());
 
 // Shared combat utilities and farming orchestrator
 builder.Services.AddScoped<CombatHelpers>();

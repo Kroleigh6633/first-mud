@@ -195,7 +195,7 @@ public class ViewCityCommandHandler(
 /// Shared helper that builds the building DTO list for CityView payloads.
 /// Housing buildings (Huts) include a residents list; production buildings include a single worker.
 /// </summary>
-internal static class CityViewBuilder
+public static class CityViewBuilder
 {
     public static async Task<List<object>> BuildDtosAsync(
         IReadOnlyList<FirstMud.Domain.Entities.HomesteadBuilding> buildings,

@@ -1,3 +1,4 @@
+using FirstMud.Application.Events;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
@@ -42,7 +43,7 @@ public class ActivateCompanionCommandHandler(
     ICompanionRepository companionRepository,
     BuildingService buildingService,
     GameNotificationService notificationService,
-    IHubContext<GameHub> hubContext) : ICommandHandler<ActivateCompanionCommand>
+    IGameEventPublisher eventPublisher) : ICommandHandler<ActivateCompanionCommand>
 {
     public async Task<CommandResult> HandleAsync(ActivateCompanionCommand cmd, CancellationToken ct)
     {
@@ -88,7 +89,9 @@ public class ActivateCompanionCommandHandler(
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} joins your active party. (Layer {companion.CurrentLayer} {companion.Type})", ct);
 
-        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
+        // Companion-specific active-state change; BuildingService emits the CityStateChangedEvent.
+        await eventPublisher.PublishAsync(cmd.PlayerId,
+            new CompanionStateChangedEvent(companion.Id, "Activated"), ct);
 
         return new CommandResult(true, $"{companion.Name} activated.");
     }
@@ -99,7 +102,7 @@ public class DeactivateCompanionCommandHandler(
     ICompanionRepository companionRepository,
     BuildingService buildingService,
     GameNotificationService notificationService,
-    IHubContext<GameHub> hubContext) : ICommandHandler<DeactivateCompanionCommand>
+    IGameEventPublisher eventPublisher) : ICommandHandler<DeactivateCompanionCommand>
 {
     public async Task<CommandResult> HandleAsync(DeactivateCompanionCommand cmd, CancellationToken ct)
     {
@@ -129,7 +132,9 @@ public class DeactivateCompanionCommandHandler(
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} returns to the roster and has been assigned to city duty.", ct);
 
-        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
+        // Companion-specific active-state change; BuildingService emits the CityStateChangedEvent.
+        await eventPublisher.PublishAsync(cmd.PlayerId,
+            new CompanionStateChangedEvent(companion.Id, "Deactivated"), ct);
 
         return new CommandResult(true, $"{companion.Name} deactivated.");
     }
@@ -203,7 +208,7 @@ public class RecallCompanionCommandHandler(
     ICompanionRepository companionRepository,
     BuildingService buildingService,
     GameNotificationService notificationService,
-    IHubContext<GameHub> hubContext) : ICommandHandler<RecallCompanionCommand>
+    IGameEventPublisher eventPublisher) : ICommandHandler<RecallCompanionCommand>
 {
     public async Task<CommandResult> HandleAsync(RecallCompanionCommand cmd, CancellationToken ct)
     {
@@ -227,7 +232,8 @@ public class RecallCompanionCommandHandler(
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} has been recalled from {prevDuty} duty and is ready to adventure.", ct);
 
-        await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
+        await eventPublisher.PublishAsync(cmd.PlayerId,
+            new CompanionStateChangedEvent(companion.Id, "Recalled"), ct);
 
         return new CommandResult(true, $"{companion.Name} recalled from homestead.");
     }

@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -5,61 +6,41 @@ using FirstMud.Domain.Interfaces;
 namespace FirstMud.GameServer.Services;
 
 /// <summary>
-/// Pure static helpers for finding and consuming items during auto-farm.
+/// Helpers for finding and consuming items during auto-farm.
 ///
-/// Extracted from AutoFarmCommandHandler where they lived as private static
-/// methods — giving them a named home and making them testable.
+/// Effect data (what potions exist, what they do, priority ordering) is
+/// now loaded from content/consumables.json via IContentProvider. This
+/// class only owns the "apply to player + persist + format message"
+/// glue that can't reasonably live in a JSON file.
 /// </summary>
 public static class ConsumableHelper
 {
-    public static readonly string[] HealingPriority =
-    [
-        "minor healing draught",
-        "healing potion",
-        "greater healing elixir"
-    ];
+    public const string HealingGroup = "Healing";
+    public const string WeaveGroup   = "Weave";
+    public const string BuffGroup    = "Buff";
 
-    public static readonly string[] WeavePriority =
-    [
-        "weave tincture",
-        "weave elixir"
-    ];
+    /// <summary>
+    /// Snake-order list of healing consumable match-tokens, low-to-high potency.
+    /// Backed by the content provider so designers can edit content/consumables.json.
+    /// </summary>
+    public static string[] HealingPriority(IContentProvider content) =>
+        content.ConsumablesByGroup(HealingGroup).Select(c => c.MatchToken).ToArray();
 
-    public static readonly string[] BuffNames =
-    [
-        "fortitude brew",
-        "speed draught",
-        "strength tonic"
-    ];
+    public static string[] WeavePriority(IContentProvider content) =>
+        content.ConsumablesByGroup(WeaveGroup).Select(c => c.MatchToken).ToArray();
 
-    private sealed record ConsumableEffect(
-        string EffectType,
-        int Amount,
-        string? BuffKey = null,
-        float BuffValue = 0f);
-
-    private static ConsumableEffect? ResolveEffect(string name)
-    {
-        var n = name.ToLowerInvariant();
-        if (n.Contains("minor healing draught"))  return new ConsumableEffect("Heal", 30);
-        if (n.Contains("healing potion"))         return new ConsumableEffect("Heal", 60);
-        if (n.Contains("greater healing elixir")) return new ConsumableEffect("Heal", 100);
-        if (n.Contains("weave tincture"))         return new ConsumableEffect("RestoreWeave", 20);
-        if (n.Contains("weave elixir"))           return new ConsumableEffect("RestoreWeave", 50);
-        if (n.Contains("fortitude brew"))         return new ConsumableEffect("Buff", 0, "MaxHpBonus", 0.10f);
-        if (n.Contains("speed draught"))          return new ConsumableEffect("Buff", 0, "SpeedBonus", 0.20f);
-        if (n.Contains("strength tonic"))         return new ConsumableEffect("Buff", 0, "StrikeDamageBonus", 0.15f);
-        return null;
-    }
+    public static string[] BuffNames(IContentProvider content) =>
+        content.ConsumablesByGroup(BuffGroup).Select(c => c.MatchToken).ToArray();
 
     public static async Task<string?> ApplyAndConsumeAsync(
         Player player,
         Item item,
         IPlayerRepository playerRepo,
         IItemRepository itemRepo,
+        IContentProvider content,
         CancellationToken ct)
     {
-        var effect = ResolveEffect(item.Name);
+        var effect = content.ResolveConsumable(item.Name);
         if (effect is null) return null;
 
         string message;

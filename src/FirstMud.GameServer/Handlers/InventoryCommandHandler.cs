@@ -1,8 +1,10 @@
+using FirstMud.Application.Events;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Services;
+using FirstMud.GameServer.Services.Snapshots;
 
 namespace FirstMud.GameServer.Handlers;
 
@@ -64,7 +66,8 @@ public class OpenInventoryCommandHandler(
 public class EquipCommandHandler(
     IPlayerRepository playerRepository,
     IItemRepository itemRepository,
-    GameNotificationService notificationService) : ICommandHandler<EquipCommand>
+    GameNotificationService notificationService,
+    IGameEventPublisher eventPublisher) : ICommandHandler<EquipCommand>
 {
     public async Task<CommandResult> HandleAsync(EquipCommand cmd, CancellationToken ct)
     {
@@ -95,21 +98,21 @@ public class EquipCommandHandler(
         await notificationService.SendMessageAsync(cmd.PlayerId, "system", $"You equipped {item.DisplayName}.", ct);
         await notificationService.SendEventAsync(cmd.PlayerId, "EquipmentChanged", equippedPayload, ct);
 
+        // Inventory & Crafting panels derive availability from equipped state — refresh both.
+        await eventPublisher.PublishAsync(cmd.PlayerId,
+            new EquipmentChangedEvent(EquippedItemId: item.Id, UnequippedItemId: previousId), ct);
+
         return new CommandResult(true, $"Equipped {item.DisplayName}.", equippedPayload);
     }
 }
 
 public class LockItemCommandHandler(
-    IPlayerRepository playerRepository,
     IItemRepository itemRepository,
-    GameNotificationService notificationService) : ICommandHandler<LockItemCommand>
+    GameNotificationService notificationService,
+    InventorySnapshotService inventorySnapshots) : ICommandHandler<LockItemCommand>
 {
     public async Task<CommandResult> HandleAsync(LockItemCommand cmd, CancellationToken ct)
     {
-        var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
-        if (player is null)
-            return new CommandResult(false, "Player not found.");
-
         var item = await itemRepository.GetByIdAsync(cmd.ItemId, ct);
         if (item is null || item.OwnerId != cmd.PlayerId)
             return new CommandResult(false, "Item not found in your inventory.");
@@ -119,43 +122,7 @@ public class LockItemCommandHandler(
 
         var lockState = item.IsLocked ? "locked" : "unlocked";
         await notificationService.SendMessageAsync(cmd.PlayerId, "system", $"{item.DisplayName} is now {lockState}.", ct);
-
-        // Refresh inventory so the client reflects the updated lock state
-        var items = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-        var payload = new
-        {
-            PlayerId = player.Id,
-            player.Name,
-            ActiveCompanionIds = player.ActiveCompanionIds.Select(id => id.ToString()).ToList(),
-            CraftingSkill = player.CraftingSkill,
-            SalvageSkill = player.SalvageSkill,
-            AutoSalvageWeaponThreshold = player.AutoSalvageWeaponThreshold,
-            AutoSalvageArmorThreshold = player.AutoSalvageArmorThreshold,
-            EquippedItems = player.EquippedItems.ToDictionary(
-                kv => kv.Key.ToString(),
-                kv => kv.Value.ToString()),
-            Items = items.Select(i => new
-            {
-                Id = i.Id.ToString(),
-                i.Name,
-                i.Description,
-                Workmanship = i.Workmanship.Value,
-                Category = i.Category.ToString(),
-                Slot = i.Slot.ToString(),
-                i.Quantity,
-                i.IsStackable,
-                i.IsLocked,
-                i.IsUnstable,
-                MaxImbueSlots = i.MaxImbueSlots,
-                Imbues = i.Imbues.Select(imbue => new
-                {
-                    Type = imbue.Type.ToString(),
-                    imbue.Power
-                }).ToList()
-            }).ToList()
-        };
-
-        await notificationService.SendEventAsync(cmd.PlayerId, "Inventory", payload, ct);
+        await inventorySnapshots.BroadcastAsync(cmd.PlayerId, ct);
 
         return new CommandResult(true, $"{item.Name} {lockState}.", new { ItemId = item.Id, item.IsLocked });
     }
@@ -163,7 +130,8 @@ public class LockItemCommandHandler(
 
 public class UnequipCommandHandler(
     IPlayerRepository playerRepository,
-    GameNotificationService notificationService) : ICommandHandler<UnequipCommand>
+    GameNotificationService notificationService,
+    IGameEventPublisher eventPublisher) : ICommandHandler<UnequipCommand>
 {
     public async Task<CommandResult> HandleAsync(UnequipCommand cmd, CancellationToken ct)
     {
@@ -192,6 +160,9 @@ public class UnequipCommandHandler(
             RemovedSlot = cmd.Slot
         };
         await notificationService.SendEventAsync(cmd.PlayerId, "EquipmentChanged", unequipPayload, ct);
+
+        await eventPublisher.PublishAsync(cmd.PlayerId,
+            new EquipmentChangedEvent(EquippedItemId: null, UnequippedItemId: removedId), ct);
 
         return new CommandResult(true, $"Unequipped {cmd.Slot} item.");
     }

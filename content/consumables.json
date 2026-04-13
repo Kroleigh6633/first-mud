@@ -1,0 +1,75 @@
+{
+  "$schema": "./schemas/consumables.schema.json",
+  "consumables": [
+    {
+      "id": "minor-healing-draught",
+      "matchToken": "minor healing draught",
+      "effectType": "Heal",
+      "amount": 30,
+      "priorityGroup": "Healing",
+      "priorityRank": 0
+    },
+    {
+      "id": "healing-potion",
+      "matchToken": "healing potion",
+      "effectType": "Heal",
+      "amount": 60,
+      "priorityGroup": "Healing",
+      "priorityRank": 1
+    },
+    {
+      "id": "greater-healing-elixir",
+      "matchToken": "greater healing elixir",
+      "effectType": "Heal",
+      "amount": 100,
+      "priorityGroup": "Healing",
+      "priorityRank": 2
+    },
+    {
+      "id": "weave-tincture",
+      "matchToken": "weave tincture",
+      "effectType": "RestoreWeave",
+      "amount": 20,
+      "priorityGroup": "Weave",
+      "priorityRank": 0
+    },
+    {
+      "id": "weave-elixir",
+      "matchToken": "weave elixir",
+      "effectType": "RestoreWeave",
+      "amount": 50,
+      "priorityGroup": "Weave",
+      "priorityRank": 1
+    },
+    {
+      "id": "fortitude-brew",
+      "matchToken": "fortitude brew",
+      "effectType": "Buff",
+      "amount": 0,
+      "buffKey": "MaxHpBonus",
+      "buffValue": 0.10,
+      "priorityGroup": "Buff",
+      "priorityRank": 0
+    },
+    {
+      "id": "speed-draught",
+      "matchToken": "speed draught",
+      "effectType": "Buff",
+      "amount": 0,
+      "buffKey": "SpeedBonus",
+      "buffValue": 0.20,
+      "priorityGroup": "Buff",
+      "priorityRank": 1
+    },
+    {
+      "id": "strength-tonic",
+      "matchToken": "strength tonic",
+      "effectType": "Buff",
+      "amount": 0,
+      "buffKey": "StrikeDamageBonus",
+      "buffValue": 0.15,
+      "priorityGroup": "Buff",
+      "priorityRank": 2
+    }
+  ]
+}

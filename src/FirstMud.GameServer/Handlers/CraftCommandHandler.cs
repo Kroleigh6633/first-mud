@@ -1,3 +1,4 @@
+using FirstMud.Application.Events;
 using FirstMud.Application.Models;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
@@ -25,6 +26,7 @@ public class CraftCommandHandler(
     IItemRepository itemRepository,
     IHomesteadRepository homesteadRepository,
     IHubContext<GameHub> hubContext,
+    IGameEventPublisher eventPublisher,
     ILogger<CraftCommandHandler> logger) : ICommandHandler<CraftCommand>
 {
     public async Task<CommandResult> HandleAsync(CraftCommand cmd, CancellationToken ct)
@@ -89,7 +91,11 @@ public class CraftCommandHandler(
 
                 try
                 {
+                    bool fromStorage = item.OwnerId is null;
                     await ConsumeItemUnitsAsync(item, unitsToConsume, homestead, ct);
+                    await eventPublisher.PublishAsync(cmd.PlayerId,
+                        new ItemConsumedEvent(item.Id, unitsToConsume, fromStorage, fromStorage ? homestead?.Id : null),
+                        ct);
                 }
                 catch (Exception ex)
                 {
@@ -104,7 +110,13 @@ public class CraftCommandHandler(
                 {
                     var taperItem = await itemRepository.GetByIdAsync(cmd.TaperId.Value, ct);
                     if (taperItem is not null)
+                    {
+                        bool fromStorage = taperItem.OwnerId is null;
                         await ConsumeItemUnitsAsync(taperItem, 1, homestead, ct);
+                        await eventPublisher.PublishAsync(cmd.PlayerId,
+                            new ItemConsumedEvent(taperItem.Id, 1, fromStorage, fromStorage ? homestead?.Id : null),
+                            ct);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -145,6 +157,11 @@ public class CraftCommandHandler(
 
         if (result.ProducedItem is not null)
         {
+            // Produced items always land in the player's inventory (OwnerId = playerId) —
+            // notify the inventory orchestrator so the panel updates without a manual refetch.
+            await eventPublisher.PublishAsync(cmd.PlayerId,
+                new ItemAddedToInventoryEvent(result.ProducedItem.Id), ct);
+
             logger.LogInformation(
                 "Player {PlayerId} crafted {ItemName} (W{Work}) via recipe {RecipeId} — {Outcome}",
                 cmd.PlayerId, result.ProducedItem.Name, result.ProducedItem.Workmanship.Value,

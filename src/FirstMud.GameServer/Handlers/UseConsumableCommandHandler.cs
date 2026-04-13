@@ -1,3 +1,5 @@
+using FirstMud.Application.Content;
+using FirstMud.Application.Events;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -9,7 +11,9 @@ namespace FirstMud.GameServer.Handlers;
 public class UseConsumableCommandHandler(
     IPlayerRepository playerRepository,
     IItemRepository itemRepository,
-    GameNotificationService notificationService) : ICommandHandler<UseConsumableCommand>
+    GameNotificationService notificationService,
+    IGameEventPublisher eventPublisher,
+    IContentProvider content) : ICommandHandler<UseConsumableCommand>
 {
     public async Task<CommandResult> HandleAsync(UseConsumableCommand cmd, CancellationToken ct)
     {
@@ -24,7 +28,7 @@ public class UseConsumableCommandHandler(
         if (item.Category != ItemCategory.Consumable)
             return new CommandResult(false, $"{item.Name} is not a consumable.");
 
-        var effect = ResolveEffect(item.Name);
+        var effect = content.ResolveConsumable(item.Name);
         if (effect is null)
             return new CommandResult(false, $"{item.Name} has no known effect.");
 
@@ -43,6 +47,11 @@ public class UseConsumableCommandHandler(
             await itemRepository.DeleteAsync(item.Id, ct);
         }
 
+        // Consumables always come from inventory (OwnerId == playerId), so FromStorage = false.
+        // The InventoryRefreshOrchestrator will re-push the Inventory snapshot.
+        await eventPublisher.PublishAsync(cmd.PlayerId,
+            new ItemConsumedEvent(item.Id, 1, FromStorage: false), ct);
+
         await notificationService.SendMessageAsync(cmd.PlayerId, "system", message, ct);
 
         // Refresh world-state so HP/Weave bars update immediately
@@ -59,29 +68,12 @@ public class UseConsumableCommandHandler(
         return new CommandResult(true, message);
     }
 
-    // ─── Effect resolution ────────────────────────────────────────────────────
+    // ─── Effect application ───────────────────────────────────────────────────
+    // Effect resolution is now data-driven (see content/consumables.json,
+    // loaded via IContentProvider). Application still lives here because it
+    // mutates the Player aggregate and formats user-facing strings.
 
-    private sealed record ConsumableEffect(
-        string EffectType,   // Heal | RestoreWeave | Buff
-        int Amount,
-        string? BuffKey = null,
-        float BuffValue = 0f);
-
-    private static ConsumableEffect? ResolveEffect(string name)
-    {
-        var n = name.ToLowerInvariant();
-        if (n.Contains("minor healing draught"))    return new ConsumableEffect("Heal", 30);
-        if (n.Contains("healing potion"))           return new ConsumableEffect("Heal", 60);
-        if (n.Contains("greater healing elixir"))   return new ConsumableEffect("Heal", 100);
-        if (n.Contains("weave tincture"))           return new ConsumableEffect("RestoreWeave", 20);
-        if (n.Contains("weave elixir"))             return new ConsumableEffect("RestoreWeave", 50);
-        if (n.Contains("fortitude brew"))           return new ConsumableEffect("Buff", 0, "MaxHpBonus", 0.10f);
-        if (n.Contains("speed draught"))            return new ConsumableEffect("Buff", 0, "SpeedBonus", 0.20f);
-        if (n.Contains("strength tonic"))           return new ConsumableEffect("Buff", 0, "StrikeDamageBonus", 0.15f);
-        return null;
-    }
-
-    private static string ApplyEffect(Domain.Entities.Player player, ConsumableEffect effect)
+    private static string ApplyEffect(Domain.Entities.Player player, ConsumableDefinition effect)
     {
         switch (effect.EffectType)
         {

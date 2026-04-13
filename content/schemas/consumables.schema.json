@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Consumables",
+  "description": "Data-driven consumable definitions for first-mud. Loaded at startup by ContentProvider.",
+  "type": "object",
+  "required": ["consumables"],
+  "properties": {
+    "consumables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "matchToken", "effectType"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identifier (kebab-case). Not currently matched against item names; use matchToken for that."
+          },
+          "matchToken": {
+            "type": "string",
+            "description": "Lowercase substring matched against Item.Name. The first consumable whose token is contained in the item name (in array order) wins."
+          },
+          "effectType": {
+            "type": "string",
+            "enum": ["Heal", "RestoreWeave", "Buff"]
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "HP or Weave amount restored. Ignored for Buff."
+          },
+          "buffKey": {
+            "type": "string",
+            "enum": ["MaxHpBonus", "SpeedBonus", "StrikeDamageBonus"],
+            "description": "Required when effectType=Buff."
+          },
+          "buffValue": {
+            "type": "number",
+            "description": "Buff magnitude (0.10 = +10%). Required when effectType=Buff."
+          },
+          "priorityGroup": {
+            "type": "string",
+            "enum": ["Healing", "Weave", "Buff"],
+            "description": "Which auto-farm priority list this belongs to."
+          },
+          "priorityRank": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Sort order within priorityGroup. Higher = preferred by auto-farm."
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "effectType": { "const": "Buff" } } },
+            "then": { "required": ["buffKey", "buffValue"] }
+          }
+        ]
+      }
+    }
+  }
+}
