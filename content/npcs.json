@@ -191,6 +191,44 @@
       ]
     },
     {
+      "id": "tarrin-vale",
+      "displayName": "Tarrin Vale",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "shopkeeper",
+      "shortDescription": "Portmere dockside general-goods merchant; weighs coins on a palm-scale before accepting them.",
+      "voiceTells": [
+        "Tests every gold piece by weight in his palm, never by eye.",
+        "Quotes two prices: a 'door price' and a 'back-room price', always the same number.",
+        "Keeps a ledger of loaned-out umbrellas he has never recovered."
+      ]
+    },
+    {
+      "id": "ormund-gresh",
+      "displayName": "Ormund Gresh",
+      "factionId": "HouseCaervorn",
+      "homeZoneId": "aeldran-1-caervorn-highlands",
+      "role": "shopkeeper",
+      "shortDescription": "Caervorn highland quartermaster; sells ores and iron goods at the Marchkeep cross-roads.",
+      "voiceTells": [
+        "Taps the counter three times before quoting a price — old quartermaster's tic.",
+        "Refers to every ingot as 'a brick of honest work.'",
+        "Refuses to deal before midday — claims iron 'dreams' until the sun is up."
+      ]
+    },
+    {
+      "id": "sable-meir",
+      "displayName": "Sable Meir",
+      "factionId": "ThornwoodCovens",
+      "homeZoneId": "aeldran-2-thornwood",
+      "role": "shopkeeper",
+      "shortDescription": "Thornwood herb-stall keeper and reagent broker; knows which roots the Coven will and will not buy.",
+      "voiceTells": [
+        "Labels every jar twice — once in common, once in a cipher only she can read.",
+        "Refuses to sell the same herb twice in one day to the same customer.",
+        "Sings very quietly when weighing out Moonbloom; will stop instantly if noticed."
+      ]
+    },
+    {
       "id": "lirya-vane",
       "displayName": "Senior Factor Lirya Vane",
       "factionId": "EmeraldCompact",

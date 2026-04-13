@@ -57,6 +57,8 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.TilesDiscovered)
             .HasDefaultValue(0);
         builder.Property(p => p.CraftingSeed);
+        builder.Property(p => p.Gold)
+            .HasDefaultValue(0);
 
         builder.Property(p => p.CurrentHp);
         builder.Property(p => p.MaxHp);

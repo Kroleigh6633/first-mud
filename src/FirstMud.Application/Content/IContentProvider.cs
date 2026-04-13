@@ -186,6 +186,20 @@ public interface IContentProvider
 
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
+    // ─── Trade ───────────────────────────────────────────────────────────────
+
+    /// <summary>Per-item base gold-value table loaded from content/item-values.json.</summary>
+    ItemValuesDefinition ItemValues { get; }
+
+    /// <summary>Trade spread + gold curve coefficients loaded from content/trade-curves.json.</summary>
+    TradeCurvesDefinition TradeCurves { get; }
+
+    /// <summary>All vendor definitions, in file order.</summary>
+    IReadOnlyList<VendorDefinition> AllVendors();
+
+    /// <summary>Lookup a vendor by its NPC id. Returns null if unknown.</summary>
+    VendorDefinition? GetVendor(string npcId);
+
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>
     void Reload();
 }

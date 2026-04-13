@@ -151,6 +151,9 @@ builder.Services.AddScoped<ICommandHandler<PracticeEnchantingCommand>, PracticeE
 builder.Services.AddScoped<ICommandHandler<AutoProgressionStartCommand>, AutoProgressionStartCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<AutoProgressionStopCommand>, AutoProgressionStopCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<AutoProgressionStatusCommand>, AutoProgressionStatusCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ViewVendorCommand>, ViewVendorCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<BuyItemCommand>, BuyItemCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<SellItemCommand>, SellItemCommandHandler>();
 
 // SignalR command parsing: one ICommandParser per command name, plus the
 // registry-based dispatcher. Add a new command = add one parser + one line here.
@@ -204,6 +207,9 @@ builder.Services.AddSingleton<ICommandParser, ViewCityCommandParser>();
 builder.Services.AddSingleton<ICommandParser, BuildStaffEverythingCommandParser>();
 builder.Services.AddSingleton<ICommandParser, PracticeEnchantingCommandParser>();
 builder.Services.AddSingleton<ICommandParser, AutoProgressionCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ViewVendorCommandParser>();
+builder.Services.AddSingleton<ICommandParser, BuyItemCommandParser>();
+builder.Services.AddSingleton<ICommandParser, SellItemCommandParser>();
 builder.Services.AddSingleton<GameServerCommandFactory>();
 
 var app = builder.Build();

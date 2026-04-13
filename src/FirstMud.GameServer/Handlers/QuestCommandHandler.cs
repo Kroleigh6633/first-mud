@@ -173,6 +173,7 @@ public class AcceptQuestCommandHandler(
 public class CompleteQuestCommandHandler(
     IPlayerRepository playerRepository,
     QuestService questService,
+    IContentProvider contentProvider,
     IHubContext<GameHub> hubContext) : ICommandHandler<CompleteQuestCommand>
 {
     public async Task<CommandResult> HandleAsync(CompleteQuestCommand cmd, CancellationToken ct)
@@ -212,6 +213,24 @@ public class CompleteQuestCommandHandler(
                         timestamp = DateTime.UtcNow.ToString("O"),
                         category = "quest",
                         text = $"You gained {questXp} experience!"
+                    }, ct);
+            }
+
+            // Quest gold reward — base + per-rep-point bonus (content-tunable).
+            var goldCurve = contentProvider.TradeCurves.Gold;
+            var goldReward = (int)Math.Round(goldCurve.QuestRewardBase
+                + goldCurve.QuestRewardPerReputationPoint * result.ReputationGained);
+            if (goldReward > 0)
+            {
+                player.AddGold(goldReward);
+                await playerRepository.UpdateAsync(player, ct);
+                await hubContext.Clients
+                    .Group(cmd.PlayerId.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category = "quest",
+                        text = $"You receive {goldReward} gold."
                     }, ct);
             }
 

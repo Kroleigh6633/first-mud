@@ -46,6 +46,9 @@ public class Player
     // Portal home — saved position to return to after visiting homestead
     public Position? SavedReturnPosition { get; private set; }
 
+    // Gold pouch — currency for the trade system (stage 1).
+    public int Gold { get; private set; }
+
     // Carry capacity
     private int _maxInventorySlots = 40;
     public int MaxInventorySlots => _maxInventorySlots;
@@ -371,6 +374,25 @@ public class Player
         }
 
         return null;
+    }
+
+    /// <summary>Credits the player's gold pouch. Negative amounts are treated as zero (use <see cref="TrySpendGold"/> to debit).</summary>
+    public void AddGold(int amount)
+    {
+        if (amount <= 0) return;
+        Gold += amount;
+    }
+
+    /// <summary>
+    /// Attempts to debit <paramref name="amount"/> gold. Returns false if
+    /// insufficient funds; in that case Gold is unchanged.
+    /// </summary>
+    public bool TrySpendGold(int amount)
+    {
+        if (amount <= 0) return true;
+        if (Gold < amount) return false;
+        Gold -= amount;
+        return true;
     }
 
     public void GainSalvageSkillXp(int amount)

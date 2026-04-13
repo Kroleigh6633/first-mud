@@ -36,6 +36,11 @@ public static class ServiceExtensions
         services.AddScoped<HomesteadCompanionService>();
         services.AddScoped<SmeltService>();
         services.AddScoped<BuildingService>();
+        // Live vendor stock must survive across scoped requests; keep the
+        // mutable stock dictionary in a singleton holder so per-request
+        // scoped TradeService instances share it.
+        services.AddSingleton<TradeStockStore>();
+        services.AddScoped<TradeService>();
         return services;
     }
 }

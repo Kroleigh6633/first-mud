@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "vendors",
+  "type": "object",
+  "required": ["vendors"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "vendors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["npcId", "stock"],
+        "properties": {
+          "npcId": { "type": "string", "minLength": 1 },
+          "displayName": { "type": "string" },
+          "buysCategories": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "stock": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["itemName", "category", "quantity"],
+              "properties": {
+                "itemName": { "type": "string", "minLength": 1 },
+                "category": { "type": "string" },
+                "quantity": { "type": "integer", "minimum": 0 },
+                "workmanship": { "type": "integer", "minimum": 1, "maximum": 10 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

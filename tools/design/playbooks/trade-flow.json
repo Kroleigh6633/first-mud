@@ -1,0 +1,30 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "trade-flow",
+  "displayName": "Trade flow — gold in vs gold out per hour",
+  "description": "STAGE 1 SEED. Measures gold-in / gold-out per hour across playstyle and hours-played. Expected bands: balanced → net positive ~50g/hour; craft-heavy → net positive ~100g/hour; enchanting-focused → net near zero (buying reagents offsets selling). Currently descriptive only — the playbook runner infrastructure supports kind=combat and kind=crafting; an economy evaluator is stage-2 work. This file documents expected bands so that evaluator can be written against them.",
+  "kind": "economy",
+  "holdouts": {},
+  "axes": [
+    { "name": "playstyle", "values": [1, 2, 3] },
+    { "name": "playerHours", "values": [1, 5, 10, 20, 40] }
+  ],
+  "rolls": 1,
+  "seed": 42,
+  "axisLegend": {
+    "playstyle": {
+      "1": "balanced (combat + quests + occasional crafting)",
+      "2": "craft-heavy (sells surplus mats to vendors)",
+      "3": "enchanting-focused (buys reagents)"
+    }
+  },
+  "expectedGoldPerHour": {
+    "cells": [
+      { "playstyle": 1, "expectedNetPerHour": [30, 70],    "comment": "balanced" },
+      { "playstyle": 2, "expectedNetPerHour": [80, 140],   "comment": "craft-heavy (seller)" },
+      { "playstyle": 3, "expectedNetPerHour": [-20, 20],   "comment": "enchanting-focused" }
+    ]
+  },
+  "expectedDistribution": { "cells": [] },
+  "toleranceBands": {}
+}

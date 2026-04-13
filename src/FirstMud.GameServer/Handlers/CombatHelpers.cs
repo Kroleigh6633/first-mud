@@ -392,6 +392,17 @@ public class CombatHelpers(
             ownedItems = await itemRepository.GetByOwnerAsync(playerId, ct);
         }
 
+        // Gold drop is independent of item drop — even if inventory is full
+        // the player still gets coin.
+        var goldAmount = lootService.RollGoldDrop(dangerLevel);
+        if (goldAmount > 0)
+        {
+            player.AddGold(goldAmount);
+            await playerRepository.UpdateAsync(player, ct);
+            await notificationService.SendMessageAsync(
+                playerId, "loot", $"You pick up {goldAmount} gold.", ct);
+        }
+
         var result = await lootService.RollLootDropAsync(
             dangerLevel,
             playerId,

@@ -65,3 +65,8 @@ public record AutoProgressionStartCommand(Guid PlayerId) : IGameCommand;
 public record AutoProgressionStopCommand(Guid PlayerId) : IGameCommand;
 /// <summary>Query current auto-progression session status (active, binding constraint, reliability).</summary>
 public record AutoProgressionStatusCommand(Guid PlayerId) : IGameCommand;
+
+// Trade (stage 1)
+public record ViewVendorCommand(Guid PlayerId, string NpcId) : IGameCommand;
+public record BuyItemCommand(Guid PlayerId, string NpcId, string ItemName, int Quantity) : IGameCommand;
+public record SellItemCommand(Guid PlayerId, string NpcId, string ItemName, int Quantity) : IGameCommand;
