@@ -29,6 +29,9 @@ yarn-error.log*
 ## Docker volumes (local)
 docker/volumes/
 
+## Claude worktrees (embedded repos)
+.claude/worktrees/
+
 ## OS
 .DS_Store
 Thumbs.db
