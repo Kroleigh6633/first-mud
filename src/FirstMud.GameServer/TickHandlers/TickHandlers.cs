@@ -373,6 +373,91 @@ public class BuildingConstructionTickHandler(IServiceScopeFactory scopeFactory, 
     }
 }
 
+/// <summary>
+/// Drives the auto-progression meta-mode: every 60s for each active session,
+/// assess the binding constraint and dispatch (or skip, for stubbed Craft/Imbue
+/// sub-modes). See <c>docs/design/auto-progression-design.md</c>.
+/// </summary>
+public class AutoProgressionTickHandler(IServiceScopeFactory scopeFactory, ILogger<AutoProgressionTickHandler> logger) : ITickHandler
+{
+    public string Name => "Auto-progression";
+    public TimeSpan Interval => TimeSpan.FromSeconds(60);
+
+    public async Task HandleTickAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var service  = scope.ServiceProvider.GetRequiredService<FirstMud.Application.Services.AutoProgressionService>();
+            var notifier = scope.ServiceProvider.GetRequiredService<FirstMud.GameServer.Services.GameNotificationService>();
+            var targets  = new FirstMud.Application.Services.ProgressionTargets();
+            var playerRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.IPlayerRepository>();
+
+            var players = await playerRepo.GetActivePlayersAsync(ct);
+            foreach (var player in players)
+            {
+                var session = service.GetSession(player.Id);
+                if (session is null) continue;
+
+                var step = await service.EvaluateAsync(player.Id, ct);
+                session.LastStep = step;
+
+                if (step.Mode == FirstMud.Application.Services.ProgressionMode.Done)
+                {
+                    session.ConsecutiveHitsAtTarget++;
+                    if (session.ConsecutiveHitsAtTarget >= targets.GraceTicks)
+                    {
+                        await notifier.SendMessageAsync(player.Id, "system",
+                            $"Auto-progression complete! d{targets.TargetDangerLevel} reliability {step.Reliability:P0}. Congrats.", ct);
+                        await notifier.SendEventAsync(player.Id, "AutoProgressionStatus",
+                            new { active = false, reason = "completed", reliability = step.Reliability }, ct);
+                        service.EndSession(player.Id);
+                    }
+                    continue;
+                }
+                session.ConsecutiveHitsAtTarget = 0;
+
+                // Stall detection — if the top deficit hasn't moved, increment counter.
+                var topDeficit = step.DeficitScores.Count > 0
+                    ? step.DeficitScores.Values.Max()
+                    : 0.0;
+                if (Math.Abs(topDeficit - session.LastTopDeficit) < 0.001)
+                    session.TicksWithoutProgress++;
+                else
+                    session.TicksWithoutProgress = 0;
+                session.LastTopDeficit = topDeficit;
+
+                if (session.TicksWithoutProgress >= targets.StallTickLimit)
+                {
+                    await notifier.SendMessageAsync(player.Id, "system",
+                        $"Auto-progression stalled ({session.TicksWithoutProgress} ticks, binding={step.BindingConstraint}). {step.Reason}", ct);
+                    session.TicksWithoutProgress = 0; // reset so we don't spam
+                }
+
+                if (!step.DispatchedActual)
+                {
+                    // TODO: wire to real sub-modes once auto-craft / auto-imbue ship.
+                    // For now, just log the decision so runs are observable.
+                    logger.LogDebug(
+                        "Auto-progression tick for {PlayerId}: mode={Mode}, binding={Axis}, reliability={Rel}, reason={Reason}",
+                        player.Id, step.Mode, step.BindingConstraint, step.Reliability, step.Reason);
+                    continue;
+                }
+
+                // TODO: actual dispatch to existing sub-modes (auto-farm, quest runner).
+                // Scaffolded here as a debug log; real wiring comes in the follow-up cycle.
+                logger.LogInformation(
+                    "Auto-progression would dispatch {Mode} for player {PlayerId} (binding={Axis}).",
+                    step.Mode, player.Id, step.BindingConstraint);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Error in auto-progression tick.");
+        }
+    }
+}
+
 /// <summary>Regenerates resource-node yield every 60s.</summary>
 public class ResourceRegenTickHandler(IServiceScopeFactory scopeFactory, ILogger<ResourceRegenTickHandler> logger) : ITickHandler
 {

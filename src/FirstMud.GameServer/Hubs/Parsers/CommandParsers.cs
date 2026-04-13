@@ -376,3 +376,23 @@ public sealed class PracticeEnchantingCommandParser : ICommandParser
     public string CommandName => "practiceenchanting";
     public IGameCommand? Parse(JsonElement payload, Guid playerId) => new PracticeEnchantingCommand(playerId);
 }
+
+/// <summary>
+/// Auto-progression meta-mode. Single command name "autoprogression" with an
+/// "action" payload field (start / stop / status) — matches the client's
+/// typed <c>autoProgression(action)</c> surface.
+/// </summary>
+public sealed class AutoProgressionCommandParser : ICommandParser
+{
+    public string CommandName => "autoprogression";
+    public IGameCommand? Parse(JsonElement payload, Guid playerId)
+    {
+        var action = (payload.TryGetString("action") ?? "start").ToLowerInvariant();
+        return action switch
+        {
+            "stop"   => new AutoProgressionStopCommand(playerId),
+            "status" => new AutoProgressionStatusCommand(playerId),
+            _        => new AutoProgressionStartCommand(playerId),
+        };
+    }
+}
