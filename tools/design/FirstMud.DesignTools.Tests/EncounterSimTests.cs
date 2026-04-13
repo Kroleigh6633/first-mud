@@ -241,4 +241,43 @@ public class EncounterSimTests
         Assert.True(winRate >= 0.60,
             $"TPK regression pin: L8 + 3×layer-3 vs D7 boss-pack must win ≥60%, got {winRate:P1}.");
     }
+
+    [Fact]
+    public void Duplicate_captured_monster_companions_do_not_crash_sim()
+    {
+        // Regression for playtest crash (2026-04-13): a party with two
+        // CapturedMonsters sharing (Element, Layer) produced two combatants
+        // named "CapturedMonster-Earth-L5". Run()'s final ToDictionary(byName)
+        // then threw "An item with the same key has already been added. Key:
+        // CapturedMonster-Earth-L5" and bubbled out of EstimateWinRate, turning
+        // every wilderness move into a "Command failed" on the client.
+        //
+        // The fix is twofold:
+        //   1. BuildEncounter now appends a "#<index>" disambiguator so two
+        //      companions with identical (Type, Element, Layer) still produce
+        //      distinct combatant names.
+        //   2. Run()'s damageByName aggregation uses GroupBy instead of
+        //      ToDictionary so any future caller that constructs a custom
+        //      encounter with duplicate names still gets a sane result.
+        // This test pins both behaviors: 3 identical CapturedMonsters must
+        // simulate without throwing and must produce 3 distinct damage keys.
+        var monsters = new[] { TemplateFor("timber-wolf") };
+        var party = new[]
+        {
+            new CombatSimulationService.PartyMember(CompanionType.CapturedMonster, MagicElement.Earth, 5, 10),
+            new CombatSimulationService.PartyMember(CompanionType.CapturedMonster, MagicElement.Earth, 5, 10),
+            new CombatSimulationService.PartyMember(CompanionType.CapturedMonster, MagicElement.Earth, 5, 10),
+        };
+
+        var rng = new Random(123);
+        var svc = new CombatSimulationService(rng);
+        var enc = svc.BuildEncounter(MagicElement.Aether, 8, party, monsters);
+
+        // Must not throw — historically this threw ArgumentException.
+        var result = svc.Run(enc, maxRounds: 40);
+
+        Assert.Equal(3, result.DamageByCompanion.Count);
+        foreach (var key in result.DamageByCompanion.Keys)
+            Assert.Contains("CapturedMonster-Earth-L5", key);
+    }
 }

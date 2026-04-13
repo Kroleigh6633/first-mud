@@ -310,14 +310,30 @@ public class MoveCommandHandler(
             .ToList();
 
         int wins = 0;
+        int successfulRolls = 0;
         for (int i = 0; i < rolls; i++)
         {
-            var rng = new Random(unchecked(player.Id.GetHashCode() * 1_000_003 + i));
-            var sim = new CombatSimulationService(rng);
-            var enc = sim.BuildEncounter(element, player.Level, party, monsters);
-            var result = sim.Run(enc, maxRounds: 40);
-            if (result.Outcome == CombatSimulationService.Outcome.Victory) wins++;
+            try
+            {
+                var rng = new Random(unchecked(player.Id.GetHashCode() * 1_000_003 + i));
+                var sim = new CombatSimulationService(rng);
+                var enc = sim.BuildEncounter(element, player.Level, party, monsters);
+                var result = sim.Run(enc, maxRounds: 40);
+                if (result.Outcome == CombatSimulationService.Outcome.Victory) wins++;
+                successfulRolls++;
+            }
+            catch
+            {
+                // The pre-combat win-rate preview must never bubble an exception
+                // up to the move command — a sim bug would otherwise convert
+                // every wilderness move into a "Command failed" on the client
+                // and appear as a repeated error storm to the player. Swallow
+                // and skip; if *every* roll throws we fall back to a neutral
+                // 0.5 estimate so the move proceeds past the <20% auto-avoid
+                // gate and the player still gets into combat.
+            }
         }
-        return (double)wins / rolls;
+        if (successfulRolls == 0) return 0.5;
+        return (double)wins / successfulRolls;
     }
 }

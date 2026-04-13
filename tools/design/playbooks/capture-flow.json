@@ -1,0 +1,36 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "capture-flow",
+  "kind": "flow",
+  "displayName": "Capture flow regression",
+  "description": "Flow playbook (new category): exercises the back-to-back monster-capture path. Pins a regression from playtest 2026-04-13 where two CapturedMonsters sharing (Element, Layer) both produced combatant name 'CapturedMonster-Earth-L5', and CombatSimulationService.Run()'s damageByName.ToDictionary() threw 'An item with the same key has already been added.' The crash bubbled out of MoveCommandHandler.EstimateWinRate and turned every wilderness move into a 'Command failed'. Each cell simulates N encounters with `captureCopies` identical CapturedMonster companions in the party — the exact pathological arrangement that triggered the original bug. The fix adds a '#<index>' disambiguator in BuildEncounter and a defensive GroupBy in Run(). If the fix holds, errorRate is 0 across every cell. NOTE: this playbook uses `kind: flow` because the existing PlaybookEngine evaluates viability-band playbooks (kind: viability, default); a parallel agent is adding the flow evaluator to PlaybookEngine. Until then, the executable regression lives in `CaptureFlowPlaybookTests` under `tools/design/FirstMud.DesignTools.Tests/` and reads this file as data.",
+  "holdouts": {
+    "playerLevel": 5,
+    "playerElement": "Aether",
+    "monsterId": "timber-wolf"
+  },
+  "axes": [
+    { "name": "playerPower",         "values": [1, 5, 10, 15] },
+    { "name": "targetMonsterLayer",  "values": [1, 2, 3, 4, 5, 6] },
+    { "name": "targetMonsterElement","values": [0, 1, 2, 3, 4] }
+  ],
+  "rolls": 8,
+  "seed": 42,
+  "flow": {
+    "scenario": "back-to-back-capture",
+    "captureCopies": 3,
+    "metrics": [
+      { "name": "successRate", "description": "Fraction of attempts where the sim returned a non-Timeout outcome." },
+      { "name": "fleeRate",    "description": "Fraction expected to hit the 'sense your power' gate upstream (tracked but not asserted here — MoveCommandHandler enforces the gate before any sim runs)." },
+      { "name": "errorRate",   "description": "Fraction of attempts that threw. Expected 0 across every cell. Any cell > 0 is a regression.", "expected": 0.0 }
+    ]
+  },
+  "expectedViability": { "cells": [] },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}
