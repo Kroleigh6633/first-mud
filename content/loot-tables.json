@@ -204,7 +204,7 @@
   ],
 
   "dropChance": {
-    "base": 40,
+    "base": 50,
     "perDangerLevel": 4,
     "autoFarmMultiplier": 0.60
   },
