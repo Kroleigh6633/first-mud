@@ -46,6 +46,7 @@ const SECTIONS: Section[] = [
       { keys: ['V'], description: 'open homestead storage vault (at homestead only)' },
       { keys: ['B'], description: 'open companion panel — manage your party of 3' },
       { keys: ['R'], description: 'open crafting panel — view recipes and craft items' },
+      { keys: ['G'], description: 'open city panel — view homestead buildings and construction' },
       { keys: ['?', 'H'], description: 'open / close this help menu' },
       { keys: ['M'], description: 'mute / unmute audio (music + SFX)' },
       { keys: ['Esc'], description: 'close any open panel / cancel auto-farm' },

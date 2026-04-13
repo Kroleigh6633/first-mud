@@ -303,8 +303,8 @@ public class DungeonMasterService : BackgroundService
                     "MATCH (q:Quest {isDmGenerated: true}) " +
                     "WHERE NOT ()-[:COMPLETED]->(q) " +
                     "RETURN count(q) AS cnt");
-                var record = await cursor.SingleAsync();
-                return record["cnt"].As<int>();
+                await cursor.FetchAsync();
+                return (int)(long)cursor.Current["cnt"];
             }, ct);
 
             if (activeCount >= ActiveDmQuestCap)

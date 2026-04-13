@@ -331,7 +331,7 @@ function drawHomesteadBuilding(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
-  tileW: number,
+  _tileW: number,
   tileH: number,
   type: BuildingType,
   isConstructed: boolean,
@@ -679,6 +679,21 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       npcMap.get(key)!.push(npc);
     }
 
+    // Homestead building lookup (grid coords are relative to homestead centre -100,-100)
+    const homesteadCx = -100;
+    const homesteadCy = -100;
+    const buildingMap = new Map<string, HomesteadBuilding>();
+    for (const b of homesteadBuildingsRef.current) {
+      // Each building occupies a 2×2 footprint centred on (homesteadCx + gridX, homesteadCy + gridY)
+      const bx = homesteadCx + b.gridX;
+      const by = homesteadCy + b.gridY;
+      for (let dx = 0; dx <= 1; dx++) {
+        for (let dy = 0; dy <= 1; dy++) {
+          buildingMap.set(`${bx + dx},${by + dy}`, b);
+        }
+      }
+    }
+
     const visited = visitedRef.current;
 
     // Clear
@@ -785,6 +800,23 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
         ctx.shadowBlur = 8 * dpr;
         ctx.fillText(centerTile.asciiSymbol, sx, sy);
         ctx.shadowBlur = 0;
+      }
+
+      // ── Homestead buildings ────────────────────────────────────────────────
+      const homesteadBuilding = buildingMap.get(key);
+      if (homesteadBuilding && !centerTile) {
+        // Only draw on the "anchor" tile (top-left of 2×2 footprint = gridX+homesteadCx, gridY+homesteadCy)
+        const anchorX = homesteadCx + homesteadBuilding.gridX;
+        const anchorY = homesteadCy + homesteadBuilding.gridY;
+        if (gx === anchorX && gy === anchorY) {
+          drawHomesteadBuilding(
+            ctx, sx, sy, tileW, tileH,
+            homesteadBuilding.type,
+            homesteadBuilding.isConstructed,
+            homesteadBuilding.constructionProgress,
+            dpr,
+          );
+        }
       }
 
       // ── Difficulty border (zone 3×3 halo including centre) ─────────────────

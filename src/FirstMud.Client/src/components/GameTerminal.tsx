@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap, SmeltCompleteEvent } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap, SmeltCompleteEvent, CityViewSnapshot } from '../types/game';
 import WorldMap from './WorldMap';
 import { getBiome } from '../utils/biome';
 import StatusPanel from './StatusPanel';
@@ -14,6 +14,7 @@ import CharacterSheet from './CharacterSheet';
 import CombatPanel from './CombatPanel';
 import CompanionPanel from './CompanionPanel';
 import CraftingPanel from './CraftingPanel';
+import CityPanel from './CityPanel';
 import AutoFarmPicker from './AutoFarmPicker';
 import type { AutoFarmSettings } from './AutoFarmPicker';
 import { useKeyboard } from '../hooks/useKeyboard';
@@ -44,6 +45,7 @@ interface Props {
   lastSmeltResult?: SmeltCompleteEvent | null;
   questWaypoint?: QuestWaypoint | null;
   questProgress?: QuestProgressMap;
+  cityView?: CityViewSnapshot | null;
 }
 
 /**
@@ -126,6 +128,7 @@ export default function GameTerminal({
   lastSmeltResult = null,
   questWaypoint = null,
   questProgress = {},
+  cityView = null,
 }: Props) {
   const keyAction = useKeyboard();
 
@@ -163,6 +166,7 @@ export default function GameTerminal({
   const [showCompanions, setShowCompanions] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
   const [showAutoFarmPicker, setShowAutoFarmPicker] = useState(false);
+  const [showCity, setShowCity] = useState(false);
   const [statusCollapsed, setStatusCollapsed] = useState(false);
   const [autoNavigating, setAutoNavigating] = useState(false);
   const [autoQuestActive, setAutoQuestActive] = useState(false);
@@ -500,6 +504,10 @@ export default function GameTerminal({
         }
         break;
       }
+      case 'city':
+        sendCommand('viewcity', null);
+        setShowCity(prev => !prev);
+        break;
       case 'escape':
         setAutoNavigating(false);
         setAutoQuestActive(false);
@@ -511,6 +519,7 @@ export default function GameTerminal({
         setShowCompanions(false);
         setShowCrafting(false);
         setShowAutoFarmPicker(false);
+        setShowCity(false);
         break;
       case 'mute':
         toggleMute();
@@ -912,7 +921,7 @@ export default function GameTerminal({
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} questWaypoint={questWaypoint} />
+          <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} questWaypoint={questWaypoint} homesteadBuildings={cityView?.buildings ?? []} />
         </div>
 
         {/* Status panel — collapsible */}
@@ -1236,6 +1245,13 @@ export default function GameTerminal({
         <CharacterSheet player={worldState?.player ?? null} equipment={equipment} onClose={() => setShowCharSheet(false)} />
       )}
       {combat && <CombatPanel combat={combat} sendCommand={sendCommand} autoFarmStatus={autoFarmStatus} forceAutoCombat={autoQuestActive} playSound={playSound} />}
+      {showCity && (
+        <CityPanel
+          cityView={cityView ?? null}
+          onClose={() => setShowCity(false)}
+          sendCommand={sendCommand}
+        />
+      )}
       {showStorage && atHomestead && (
         <StoragePanel
           snapshot={storageView}
