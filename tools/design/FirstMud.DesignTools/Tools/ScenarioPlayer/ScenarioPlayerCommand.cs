@@ -12,6 +12,7 @@ public static class ScenarioPlayerCommand
         var forced = string.IsNullOrWhiteSpace(chooseCsv)
             ? null
             : chooseCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var allowUnderflow = Args.Has(args, "--allow-underflow");
 
         ConsolePretty.Header($"scenario-player: {Path.GetFileName(fixture)}");
         var spec = FixtureLoader.Load<QuestSpec>(fixture);
@@ -23,7 +24,7 @@ public static class ScenarioPlayerCommand
         Console.WriteLine();
 
         var runner = new ScenarioRunner();
-        var result = runner.Run(spec, forced);
+        var result = runner.Run(spec, forced, new ScenarioRunner.Options { AllowUnderflow = allowUnderflow });
 
         foreach (var step in result.Steps)
         {

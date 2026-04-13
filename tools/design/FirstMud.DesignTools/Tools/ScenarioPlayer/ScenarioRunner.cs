@@ -9,8 +9,19 @@ namespace FirstMud.DesignTools.Tools.ScenarioPlayer;
 /// </summary>
 public sealed class ScenarioRunner
 {
-    public ScenarioResult Run(QuestSpec spec, IReadOnlyList<string>? forcedChoices = null)
+    /// <summary>Runner-level options.</summary>
+    public sealed class Options
     {
+        /// <summary>When true, removeItem underflow becomes a warning and the subtract is clamped to 0.</summary>
+        public bool AllowUnderflow { get; set; }
+    }
+
+    public ScenarioResult Run(QuestSpec spec, IReadOnlyList<string>? forcedChoices = null, Options? options = null)
+    {
+        options ??= new Options();
+        // Fixture-level allowUnderflow overrides off → on (never on → off).
+        var allowUnderflow = options.AllowUnderflow || spec.AllowUnderflow;
+
         var state = new RunState
         {
             Flags = new HashSet<string>(spec.StartState.Flags),
@@ -56,7 +67,7 @@ public sealed class ScenarioRunner
                 break;
             }
 
-            var chosen = PickChoice(beat, state, queue, step);
+            var chosen = PickChoice(beat, state, queue, step, result);
             if (chosen is null)
             {
                 step.Terminal = true;
@@ -68,7 +79,7 @@ public sealed class ScenarioRunner
 
             foreach (var eff in chosen.Effects)
             {
-                var delta = ApplyEffect(eff, state);
+                var delta = ApplyEffect(eff, state, beat.Id, chosen.Id, allowUnderflow, result, step);
                 step.Deltas.Add(delta);
             }
 
@@ -88,24 +99,42 @@ public sealed class ScenarioRunner
         return result;
     }
 
-    private static QuestChoice? PickChoice(QuestBeat beat, RunState state, Queue<string> forced, ScenarioStep step)
+    private static QuestChoice? PickChoice(QuestBeat beat, RunState state, Queue<string> forced, ScenarioStep step, ScenarioResult result)
     {
         // Surface available choices.
         foreach (var c in beat.Choices)
             step.AvailableChoices.Add($"{c.Id}: {c.Text}");
+
+        // Eligibility: a choice with a `requires` block whose stock check fails is NOT traversable.
+        bool Eligible(QuestChoice c, out List<string> reasons)
+        {
+            reasons = new();
+            if (c.Requires is null) return true;
+            return MeetsRequirements(c.Requires, state, out reasons);
+        }
 
         if (forced.Count > 0)
         {
             var wanted = forced.Dequeue();
             var pick = beat.Choices.FirstOrDefault(c => c.Id == wanted);
             if (pick is null)
+            {
                 step.RequirementWarnings.Add($"forced choice '{wanted}' not found at beat '{beat.Id}'; falling back.");
+            }
+            else if (!Eligible(pick, out var reasons))
+            {
+                // Forced into an ineligible branch — that's a hard design error to surface.
+                result.Errors.Add($"ERROR at beat '{beat.Id}' choice '{pick.Id}': branch not traversable ({string.Join("; ", reasons)})");
+                return null;
+            }
             else
+            {
                 return pick;
+            }
         }
 
-        // First choice is the default path.
-        return beat.Choices.FirstOrDefault();
+        // Default: first ELIGIBLE choice.
+        return beat.Choices.FirstOrDefault(c => Eligible(c, out _));
     }
 
     private static bool MeetsRequirements(QuestRequires req, RunState state, out List<string> missing)
@@ -122,7 +151,7 @@ public sealed class ScenarioRunner
         return missing.Count == 0;
     }
 
-    private static string ApplyEffect(QuestEffect eff, RunState state)
+    private static string ApplyEffect(QuestEffect eff, RunState state, string beatId, string choiceId, bool allowUnderflow, ScenarioResult result, ScenarioStep step)
     {
         switch (eff.Type)
         {
@@ -134,8 +163,24 @@ public sealed class ScenarioRunner
                 state.Inventory[eff.Key] = (state.Inventory.TryGetValue(eff.Key, out var a) ? a : 0) + eff.Amount;
                 return $"item+ {eff.Key} x{eff.Amount}";
             case "removeItem":
-                state.Inventory[eff.Key] = Math.Max(0, (state.Inventory.TryGetValue(eff.Key, out var r) ? r : 0) - eff.Amount);
+            {
+                var have = state.Inventory.TryGetValue(eff.Key, out var r) ? r : 0;
+                if (eff.Amount > have)
+                {
+                    var msg = $"removeItem '{eff.Key}' x{eff.Amount} exceeds stock ({have} available)";
+                    if (allowUnderflow)
+                    {
+                        step.RequirementWarnings.Add($"WARN at beat '{beatId}' choice '{choiceId}': {msg} (clamped to 0)");
+                        state.Inventory[eff.Key] = 0;
+                        return $"item- {eff.Key} x{eff.Amount} (underflow→0)";
+                    }
+                    result.Errors.Add($"ERROR at beat '{beatId}' choice '{choiceId}': {msg}");
+                    state.Inventory[eff.Key] = 0;
+                    return $"item- {eff.Key} x{eff.Amount} (UNDERFLOW)";
+                }
+                state.Inventory[eff.Key] = have - eff.Amount;
                 return $"item- {eff.Key} x{eff.Amount}";
+            }
             case "addReputation":
                 state.Reputation[eff.Key] = (state.Reputation.TryGetValue(eff.Key, out var rep) ? rep : 0) + eff.Amount;
                 return $"rep+ {eff.Key} {eff.Amount:+#;-#;0}";
