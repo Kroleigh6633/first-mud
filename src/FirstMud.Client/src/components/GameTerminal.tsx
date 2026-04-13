@@ -138,6 +138,23 @@ export default function GameTerminal({
   const { playSound, setMusicVolume, setSfxVolume, musicVolume, sfxVolume, isMuted, toggleMute } =
     useAudio(currentBiomeType, combat !== null, atHomestead);
 
+  // Exploration: count unique visited tiles from localStorage (updated on each move)
+  const [visitedTileCount, setVisitedTileCount] = useState(0);
+  const playerId = worldState?.player?.id ?? null;
+  const playerX = worldState?.player?.x;
+  const playerY = worldState?.player?.y;
+  useEffect(() => {
+    if (!playerId) return;
+    try {
+      const raw = localStorage.getItem(`firstmud_visited_${playerId}`);
+      if (!raw) { setVisitedTileCount(0); return; }
+      const arr = JSON.parse(raw) as string[];
+      setVisitedTileCount(arr.length);
+    } catch {
+      setVisitedTileCount(0);
+    }
+  }, [playerId, playerX, playerY]);
+
   const [showQuestLog, setShowQuestLog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
@@ -961,6 +978,7 @@ export default function GameTerminal({
               currentTile={currentTile}
               equipment={equipment}
               companionRoster={companionRoster}
+              visitedTileCount={visitedTileCount}
             />
           )}
         </div>

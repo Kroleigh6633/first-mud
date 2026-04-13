@@ -34,6 +34,7 @@ export interface PlayerState {
   activeCompanionIds: string[];
   unlockedPortals: WorldId[];
   currentQuestIds?: string[];
+  tilesDiscovered?: number;
   effectiveStrength?: number;
   effectiveAgility?: number;
   effectiveIntellect?: number;

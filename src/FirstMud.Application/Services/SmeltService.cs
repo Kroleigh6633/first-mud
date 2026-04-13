@@ -176,14 +176,6 @@ public class SmeltService
             }
         }
 
-        // Award CraftingSkill XP: +1 per 5 units smelted
-        var xpGain = toSmelt / 5;
-        if (xpGain > 0)
-        {
-            player.GainCraftingSkillXp(xpGain);
-            await _players.UpdateAsync(player, ct);
-        }
-
         _logger.LogInformation(
             "Player {PlayerId} smelted {Amount} Metal → {Results}",
             playerId, toSmelt, string.Join(", ", tally.Select(kv => $"{kv.Value}x {kv.Key}")));
@@ -191,8 +183,6 @@ public class SmeltService
         var yields = tally.Select(kv => new SmeltYield(kv.Key, kv.Value)).ToList();
         var summary = string.Join(", ", yields.Select(y => $"{y.Name} x{y.Quantity}"));
         var msg = $"Smelted {toSmelt} Metal → {summary}";
-        if (xpGain > 0)
-            msg += $" (+{xpGain} Crafting Skill XP)";
 
         return new SmeltResult(true, msg, yields);
     }

@@ -304,6 +304,11 @@ namespace FirstMud.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
+                    b.Property<int>("TilesDiscovered")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<int>("CraftingSeed")
                         .HasColumnType("int");
 

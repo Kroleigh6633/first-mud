@@ -6,6 +6,7 @@ interface Props {
   currentTile: ZoneTile | null;
   equipment?: EquipmentSlots;
   companionRoster?: CompanionState[];
+  visitedTileCount?: number;
 }
 
 function Bar({ current, max, width, color }: { current: number; max: number; width: number; color: string }) {

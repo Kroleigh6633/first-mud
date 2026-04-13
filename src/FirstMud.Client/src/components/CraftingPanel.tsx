@@ -131,30 +131,30 @@ function outcomeColor(outcome: string): string {
  *
  *  skillDiff = recipe.requiredCraftingSkill − playerCraftingSkill
  *
- *  skillDiff ≤ −10  →  grey   (#666)     "no skill-up"
- *  skillDiff ≤  −5  →  green  (#44aa44)  "small skill-up"
- *  skillDiff ≤  −2  →  yellow (#cccc44)  "good skill-up"
- *  skillDiff ≤   0  →  orange (#cc8844)  "max skill-up"
- *  skillDiff ≤   2  →  red    (#cc4444)  "challenging"
- *  skillDiff >   2  →  dark red (#661111) "locked"
+ *  skillDiff ≤ −50  →  grey      (#666)     "no skill-up"
+ *  skillDiff ≤ −20  →  green     (#44aa44)  "small skill-up"
+ *  skillDiff ≤  −5  →  yellow    (#cccc44)  "good skill-up"
+ *  skillDiff ≤   0  →  orange    (#cc8844)  "max skill-up"
+ *  skillDiff ≤   5  →  red       (#cc4444)  "challenging"
+ *  skillDiff >   5  →  dark red  (#661111)  "locked"
  */
 function recipeSkillColor(requiredSkill: number, playerSkill: number): string {
   const diff = requiredSkill - playerSkill;
-  if (diff <= -10) return '#666666';
-  if (diff <= -5)  return '#44aa44';
-  if (diff <= -2)  return '#cccc44';
+  if (diff <= -50) return '#666666';
+  if (diff <= -20) return '#44aa44';
+  if (diff <= -5)  return '#cccc44';
   if (diff <= 0)   return '#cc8844';
-  if (diff <= 2)   return '#cc4444';
+  if (diff <= 5)   return '#cc4444';
   return '#661111';
 }
 
 function recipeSkillLabel(requiredSkill: number, playerSkill: number): string {
   const diff = requiredSkill - playerSkill;
-  if (diff <= -10) return '(no skill-up)';
-  if (diff <= -5)  return '(small skill-up)';
-  if (diff <= -2)  return '(good skill-up)';
+  if (diff <= -50) return '(no skill-up)';
+  if (diff <= -20) return '(small skill-up)';
+  if (diff <= -5)  return '(good skill-up)';
   if (diff <= 0)   return '(max skill-up)';
-  if (diff <= 2)   return '(challenging)';
+  if (diff <= 5)   return '(challenging)';
   return `(locked — need Skill ${requiredSkill})`;
 }
 
@@ -199,6 +199,7 @@ export default function CraftingPanel({
   const [selectedTaperId, setSelectedTaperId] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusColor, setStatusColor] = useState('#cccccc');
+  const [categoryTab, setCategoryTab] = useState<string>('ALL');
 
   // Timed crafting progress bar state
   const [crafting, setCrafting] = useState(false);
@@ -277,6 +278,20 @@ export default function CraftingPanel({
   }, [lastCraftResult]);
 
   const selectedRecipe = recipes.find(r => r.recipeId === selectedRecipeId) ?? null;
+
+  /** Map tab label → resultCategory values to include */
+  const tabCategoryMap: Record<string, string[]> = {
+    ALL:         [],
+    WEAPONS:     ['Weapon'],
+    ARMOR:       ['Armor'],
+    CONSUMABLES: ['Consumable'],
+    MATERIALS:   ['Component', 'Reagent'],
+    ACCESSORIES: ['Accessory'],
+  };
+
+  const filteredRecipes = categoryTab === 'ALL'
+    ? recipes
+    : recipes.filter(r => tabCategoryMap[categoryTab]?.includes(r.resultCategory));
 
   /**
    * Returns all items (from inventory + storage combined) matching the given
@@ -442,10 +457,41 @@ export default function CraftingPanel({
         <div style={bodyStyle}>
           {/* Recipe list */}
           <div style={listStyle}>
-            {recipes.length === 0 && (
-              <div style={{ padding: '12px', color: '#666' }}>No recipes available.</div>
+            {/* Category tabs */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              borderBottom: '1px solid #1a3a1a',
+              flexShrink: 0,
+            }}>
+              {(['ALL', 'WEAPONS', 'ARMOR', 'CONSUMABLES', 'MATERIALS', 'ACCESSORIES'] as const).map(tab => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setCategoryTab(tab)}
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    background: categoryTab === tab ? '#002200' : 'transparent',
+                    border: 'none',
+                    borderRight: '1px solid #1a3a1a',
+                    color: categoryTab === tab ? '#00ff41' : '#556655',
+                    letterSpacing: '0.06em',
+                    flexShrink: 0,
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            {filteredRecipes.length === 0 && (
+              <div style={{ padding: '12px', color: '#666' }}>
+                {recipes.length === 0 ? 'No recipes available.' : 'No recipes in this category.'}
+              </div>
             )}
-            {recipes.map(r => {
+            {filteredRecipes.map(r => {
               const skillColor = recipeSkillColor(r.requiredCraftingSkill, craftingSkill);
               const skillLabel = recipeSkillLabel(r.requiredCraftingSkill, craftingSkill);
               return (

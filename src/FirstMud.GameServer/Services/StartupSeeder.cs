@@ -600,6 +600,126 @@ public class StartupSeeder(
             [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
              RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      1)],
             ItemCategory.Consumable, "Fortitude Brew",    2, 5, 5),
+
+        // ── Skill 10-20: Journeyman ───────────────────────────────────────────
+        ("STEEL_SWORD_001",          "Steel Sword",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       5),
+             RecipeIngredient.Create(ItemCategory.Component, "Stone",          2)],
+            ItemCategory.Weapon,      "Steel Sword",          4, 7, 10),
+
+        ("REINFORCED_LEATHER_001",   "Reinforced Leather Armor",
+            [RecipeIngredient.Create(ItemCategory.Component, "Leather",        6),
+             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       2)],
+            ItemCategory.Armor,       "Reinforced Leather Armor", 4, 7, 10),
+
+        ("CHAIN_SHIRT_001",          "Chain Shirt",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       8),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Chain Shirt",          5, 8, 15),
+
+        ("THORNWOOD_LONGBOW_001",    "Thornwood Longbow",
+            [RecipeIngredient.Create(ItemCategory.Component, "Wood",           4),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",          3)],
+            ItemCategory.Weapon,      "Thornwood Longbow",    4, 7, 12),
+
+        ("CRYSTAL_WAND_001",         "Crystal Wand",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
+             RecipeIngredient.Create(ItemCategory.Component, "Wood",           2)],
+            ItemCategory.Weapon,      "Crystal Wand",         4, 7, 15),
+
+        ("GREATER_HEALING_POTION_001","Greater Healing Potion",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",          8),
+             RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment",  3)],
+            ItemCategory.Consumable,  "Greater Healing Potion", 3, 7, 15),
+
+        // ── Skill 25-50: Expert ───────────────────────────────────────────────
+        ("SILVER_BLADE_001",         "Silver Blade",
+            [RecipeIngredient.Create(ItemCategory.Component, "Silver Ore",     4),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Weapon,      "Silver Blade",         6, 8, 25),
+
+        ("OBSIDIAN_EDGE_001",        "Obsidian Edge",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Obsidian Shard", 5),
+             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       3)],
+            ItemCategory.Weapon,      "Obsidian Edge",        6, 9, 30),
+
+        ("SCALE_MAIL_001",           "Scale Mail",
+            [RecipeIngredient.Create(ItemCategory.Component, "Sea Scale",      6),
+             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       4)],
+            ItemCategory.Armor,       "Scale Mail",           6, 8, 30),
+
+        ("SPIDER_SILK_VEST_001",     "Spider Silk Vest",
+            [RecipeIngredient.Create(ItemCategory.Component, "Spider Silk",    5),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",          3)],
+            ItemCategory.Armor,       "Spider Silk Vest",     5, 8, 25),
+
+        ("MITHRIL_HELM_001",         "Mithril Helm",
+            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    3),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Mithril Helm",         7, 9, 40),
+
+        ("CORAL_FOCUS_001",          "Coral Focus",
+            [RecipeIngredient.Create(ItemCategory.Component, "Coral Fragment", 4),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 2)],
+            ItemCategory.Weapon,      "Coral Focus",          6, 8, 35),
+
+        ("WEAVE_ELIXIR_001",         "Weave Elixir",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
+             RecipeIngredient.Create(ItemCategory.Component, "Herbs",          5)],
+            ItemCategory.Consumable,  "Weave Elixir",         3, 7, 30),
+
+        // ── Skill 50-75: Artisan ──────────────────────────────────────────────
+        ("MITHRIL_SWORD_001",        "Mithril Sword",
+            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    6),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  2)],
+            ItemCategory.Weapon,      "Mithril Sword",        8, 10, 50),
+
+        ("MITHRIL_PLATE_001",        "Mithril Plate",
+            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    8),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        4)],
+            ItemCategory.Armor,       "Mithril Plate",        8, 10, 60),
+
+        ("DIAMOND_RING_001",         "Diamond Ring",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  3),
+             RecipeIngredient.Create(ItemCategory.Component, "Silver Ore",     2)],
+            ItemCategory.Accessory,   "Diamond Ring",         7, 9, 55),
+
+        ("ASHWOOD_STAFF_001",        "Ashwood Staff",
+            [RecipeIngredient.Create(ItemCategory.Component, "Ashwood",        5),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3)],
+            ItemCategory.Weapon,      "Ashwood Staff",        7, 9, 50),
+
+        ("WYRD_WARD_001",            "Wyrd Ward",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Wyrd Shard",     3),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 2)],
+            ItemCategory.Accessory,   "Wyrd Ward",            8, 10, 65),
+
+        // ── Skill 75-100: Master ──────────────────────────────────────────────
+        ("VOID_BLADE_001",           "Void Blade",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Void Essence",   3),
+             RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    5)],
+            ItemCategory.Weapon,      "Void Blade",           9, 10, 80),
+
+        ("PHASE_BOW_001",            "Phase Bow",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Phase Thread",   4),
+             RecipeIngredient.Create(ItemCategory.Component, "Ashwood",        3)],
+            ItemCategory.Weapon,      "Phase Bow",            9, 10, 85),
+
+        ("TEAR_FRAGMENT_RING_001",   "Tear Fragment Ring",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Tear Fragment",  2),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  3)],
+            ItemCategory.Accessory,   "Tear Fragment Ring",   9, 10, 90),
+
+        ("WYRD_ARMOR_001",           "Wyrd Armor",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Wyrd Shard",     5),
+             RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    4)],
+            ItemCategory.Armor,       "Wyrd Armor",           9, 10, 95),
+
+        ("MASTERS_TONIC_001",        "Master's Tonic",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Void Essence",   1),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 5),
+             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         10)],
+            ItemCategory.Consumable,  "Master's Tonic",       4, 8, 100),
     ];
 
     private async Task SeedStarterRecipesAsync(CancellationToken ct)

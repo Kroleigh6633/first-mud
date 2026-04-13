@@ -44,7 +44,8 @@ public record PlayerStateDto(
     int EffectiveMaxHp,
     int BonusStrikeDamage,
     int BonusSpellDamage,
-    List<CompanionDto> ActiveCompanions);
+    List<CompanionDto> ActiveCompanions,
+    int TilesDiscovered);
 
 public record WorldStateSnapshot(
     PlayerStateDto Player,
@@ -196,7 +197,8 @@ public class WorldStateService
             effectiveMaxHp,
             bonusStrikeDamage,
             bonusSpellDamage,
-            activeCompanionDetails);
+            activeCompanionDetails,
+            player.TilesDiscovered);
 
         var aiStates = _aiPlayerService.GetAiStates().ToList();
 

@@ -1,5 +1,6 @@
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
+using FirstMud.Domain.Events;
 using FirstMud.Domain.Interfaces;
 using FirstMud.Domain.ValueObjects;
 using FirstMud.GameServer.Commands;
@@ -12,12 +13,19 @@ namespace FirstMud.GameServer.Handlers;
 public class MoveCommandHandler(
     IPlayerRepository playerRepository,
     IZoneRepository zoneRepository,
+    IItemRepository itemRepository,
     ICompanionRepository companionRepository,
     CombatService combatService,
     CombatHelpers combatHelpers,
+    LootService lootService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<MoveCommand>
 {
+    // In-memory set of treasure tiles already claimed this session (playerId → set of "x,y")
+    // Prevents the same tile rewarding a player multiple times per server process.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, HashSet<string>>
+        _claimedTreasures = new();
+
     public async Task<CommandResult> HandleAsync(MoveCommand cmd, CancellationToken ct)
     {
         if (Math.Abs(cmd.DeltaX) > 1 || Math.Abs(cmd.DeltaY) > 1)
@@ -37,6 +45,10 @@ public class MoveCommandHandler(
             current.X + cmd.DeltaX,
             current.Y + cmd.DeltaY);
 
+        // Award 1 XP per new tile moved (every move counts as exploration)
+        var milestone = player.RecordTileDiscovery();
+        player.GainExperience(1);
+
         player.Move(newPosition);
         await playerRepository.UpdateAsync(player, ct);
 
@@ -52,6 +64,25 @@ public class MoveCommandHandler(
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
             .SendAsync("PlayerMoved", positionPayload, ct);
+
+        // Broadcast exploration milestone message if one was reached
+        if (milestone is not null)
+        {
+            await notificationService.SendMessageAsync(
+                cmd.PlayerId,
+                "wyrd",
+                $"{milestone.Label} (+{milestone.XpAwarded} XP)",
+                ct);
+        }
+
+        // Hidden treasure check: 1% of wilderness tiles (deterministic hash of x,y)
+        var tx = newPosition.X;
+        var ty = newPosition.Y;
+        var treasureHash = ((tx * 48271 + ty * 91283) & 0x7FFFFFFF) % 100;
+        if (treasureHash == 0)
+        {
+            await TryAwardHiddenTreasureAsync(cmd.PlayerId, player, tx, ty, ct);
+        }
 
         await TryTriggerEncounterAsync(cmd.PlayerId, newPosition, ct);
 
@@ -152,5 +183,60 @@ public class MoveCommandHandler(
         await hubContext.Clients
             .Group(playerId.ToString())
             .SendAsync("CombatUpdate", dto, ct);
+    }
+
+    private async Task TryAwardHiddenTreasureAsync(
+        Guid playerId,
+        Player player,
+        int x, int y,
+        CancellationToken ct)
+    {
+        var tileKey = $"{x},{y}";
+        var claimed = _claimedTreasures.GetOrAdd(playerId, _ => []);
+
+        lock (claimed)
+        {
+            if (!claimed.Add(tileKey))
+                return; // Already claimed this tile this session
+        }
+
+        await notificationService.SendMessageAsync(
+            playerId,
+            "loot-rare",
+            "You discover a hidden cache buried beneath the soil!",
+            ct);
+
+        // Drop a guaranteed rare item (W4–W7) as the treasure
+        var biome = CombatHelpers.GuessWildernessBiome(x, y);
+        var dangerLevel = Math.Max(4, CombatHelpers.GetWildernessDanger(x, y, biome));
+
+        var items = await itemRepository.GetByOwnerAsync(playerId, ct);
+        var inventoryCount = items.Count;
+
+        var lootResult = await lootService.RollLootDropAsync(
+            dangerLevel: dangerLevel,
+            ownerId: playerId,
+            originWorld: player.Position.World,
+            currentInventoryCount: inventoryCount,
+            maxInventorySlots: player.MaxInventorySlots,
+            ct: ct,
+            player: player,
+            zoneName: null,
+            isAutoFarm: false);
+
+        if (lootResult.Dropped && lootResult.Item is not null && !lootResult.AutoSalvaged)
+        {
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("LootDropped", new
+                {
+                    lootResult.Item.Id,
+                    Name = lootResult.Item.Name,
+                    Description = lootResult.Item.Description,
+                    Workmanship = lootResult.Item.Workmanship.Value,
+                    Category = lootResult.Item.Category.ToString(),
+                    Slot = lootResult.Item.Slot.ToString(),
+                }, ct);
+        }
     }
 }
