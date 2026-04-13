@@ -144,7 +144,7 @@ public class MechanicsSweepTests
 
         // Assert
         result.Success.Should().BeFalse("equipped items must not be salvageable");
-        result.Message.Should().Contain("equipped", StringComparison.OrdinalIgnoreCase,
+        result.Message.ToLowerInvariant().Should().Contain("equipped",
             "error message should mention equip status");
     }
 
