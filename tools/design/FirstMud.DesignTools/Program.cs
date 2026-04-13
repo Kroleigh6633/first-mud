@@ -2,6 +2,7 @@ using FirstMud.DesignTools.Shared;
 using FirstMud.DesignTools.Tools.DialogueLint;
 using FirstMud.DesignTools.Tools.EconomySim;
 using FirstMud.DesignTools.Tools.EncounterSim;
+using FirstMud.DesignTools.Tools.ProgressionSim;
 using FirstMud.DesignTools.Tools.FactionState;
 using FirstMud.DesignTools.Tools.ScenarioPlayer;
 
@@ -29,6 +30,7 @@ public static class Program
                 "faction-state"   => FactionStateCommand.Run(rest),
                 "encounter-sim"   => EncounterSimCommand.Run(rest),
                 "economy-sim"     => EconomySimCommand.Run(rest),
+                "progression-sim" => ProgressionSimCommand.Run(rest),
                 _                 => Unknown(command),
             };
         }
@@ -57,6 +59,7 @@ public static class Program
         Console.WriteLine("  faction-state     Render factions at a marker.         [scaffold]");
         Console.WriteLine("  encounter-sim     Simulate combat rolls.               [FULL]");
         Console.WriteLine("  economy-sim       Simulate N hours of play.            [scaffold]");
+        Console.WriteLine("  progression-sim   Full progression curve sim.          [FULL]");
         Console.WriteLine();
         Console.WriteLine("Each tool writes JSON + markdown under docs/design/sim-logs/.");
     }
