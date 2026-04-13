@@ -1140,7 +1140,7 @@ export default function GameTerminal({
       {showCharSheet && (
         <CharacterSheet player={worldState?.player ?? null} equipment={equipment} onClose={() => setShowCharSheet(false)} />
       )}
-      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} autoFarmStatus={autoFarmStatus} />}
+      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} autoFarmStatus={autoFarmStatus} forceAutoCombat={autoQuestActive} />}
       {showStorage && atHomestead && (
         <StoragePanel
           snapshot={storageView}
