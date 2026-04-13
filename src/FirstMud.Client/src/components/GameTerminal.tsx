@@ -236,6 +236,12 @@ export default function GameTerminal({
   const [autoQuestIndex, setAutoQuestIndex] = useState(0);
   const [_autoQuestTotal, setAutoQuestTotal] = useState(0);
   const [_autoQuestTitle, setAutoQuestTitle] = useState('');
+  // When L-mode runs out of quests, it transitions into F-mode (auto-farm) and
+  // sets this flag. While true, the L runner's tick is paused; instead, a
+  // separate effect watches `availableQuests` and, when a new un-taken quest
+  // appears, it stops the farm, clears this flag, and resumes the L runner
+  // from index 0. The L key (and Escape) also stop the farm when this is set.
+  const [autoQuestFarmingIdle, setAutoQuestFarmingIdle] = useState(false);
 
   // Single interval ref for the auto-quest runner — avoids the broken
   // multi-effect chain.  Cleared whenever the run stops.
@@ -299,6 +305,8 @@ export default function GameTerminal({
   autoQuestActiveRef.current = autoQuestActive;
   const autoQuestIndexRef = useRef(autoQuestIndex);
   autoQuestIndexRef.current = autoQuestIndex;
+  const autoQuestFarmingIdleRef = useRef(autoQuestFarmingIdle);
+  autoQuestFarmingIdleRef.current = autoQuestFarmingIdle;
 
   // Wrap appendMessage so that Error events arriving during the 'interact'
   // phase are flagged as an interact failure (missing items, kills, etc.).
@@ -555,6 +563,13 @@ export default function GameTerminal({
     { keys: ['l', 'L'], description: 'auto-quest run toggle', handler: () => {
       if (autoQuestActiveRef.current) {
         console.log('[L key] Stopping auto-quest run');
+        // If we transitioned into auto-farm while idle, also stop the farm so
+        // the user gets a clean shutdown with one keypress (parity with F).
+        if (autoQuestFarmingIdleRef.current && autoFarmRef.current?.active) {
+          console.log('[L key] Stopping auto-farm (was running as L idle fallback)');
+          commands.autoFarm();
+        }
+        setAutoQuestFarmingIdle(false);
         setAutoQuestActive(false);
         setAutoNavigating(false);
         appendMessage({
@@ -600,6 +615,11 @@ export default function GameTerminal({
 
     { keys: ['Escape'], description: 'close panels / cancel', handler: () => {
       setAutoNavigating(false);
+      // If L had transitioned into auto-farm, shut that down too on Escape.
+      if (autoQuestFarmingIdleRef.current && autoFarmRef.current?.active) {
+        commands.autoFarm();
+      }
+      setAutoQuestFarmingIdle(false);
       setAutoQuestActive(false);
       setShowHelp(false);
       setShowQuestLog(false);
@@ -737,27 +757,40 @@ export default function GameTerminal({
     const nextQuest = ordered[autoQuestIndexRef.current];
 
     if (!nextQuest) {
-      console.log('[autoquest] No more quests — run complete');
-      setAutoQuestActive(false);
+      console.log('[autoquest] No more quests — transitioning to auto-farm until new quests arrive');
       setAutoNavigating(false);
-      // If every quest was skipped (none completed), tell the player why instead
-      // of falsely claiming "all quests completed".
       const totalQuests = ordered.length;
       const skippedCount = autoQuestSkippedIndicesRef.current.size;
-      if (skippedCount > 0 && skippedCount >= totalQuests) {
-        wrappedAppendMessage({
-          timestamp: new Date().toISOString(),
-          category: 'quest',
-          text: 'Quest auto-run paused — remaining quests need items/kills. Farm more or complete them manually.',
-        });
-      } else {
-        wrappedAppendMessage({
-          timestamp: new Date().toISOString(),
-          category: 'quest',
-          text: 'All quests completed! Quest auto-run finished.',
+      const allSkipped = skippedCount > 0 && skippedCount >= totalQuests;
+      autoQuestSkippedIndicesRef.current = new Set();
+
+      // Remain in L mode but drop into auto-farm. A separate effect watches
+      // availableQuests and will resume the quest loop when new ones appear.
+      // Conservative defaults: stay in current zone, cap danger at a safe
+      // floor relative to player level, balanced priority.
+      if (!autoFarmRef.current?.active) {
+        const player = worldStateRef.current?.player;
+        const level = player?.level ?? 1;
+        const maxDanger = Math.min(Math.max(level - 1, 1), 3);
+        commands.autoFarm({
+          targetZone: null,
+          maxDanger,
+          priority: 'balanced',
         });
       }
-      autoQuestSkippedIndicesRef.current = new Set();
+      setAutoQuestFarmingIdle(true);
+      // Reset index so the next batch of quests starts clean
+      setAutoQuestIndex(0);
+      setAutoQuestTotal(0);
+      setAutoQuestTitle('');
+
+      wrappedAppendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'quest',
+        text: allSkipped
+          ? 'Remaining quests need items/kills — auto-farming while waiting for new quests. Press [L] to stop.'
+          : 'All quests completed — auto-farming while waiting for new quests. Press [L] to stop.',
+      });
       return;
     }
 
@@ -1056,6 +1089,40 @@ export default function GameTerminal({
     };
   // Re-run when active state changes or we advance to the next quest index
   }, [autoQuestActive, autoQuestIndex, commands, wrappedAppendMessage]);
+
+  // ── Farming-idle watcher ─────────────────────────────────────────────────
+  // While auto-quest is active but has run out of work, it parks itself in
+  // auto-farm. This effect watches `availableQuests` and, when a new un-taken
+  // quest appears, stops the farm and kicks the quest runner back into gear.
+  useEffect(() => {
+    if (!autoQuestFarmingIdle) return;
+    // We want ANY quest that the L runner would attempt — non-empty list.
+    // (The sort in the runner already prefers taken > higher rep.)
+    if (availableQuests.length === 0) return;
+
+    console.log('[autoquest idle] New quests available — resuming L mode');
+    if (autoFarmRef.current?.active) {
+      commands.autoFarm(); // toggle off
+    }
+    setAutoQuestFarmingIdle(false);
+    // Bump index to 0 so the runner effect re-fires with a fresh list.
+    // Setting to 0 when already 0 won't retrigger, so force via a no-op
+    // setAutoQuestActive(true) round-trip is avoided — instead we rely on
+    // setAutoQuestIndex updating state. If index is already 0, increment-
+    // then-reset isn't safe; instead briefly toggle active off/on.
+    setAutoQuestActive(false);
+    // Defer re-start so the cleanup effect runs first, then re-enter L mode.
+    setTimeout(() => {
+      setAutoQuestIndex(0);
+      setAutoQuestTotal(availableQuestsRef.current.length);
+      setAutoQuestActive(true);
+      wrappedAppendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'quest',
+        text: `New quest${availableQuestsRef.current.length !== 1 ? 's' : ''} available — resuming auto-quest run.`,
+      });
+    }, 50);
+  }, [autoQuestFarmingIdle, availableQuests, commands, wrappedAppendMessage]);
 
   const handleAcceptQuest = (questId: string) => {
     commands.acceptQuest({ questId });
@@ -1361,9 +1428,12 @@ export default function GameTerminal({
             alignItems: 'center',
           }}
         >
-          <span style={{ color: '#ee88ff', fontWeight: 'bold' }}>QUEST AUTO-RUN</span>
-          <span>{autoQuestIndex + 1}/{_autoQuestTotal}</span>
-          {_autoQuestTitle ? <span style={{ color: '#ddaaff' }}>— {_autoQuestTitle}</span> : null}
+          <span style={{ color: '#ee88ff', fontWeight: 'bold' }}>
+            {autoQuestFarmingIdle ? 'AUTO-QUEST (FARMING IDLE)' : 'QUEST AUTO-RUN'}
+          </span>
+          {!autoQuestFarmingIdle && <span>{autoQuestIndex + 1}/{_autoQuestTotal}</span>}
+          {!autoQuestFarmingIdle && _autoQuestTitle ? <span style={{ color: '#ddaaff' }}>— {_autoQuestTitle}</span> : null}
+          {autoQuestFarmingIdle && <span style={{ color: '#ddaaff' }}>— waiting for new quests</span>}
           <span style={{ color: '#666' }}>· [L] stop</span>
         </div>
       )}
