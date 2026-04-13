@@ -126,14 +126,17 @@ public class Companion
 
     /// <summary>
     /// Assigns the companion to homestead duty.
-    /// The caller must ensure the companion is not in the active adventuring party first.
+    /// The caller must ensure the companion is not in the active adventuring party first
+    /// (verified against <c>player.ActiveCompanionIds</c>, not the stale <c>IsActive</c> flag).
     /// </summary>
     public void AssignToHomestead(HomesteadDuty duty)
     {
         if (duty == HomesteadDuty.None)
             throw new InvalidOperationException("Use RecallFromHomestead to clear duty.");
-        if (IsActive)
-            throw new InvalidOperationException($"{Name} is still in the adventuring party. Deactivate first.");
+        // NOTE: Do NOT check IsActive here — it is a stale boolean that lags behind the
+        // authoritative player.ActiveCompanionIds list.  The caller (BuildingService,
+        // CompanionCommandHandler, etc.) is responsible for verifying the companion is not
+        // in the active party before calling this method.
         AssignedDuty = duty;
         DutyStartedAt = DateTime.UtcNow;
     }

@@ -849,7 +849,7 @@ export default function GameTerminal({
 
           // ── Pre-check: sample path danger before committing to navigate ──
           const playerLevelNow = player.level ?? 1;
-          const hardCap = playerLevelNow + 4;
+          const hardCap = Math.min(Math.ceil(playerLevelNow * 0.7), 8);
           const pathMaxDanger = samplePathDanger(player.x, player.y, wp.targetX, wp.targetY, 6);
           if (pathMaxDanger > hardCap) {
             console.warn(`[autoquest] Path to "${nextQuest.title}" has max danger ${pathMaxDanger} (hard cap ${hardCap}) — skipping quest`);
@@ -917,6 +917,14 @@ export default function GameTerminal({
         // Use atHomesteadRef (the authoritative flag) rather than raw coords
         // so the check stays consistent with the P key handler.
         if (atHomesteadRef.current) {
+          // Don't leave homestead until HP is full — homestead heals +10 HP/s
+          const hp = player.currentHp;
+          const maxHp = player.maxHp;
+          if (hp < maxHp) {
+            console.log(`[autoquest navigate] Waiting for full HP at homestead (${hp}/${maxHp})`);
+            return; // still healing — skip this tick
+          }
+
           if (!autoQuestPortalSentRef.current && Date.now() >= portalCooldownUntilRef.current) {
             console.log('[autoquest navigate] Player is at homestead — sending portalback before navigating');
             autoQuestPortalSentRef.current = true;
@@ -946,7 +954,7 @@ export default function GameTerminal({
           return;
         }
 
-        const safeStepCap = (player.level ?? 1) + 2;
+        const safeStepCap = Math.min(Math.ceil((player.level ?? 1) * 0.6), 7);
         const step = stepTowardSafe(player.x, player.y, wp.targetX, wp.targetY, safeStepCap);
 
         if (step === null) {

@@ -241,20 +241,25 @@ public class BuildingService
     /// <summary>
     /// Assigns the best-aptitude idle companion to a newly completed building.
     /// Called automatically when construction finishes.
+    /// Pass <paramref name="playerActiveCompanionIds"/> (from <c>player.ActiveCompanionIds</c>)
+    /// as the authoritative active list — avoids relying on the stale <c>IsActive</c> boolean.
     /// </summary>
     public async Task<Companion?> AutoAssignCompanionAsync(
         Guid playerId,
         HomesteadBuilding building,
+        IReadOnlyList<Guid>? playerActiveCompanionIds = null,
         CancellationToken ct = default)
     {
         if (!building.IsConstructed) return null;
         if (!BuildingDuty.TryGetValue(building.Type, out var duty)) return null;
 
         var companions = await _companions.GetByOwnerAsync(playerId, ct);
+        var activeIds = playerActiveCompanionIds ?? [];
 
-        // Find idle companions (not adventuring, not on duty) with the best aptitude
+        // Find idle companions (not adventuring per authoritative list, not on duty) with the best aptitude
+        // Use activeIds (from player.ActiveCompanionIds) rather than the stale IsActive boolean.
         var best = companions
-            .Where(c => !c.IsPermanentlyGone && !c.IsActive && !c.AssignedDuty.HasValue)
+            .Where(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id) && !c.AssignedDuty.HasValue)
             .OrderByDescending(c => c.GetAptitude(duty))
             .ThenByDescending(c => c.Level)
             .FirstOrDefault();
@@ -358,7 +363,7 @@ public class BuildingService
                 // Auto-assign best companion if building just finished
                 Companion? assignee = null;
                 if (playerId != Guid.Empty)
-                    assignee = await AutoAssignCompanionAsync(playerId, building, ct);
+                    assignee = await AutoAssignCompanionAsync(playerId, building, null, ct);
 
                 results.Add(new BuildingConstructionResult(
                     playerId,

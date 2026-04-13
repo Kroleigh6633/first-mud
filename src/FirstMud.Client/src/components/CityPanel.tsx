@@ -546,14 +546,20 @@ export default function CityPanel({
   const underConstruction = cityView.buildings.filter(b => !b.isConstructed);
   const assignedCount = cityView.buildings.filter(b => b.assignedCompanionName).length;
 
-  // Companions available for assignment: not active, not already assigned to a building
+  // Companions available for assignment:
+  //   - not in the active adventuring party (use authoritative activeCompanionIds, not stale c.isActive)
+  //   - not already assigned to a building in this city view
+  //   - not on any homestead duty (assignedDuty covers companions on duty but not yet mapped to a building)
   const assignedCompanionIds = new Set(
     cityView.buildings
       .filter(b => b.assignedCompanionId)
       .map(b => b.assignedCompanionId as string)
   );
   const availableCompanions = companionRoster.filter(
-    c => !activeCompanionIds.includes(c.id) && !assignedCompanionIds.has(c.id)
+    c =>
+      !activeCompanionIds.includes(c.id) &&
+      !assignedCompanionIds.has(c.id) &&
+      !c.assignedDuty
   );
 
   // Auto-assign all: for each building without a worker, pick best-aptitude available companion
