@@ -171,6 +171,96 @@ public class PlaybookRunnerTests
     }
 
     [Fact]
+    public void Cell_salt_is_deterministic_from_index_tuple_only()
+    {
+        // Determinism regression guard (Fix #1 from CP7 follow-ups):
+        // DeterministicCellSalt must depend ONLY on the integer index tuple.
+        // No string hashing, no process-randomized input, no globals.
+        // If someone replaces the implementation with GetHashCode-style
+        // randomization, this test will start producing different values
+        // across CI runs and the comparison below will still hold per-run,
+        // but the hard-coded regression vector at the bottom will fail.
+        var a1 = PlaybookEngine.DeterministicCellSalt(new[] { 0, 0 });
+        var a2 = PlaybookEngine.DeterministicCellSalt(new[] { 0, 0 });
+        Assert.Equal(a1, a2);
+
+        Assert.NotEqual(
+            PlaybookEngine.DeterministicCellSalt(new[] { 0, 1 }),
+            PlaybookEngine.DeterministicCellSalt(new[] { 1, 0 }));
+
+        // Hard-coded regression vector — these values are produced by the
+        // prime-weighted positional mix. Changing the mix is OK but requires
+        // updating these constants deliberately.
+        Assert.Equal(257,                       PlaybookEngine.DeterministicCellSalt(new[] { 0 }));
+        Assert.Equal(514,                       PlaybookEngine.DeterministicCellSalt(new[] { 1 }));
+        // [2, 1]: a=0 → 0*1_000_003 + 3*1*257 = 771; a=1 → 771*1_000_003 + 2*2*257 = 771000003771 + 1028.
+        Assert.Equal(unchecked(771 * 1_000_003 + 2 * 2 * 257),
+                     PlaybookEngine.DeterministicCellSalt(new[] { 2, 1 }));
+    }
+
+    [Fact]
+    public void Gear_tier_and_imbue_level_are_distinct_from_player_level()
+    {
+        // Fix #2 regression guard: CombatContext must apply gear and imbue
+        // DIFFERENTLY from raw player level. Run three identical combats
+        // that differ only in which axis is boosted; if all three yield the
+        // same win rate, the proxy collapsed and the playbook framework is
+        // not telling us what we think it's telling us.
+        var engine = new PlaybookEngine(Content());
+
+        // Shared rig: danger 7 vs timber-wolf, solo player, level 5 baseline.
+        var baseline = MakeSinglePlayerPlaybook(level: 5, gear: 0, imbue: 0);
+        var gear     = MakeSinglePlayerPlaybook(level: 5, gear: 5, imbue: 0);
+        var imbue    = MakeSinglePlayerPlaybook(level: 5, gear: 0, imbue: 5);
+
+        var bWin = engine.Execute(baseline).Cells.Single().Summary.WinRate;
+        var gWin = engine.Execute(gear).Cells.Single().Summary.WinRate;
+        var iWin = engine.Execute(imbue).Cells.Single().Summary.WinRate;
+
+        Assert.True(gWin > bWin, $"gear (gt=5) should beat baseline (gt=0); got {gWin:F3} vs {bWin:F3}");
+        Assert.True(iWin > bWin, $"imbue (il=5) should beat baseline (il=0); got {iWin:F3} vs {bWin:F3}");
+        // Gear affects Strike (the default auto-player pick); imbue affects
+        // magical abilities which the auto-player doesn't cast, so gear should
+        // outpace imbue for this sim configuration. This asymmetry is the
+        // whole point — they're NOT collapsed into the level curve.
+        Assert.NotEqual(gWin, iWin);
+    }
+
+    private static Playbook MakeSinglePlayerPlaybook(int level, int gear, int imbue)
+    {
+        var pb = new Playbook
+        {
+            Id = $"test-ctx-L{level}-G{gear}-I{imbue}",
+            DisplayName = "ctx probe",
+            Description = "single cell probe for Fix #2",
+            Rolls = 120,
+            Seed = 2026,
+            Holdouts = new Holdouts
+            {
+                PlayerLevel = level,
+                PlayerElement = "Aether",
+                GearTier = gear,
+                ImbueLevel = imbue,
+                DangerLevel = 7,
+            },
+            Axes = new List<Axis>
+            {
+                new() { Name = "dangerLevel", Values = new[] { 7 } },
+            },
+            ToleranceBands = new Dictionary<string, double[]>
+            {
+                ["trivial"]   = new[] { 95.0, 100.0 },
+                ["easy"]      = new[] { 85.0, 95.0 },
+                ["balanced"]  = new[] { 60.0, 85.0 },
+                ["hard"]      = new[] { 30.0, 60.0 },
+                ["punishing"] = new[] { 0.0, 30.0 },
+            },
+        };
+        pb.ExpectedViability = new ExpectedViability();
+        return pb;
+    }
+
+    [Fact]
     public void Loaded_seed_playbooks_have_valid_structure()
     {
         // Sanity check that every shipped playbook deserializes and has the
