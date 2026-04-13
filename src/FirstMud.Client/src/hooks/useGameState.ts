@@ -279,9 +279,33 @@ export function useGameState(): GameStateResult {
       connection.on('QuestKillProgress', (payload: { questId: string; kills: number; required: number }) => {
         setQuestProgress(prev => ({
           ...prev,
-          [payload.questId]: { questId: payload.questId, kills: payload.kills, required: payload.required },
+          [payload.questId]: {
+            questId: payload.questId,
+            kills: payload.kills,
+            gathered: prev[payload.questId]?.gathered,
+            required: payload.required,
+          },
         }));
         if (payload.kills >= payload.required) {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: `Quest objective complete! Navigate to the waypoint and press [E] to finish.`,
+          });
+        }
+      });
+
+      connection.on('QuestHarvestProgress', (payload: { questId: string; gathered: number; required: number }) => {
+        setQuestProgress(prev => ({
+          ...prev,
+          [payload.questId]: {
+            questId: payload.questId,
+            kills: prev[payload.questId]?.kills ?? 0,
+            gathered: payload.gathered,
+            required: payload.required,
+          },
+        }));
+        if (payload.gathered >= payload.required) {
           appendMessage({
             timestamp: new Date().toISOString(),
             category: 'quest',

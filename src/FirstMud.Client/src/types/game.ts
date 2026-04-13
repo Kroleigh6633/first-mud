@@ -351,6 +351,8 @@ export interface QuestWaypoint {
 export interface QuestProgress {
   questId: string;
   kills: number;
+  /** Items gathered (for gather/deliver quests). Present alongside or instead of kills. */
+  gathered?: number;
   required: number;
 }
 

@@ -101,7 +101,13 @@ public class QuestAutoCompleteService(
     /// <summary>
     /// Finds items in the player's inventory that match the given keyword.
     /// Tries exact contains match first, then common synonyms.
+    /// Exposed internally so harvest/loot handlers can broadcast progress
+    /// using the same matching rules the auto-completer applies.
     /// </summary>
+    public static List<Domain.Entities.Item> FindMatchingItemsForKeyword(
+        IReadOnlyList<Domain.Entities.Item> items,
+        string keyword) => FindMatchingItems(items, keyword);
+
     private static List<Domain.Entities.Item> FindMatchingItems(
         IReadOnlyList<Domain.Entities.Item> items,
         string keyword)
