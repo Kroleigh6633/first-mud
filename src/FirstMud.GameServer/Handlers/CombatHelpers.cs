@@ -753,7 +753,10 @@ public class CombatHelpers(
 
             // Activate the replacement (may need to recall from homestead first)
             if (replacement.AssignedDuty.HasValue && replacement.AssignedDuty != Domain.Enums.HomesteadDuty.None)
+            {
                 replacement.RecallFromHomestead();
+                await buildingService.ClearCompanionFromBuildingsAsync(playerId, replacement.Id, ct);
+            }
 
             player.TryAddActiveCompanion(replacement.Id);
             replacement.SetActive(true);

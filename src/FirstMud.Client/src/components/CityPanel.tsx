@@ -28,6 +28,7 @@ const BUILDING_DUTY: Partial<Record<BuildingType, HomesteadDuty>> = {
   Barracks:       'Guard',
   Library:        'Salvager',
   Warehouse:      'Guard',
+  Greenhouse:     'Harvester',
 };
 
 const HOUSING_TYPES = new Set<BuildingType>(['Hut']);
@@ -48,6 +49,7 @@ const WORKER_CAPACITY: Record<BuildingType, number> = {
   Warehouse:       1,
   Fletcher:        2,
   Hut:             0,
+  Greenhouse:      2,
 };
 
 const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[]> = {
@@ -65,12 +67,13 @@ const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[
   Library:        [{ material: 'Wood', qty: 10 }, { material: 'Stone', qty: 5 }],
   Warehouse:      [{ material: 'Wood', qty: 12 }, { material: 'Stone', qty: 5 }],
   Hut:            [{ material: 'Wood', qty: 5 },  { material: 'Stone', qty: 3 }],
+  Greenhouse:     [{ material: 'Wood', qty: 8 },  { material: 'Stone', qty: 5 }, { material: 'Sand', qty: 3 }],
 };
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'Forge', 'Fletcher', 'Tannery', 'EnchantingTower', 'AlchemistHut',
   'Stoneworker', 'Woodworker', 'MarketStall', 'Farm', 'Mine',
-  'Barracks', 'Library', 'Warehouse', 'Hut',
+  'Barracks', 'Library', 'Warehouse', 'Hut', 'Greenhouse',
 ];
 
 // Aptitude per companion type per duty (mirrors CompanionPanel)
@@ -128,6 +131,7 @@ function buildingIcon(type: BuildingType): string {
     case 'Library':         return '📚';
     case 'Warehouse':       return '📦';
     case 'Hut':             return '🏠';
+    case 'Greenhouse':      return '🌿';
   }
 }
 
@@ -147,6 +151,7 @@ function buildingColor(type: BuildingType): string {
     case 'Library':         return '#44aacc';
     case 'Warehouse':       return '#aaaaaa';
     case 'Hut':             return '#cc9966';
+    case 'Greenhouse':      return '#44cc88';
   }
 }
 
@@ -241,7 +246,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
         <span style={{ color: '#ffcc00', fontSize: '10px' }}>{tierStr}</span>
         {!isHousing && building.isConstructed && (
           <span style={{ color: '#888888', fontSize: '10px', marginLeft: '4px' }}>
-            {building.assignedCompanionName ? '1' : '0'}/{workerCapacity} workers
+            {(building as any).workers?.length ?? (building.assignedCompanionName ? 1 : 0)}/{(building as any).workerCapacity ?? workerCapacity} workers
           </span>
         )}
         {!building.isConstructed && (
@@ -275,72 +280,42 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
         </div>
       )}
 
-      {/* Production building (constructed) — show worker info or assign dropdown */}
+      {/* Production building (constructed) — show workers (auto-managed) */}
       {!isHousing && building.isConstructed && (
         <div style={{ fontSize: '11px', marginTop: '4px' }}>
-          {building.assignedCompanionName ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#aaaaaa' }}>
-                Worker: <span style={{ color: '#00ccff' }}>{building.assignedCompanionName}</span>
-                {duty && (
-                  <> <span style={{ color: '#888888', fontSize: '10px' }}>({duty})</span></>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={handleUnassign}
-                style={unassignBtnStyle}
-                title="Recall companion from this building"
-              >
-                Unassign
-              </button>
-            </div>
-          ) : (
-            <div style={{ marginTop: '4px' }}>
-              <div style={{ color: '#888888', marginBottom: '4px' }}>
-                No worker — assign a companion:
+          {(() => {
+            const workers: { id: string; name: string; duty?: string }[] = (building as any).workers ?? [];
+            if (workers.length === 0 && building.assignedCompanionName) {
+              // Legacy single-worker fallback
+              workers.push({ id: building.assignedCompanionId ?? '', name: building.assignedCompanionName, duty: duty ?? undefined });
+            }
+            return workers.length > 0 ? (
+              <div>
+                {workers.map((w, i) => (
+                  <div key={w.id || i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                    <span style={{ color: '#aaaaaa' }}>
+                      Worker: <span style={{ color: '#00ccff' }}>{w.name}</span>
+                      {(w.duty || duty) && (
+                        <> <span style={{ color: '#888888', fontSize: '10px' }}>({w.duty || duty})</span></>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleUnassign}
+                      style={unassignBtnStyle}
+                      title="Recall companion from this building"
+                    >
+                      Unassign
+                    </button>
+                  </div>
+                ))}
               </div>
-              {sorted.length === 0 ? (
-                <div style={{ color: '#555555', fontSize: '10px' }}>
-                  No available companions (all active or already assigned)
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  <select
-                    value={selectedCompanionId}
-                    onChange={e => setSelectedCompanionId(e.target.value)}
-                    style={selectStyle}
-                    aria-label={`Select companion for ${building.type}`}
-                  >
-                    <option value="">-- Select companion --</option>
-                    {sorted.map(c => {
-                      const apt = duty ? (APTITUDE[c.type]?.[duty] ?? 1) : 1;
-                      const stars = '★'.repeat(apt) + '☆'.repeat(3 - apt);
-                      return (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.type}) {duty}: {stars}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  {selectedCompanionId && duty && (
-                    <>
-                      <span style={{ color: '#888888', fontSize: '10px' }}>
-                        {duty}: <AptitudeStars count={APTITUDE[sorted.find(c => c.id === selectedCompanionId)?.type ?? 'HiredHero']?.[duty] ?? 1} />
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleAssign}
-                        style={assignBtnStyle}
-                      >
-                        Assign
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            ) : (
+              <div style={{ color: '#555555' }}>
+                No workers assigned — the administrator will auto-fill when companions are available.
+              </div>
+            );
+          })()}
           <span style={{ color: '#444444', fontSize: '10px', display: 'block', marginTop: '2px' }}>
             Pos: ({building.gridX},{building.gridY})
           </span>
@@ -594,11 +569,13 @@ function computeWorkforceStats(
   );
   const underConstruction = buildings.filter(b => !b.isConstructed);
 
-  const working = productionBuildings.filter(
-    b => b.type !== 'Barracks' && b.assignedCompanionName
+  // Count by companion duty (not building type) for accurate workforce totals
+  const nonAdventuring = companionRoster.filter(c => !activeCompanionIds.includes(c.id));
+  const working = nonAdventuring.filter(
+    c => c.assignedDuty && c.assignedDuty !== 'Guard'
   ).length;
-  const guards = productionBuildings.filter(
-    b => (b.type === 'Barracks' || b.type === 'Warehouse') && b.assignedCompanionName
+  const guards = nonAdventuring.filter(
+    c => c.assignedDuty === 'Guard'
   ).length;
 
   const housed = housingBuildings.reduce((sum, b) => sum + (b.residents?.length ?? 0), 0);
@@ -608,12 +585,17 @@ function computeWorkforceStats(
 
   const assignedOrActive = new Set([
     ...activeCompanionIds,
-    ...buildings
-      .filter(b => b.assignedCompanionId)
-      .map(b => b.assignedCompanionId as string),
+    ...buildings.flatMap(b => {
+      const workers: { id: string }[] = (b as any).workers ?? [];
+      const workerIds = workers.map(w => w.id);
+      // Also include legacy single assignedCompanionId
+      if (b.assignedCompanionId && !workerIds.includes(b.assignedCompanionId))
+        workerIds.push(b.assignedCompanionId);
+      return workerIds;
+    }),
   ]);
   const unemployed = companionRoster.filter(
-    c => !assignedOrActive.has(c.id)
+    c => !assignedOrActive.has(c.id) && !c.assignedDuty
   ).length;
 
   const allProductionStaffed = productionBuildings.length > 0 &&
@@ -655,13 +637,7 @@ function OverviewTab({ stats }: OverviewTabProps) {
 
   if (stats.homeless > 0) {
     const hutsNeeded = Math.ceil(stats.homeless / 3); // 3 capacity per hut
-    recommendations.push({ ok: false, text: `${stats.homeless} companions need housing — build ${hutsNeeded} more hut${hutsNeeded !== 1 ? 's' : ''}` });
-  }
-
-  if (stats.unemployed > 10) {
-    recommendations.push({ ok: false, text: `${stats.unemployed} companions unemployed — build more production buildings` });
-  } else if (stats.unemployed > 0) {
-    recommendations.push({ ok: false, text: `${stats.unemployed} companions unemployed — assign them to production buildings` });
+    recommendations.push({ ok: false, text: `${stats.homeless} companions need housing — the administrator will auto-build ${hutsNeeded} hut${hutsNeeded !== 1 ? 's' : ''} when materials are available` });
   }
 
   if (stats.guards === 0 && stats.productionBuildings.length > 0) {
@@ -725,8 +701,9 @@ function OverviewTab({ stats }: OverviewTabProps) {
         <span style={{ color: stats.homeless > 0 ? '#ff8800' : '#555555' }}>{stats.homeless}</span>
       </div>
       <div style={{ ...rowStyle, marginLeft: '12px' }}>
-        <span style={labelStyle}>Unemployed:</span>
+        <span style={labelStyle}>Unassigned:</span>
         <span style={{ color: stats.unemployed > 0 ? '#ffcc00' : '#555555' }}>{stats.unemployed}</span>
+        {stats.unemployed === 0 && <span style={{ color: '#555555', marginLeft: '4px' }}>(all auto-assigned)</span>}
       </div>
 
       {/* Building summary */}

@@ -95,6 +95,7 @@ builder.Services.AddScoped<ICommandHandler<AssignBuilderCommand>, AssignBuilderC
 builder.Services.AddScoped<ICommandHandler<UnassignBuilderCommand>, UnassignBuilderCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<ViewCityCommand>, ViewCityCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<BuildStaffEverythingCommand>, BuildStaffEverythingCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<PracticeEnchantingCommand>, PracticeEnchantingCommandHandler>();
 
 var app = builder.Build();
 

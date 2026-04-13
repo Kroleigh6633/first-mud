@@ -106,6 +106,7 @@ public class LootService
             new("Mountain Herb",        "A hardy alpine herb with potent healing properties.",                        ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
             new("Granite Block",        "A heavy block of dense grey granite. Durable construction material.",        ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
             new("Eagle Feather",        "A large primary feather from a mountain eagle. Prized for fletching.",       ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Sulphur",              "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
         ],
         ["forest"] =
         [
@@ -114,6 +115,7 @@ public class LootService
             new("Amber Resin",          "Golden tree resin with mild magical adhesive properties.",                   ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
             new("Moonbloom Petal",      "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", ItemCategory.Reagent, EquipmentSlot.None, MinWork: 4, MaxWork: 6),
             new("Spider Silk",          "Fine, strong thread spun by giant forest spiders. Used in light armor.",     ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
+            new("Feather",              "A large plume from a forest bird. Used in air-aligned crafting.",               ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
         ],
         ["desert"] =
         [
@@ -121,6 +123,7 @@ public class LootService
             new("Fire Crystal",         "A deep-red crystal radiating concentrated fire magic.",                      ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 4, MaxWork: 7),
             new("Scorched Bone",        "Bone bleached and hardened by desert heat. Still serviceable.",              ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
             new("Cactus Fiber",         "Coarse fiber stripped from desert cactus. Basic but plentiful.",             ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Sulphur",              "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
             new("Ashite Dust",          "Fine grey powder imbued with residual magic from the Ardweld collapse.",     ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 5, MaxWork: 7),
         ],
         ["water"] =
@@ -130,6 +133,7 @@ public class LootService
             new("Deep Ink",             "Thick black ink harvested from a deep-sea cephalopod. Used for scrollwork.", ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 2, MaxWork: 4),
             new("Pearl",                "A lustrous pearl from a coastal mollusk. Valuable and magically receptive.", ItemCategory.Reagent,   EquipmentSlot.None, MinWork: 4, MaxWork: 7),
             new("Driftwood",            "Salt-treated wood washed ashore. Rot-resistant and light.",                  ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
+            new("Coral",                "A chunk of living coral harvested from tidal pools. Used in water-aligned crafting.", ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 4),
         ],
         ["swamp"] =
         [
@@ -146,6 +150,7 @@ public class LootService
             new("Flint",                "A piece of flint knapped to a sharp edge. Essential for tool making.",       ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
             new("Wheat Sheaf",          "A bundle of harvested wheat. Ingredient in future food crafting.",           ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 2),
             new("Copper Nugget",        "A small nugget of soft copper ore. Used in basic metalworking.",             ItemCategory.Component, EquipmentSlot.None, MinWork: 2, MaxWork: 3),
+            new("Feather",              "A large plume from a plains bird. Used in air-aligned crafting.",               ItemCategory.Component, EquipmentSlot.None, MinWork: 1, MaxWork: 3),
         ],
         ["wyrd"] =
         [

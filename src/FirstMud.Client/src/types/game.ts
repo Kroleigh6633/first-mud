@@ -408,7 +408,8 @@ export type BuildingType =
   | 'Barracks'
   | 'Library'
   | 'Warehouse'
-  | 'Hut';
+  | 'Hut'
+  | 'Greenhouse';
 
 export interface HutResident {
   id: string;

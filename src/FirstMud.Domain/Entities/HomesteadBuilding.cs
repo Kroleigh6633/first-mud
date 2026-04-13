@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FirstMud.Domain.Enums;
 
 namespace FirstMud.Domain.Entities;
@@ -12,7 +13,23 @@ public class HomesteadBuilding
     public int GridY { get; private set; }
     public bool IsConstructed { get; private set; } // false = under construction
     public int ConstructionProgress { get; private set; } // 0–100
-    public Guid? AssignedCompanionId { get; private set; }
+
+    // Multi-worker support: JSON array of companion GUIDs assigned to this building.
+    // Replaces the old single AssignedCompanionId column.
+    public string AssignedCompanionIdsJson { get; private set; } = "[]";
+
+    /// <summary>Deserialized list of all companion IDs assigned to this building.</summary>
+    public IReadOnlyList<Guid> AssignedCompanionIds =>
+        string.IsNullOrEmpty(AssignedCompanionIdsJson) || AssignedCompanionIdsJson == "[]"
+            ? []
+            : JsonSerializer.Deserialize<List<Guid>>(AssignedCompanionIdsJson) ?? [];
+
+    /// <summary>Backward compat: returns first assigned companion or null.</summary>
+    public Guid? AssignedCompanionId =>
+        AssignedCompanionIds.Count > 0 ? AssignedCompanionIds[0] : null;
+
+    /// <summary>Number of workers currently assigned.</summary>
+    public int WorkerCount => AssignedCompanionIds.Count;
 
     private HomesteadBuilding() { }
 
@@ -34,7 +51,7 @@ public class HomesteadBuilding
             GridY = gridY,
             IsConstructed = alreadyConstructed,
             ConstructionProgress = alreadyConstructed ? 100 : 0,
-            AssignedCompanionId = null,
+            AssignedCompanionIdsJson = "[]",
         };
     }
 
@@ -56,18 +73,38 @@ public class HomesteadBuilding
     }
 
     /// <summary>
-    /// Assigns a companion to work at this building (crafter, guard, etc.).
+    /// Assigns a companion to work at this building. Supports multiple workers.
     /// </summary>
     public void AssignCompanion(Guid companionId)
     {
-        AssignedCompanionId = companionId;
+        var ids = AssignedCompanionIds.ToList();
+        if (!ids.Contains(companionId))
+        {
+            ids.Add(companionId);
+            AssignedCompanionIdsJson = JsonSerializer.Serialize(ids);
+        }
     }
 
     /// <summary>
-    /// Removes the companion assignment (companion recalled or reassigned).
+    /// Removes a specific companion from this building.
+    /// </summary>
+    public void RemoveCompanion(Guid companionId)
+    {
+        var ids = AssignedCompanionIds.ToList();
+        if (ids.Remove(companionId))
+            AssignedCompanionIdsJson = JsonSerializer.Serialize(ids);
+    }
+
+    /// <summary>
+    /// Removes ALL companion assignments (clears the building).
     /// </summary>
     public void UnassignCompanion()
     {
-        AssignedCompanionId = null;
+        AssignedCompanionIdsJson = "[]";
     }
+
+    /// <summary>
+    /// Returns true if the given companion is assigned to this building.
+    /// </summary>
+    public bool HasCompanion(Guid companionId) => AssignedCompanionIds.Contains(companionId);
 }

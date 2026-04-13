@@ -795,6 +795,58 @@ public class StartupSeeder(
              RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 5),
              RecipeIngredient.Create(ItemCategory.Component, "Herbs",         10)],
             ItemCategory.Consumable,  "Master's Tonic",       4, 8, 100),
+
+        // ── Skill 1: practice items ──────────────────────────────────────────
+        ("PRACTICE_WAND_001",        "Oak Wand (Practice)",
+            [RecipeIngredient.Create(ItemCategory.Component, "Wood",          2),
+             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         1)],
+            ItemCategory.Weapon,      "Oak Wand (Practice)",  1, 3, 1),
+
+        ("PRACTICE_CHARM_001",       "Bone Charm",
+            [RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2),
+             RecipeIngredient.Create(ItemCategory.Component, "Stone",         1)],
+            ItemCategory.Accessory,   "Bone Charm",           1, 3, 1),
+
+        // ── Elemental Taper recipes — crafted at Greenhouse or Alchemist ────
+        ("TAPER_FIRE_001",           "Fire Shaping Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Sulphur",       2)],
+            ItemCategory.Reagent,     "Fire Shaping Taper",   3, 6, 5),
+
+        ("TAPER_WATER_001",          "Water Shaping Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Coral",         2)],
+            ItemCategory.Reagent,     "Water Shaping Taper",  3, 6, 5),
+
+        ("TAPER_EARTH_001",          "Earth Shaping Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Stone",         2)],
+            ItemCategory.Reagent,     "Earth Shaping Taper",  3, 6, 5),
+
+        ("TAPER_AIR_001",            "Air Shaping Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Feather",       2)],
+            ItemCategory.Reagent,     "Air Shaping Taper",    3, 6, 5),
+
+        ("TAPER_FORT_001",           "Fortitude Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         4),
+             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      2)],
+            ItemCategory.Reagent,     "Fortitude Taper",      4, 7, 10),
+
+        ("TAPER_WARD_001",           "Warding Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         4),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",       2)],
+            ItemCategory.Reagent,     "Warding Taper",        4, 7, 10),
+
+        ("TAPER_WYRD_001",           "Wyrd Shard Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         5),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3)],
+            ItemCategory.Reagent,     "Wyrd Shard Taper",     5, 8, 20),
+
+        ("TAPER_REST_001",           "Dravenite Dust Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         5),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         3)],
+            ItemCategory.Reagent,     "Dravenite Dust Taper", 4, 7, 15),
     ];
 
     private async Task SeedStarterRecipesAsync(CancellationToken ct)
@@ -947,7 +999,7 @@ public class StartupSeeder(
     {
         var hutType = (int)Domain.Enums.BuildingType.Hut;
         var hutsWithAssignees = await db.HomesteadBuildings
-            .Where(b => b.Type == (Domain.Enums.BuildingType)hutType && b.AssignedCompanionId != null)
+            .Where(b => b.Type == (Domain.Enums.BuildingType)hutType && b.AssignedCompanionIdsJson != "[]" && b.AssignedCompanionIdsJson != "")
             .ToListAsync(ct);
 
         if (hutsWithAssignees.Count == 0)
@@ -959,7 +1011,8 @@ public class StartupSeeder(
         int migrated = 0;
         foreach (var hut in hutsWithAssignees)
         {
-            var companionId = hut.AssignedCompanionId!.Value;
+            if (hut.WorkerCount == 0) continue;
+            var companionId = hut.AssignedCompanionIds[0];
             var companion = await db.Companions.FindAsync([companionId], ct);
             if (companion is not null && companion.HousingBuildingId is null)
             {
@@ -1067,7 +1120,17 @@ public class StartupSeeder(
 
                 // Recall replacement from homestead if needed, then activate
                 if (replacement.AssignedDuty.HasValue && replacement.AssignedDuty != HomesteadDuty.None)
+                {
                     replacement.RecallFromHomestead();
+                    // Clear building reference so building doesn't retain a ghost worker
+                    var assignedBuilding = db.HomesteadBuildings
+                        .FirstOrDefault(b => b.HasCompanion(replacement.Id));
+                    if (assignedBuilding is not null)
+                    {
+                        assignedBuilding.UnassignCompanion();
+                        db.HomesteadBuildings.Update(assignedBuilding);
+                    }
+                }
 
                 player.TryAddActiveCompanion(replacement.Id);
                 replacement.SetActive(true);

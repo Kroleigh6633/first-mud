@@ -60,6 +60,17 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
   const hasWeapons = unequippedItems.some(i => i.category?.toLowerCase() === 'weapon');
   const hasArmor   = unequippedItems.some(i => i.category?.toLowerCase() === 'armor');
 
+  // Practice enchanting eligibility: have imbue-able items AND tapers
+  const imbueableItems = unequippedItems.filter(i =>
+    (i.category?.toLowerCase() === 'weapon' || i.category?.toLowerCase() === 'armor')
+    && !i.isLocked
+    && (i.imbues?.length ?? 0) < (i.maxImbueSlots ?? 1)
+  );
+  const hasTapers = allItems.some(i => i.category === 'Reagent');
+  const canPracticeEnchanting = imbueableItems.length > 0 && hasTapers;
+
+  const handlePracticeEnchanting = () => sendCommand('practiceenchanting', {});
+
   const sharedRowProps = {
     allItems,
     maxSalvageable,
@@ -134,8 +145,8 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
         )}
 
         {/* Bulk salvage buttons */}
-        {(hasWeapons || hasArmor) && (
-          <div style={{ padding: '4px 14px 8px', display: 'flex', gap: '8px' }}>
+        {(hasWeapons || hasArmor || canPracticeEnchanting) && (
+          <div style={{ padding: '4px 14px 8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {hasWeapons && (
               <button type="button" style={salvageAllBtnStyle} onClick={() => handleSalvageAll('Weapon')} aria-label="salvage all weapons">
                 salvage all weapons
@@ -144,6 +155,22 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
             {hasArmor && (
               <button type="button" style={salvageAllBtnStyle} onClick={() => handleSalvageAll('Armor')} aria-label="salvage all armor">
                 salvage all armor
+              </button>
+            )}
+            {canPracticeEnchanting && (
+              <button
+                type="button"
+                style={{
+                  ...salvageAllBtnStyle,
+                  borderColor: '#9944ff',
+                  color: '#cc88ff',
+                  background: '#1a0033',
+                }}
+                onClick={handlePracticeEnchanting}
+                aria-label="practice enchanting"
+                title={`Imbue ${imbueableItems.length} item(s) with available tapers, then auto-salvage fully imbued items`}
+              >
+                practice enchanting ({imbueableItems.length})
               </button>
             )}
           </div>

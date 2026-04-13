@@ -39,7 +39,14 @@ internal sealed class HomesteadBuildingConfiguration : IEntityTypeConfiguration<
         builder.Property(b => b.ConstructionProgress)
             .IsRequired();
 
-        builder.Property(b => b.AssignedCompanionId)
-            .IsRequired(false);
+        builder.Property(b => b.AssignedCompanionIdsJson)
+            .HasColumnName("AssignedCompanionIdsJson")
+            .HasDefaultValue("[]")
+            .IsRequired();
+
+        // Ignore computed properties — EF should not try to map these columns
+        builder.Ignore(b => b.AssignedCompanionIds);
+        builder.Ignore(b => b.AssignedCompanionId);
+        builder.Ignore(b => b.WorkerCount);
     }
 }

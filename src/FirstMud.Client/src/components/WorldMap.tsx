@@ -323,6 +323,7 @@ function buildingBaseColors(type: BuildingType): { wall: string; roof: string; a
     case 'Library':        return { wall: '#2a3040', roof: '#4a5060', accent: '#44aacc' };
     case 'Warehouse':      return { wall: '#404040', roof: '#606060', accent: '#aaaaaa' };
     case 'Hut':            return { wall: '#7a5030', roof: '#a06838', accent: '#ddaa77' };
+    case 'Greenhouse':     return { wall: '#2a5a3a', roof: '#44aa66', accent: '#88eebb' };
     default:               return { wall: '#3a3a3a', roof: '#5a5a5a', accent: '#888888' };
   }
 }
@@ -925,6 +926,61 @@ function drawHomesteadBuilding(
       ctx.globalAlpha = 0.55;
       ctx.fillRect(sx + hw * 0.35, roofBase + wh * 0.28, hw * 0.3, tileH * 0.16);
       ctx.globalAlpha = 1;
+      break;
+    }
+
+    // ── Greenhouse: green-tinted geodesic dome ──────────────────────────────
+    case 'Greenhouse': {
+      const radius = tileW * 0.38;
+      const domeTop = floor - tileH * 1.6;
+      const cx = sx;
+      const cy = floor;
+
+      // Base platform
+      ctx.fillStyle = '#2a5a3a';
+      ctx.fillRect(cx - radius, cy - tileH * 0.15, radius * 2, tileH * 0.15);
+
+      // Dome body — semi-ellipse
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - tileH * 0.15, radius, tileH * 1.45, 0, Math.PI, 0);
+      ctx.fillStyle = 'rgba(68, 170, 102, 0.45)';
+      ctx.fill();
+      ctx.strokeStyle = '#44aa66';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Geodesic rib lines — vertical
+      ctx.strokeStyle = 'rgba(136, 238, 187, 0.6)';
+      ctx.lineWidth = 0.8;
+      for (let i = -2; i <= 2; i++) {
+        const xOff = (radius * 0.35) * i;
+        const ribH = tileH * 1.45 * Math.sqrt(1 - (xOff * xOff) / (radius * radius));
+        ctx.beginPath();
+        ctx.moveTo(cx + xOff, cy - tileH * 0.15);
+        ctx.lineTo(cx + xOff, cy - tileH * 0.15 - ribH);
+        ctx.stroke();
+      }
+
+      // Geodesic rib lines — horizontal
+      for (let i = 1; i <= 3; i++) {
+        const yOff = tileH * 1.45 * (i / 4);
+        const ribY = cy - tileH * 0.15 - yOff;
+        const span = radius * Math.sqrt(1 - (yOff * yOff) / (tileH * 1.45 * tileH * 1.45));
+        ctx.beginPath();
+        ctx.moveTo(cx - span, ribY);
+        ctx.lineTo(cx + span, ribY);
+        ctx.stroke();
+      }
+
+      // Small green leaf accent at top
+      ctx.fillStyle = '#33cc66';
+      ctx.beginPath();
+      ctx.arc(cx, domeTop + tileH * 0.15, tileW * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Door
+      ctx.fillStyle = '#1a3a2a';
+      ctx.fillRect(cx - tileW * 0.05, cy - tileH * 0.4, tileW * 0.1, tileH * 0.4);
       break;
     }
 

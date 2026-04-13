@@ -58,3 +58,5 @@ public record UnassignBuilderCommand(Guid PlayerId, Guid BuildingId) : IGameComm
 public record ViewCityCommand(Guid PlayerId) : IGameCommand;
 /// <summary>One-click: seed all missing starter buildings then auto-staff every empty slot.</summary>
 public record BuildStaffEverythingCommand(Guid PlayerId) : IGameCommand;
+/// <summary>Imbue all eligible items with available tapers, then auto-salvage fully imbued items.</summary>
+public record PracticeEnchantingCommand(Guid PlayerId) : IGameCommand;

@@ -153,10 +153,30 @@ public class GameLoopService : BackgroundService
         await _aiPlayerService.TickAsync(ct);
     }
 
-    private Task ProcessAutomationTickAsync(CancellationToken ct)
+    /// <summary>
+    /// Periodic sweep: ensure all idle companions are assigned to city duties.
+    /// Runs every 5 minutes to catch any companions that slipped through event-driven assignment.
+    /// </summary>
+    private async Task ProcessAutomationTickAsync(CancellationToken ct)
     {
         _logger.LogDebug("Running automation upkeep tick at game tick {TickCount}.", _tickCount);
-        return Task.CompletedTask;
+
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var playerRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.IPlayerRepository>();
+            var buildingService = scope.ServiceProvider.GetRequiredService<FirstMud.Application.Services.BuildingService>();
+
+            var players = await playerRepo.GetActivePlayersAsync(ct);
+            foreach (var player in players)
+            {
+                await buildingService.AutoAssignIdleCompanionsAsync(player.Id, player.ActiveCompanionIds, ct);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in automation companion sweep.");
+        }
     }
 
     /// <summary>

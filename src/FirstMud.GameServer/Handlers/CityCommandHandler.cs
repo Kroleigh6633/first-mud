@@ -20,7 +20,7 @@ public class PlaceBuildingCommandHandler(
     public async Task<CommandResult> HandleAsync(PlaceBuildingCommand cmd, CancellationToken ct)
     {
         if (!Enum.TryParse<BuildingType>(cmd.BuildingType, ignoreCase: true, out var buildingType))
-            return new CommandResult(false, $"Unknown building type: '{cmd.BuildingType}'. Valid types: Forge, Tannery, MarketStall, Farm, Mine, Warehouse, Barracks, Fletcher, EnchantingTower, AlchemistHut, Stoneworker, Woodworker, Library.");
+            return new CommandResult(false, $"Unknown building type: '{cmd.BuildingType}'. Valid types: Forge, Tannery, MarketStall, Farm, Mine, Warehouse, Barracks, Fletcher, EnchantingTower, AlchemistHut, Stoneworker, Woodworker, Library, Greenhouse.");
 
         var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
         if (homestead is null)
@@ -209,12 +209,18 @@ internal static class CityViewBuilder
             }
             else
             {
-                // Production building: show single worker
-                string? assignedName = null;
-                if (b.AssignedCompanionId.HasValue)
+                // Production building: show all workers
+                var workers = new List<object>();
+                foreach (var companionId in b.AssignedCompanionIds)
                 {
-                    var companion = await companionRepository.GetByIdAsync(b.AssignedCompanionId.Value, ct);
-                    assignedName = companion?.Name;
+                    var companion = await companionRepository.GetByIdAsync(companionId, ct);
+                    if (companion is not null)
+                    {
+                        var duty = FirstMud.Application.Services.BuildingService.IsProductionType(b.Type)
+                            ? companion.AssignedDuty?.ToString()
+                            : null;
+                        workers.Add(new { id = companion.Id, name = companion.Name, duty });
+                    }
                 }
 
                 dtos.Add(new
@@ -228,7 +234,9 @@ internal static class CityViewBuilder
                     isConstructed        = b.IsConstructed,
                     constructionProgress = b.ConstructionProgress,
                     assignedCompanionId  = b.AssignedCompanionId,
-                    assignedCompanionName= assignedName,
+                    assignedCompanionName= workers.Count > 0 ? ((dynamic)workers[0]).name : null,
+                    workers,
+                    workerCapacity       = FirstMud.Application.Services.BuildingService.GetWorkerCapacity(b.Type),
                     residents            = (object?)null,
                     residentCapacity     = 0,
                 });

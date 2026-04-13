@@ -35,6 +35,7 @@ public class BuildingService
         [BuildingType.Library]        = [("Wood", 10), ("Stone", 5)],
         [BuildingType.Warehouse]      = [("Wood", 12), ("Stone", 5)],
         [BuildingType.Hut]            = [("Wood",  5), ("Stone",  3)],
+        [BuildingType.Greenhouse]     = [("Wood",  8), ("Stone",  5), ("Sand",  3)],
     };
 
     // Best HomesteadDuty for each production building type — used for auto-assignment.
@@ -54,7 +55,31 @@ public class BuildingService
         [BuildingType.Barracks]       = HomesteadDuty.Guard,
         [BuildingType.Library]        = HomesteadDuty.Salvager,
         [BuildingType.Warehouse]      = HomesteadDuty.Guard,
+        [BuildingType.Greenhouse]     = HomesteadDuty.Harvester,
     };
+
+    // Worker capacity per building type (how many companions can work there)
+    private static readonly Dictionary<BuildingType, int> WorkerCapacity = new()
+    {
+        [BuildingType.Forge]          = 2,
+        [BuildingType.Tannery]        = 2,
+        [BuildingType.Farm]           = 3,
+        [BuildingType.Mine]           = 3,
+        [BuildingType.Woodworker]     = 2,
+        [BuildingType.AlchemistHut]   = 2,
+        [BuildingType.Stoneworker]    = 2,
+        [BuildingType.EnchantingTower]= 1,
+        [BuildingType.MarketStall]    = 1,
+        [BuildingType.Library]        = 1,
+        [BuildingType.Barracks]       = 5,
+        [BuildingType.Warehouse]      = 1,
+        [BuildingType.Fletcher]       = 2,
+        [BuildingType.Greenhouse]     = 2,
+    };
+
+    /// <summary>Returns the max worker count for a building type.</summary>
+    public static int GetWorkerCapacity(BuildingType type) =>
+        WorkerCapacity.TryGetValue(type, out var cap) ? cap : 1;
 
     /// <summary>Returns true if this building type is residential housing (holds residents, not workers).</summary>
     public static bool IsHousingType(BuildingType type) => type == BuildingType.Hut;
@@ -316,22 +341,27 @@ public class BuildingService
             return (false, "Building not found.");
         if (building.HomesteadId != homestead.Id)
             return (false, "That building does not belong to your homestead.");
-        if (!building.AssignedCompanionId.HasValue)
+        if (building.WorkerCount == 0)
             return (false, "No companion is assigned to that building.");
 
-        var companionId = building.AssignedCompanionId.Value;
+        // Recall all workers from this building
+        var workerIds = building.AssignedCompanionIds.ToList();
         building.UnassignCompanion();
         await _buildings.UpdateAsync(building, ct);
 
-        // Recall companion back to idle (clear duty)
-        var companion = await _companions.GetByIdAsync(companionId, ct);
-        if (companion is not null)
+        var names = new List<string>();
+        foreach (var companionId in workerIds)
         {
-            companion.RecallFromHomestead();
-            await _companions.UpdateAsync(companion, ct);
+            var companion = await _companions.GetByIdAsync(companionId, ct);
+            if (companion is not null)
+            {
+                companion.RecallFromHomestead();
+                await _companions.UpdateAsync(companion, ct);
+                names.Add(companion.Name);
+            }
         }
 
-        var name = companion?.Name ?? "Companion";
+        var name = names.Count > 0 ? string.Join(", ", names) : "Companion";
         _logger.LogInformation("Player {PlayerId} unassigned {CompanionName} from {BuildingType}.", playerId, name, building.Type);
         return (true, $"{name} recalled from {building.Type}.");
     }
@@ -447,7 +477,7 @@ public class BuildingService
         foreach (var building in underConstruction)
         {
             // Count assigned builders (each assigned companion = 1 builder)
-            int builderCount = building.AssignedCompanionId.HasValue ? 1 : 0;
+            int builderCount = building.WorkerCount;
             if (builderCount == 0) continue; // no builder assigned, no progress
 
             // 5% per builder per tick
@@ -460,16 +490,47 @@ public class BuildingService
                 // Look up homestead owner for the notification
                 Guid playerId = await GetHomesteadOwnerAsync(building.HomesteadId, ct);
 
-                // Auto-assign best companion if building just finished
-                Companion? assignee = null;
                 if (playerId != Guid.Empty)
-                    assignee = await AutoAssignCompanionAsync(playerId, building, null, ct);
+                {
+                    // Free all builders from the completed building so they can be reassigned
+                    foreach (var builderId in building.AssignedCompanionIds.ToList())
+                    {
+                        var builder = await _companions.GetByIdAsync(builderId, ct);
+                        if (builder is not null)
+                        {
+                            builder.RecallFromHomestead();
+                            await _companions.UpdateAsync(builder, ct);
+                        }
+                    }
+                    building.UnassignCompanion();
+                    await _buildings.UpdateAsync(building, ct);
 
-                results.Add(new BuildingConstructionResult(
-                    playerId,
-                    building.Id,
-                    building.Type,
-                    assignee?.Name));
+                    // Now auto-assign everyone (including the freed builder) to their best fit
+                    await AutoAssignIdleCompanionsAsync(playerId, null, ct);
+
+                    // Reload to get the new assignee name
+                    var refreshedBuilding = await _buildings.GetByIdAsync(building.Id, ct);
+                    string? assigneeName = null;
+                    if (refreshedBuilding is not null && refreshedBuilding.WorkerCount > 0)
+                    {
+                        var assignee = await _companions.GetByIdAsync(refreshedBuilding.AssignedCompanionIds[0], ct);
+                        assigneeName = assignee?.Name;
+                    }
+
+                    results.Add(new BuildingConstructionResult(
+                        playerId,
+                        building.Id,
+                        building.Type,
+                        assigneeName));
+                }
+                else
+                {
+                    results.Add(new BuildingConstructionResult(
+                        Guid.Empty,
+                        building.Id,
+                        building.Type,
+                        null));
+                }
             }
         }
 
@@ -477,9 +538,9 @@ public class BuildingService
     }
 
     /// <summary>
-    /// Master one-click operation: seeds all missing starter buildings then auto-assigns the
-    /// best-fit idle companion to every building that has no worker.
-    /// Returns a summary of what was done.
+    /// Master one-click operation: seeds all missing starter buildings then delegates to
+    /// the smart auto-assign system which fills production → construction → guard overflow,
+    /// pulling guards for critical needs when no idle companions are available.
     /// </summary>
     public async Task<(int BuildingsAdded, int CompanionsAssigned, string Summary)> BuildStaffEverythingAsync(
         Guid playerId,
@@ -490,83 +551,17 @@ public class BuildingService
         if (homestead is null)
             return (0, 0, "No homestead found.");
 
-        // Step 1 — seed missing buildings
+        // Step 1 — seed missing starter buildings
         int added = await SeedStarterBuildingsAsync(homestead.Id, ct);
 
-        // Step 2 — reload buildings after potential seed
-        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
-        var companions = await _companions.GetByOwnerAsync(playerId, ct);
+        // Step 2 — smart auto-assign: production → construction → guard overflow
+        // This pulls guards for critical needs when idle pool is empty.
+        int assigned = await AutoAssignIdleCompanionsAsync(playerId, playerActiveCompanionIds, ct);
 
-        var activeIds = playerActiveCompanionIds ?? [];
+        var summary = $"Placed {added} building(s), reassigned {assigned} companion(s) to optimal duties.";
+        _logger.LogInformation("BuildStaffEverything for player {PlayerId}: {Summary}", playerId, summary);
 
-        // Available = not adventuring (checked against authoritative list), not already on duty
-        var available = companions
-            .Where(c => !c.IsPermanentlyGone
-                     && !activeIds.Contains(c.Id)
-                     && !c.AssignedDuty.HasValue)
-            .ToList();
-
-        // Step 3 — assign WORKERS to production buildings (not huts)
-        int assigned = 0;
-        foreach (var building in buildings.Where(b => IsProductionType(b.Type) && !b.AssignedCompanionId.HasValue))
-        {
-            if (available.Count == 0) break;
-
-            var duty = building.IsConstructed
-                ? (BuildingDuty.TryGetValue(building.Type, out var d) ? d : HomesteadDuty.Crafter)
-                : HomesteadDuty.Crafter;
-
-            var best = available
-                .OrderByDescending(c => c.GetAptitude(duty))
-                .ThenByDescending(c => c.Level)
-                .First();
-
-            best.AssignToHomestead(duty);
-            building.AssignCompanion(best.Id);
-
-            await _companions.UpdateAsync(best, ct);
-            await _buildings.UpdateAsync(building, ct);
-
-            available.Remove(best);
-            assigned++;
-        }
-
-        // Step 4 — assign RESIDENTS to huts (fill vacancies in constructed huts)
-        // Reload companions after worker assignments to get fresh HousingBuildingId state
-        var allCompanions = await _companions.GetByOwnerAsync(playerId, ct);
-        var huts = buildings
-            .Where(b => IsHousingType(b.Type) && b.IsConstructed)
-            .ToList();
-
-        int housed = 0;
-        foreach (var hut in huts)
-        {
-            var capacity = GetHutCapacity(hut.Tier);
-            var currentResidents = allCompanions.Count(c => c.HousingBuildingId == hut.Id);
-            if (currentResidents >= capacity) continue;
-
-            var vacancies = capacity - currentResidents;
-            // Companions eligible for housing: on homestead duty (any), not already housed, not permanently gone
-            var unhoused = allCompanions
-                .Where(c => !c.IsPermanentlyGone
-                         && !activeIds.Contains(c.Id)
-                         && c.HousingBuildingId is null)
-                .Take(vacancies)
-                .ToList();
-
-            foreach (var companion in unhoused)
-            {
-                companion.AssignHousing(hut.Id);
-                await _companions.UpdateAsync(companion, ct);
-                housed++;
-            }
-        }
-
-        var summary = $"Placed {added} building(s), assigned {assigned} worker(s), housed {housed} companion(s).";
-        _logger.LogInformation(
-            "BuildStaffEverything for player {PlayerId}: {Summary}", playerId, summary);
-
-        return (added, assigned + housed, summary);
+        return (added, assigned, summary);
     }
 
     /// <summary>
@@ -607,6 +602,208 @@ public class BuildingService
         }
 
         return null; // all huts full
+    }
+
+    /// <summary>
+    /// Smart auto-assign: the city administrator assigns all non-adventuring companions.
+    /// Priority order:
+    ///   1. Staff constructed production buildings (city needs first)
+    ///   2. Assign builders to under-construction buildings
+    ///   3. Overflow → Guard duty
+    /// When idle companions aren't enough, PULLS guards from overflow to fill critical roles.
+    /// Also auto-houses all companions in available huts.
+    /// Call this whenever the companion roster changes (capture, party swap, recall, building done, etc.).
+    /// </summary>
+    public async Task<int> AutoAssignIdleCompanionsAsync(
+        Guid playerId,
+        IReadOnlyList<Guid>? playerActiveCompanionIds = null,
+        CancellationToken ct = default)
+    {
+        var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+        if (homestead is null) return 0;
+
+        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        var companions = await _companions.GetByOwnerAsync(playerId, ct);
+        var activeIds = playerActiveCompanionIds ?? [];
+
+        // Pool = all non-adventuring, non-permanently-gone companions
+        var pool = companions
+            .Where(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id))
+            .ToList();
+
+        if (pool.Count == 0) return 0;
+
+        int changes = 0;
+
+        // ── Step 1: Staff constructed production buildings to capacity (highest priority) ─
+        var understaffedProduction = buildings
+            .Where(b => IsProductionType(b.Type) && b.IsConstructed && b.WorkerCount < GetWorkerCapacity(b.Type))
+            .OrderByDescending(b => GetWorkerCapacity(b.Type) - b.WorkerCount) // most vacant first
+            .ToList();
+
+        foreach (var building in understaffedProduction)
+        {
+            if (!BuildingDuty.TryGetValue(building.Type, out var duty)) continue;
+            int vacancies = GetWorkerCapacity(building.Type) - building.WorkerCount;
+
+            for (int i = 0; i < vacancies; i++)
+            {
+                // Try idle companions first, then pull a guard
+                var candidate = pool
+                    .Where(c => !c.AssignedDuty.HasValue)
+                    .OrderByDescending(c => c.GetAptitude(duty))
+                    .ThenByDescending(c => c.Level)
+                    .FirstOrDefault();
+
+                candidate ??= pool
+                    .Where(c => c.AssignedDuty == HomesteadDuty.Guard)
+                    .OrderByDescending(c => c.GetAptitude(duty))
+                    .ThenByDescending(c => c.Level)
+                    .FirstOrDefault();
+
+                if (candidate is null) break;
+
+                // If pulling from guard, clear their old building assignment first
+                if (candidate.AssignedDuty == HomesteadDuty.Guard)
+                {
+                    var oldBuilding = buildings.FirstOrDefault(b => b.HasCompanion(candidate.Id));
+                    if (oldBuilding is not null)
+                    {
+                        oldBuilding.RemoveCompanion(candidate.Id);
+                        await _buildings.UpdateAsync(oldBuilding, ct);
+                    }
+                }
+
+                candidate.AssignToHomestead(duty);
+                building.AssignCompanion(candidate.Id);
+                await _companions.UpdateAsync(candidate, ct);
+                await _buildings.UpdateAsync(building, ct);
+                pool.Remove(candidate);
+                changes++;
+            }
+        }
+
+        // ── Step 2: Assign builders to under-construction buildings ───────────────
+        var needBuilders = buildings
+            .Where(b => !b.IsConstructed && b.WorkerCount == 0)
+            .ToList();
+
+        // Reload companions state after step 1 assignments
+        companions = await _companions.GetByOwnerAsync(playerId, ct);
+        pool = companions.Where(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id)).ToList();
+
+        foreach (var building in needBuilders)
+        {
+            // Try idle first, then pull a guard for construction
+            var candidate = pool
+                .Where(c => !c.AssignedDuty.HasValue)
+                .OrderByDescending(c => c.GetAptitude(HomesteadDuty.Crafter))
+                .ThenByDescending(c => c.Level)
+                .FirstOrDefault();
+
+            candidate ??= pool
+                .Where(c => c.AssignedDuty == HomesteadDuty.Guard)
+                .OrderByDescending(c => c.GetAptitude(HomesteadDuty.Crafter))
+                .ThenByDescending(c => c.Level)
+                .FirstOrDefault();
+
+            if (candidate is null) break;
+
+            if (candidate.AssignedDuty == HomesteadDuty.Guard)
+            {
+                var oldBuilding = buildings.FirstOrDefault(b => b.HasCompanion(candidate.Id));
+                if (oldBuilding is not null)
+                {
+                    oldBuilding.RemoveCompanion(candidate.Id);
+                    await _buildings.UpdateAsync(oldBuilding, ct);
+                }
+            }
+
+            candidate.AssignToHomestead(HomesteadDuty.Crafter);
+            building.AssignCompanion(candidate.Id);
+            await _companions.UpdateAsync(candidate, ct);
+            await _buildings.UpdateAsync(building, ct);
+            pool.Remove(candidate);
+            changes++;
+        }
+
+        // ── Step 3: Overflow → Guard duty ─────────────────────────────────────────
+        // Reload to get final state
+        companions = await _companions.GetByOwnerAsync(playerId, ct);
+        foreach (var idle in companions
+            .Where(c => !c.IsPermanentlyGone
+                     && !activeIds.Contains(c.Id)
+                     && !c.AssignedDuty.HasValue))
+        {
+            idle.AssignToHomestead(HomesteadDuty.Guard);
+            await _companions.UpdateAsync(idle, ct);
+            changes++;
+        }
+
+        // ── Step 3b: Auto-detect housing shortage → place huts if materials available
+        buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        companions = await _companions.GetByOwnerAsync(playerId, ct);
+        var totalNonActive = companions.Count(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id));
+        var totalHousingCapacity = buildings
+            .Where(b => IsHousingType(b.Type) && b.IsConstructed)
+            .Sum(b => GetHutCapacity(b.Tier));
+
+        if (totalNonActive > totalHousingCapacity)
+        {
+            int hutsNeeded = (int)Math.Ceiling((totalNonActive - totalHousingCapacity) / 3.0);
+            for (int i = 0; i < hutsNeeded; i++)
+            {
+                var (success, _, _) = await PlaceBuildingAsync(playerId, BuildingType.Hut,
+                    AutoPositionSentinel, AutoPositionSentinel, ct);
+                if (success) changes++;
+            }
+        }
+
+        // ── Step 4: House all unhoused companions ─────────────────────────────────
+        companions = await _companions.GetByOwnerAsync(playerId, ct);
+        var huts = buildings.Where(b => IsHousingType(b.Type) && b.IsConstructed).ToList();
+        foreach (var hut in huts)
+        {
+            var capacity = GetHutCapacity(hut.Tier);
+            var currentResidents = companions.Count(c => c.HousingBuildingId == hut.Id);
+            if (currentResidents >= capacity) continue;
+
+            var vacancies = capacity - currentResidents;
+            var unhoused = companions
+                .Where(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id) && c.HousingBuildingId is null)
+                .Take(vacancies)
+                .ToList();
+
+            foreach (var c in unhoused)
+            {
+                c.AssignHousing(hut.Id);
+                await _companions.UpdateAsync(c, ct);
+            }
+        }
+
+        if (changes > 0)
+            _logger.LogInformation("AutoAssign for {PlayerId}: {Count} companion assignment(s) changed.", playerId, changes);
+
+        return changes;
+    }
+
+    /// <summary>
+    /// Clears any building assignment referencing the given companion.
+    /// Call this whenever a companion is recalled from homestead duty so the building
+    /// doesn't retain a ghost reference.
+    /// </summary>
+    public async Task ClearCompanionFromBuildingsAsync(Guid playerId, Guid companionId, CancellationToken ct = default)
+    {
+        var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+        if (homestead is null) return;
+
+        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        var assigned = buildings.FirstOrDefault(b => b.HasCompanion(companionId));
+        if (assigned is not null)
+        {
+            assigned.RemoveCompanion(companionId);
+            await _buildings.UpdateAsync(assigned, ct);
+        }
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -54,10 +54,11 @@ public class GameHub : Hub
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
 
-        // Immediately seed the client with available quests, current zone view, and equipment state
+        // Immediately seed the client with available quests, current zone view, equipment, and companion roster
         _gameLoop.EnqueueCommand(new GetAvailableQuestsCommand(playerId));
         _gameLoop.EnqueueCommand(new EnterZoneCommand(playerId, 0, Guid.Empty));
         _gameLoop.EnqueueCommand(new OpenInventoryCommand(playerId));
+        _gameLoop.EnqueueCommand(new ViewCompanionsCommand(playerId));
 
         // If the player is already at homestead when they connect, send CityView so buildings render immediately
         var connectingPlayer = await _playerRepository.GetByIdAsync(playerId, Context.ConnectionAborted);
@@ -296,6 +297,8 @@ public class GameHub : Hub
             "viewcity" => new ViewCityCommand(playerId),
 
             "buildstaffeverything" => new BuildStaffEverythingCommand(playerId),
+
+            "practiceenchanting" => new PracticeEnchantingCommand(playerId),
 
             _ => null
         };

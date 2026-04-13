@@ -69,30 +69,13 @@ public class PortalHomeCommandHandler(
                     : $"Your settlement is ready: {buildings.Count} buildings with room for all {companions} companions.";
                 await notificationService.SendMessageAsync(cmd.PlayerId, "system", housingMsg, ct);
             }
-            var buildingDtos = new List<object>();
-            foreach (var b in buildings)
-            {
-                string? assignedName = null;
-                if (b.AssignedCompanionId.HasValue)
-                {
-                    var companion = await companionRepository.GetByIdAsync(b.AssignedCompanionId.Value, ct);
-                    assignedName = companion?.Name;
-                }
+            // Auto-assign any idle companions to city duties on arrival
+            await buildingService.AutoAssignIdleCompanionsAsync(cmd.PlayerId, player.ActiveCompanionIds, ct);
 
-                buildingDtos.Add(new
-                {
-                    id                    = b.Id,
-                    homesteadId           = b.HomesteadId,
-                    type                  = b.Type.ToString(),
-                    tier                  = b.Tier,
-                    gridX                 = b.GridX,
-                    gridY                 = b.GridY,
-                    isConstructed         = b.IsConstructed,
-                    constructionProgress  = b.ConstructionProgress,
-                    assignedCompanionId   = b.AssignedCompanionId,
-                    assignedCompanionName = assignedName,
-                });
-            }
+            // Reload after auto-assign and use shared CityViewBuilder for DTO construction
+            buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
+            var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+            var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
 
             var cityViewPayload = new
             {

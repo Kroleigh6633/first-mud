@@ -40,6 +40,7 @@ public class ViewCompanionsCommandHandler(
 public class ActivateCompanionCommandHandler(
     IPlayerRepository playerRepository,
     ICompanionRepository companionRepository,
+    BuildingService buildingService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<ActivateCompanionCommand>
 {
@@ -62,8 +63,12 @@ public class ActivateCompanionCommandHandler(
         if (companion.IsActive)
             return new CommandResult(false, $"{companion.Name} is already active.");
 
+        // Auto-recall from duty if needed (ATM model — just pick who you want)
         if (companion.AssignedDuty.HasValue && companion.AssignedDuty != HomesteadDuty.None)
-            return new CommandResult(false, $"{companion.Name} is on homestead duty ({companion.AssignedDuty}). Recall them first.");
+        {
+            companion.RecallFromHomestead();
+            await buildingService.ClearCompanionFromBuildingsAsync(cmd.PlayerId, companion.Id, ct);
+        }
 
         if (!player.TryAddActiveCompanion(companion.Id))
         {
@@ -77,6 +82,9 @@ public class ActivateCompanionCommandHandler(
         await playerRepository.UpdateAsync(player, ct);
         await companionRepository.UpdateAsync(companion, ct);
 
+        // Backfill: auto-assign any remaining idle companions to city duties
+        await buildingService.AutoAssignIdleCompanionsAsync(cmd.PlayerId, player.ActiveCompanionIds, ct);
+
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} joins your active party. (Layer {companion.CurrentLayer} {companion.Type})", ct);
 
@@ -89,6 +97,7 @@ public class ActivateCompanionCommandHandler(
 public class DeactivateCompanionCommandHandler(
     IPlayerRepository playerRepository,
     ICompanionRepository companionRepository,
+    BuildingService buildingService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<DeactivateCompanionCommand>
 {
@@ -114,8 +123,11 @@ public class DeactivateCompanionCommandHandler(
         await playerRepository.UpdateAsync(player, ct);
         await companionRepository.UpdateAsync(companion, ct);
 
+        // Auto-assign the deactivated companion (and any other idle ones) to city duties
+        await buildingService.AutoAssignIdleCompanionsAsync(cmd.PlayerId, player.ActiveCompanionIds, ct);
+
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
-            $"{companion.Name} returns to the roster. (Remember: unused companions drift!)", ct);
+            $"{companion.Name} returns to the roster and has been assigned to city duty.", ct);
 
         await CompanionDtoHelpers.BroadcastCompanionListAsync(cmd.PlayerId, companionRepository, hubContext, ct);
 
@@ -189,6 +201,7 @@ public class AssignCompanionDutyCommandHandler(
 /// </summary>
 public class RecallCompanionCommandHandler(
     ICompanionRepository companionRepository,
+    BuildingService buildingService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<RecallCompanionCommand>
 {
@@ -207,6 +220,9 @@ public class RecallCompanionCommandHandler(
         var prevDuty = companion.AssignedDuty.ToString();
         companion.RecallFromHomestead();
         await companionRepository.UpdateAsync(companion, ct);
+
+        // Clear the building's AssignedCompanionId so it shows as unstaffed
+        await buildingService.ClearCompanionFromBuildingsAsync(cmd.PlayerId, companion.Id, ct);
 
         await notificationService.SendMessageAsync(cmd.PlayerId, "system",
             $"{companion.Name} has been recalled from {prevDuty} duty and is ready to adventure.", ct);
