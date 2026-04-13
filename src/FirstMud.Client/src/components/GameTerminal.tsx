@@ -1250,6 +1250,10 @@ export default function GameTerminal({
           cityView={cityView ?? null}
           onClose={() => setShowCity(false)}
           sendCommand={sendCommand}
+          companionRoster={companionRoster}
+          activeCompanionIds={worldState?.player?.activeCompanionIds ?? []}
+          storageItems={storageView?.items ?? []}
+          inventoryItems={inventory?.items ?? []}
         />
       )}
       {showStorage && atHomestead && (
