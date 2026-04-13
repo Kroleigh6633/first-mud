@@ -402,8 +402,8 @@ interface PlaceBuildingSectionProps {
   restrictTo?: BuildingType;
 }
 
-// Building types that can be placed multiple times (e.g. housing)
-const MULTI_PLACE_TYPES = new Set<BuildingType>(['Hut']);
+// All building types can be placed multiple times — scale production with more buildings
+const MULTI_PLACE_TYPES = new Set<BuildingType>(ALL_BUILDING_TYPES);
 
 function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCommand, restrictTo }: PlaceBuildingSectionProps) {
   const placedTypes = new Set(buildings.map(b => b.type));
