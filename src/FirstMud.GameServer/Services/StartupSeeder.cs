@@ -466,158 +466,201 @@ public class StartupSeeder(
     // Starter recipes
     // -------------------------------------------------------------------------
 
+    // Full canonical recipe set — keyed by RecipeId.
+    // Upsert pattern: missing recipes are inserted; existing ones have their
+    // ingredients verified and corrected.  Add new entries here and they are
+    // picked up automatically on the next startup without any DB migration.
+    private static readonly (
+        string RecipeId,
+        string Name,
+        RecipeIngredient[] Ingredients,
+        ItemCategory ResultCategory,
+        string ResultItemName,
+        int WorkMin,
+        int WorkMax,
+        int SkillRequired)[] AllRecipeDefinitions =
+    [
+        // ── Skill 1: starter basics ───────────────────────────────────────────
+        ("IRON_SWORD_001",       "Iron Sword",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      3),
+             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
+            ItemCategory.Weapon,     "Iron Sword",        2, 6, 1),
+
+        ("LEATHER_ARMOR_001",    "Leather Armor",
+            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       4),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
+            ItemCategory.Armor,      "Leather Armor",     2, 5, 1),
+
+        ("HEALING_DRAUGHT_001",  "Healing Draught",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 1)],
+            ItemCategory.Consumable, "Healing Draught",   3, 7, 1),
+
+        ("LEATHER_CAP_001",      "Leather Cap",
+            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       2),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
+            ItemCategory.Armor,      "Leather Cap",       1, 4, 1),
+
+        ("LEATHER_BOOTS_001",    "Leather Boots",
+            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       3),
+             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
+            ItemCategory.Armor,      "Leather Boots",     1, 4, 1),
+
+        ("STONE_AXE_001",        "Stone Axe",
+            [RecipeIngredient.Create(ItemCategory.Component, "Stone",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
+            ItemCategory.Weapon,     "Stone Axe",         1, 4, 1),
+
+        ("SINEW_CRAFT_001",      "Sinew",
+            [RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 2)],
+            ItemCategory.Component,  "Sinew",             1, 2, 1),
+
+        // ── Skill 2: iron weapons + leather full set ──────────────────────────
+        ("THORNWOOD_BOW_001",    "Thornwood Bow",
+            [RecipeIngredient.Create(ItemCategory.Component, "Wood",          3),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2)],
+            ItemCategory.Weapon,     "Thornwood Bow",     2, 5, 2),
+
+        ("WAR_PICK_001",         "War Pick",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      4),
+             RecipeIngredient.Create(ItemCategory.Component, "Wood",          1)],
+            ItemCategory.Weapon,     "War Pick",          2, 6, 2),
+
+        ("LEATHER_LEGGINGS_001", "Leather Leggings",
+            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       3),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
+            ItemCategory.Armor,      "Leather Leggings",  1, 4, 2),
+
+        ("LEATHER_GLOVES_001",   "Leather Gloves",
+            [RecipeIngredient.Create(ItemCategory.Component, "Leather",       2)],
+            ItemCategory.Armor,      "Leather Gloves",    1, 4, 2),
+
+        ("LEATHER_CRAFT_001",    "Leather",
+            [RecipeIngredient.Create(ItemCategory.Component, "Beast Hide",    3)],
+            ItemCategory.Component,  "Leather",           1, 2, 2),
+
+        // ── Skill 3: iron armor + accessories ─────────────────────────────────
+        ("OAK_WAND_001",         "Oak Wand",
+            [RecipeIngredient.Create(ItemCategory.Component, "Wood",          2),
+             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         1)],
+            ItemCategory.Weapon,     "Oak Wand",          2, 5, 3),
+
+        ("IRON_BUCKLER_001",     "Iron Buckler",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      3),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
+            ItemCategory.Armor,      "Iron Buckler",      3, 6, 3),
+
+        ("IRON_HELM_001",        "Iron Helm",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      3),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
+            ItemCategory.Armor,      "Iron Helm",         3, 6, 3),
+
+        ("IRON_GREAVES_001",     "Iron Greaves",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      4),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
+            ItemCategory.Armor,      "Iron Greaves",      3, 7, 3),
+
+        ("IRON_VAMBRACES_001",   "Iron Vambraces",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      2),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",       1)],
+            ItemCategory.Armor,      "Iron Vambraces",    3, 6, 3),
+
+        ("BONE_RING_001",        "Bone Ring",
+            [RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 3)],
+            ItemCategory.Accessory,  "Bone Ring",         1, 4, 3),
+
+        ("WYRD_CHARM_001",       "Wyrd Charm",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Wyrd Shard",   1),
+             RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
+            ItemCategory.Accessory,  "Wyrd Charm",        2, 5, 3),
+
+        ("FOCUS_STONE_001",      "Rough Focus Stone",
+            [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
+             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       2)],
+            ItemCategory.Accessory,  "Rough Focus Stone", 2, 5, 3),
+
+        ("TAPER_SHAPING_001",    "Shaping Taper",
+            [RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2),
+             RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3)],
+            ItemCategory.Reagent,    "Shaping Taper",     4, 8, 3),
+
+        // ── Skill 5: advanced consumables ─────────────────────────────────────
+        ("HEALING_POTION_001",   "Healing Potion",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         5),
+             RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 2)],
+            ItemCategory.Consumable, "Healing Potion",    3, 7, 5),
+
+        ("WEAVE_TINCTURE_001",   "Weave Tincture",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         4),
+             RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 1)],
+            ItemCategory.Consumable, "Weave Tincture",    3, 6, 5),
+
+        ("FORTITUDE_BREW_001",   "Fortitude Brew",
+            [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
+             RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      1)],
+            ItemCategory.Consumable, "Fortitude Brew",    2, 5, 5),
+    ];
+
     private async Task SeedStarterRecipesAsync(CancellationToken ct)
     {
-        // Canonical ingredient list keyed by RecipeId — used for both initial
-        // seeding and fixup of already-seeded rows with wrong ingredient names.
-        static RecipeIngredient[] IngredientsFor(string recipeId) => recipeId switch
-        {
-            "IRON_SWORD_001"     => [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore", 3),
-                                     RecipeIngredient.Create(ItemCategory.Component, "Wood",     1)],
-            "LEATHER_ARMOR_001"  => [RecipeIngredient.Create(ItemCategory.Component, "Leather",       4),
-                                     RecipeIngredient.Create(ItemCategory.Component, "Sinew",         1)],
-            "HEALING_DRAUGHT_001"=> [RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3),
-                                     RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 1)],
-            "FOCUS_STONE_001"    => [RecipeIngredient.Create(ItemCategory.Reagent,   "Dravenite Dust", 3),
-                                     RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",      2)],
-            "TAPER_SHAPING_001"  => [RecipeIngredient.Create(ItemCategory.Component, "Sinew",         2),
-                                     RecipeIngredient.Create(ItemCategory.Component, "Herbs",         3)],
-            _                    => []
-        };
-
-        // Fix any existing recipes whose ingredients haven't been updated yet
+        // Load all recipe IDs that already exist in the DB
+        var allDefinedIds = AllRecipeDefinitions.Select(r => r.RecipeId).ToList();
         var existingRecipes = await db.Recipes
-            .Where(r => new[] { "IRON_SWORD_001", "LEATHER_ARMOR_001", "HEALING_DRAUGHT_001",
-                                "FOCUS_STONE_001", "TAPER_SHAPING_001" }.Contains(r.RecipeId))
+            .Where(r => allDefinedIds.Contains(r.RecipeId))
             .ToListAsync(ct);
 
-        var recipeFixCount = 0;
-        foreach (var existing in existingRecipes)
-        {
-            var canonical = IngredientsFor(existing.RecipeId);
-            if (canonical.Length == 0) continue;
+        var existingById = existingRecipes.ToDictionary(r => r.RecipeId);
+        var toAdd        = new List<Recipe>();
+        var fixCount     = 0;
 
-            // Compare ingredient names; replace if any don't match
-            var needsUpdate = existing.Ingredients.Count != canonical.Length
-                || existing.Ingredients.Zip(canonical).Any(p => p.First.IngredientName != p.Second.IngredientName
-                                                                  || p.First.BaseQuantity  != p.Second.BaseQuantity);
-            if (needsUpdate)
+        foreach (var (recipeId, name, ingredients, resultCategory, resultItemName,
+                      workMin, workMax, skillRequired) in AllRecipeDefinitions)
+        {
+            if (existingById.TryGetValue(recipeId, out var existing))
             {
-                existing.ReplaceIngredients(canonical);
-                db.Recipes.Update(existing);
-                recipeFixCount++;
-                logger.LogWarning(
-                    "SeedStarterRecipes: updated ingredients for recipe {RecipeId} ({Name}).",
-                    existing.RecipeId, existing.Name);
+                // Verify and correct ingredients on already-seeded rows
+                var needsUpdate = existing.Ingredients.Count != ingredients.Length
+                    || existing.Ingredients.Zip(ingredients).Any(p =>
+                        p.First.IngredientName != p.Second.IngredientName
+                        || p.First.BaseQuantity != p.Second.BaseQuantity);
+
+                if (needsUpdate)
+                {
+                    existing.ReplaceIngredients(ingredients);
+                    db.Recipes.Update(existing);
+                    fixCount++;
+                    logger.LogWarning(
+                        "SeedStarterRecipes: corrected ingredients for {RecipeId} ({Name}).",
+                        recipeId, name);
+                }
+            }
+            else
+            {
+                // Recipe not yet in DB — queue for insert
+                toAdd.Add(Recipe.Create(
+                    recipeId:              recipeId,
+                    name:                  name,
+                    ingredients:           ingredients,
+                    resultCategory:        resultCategory,
+                    resultItemName:        resultItemName,
+                    baseWorkmanshipMin:    workMin,
+                    baseWorkmanshipMax:    workMax,
+                    requiredTaperType:     null,
+                    requiredWorld:         WorldId.Aeldran,
+                    requiredCraftingSkill: skillRequired,
+                    isDiscoverable:        false));
             }
         }
 
-        if (recipeFixCount > 0)
+        if (toAdd.Count > 0)
+            await db.Recipes.AddRangeAsync(toAdd, ct);
+
+        if (toAdd.Count > 0 || fixCount > 0)
             await db.SaveChangesAsync(ct);
 
-        if (existingRecipes.Count > 0)
-        {
-            logger.LogInformation(
-                "Recipes already seeded — verified ingredients ({Fixed} updated).", recipeFixCount);
-            return;
-        }
-
-        var recipes = new[]
-        {
-            // Iron Ore (common loot drop) + Wood (harvest) → Iron Sword
-            Recipe.Create(
-                recipeId: "IRON_SWORD_001",
-                name: "Iron Sword",
-                ingredients:
-                [
-                    RecipeIngredient.Create(ItemCategory.Component, "Iron Ore", 3),
-                    RecipeIngredient.Create(ItemCategory.Component, "Wood", 1),
-                ],
-                resultCategory: ItemCategory.Weapon,
-                resultItemName: "Iron Sword",
-                baseWorkmanshipMin: 2,
-                baseWorkmanshipMax: 6,
-                requiredTaperType: null,
-                requiredWorld: WorldId.Aeldran,
-                requiredCraftingSkill: 1,
-                isDiscoverable: false),
-
-            // Leather (common loot drop) + Sinew (common loot drop) → Leather Armor
-            Recipe.Create(
-                recipeId: "LEATHER_ARMOR_001",
-                name: "Leather Armor",
-                ingredients:
-                [
-                    RecipeIngredient.Create(ItemCategory.Component, "Leather", 4),
-                    RecipeIngredient.Create(ItemCategory.Component, "Sinew", 1),
-                ],
-                resultCategory: ItemCategory.Armor,
-                resultItemName: "Leather Armor",
-                baseWorkmanshipMin: 2,
-                baseWorkmanshipMax: 5,
-                requiredTaperType: null,
-                requiredWorld: WorldId.Aeldran,
-                requiredCraftingSkill: 1,
-                isDiscoverable: false),
-
-            // Herbs (harvest) + Bone Fragment (common loot drop) → Healing Draught
-            Recipe.Create(
-                recipeId: "HEALING_DRAUGHT_001",
-                name: "Healing Draught",
-                ingredients:
-                [
-                    RecipeIngredient.Create(ItemCategory.Component, "Herbs", 3),
-                    RecipeIngredient.Create(ItemCategory.Component, "Bone Fragment", 1),
-                ],
-                resultCategory: ItemCategory.Consumable,
-                resultItemName: "Healing Draught",
-                baseWorkmanshipMin: 3,
-                baseWorkmanshipMax: 7,
-                requiredTaperType: null,
-                requiredWorld: WorldId.Aeldran,
-                requiredCraftingSkill: 1,
-                isDiscoverable: false),
-
-            // Dravenite Dust (wyrd biome loot) + Iron Ore (common loot) → Rough Focus Stone
-            Recipe.Create(
-                recipeId: "FOCUS_STONE_001",
-                name: "Rough Focus Stone",
-                ingredients:
-                [
-                    RecipeIngredient.Create(ItemCategory.Reagent, "Dravenite Dust", 3),
-                    RecipeIngredient.Create(ItemCategory.Component, "Iron Ore", 2),
-                ],
-                resultCategory: ItemCategory.Accessory,
-                resultItemName: "Rough Focus Stone",
-                baseWorkmanshipMin: 2,
-                baseWorkmanshipMax: 5,
-                requiredTaperType: null,
-                requiredWorld: WorldId.Aeldran,
-                requiredCraftingSkill: 2,
-                isDiscoverable: false),
-
-            // Sinew (common loot) + Herbs (harvest) → Shaping Taper
-            Recipe.Create(
-                recipeId: "TAPER_SHAPING_001",
-                name: "Shaping Taper",
-                ingredients:
-                [
-                    RecipeIngredient.Create(ItemCategory.Component, "Sinew", 2),
-                    RecipeIngredient.Create(ItemCategory.Component, "Herbs", 3),
-                ],
-                resultCategory: ItemCategory.Reagent,
-                resultItemName: "Shaping Taper",
-                baseWorkmanshipMin: 4,
-                baseWorkmanshipMax: 8,
-                requiredTaperType: null,
-                requiredWorld: WorldId.Aeldran,
-                requiredCraftingSkill: 3,
-                isDiscoverable: false),
-        };
-
-        await db.Recipes.AddRangeAsync(recipes, ct);
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Seeded {Count} starter recipes.", recipes.Length);
+        logger.LogInformation(
+            "SeedStarterRecipes: {Added} new recipe(s) inserted, {Fixed} ingredient set(s) corrected. Total defined: {Total}.",
+            toAdd.Count, fixCount, AllRecipeDefinitions.Length);
     }
 
     // -------------------------------------------------------------------------
