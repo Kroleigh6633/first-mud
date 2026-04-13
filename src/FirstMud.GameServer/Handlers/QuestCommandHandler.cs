@@ -88,14 +88,16 @@ public class AcceptQuestCommandHandler(
 
         await questGraphRepository.MarkQuestInProgressAsync(cmd.PlayerId, cmd.QuestId, takenByAi: false, ct: ct);
 
-        var questPayload = new { cmd.PlayerId, QuestId = cmd.QuestId };
+        // Load quest details so the title can be included in the broadcast payload.
+        var quest = await questGraphRepository.GetQuestAsync(cmd.QuestId, ct);
+
+        var questPayload = new { cmd.PlayerId, QuestId = cmd.QuestId, Title = quest?.Title ?? cmd.QuestId };
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
             .SendAsync("QuestAccepted", questPayload, ct);
 
         // Broadcast a quest waypoint so the client can navigate
-        var quest = await questGraphRepository.GetQuestAsync(cmd.QuestId, ct);
         if (quest is not null)
         {
             var (wpX, wpY, wpDesc) = ResolveWaypoint(quest.Title, quest.Description, quest.FactionId);

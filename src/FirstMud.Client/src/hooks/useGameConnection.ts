@@ -169,13 +169,13 @@ export function useGameConnection(): GameConnectionResult {
       });
     });
 
-    connection.on('QuestAccepted', (payload: { questId?: string } | string) => {
-      // Server broadcasts { PlayerId, QuestId } — pick out the id.
-      const questId = typeof payload === 'string' ? payload : payload?.questId ?? 'unknown';
+    connection.on('QuestAccepted', (payload: { questId?: string; title?: string } | string) => {
+      // Server broadcasts { PlayerId, QuestId, Title } — prefer the human-readable title.
+      const title = typeof payload === 'string' ? payload : payload?.title ?? payload?.questId ?? 'unknown';
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'quest',
-        text: `Quest accepted: ${questId}`,
+        text: `Quest accepted: ${title}`,
       });
       // Refresh the quest list so the accepted quest shows isTaken: true
       // (and the Accept button is replaced by Complete buttons).
