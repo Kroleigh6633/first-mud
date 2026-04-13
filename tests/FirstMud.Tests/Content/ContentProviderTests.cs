@@ -3,6 +3,8 @@ using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FirstMud.Tests.Content;
 
@@ -1557,6 +1559,295 @@ public class ContentProviderTests
         {
             authoredFactions.Should().Contain(quest.FactionId,
                 $"quest '{quest.QuestId}' references FactionId.{quest.FactionId} which must be authored in factions.json");
+        }
+    }
+
+    // ─── World Events ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Happy path: the shipped world-events.json loads, 12 events are seeded
+    /// from world-events.md, and lookup by id works.
+    /// </summary>
+    [Fact]
+    public void Real_world_events_file_loads_all_authored_events()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var events = provider.AllEvents();
+        events.Should().HaveCount(12);
+        events.Select(e => e.Id).Should().OnlyHaveUniqueItems();
+
+        var redMarket = provider.GetEvent("red-market");
+        redMarket.Should().NotBeNull();
+        redMarket!.Family.Should().Be("economic");
+        redMarket.Trigger.Kind.Should().Be("complex");
+        redMarket.Duration.Days.Should().Be(6);
+        redMarket.Effects.Should().NotBeEmpty();
+
+        provider.GetEvent("ashen-silence-breaks")!.OneTime.Should().BeTrue();
+        provider.GetEvent("ashen-silence-breaks")!.Duration.Permanent.Should().BeTrue();
+
+        provider.GetEvent("no-such-event").Should().BeNull();
+        provider.GetEvent("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Unknown_zone_ref_in_event_effect_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-zone-evt",
+              "displayName": "Bad",
+              "family": "economic",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "zoneAmbient", "zoneId": "no-such-zone", "text": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*unknown zoneId 'no-such-zone'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_faction_tag_in_event_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-faction-evt",
+              "displayName": "Bad",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ],
+              "factionTags": ["NotAFaction"]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*factionTag 'NotAFaction'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_npc_ref_in_event_does_not_throw_until_npc_catalog_exists()
+    {
+        // npcId refs are deliberately permissive today — the NPC catalog is
+        // not yet JSON-backed. This test fences that tolerance so a future
+        // tightening is an intentional decision, not a drive-by change.
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "permissive-npc",
+              "displayName": "x",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "npcDialogueLine", "npcId": "not-in-any-registry", "text": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var provider = new ContentProvider(dir.FullName);
+            provider.GetEvent("permissive-npc").Should().NotBeNull();
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_quest_ref_in_event_trigger_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-quest-evt",
+              "displayName": "Bad",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "questCompleted", "questId": "NO_SUCH_QUEST" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*NO_SUCH_QUEST*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Duplicate_event_id_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "dupe",
+              "displayName": "A",
+              "family": "economic",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            },
+            {
+              "id": "dupe",
+              "displayName": "B",
+              "family": "economic",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*duplicate event id 'dupe'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Missing_onExpire_for_transient_event_emits_warning()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "missing-cleanup",
+              "displayName": "Missing Cleanup",
+              "family": "economic",
+              "priority": 1,
+              "description": "transient price shift with no restore",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 3 },
+              "effects": [ { "type": "shopPriceShift", "zoneId": "aeldran-7-starting-road", "item": "grain", "multiplier": 1.5 } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var logger = new CapturingLogger<ContentProvider>();
+            var provider = new ContentProvider(dir.FullName, logger);
+            provider.GetEvent("missing-cleanup").Should().NotBeNull();
+            logger.Warnings.Should().Contain(m => m.Contains("missing-cleanup") && m.Contains("onExpire"));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_trigger_shape_throws_on_load()
+    {
+        // repThreshold requires factionId + (minTier OR min); here we provide
+        // a bogus factionId.
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-trigger",
+              "displayName": "Bad Trigger",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "repThreshold", "factionId": "NotAFaction", "min": 0 },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*repThreshold*NotAFaction*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    private static DirectoryInfo MakeContentDirWithEvents(string eventsJson)
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-evt-test-");
+        WriteAllPrerequisitesExcept(dir.FullName);
+        File.WriteAllText(Path.Combine(dir.FullName, "world-events.json"), eventsJson);
+        return dir;
+    }
+
+    /// <summary>Records LogWarning calls in memory for assertion.</summary>
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Warnings { get; } = new();
+        IDisposable ILogger.BeginScope<TState>(TState state) => NullScope.Instance;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+                Warnings.Add(formatter(state, exception));
+        }
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+            public void Dispose() { }
         }
     }
 

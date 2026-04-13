@@ -1,0 +1,259 @@
+{
+  "$comment": "World-tick events for Aeldran. Source: docs/design/world-events.md. Runtime scheduling (cron, priority arbitration, flag writes) lives in C#; this file is the authoring surface.",
+  "events": [
+    {
+      "id": "red-market",
+      "displayName": "The Red Market",
+      "family": "economic",
+      "priority": 3,
+      "description": "Scarcity bites after a long quiet stretch. Surplus-holders price up; guards shift from poaching patrols to grain escort.",
+      "trigger": {
+        "kind": "complex",
+        "prose": "14+ in-game days without a raid event anywhere AND player has Trusted+ with any single faction."
+      },
+      "duration": { "days": 6 },
+      "effects": [
+        { "type": "shopPriceShift", "zoneId": "aeldran-7-starting-road", "item": "grain", "multiplier": 1.4 },
+        { "type": "shopPriceShift", "zoneId": "aeldran-7-starting-road", "item": "herbs", "multiplier": 1.6 },
+        { "type": "encounterRateShift", "zoneId": "aeldran-2-thornwood", "multiplier": 0.5 },
+        { "type": "npcDialogueLine", "npcId": "senna-orrick", "text": "The road's hungry this week. Drinks stay the same, stew's a copper up, don't look at me like that." },
+        { "type": "unlockDialogue", "npcId": "harken-vos", "text": "food-cart ambush, third this month." }
+      ],
+      "onExpire": [
+        { "type": "shopPriceShift", "zoneId": "aeldran-7-starting-road", "item": "grain", "multiplier": 1.0 },
+        { "type": "shopPriceShift", "zoneId": "aeldran-7-starting-road", "item": "herbs", "multiplier": 1.0 },
+        { "type": "encounterRateShift", "zoneId": "aeldran-2-thornwood", "multiplier": 1.0 }
+      ],
+      "worldStateFlag": "market.red"
+    },
+    {
+      "id": "rider-dust-up",
+      "displayName": "Rider Dust-Up at the Bent Mare",
+      "family": "political",
+      "priority": 2,
+      "description": "Two Riders of opposed factional sympathies lodge the same night. A road-event gets quietly handled; a stool gets broken.",
+      "trigger": {
+        "kind": "complex",
+        "prose": "Two Rider NPCs within Eastmile node on a given tick with reputation-lean values of opposite sign > 500."
+      },
+      "duration": { "days": 1 },
+      "effects": [
+        { "type": "encounterRateShift", "zoneId": "aeldran-2-thornwood", "multiplier": 0.0 },
+        { "type": "npcDialogueLine", "npcId": "senna-orrick", "text": "You missed the show. Two of yours. The broken stool is yours to replace." }
+      ],
+      "onExpire": [
+        { "type": "encounterRateShift", "zoneId": "aeldran-2-thornwood", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "caervorn-assay-sweep",
+      "displayName": "Caervorn Assay Sweep",
+      "family": "political",
+      "priority": 3,
+      "description": "Ewan Truce files a report. Marchkeep entries now require on-the-spot assay; Thornwood-coded items get confiscated at a 10% roll.",
+      "trigger": {
+        "kind": "repThreshold",
+        "factionId": "ThornwoodCovens",
+        "minTier": "Trusted",
+        "prose": "Raising Thornwood rep into Trusted while player visited Marchkeep within the last 10 days."
+      },
+      "duration": { "days": 10 },
+      "effects": [
+        { "type": "npcDialogueLine", "npcId": "captain-hollemar", "text": "My orders are my orders, Rider. I recommend a different road this month." },
+        { "type": "npcDialogueLine", "npcId": "auld-maerwyn", "text": "They took my nephew's ring. I will be cold about it. Tea?" },
+        { "type": "reputationDrift", "factionId": "HouseCaervorn", "delta": 10 }
+      ],
+      "onExpire": [
+        { "type": "reputationDrift", "factionId": "HouseCaervorn", "delta": 0 }
+      ],
+      "factionTags": ["HouseCaervorn", "ThornwoodCovens"],
+      "zoneTags": ["aeldran-1-caervorn-highlands"],
+      "worldStateFlag": "assaySweep.active"
+    },
+    {
+      "id": "dream-installation-tick",
+      "displayName": "The Dream-Installation Tick",
+      "family": "faction-long-arc",
+      "priority": 4,
+      "description": "The Ashen Court's build-out cadence. A new Dream-relay node appears in a zone the player has not visited recently — defaced shrine or milestone.",
+      "trigger": { "kind": "gameTick", "everyDays": 20 },
+      "duration": { "days": 3 },
+      "effects": [
+        { "type": "spawnNode", "zoneId": "aeldran-7-starting-road", "text": "A milestone stone, defaced with a spiral of ashmark — fresh." },
+        { "type": "npcDialogueLine", "npcId": "brother-velm", "text": "Bad dream last night. The kind that leaves a smell." },
+        { "type": "unlockDialogue", "npcId": "auld-maerwyn", "text": "Mabon's fur is up, which is never a compliment. Go look." }
+      ],
+      "onExpire": [
+        { "type": "setFlag", "flag": "dream.node.stale", "value": true }
+      ],
+      "factionTags": ["AshenCourt"]
+    },
+    {
+      "id": "market-day-gravenlanding",
+      "displayName": "Market-Day at Gravenmarsh Landing",
+      "family": "economic",
+      "priority": 2,
+      "description": "Every seventh day. Dravenite and bog-iron halved; smugglers thicken; Lieutenant Varn is always on duty (useful to players avoiding him).",
+      "trigger": { "kind": "gameTick", "everyDays": 7 },
+      "duration": { "days": 1 },
+      "effects": [
+        { "type": "shopPriceShift", "zoneId": "aeldran-4-gravenmarsh", "item": "dravenite", "multiplier": 0.5 },
+        { "type": "shopPriceShift", "zoneId": "aeldran-4-gravenmarsh", "item": "bog-iron", "multiplier": 0.5 },
+        { "type": "encounterRateShift", "zoneId": "aeldran-4-gravenmarsh", "multiplier": 3.0 },
+        { "type": "npcDialogueLine", "npcId": "harken-vos", "text": "Market day. I shall be insufferable — I will have had breakfast." }
+      ],
+      "onExpire": [
+        { "type": "shopPriceShift", "zoneId": "aeldran-4-gravenmarsh", "item": "dravenite", "multiplier": 1.0 },
+        { "type": "shopPriceShift", "zoneId": "aeldran-4-gravenmarsh", "item": "bog-iron", "multiplier": 1.0 },
+        { "type": "encounterRateShift", "zoneId": "aeldran-4-gravenmarsh", "multiplier": 1.0 }
+      ],
+      "zoneTags": ["aeldran-4-gravenmarsh"],
+      "worldStateFlag": "marketDay.gravenlanding"
+    },
+    {
+      "id": "wildfolk-migration",
+      "displayName": "Wildfolk Migration",
+      "family": "encounter",
+      "priority": 3,
+      "description": "First frost. Wildfolk pass through Thornwood Verge three times as often but 70% non-hostile; wolves push into Eastmile farmland.",
+      "trigger": { "kind": "seasonalDay", "day": 200 },
+      "duration": { "days": 14 },
+      "effects": [
+        { "type": "encounterRateShift", "zoneId": "aeldran-2-thornwood", "multiplier": 3.0 },
+        { "type": "encounterRateShift", "zoneId": "aeldran-7-starting-road", "multiplier": 1.5 },
+        { "type": "npcDialogueLine", "npcId": "senna-orrick", "text": "The Autumn's in. You'll want the back-room chair." },
+        { "type": "npcDialogueLine", "npcId": "auld-maerwyn", "text": "The wood is travelling. Don't startle it." }
+      ],
+      "onExpire": [
+        { "type": "encounterRateShift", "zoneId": "aeldran-2-thornwood", "multiplier": 1.0 },
+        { "type": "encounterRateShift", "zoneId": "aeldran-7-starting-road", "multiplier": 1.0 }
+      ],
+      "worldStateFlag": "wildfolk.migration"
+    },
+    {
+      "id": "ashen-silence-breaks",
+      "displayName": "Ashen Court Silence Breaks",
+      "family": "faction-long-arc",
+      "priority": 5,
+      "description": "Maren re-emerges. Ashen-Reach access opens for Trusted+; all Dream-relay nodes become readable. Thornwood and Caervorn both call closed councils.",
+      "trigger": {
+        "kind": "complex",
+        "prose": "Trusted+ with one of the Three AND at least one Ashen thread touched AND 60-day floor since Chain 1 Beat 4 resolution."
+      },
+      "duration": { "permanent": true },
+      "effects": [
+        { "type": "npcAvailability", "npcId": "maren", "available": true },
+        { "type": "unlockDialogue", "npcId": "harken-vos", "text": "(silence — this is the tell)" },
+        { "type": "setFlag", "flag": "ashen.silence.broken", "value": true }
+      ],
+      "factionTags": ["AshenCourt", "ThornwoodCovens", "HouseCaervorn"],
+      "zoneTags": ["aeldran-6-ashen-reach"],
+      "worldStateFlag": "ashen.silence.broken",
+      "oneTime": true
+    },
+    {
+      "id": "seed-conversion-attempt",
+      "displayName": "The Seed-Conversion Attempt",
+      "family": "faction-long-arc",
+      "priority": 4,
+      "description": "Thenna Orys, 17, Halven Orys's niece, begins receiving Dream-contact. 5-day window to intercept; otherwise she joins the Ashen Reach voluntarily.",
+      "trigger": {
+        "kind": "complex",
+        "prose": "30 days after any player touches the Compact faction AND canon-deliberations Q3 conservative ruling holds."
+      },
+      "duration": { "days": 5 },
+      "effects": [
+        { "type": "npcAvailability", "npcId": "thenna-orys", "available": true },
+        { "type": "npcDialogueLine", "npcId": "halven-orys", "text": "Generous tonight. Something on my mind." },
+        { "type": "unlockDialogue", "npcId": "auld-maerwyn", "text": "There's a girl thinking at the wrong frequency. Go listen." }
+      ],
+      "onExpire": [
+        { "type": "setFlag", "flag": "thenna.converted", "value": true },
+        { "type": "npcAvailability", "npcId": "thenna-orys", "available": false }
+      ],
+      "factionTags": ["EmeraldCompact", "AshenCourt"]
+    },
+    {
+      "id": "ironspire-dispatch",
+      "displayName": "Ironspire Dispatch",
+      "family": "political",
+      "priority": 3,
+      "description": "A sealed Caervorn dispatch rides to Marchkeep-adjacent garrisons. Contents vary by Chain 3 branch.",
+      "trigger": {
+        "kind": "questCompleted",
+        "questId": "THORN_004",
+        "prose": "3 days after Chain 3 Beat 4 resolves (any branch)."
+      },
+      "duration": { "days": 1 },
+      "effects": [
+        { "type": "npcDialogueLine", "npcId": "captain-hollemar", "text": "Moody. If you caused my interview, no tea this week." },
+        { "type": "setFlag", "flag": "ironspire.dispatch.sent", "value": true }
+      ],
+      "factionTags": ["HouseCaervorn"],
+      "zoneTags": ["aeldran-1-caervorn-highlands"],
+      "oneTime": true
+    },
+    {
+      "id": "merchants-guild-audit",
+      "displayName": "The Merchant's Guild Audit",
+      "family": "economic",
+      "priority": 2,
+      "description": "Compact factors audit the player's next sale. Legitimate -> +25 Compact. Dodgy -> -100 Compact and a 20% fine.",
+      "trigger": {
+        "kind": "complex",
+        "prose": "Player has sold goods worth over 500 silver total in any single zone's market within 30 days, regardless of faction lean."
+      },
+      "duration": { "days": 7 },
+      "effects": [
+        { "type": "npcDialogueLine", "npcId": "compact-factor", "text": "A friendly word. We'll want to see the next ledger line." },
+        { "type": "setFlag", "flag": "compact.auditing", "value": true }
+      ],
+      "onExpire": [
+        { "type": "setFlag", "flag": "compact.auditing", "value": false }
+      ],
+      "factionTags": ["EmeraldCompact"],
+      "worldStateFlag": "compact.auditing"
+    },
+    {
+      "id": "first-frost-weather",
+      "displayName": "First Frost Weather-Tick",
+      "family": "weather",
+      "priority": 1,
+      "description": "Travel times on non-King's-Road routes +25%. Bogs in Gravenmarsh freeze unevenly — random causeway closures.",
+      "trigger": { "kind": "seasonalDay", "day": 200 },
+      "duration": { "days": 30 },
+      "effects": [
+        { "type": "encounterRateShift", "zoneId": "aeldran-4-gravenmarsh", "multiplier": 0.75 },
+        { "type": "npcDialogueLine", "npcId": "senna-orrick", "text": "The road's grumpy today." },
+        { "type": "npcDialogueLine", "npcId": "drest", "text": "Brief. Go." },
+        { "type": "npcDialogueLine", "npcId": "harken-vos", "text": "Ink freezes. I write anyway." }
+      ],
+      "onExpire": [
+        { "type": "encounterRateShift", "zoneId": "aeldran-4-gravenmarsh", "multiplier": 1.0 }
+      ],
+      "worldStateFlag": "season.frost"
+    },
+    {
+      "id": "gorsewitch-circle-gathering",
+      "displayName": "The Gorsewitch Circle Gathering",
+      "family": "faction-long-arc",
+      "priority": 2,
+      "description": "Once per lunar cycle. Rhianne Moss attends. A rare Working is performed; contribute at Honored+ for a rotating minor benefit.",
+      "trigger": {
+        "kind": "lunarCycle",
+        "everyDays": 28,
+        "prose": "Every 28 in-game days, if player has Known+ with Thornwood AND visited the Thornwood Verge within 7 days."
+      },
+      "duration": { "days": 1 },
+      "effects": [
+        { "type": "npcAvailability", "npcId": "rhianne-moss", "available": true },
+        { "type": "unlockDialogue", "npcId": "auld-maerwyn", "text": "Come tomorrow. Or don't. Don't knock." }
+      ],
+      "onExpire": [
+        { "type": "npcAvailability", "npcId": "rhianne-moss", "available": false }
+      ],
+      "factionTags": ["ThornwoodCovens"],
+      "zoneTags": ["aeldran-2-thornwood"]
+    }
+  ]
+}
