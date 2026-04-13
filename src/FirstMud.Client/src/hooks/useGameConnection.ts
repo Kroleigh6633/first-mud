@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap, SmeltCompleteEvent } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap, SmeltCompleteEvent, CityViewSnapshot } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -76,6 +76,7 @@ export interface GameConnectionResult {
   lastSmeltResult: SmeltCompleteEvent | null;
   questWaypoint: QuestWaypoint | null;
   questProgress: QuestProgressMap;
+  cityView: CityViewSnapshot | null;
 }
 
 export function useGameConnection(): GameConnectionResult {
@@ -103,6 +104,7 @@ export function useGameConnection(): GameConnectionResult {
   const [lastSmeltResult, setLastSmeltResult] = useState<SmeltCompleteEvent | null>(null);
   const [questWaypoint, setQuestWaypoint] = useState<QuestWaypoint | null>(null);
   const [questProgress, setQuestProgress] = useState<QuestProgressMap>({});
+  const [cityView, setCityView] = useState<CityViewSnapshot | null>(null);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {

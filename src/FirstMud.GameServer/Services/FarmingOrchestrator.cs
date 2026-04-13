@@ -264,7 +264,7 @@ public class FarmingOrchestrator(
                                     {
                                         timestamp = DateTime.UtcNow.ToString("O"),
                                         category  = "system",
-                                        text      = $"Auto-farm: storage full — salvaged lowest-grade gear ({lowestGear.Name} W{lowestGear.Workmanship.Value}) to free a slot."
+                                        text      = $"Auto-farm: storage full — salvaged lowest-grade gear ({lowestGear.DisplayName} W{lowestGear.Workmanship.Value}) to free a slot."
                                     }, ct);
                             }
                         }

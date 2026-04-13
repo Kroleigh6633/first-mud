@@ -75,7 +75,7 @@ public class SalvageService
             await _items.DeleteAsync(itemId, ct);
             player.GainSalvageSkillXp(1);
             await _players.UpdateAsync(player, ct);
-            return new SalvageResult(false, $"You attempted to salvage {item.Name} but failed. The item was lost.", []);
+            return new SalvageResult(false, $"You attempted to salvage {item.DisplayName} but failed. The item was lost.", []);
         }
 
         // Workmanship scales yield: W1–2 → low, W5–6 → mid, W9–10 → high
@@ -124,7 +124,7 @@ public class SalvageService
             "Player {PlayerId} salvaged {ItemName} yielding {YieldCount} material type(s)",
             playerId, item.Name, yields.Count);
 
-        var successMsg = BuildSuccessMessage(item.Name, yields);
+        var successMsg = BuildSuccessMessage(item.DisplayName, yields);
         if (recoveredTapers.Count > 0)
             successMsg += $" Recovered imbue residue: {string.Join(", ", recoveredTapers)}.";
 
@@ -211,6 +211,25 @@ public class SalvageService
         if (item.Slot != Domain.Enums.EquipmentSlot.None && player.GetEquipped(item.Slot) is null)
             return null;
 
+        // Auto-equip swap has priority: never salvage an item that would be an upgrade
+        // over what the player currently has equipped in that slot.
+        // Effective workmanship = raw W + imbue count (each imbue adds +1 effective W).
+        if (item.Slot != Domain.Enums.EquipmentSlot.None)
+        {
+            var currentEquippedId = player.GetEquipped(item.Slot);
+            if (currentEquippedId is not null)
+            {
+                var currentEquipped = await _items.GetByIdAsync(currentEquippedId.Value, ct);
+                if (currentEquipped is not null && !currentEquipped.IsLocked)
+                {
+                    var newEffectiveW      = item.Workmanship.Value + item.Imbues.Count;
+                    var currentEffectiveW  = currentEquipped.Workmanship.Value + currentEquipped.Imbues.Count;
+                    if (newEffectiveW > currentEffectiveW)
+                        return null; // Item is an upgrade — let auto-equip handle it
+                }
+            }
+        }
+
         var threshold = item.Category == ItemCategory.Weapon
             ? player.AutoSalvageWeaponThreshold
             : player.AutoSalvageArmorThreshold;
@@ -255,7 +274,7 @@ public class SalvageService
         await _players.UpdateAsync(player, ct);
 
         var yieldSummary = BuildYieldSummary(yields);
-        return $"Auto-salvaged {item.Name} (W{workValue}) → {yieldSummary}";
+        return $"Auto-salvaged {item.DisplayName} (W{workValue}) → {yieldSummary}";
     }
 
     // ─── private helpers ────────────────────────────────────────────────────
@@ -399,7 +418,7 @@ public class SalvageService
         {
             var needed = RequiredSkillForWorkmanship(workmanship);
             return new SkillCheckResult(false,
-                $"Your salvage skill ({skill}) is too low to salvage this {item.Name} (W{workmanship}). Need skill {needed}.");
+                $"Your salvage skill ({skill}) is too low to salvage this {item.DisplayName} (W{workmanship}). Need skill {needed}.");
         }
 
         // High-tier material names require Skill 15+
@@ -407,7 +426,7 @@ public class SalvageService
         {
             if (item.Name.Contains(material, StringComparison.OrdinalIgnoreCase) && skill < 15)
                 return new SkillCheckResult(false,
-                    $"Your salvage skill ({skill}) is too low to salvage {item.Name}. Need skill 15 for {material} materials.");
+                    $"Your salvage skill ({skill}) is too low to salvage {item.DisplayName}. Need skill 15 for {material} materials.");
         }
 
         return new SkillCheckResult(true, string.Empty);

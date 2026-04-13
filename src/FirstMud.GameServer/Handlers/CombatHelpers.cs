@@ -397,6 +397,10 @@ public class CombatHelpers(
 
             if (currentEquippedId is null)
             {
+                logger.LogInformation(
+                    "Auto-equip check: {ItemName} W{W} (eff W{EffW}) Slot={Slot} | Current equipped: (empty) | Decision: equip",
+                    item.DisplayName, item.Workmanship.Value, item.Workmanship.Value + item.Imbues.Count, slot);
+
                 // Slot is empty — auto-equip
                 player.Equip(slot, item.Id);
                 await playerRepository.UpdateAsync(player, ct);
@@ -404,17 +408,32 @@ public class CombatHelpers(
             }
             else
             {
-                // Compare workmanship
+                // Compare effective workmanship (raw W + imbue count per item)
                 var currentEquipped = await itemRepository.GetByIdAsync(currentEquippedId.Value, ct);
+                var newEffectiveW     = item.Workmanship.Value + item.Imbues.Count;
+                var currentEffectiveW = currentEquipped is not null
+                    ? currentEquipped.Workmanship.Value + currentEquipped.Imbues.Count
+                    : 0;
+
+                logger.LogInformation(
+                    "Auto-equip check: {ItemName} W{W} (eff W{EffW}) Slot={Slot} | Current equipped: {CurrentName} W{CurrentW} (eff W{CurrentEffW}) Locked={Locked} | Decision: {Decision}",
+                    item.DisplayName, item.Workmanship.Value, newEffectiveW, slot,
+                    currentEquipped?.DisplayName ?? "unknown", currentEquipped?.Workmanship.Value ?? 0, currentEffectiveW,
+                    currentEquipped?.IsLocked ?? false,
+                    currentEquipped is null ? "skip/no-current"
+                        : currentEquipped.IsLocked ? "skip/locked"
+                        : newEffectiveW > currentEffectiveW ? "swap"
+                        : "skip/not-better");
+
                 if (currentEquipped is not null
-                    && item.Workmanship.Value > currentEquipped.Workmanship.Value
+                    && newEffectiveW > currentEffectiveW
                     && !currentEquipped.IsLocked)
                 {
-                    // Swap: new item is better and old item is not locked
+                    // Swap: new item is better (by effective workmanship) and old item is not locked
                     player.Equip(slot, item.Id);
                     await playerRepository.UpdateAsync(player, ct);
                     await notificationService.SendMessageAsync(playerId, lootCategory,
-                        $"You swap your {currentEquipped.DisplayName} W{currentEquipped.Workmanship.Value} for {item.DisplayName} W{item.Workmanship.Value}. Much better.", ct);
+                        $"You swap your {currentEquipped.DisplayName} W{currentEquipped.Workmanship.Value}{(currentEquipped.Imbues.Count > 0 ? $"+{currentEquipped.Imbues.Count}i" : "")} for {item.DisplayName} W{item.Workmanship.Value}{(item.Imbues.Count > 0 ? $"+{item.Imbues.Count}i" : "")}. Much better.", ct);
                 }
             }
         }

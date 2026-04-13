@@ -392,3 +392,39 @@ export interface SmeltCompleteEvent {
   yields: SmeltYield[];
   message: string;
 }
+
+export type BuildingType =
+  | 'Forge'
+  | 'Fletcher'
+  | 'Tannery'
+  | 'EnchantingTower'
+  | 'AlchemistHut'
+  | 'Stoneworker'
+  | 'Woodworker'
+  | 'MarketStall'
+  | 'Farm'
+  | 'Mine'
+  | 'Barracks'
+  | 'Library'
+  | 'Warehouse';
+
+export interface HomesteadBuilding {
+  id: string;
+  homesteadId: string;
+  type: BuildingType;
+  tier: number;
+  gridX: number;
+  gridY: number;
+  isConstructed: boolean;
+  constructionProgress: number;   // 0–100
+  assignedCompanionId?: string | null;
+  assignedCompanionName?: string | null;
+}
+
+export interface CityViewSnapshot {
+  homesteadId: string;
+  homesteadName: string;
+  buildingCount: number;
+  constructedCount: number;
+  buildings: HomesteadBuilding[];
+}
