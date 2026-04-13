@@ -135,13 +135,23 @@ function AptitudeStars({ count }: { count: number }) {
   );
 }
 
+function constructionTimeStr(pct: number): string {
+  const remainingPercent = 100 - pct;
+  const minutesRemaining = Math.ceil(remainingPercent / 5); // 5% per minute per builder
+  return minutesRemaining >= 60
+    ? `~${Math.floor(minutesRemaining / 60)}h ${minutesRemaining % 60}m`
+    : `~${minutesRemaining}m`;
+}
+
 function ProgressBar({ pct }: { pct: number }) {
   const filled = Math.round(pct / 5); // 20 slots
+  const timeStr = constructionTimeStr(pct);
   return (
     <span>
       <span style={{ color: '#00ff41' }}>{'█'.repeat(filled)}</span>
       <span style={{ color: '#222222' }}>{'█'.repeat(20 - filled)}</span>
       <span style={{ color: '#888888' }}> {pct}%</span>
+      <span style={{ color: '#ff8800' }}> · {timeStr} remaining</span>
     </span>
   );
 }
@@ -199,7 +209,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
         <span style={{ color: '#ffcc00', fontSize: '10px' }}>{tierStr}</span>
         {!building.isConstructed && (
           <span style={{ color: '#ff8800', fontSize: '10px', marginLeft: 'auto' }}>
-            Under Construction
+            {building.constructionProgress}% · {constructionTimeStr(building.constructionProgress)} remaining
           </span>
         )}
       </div>
