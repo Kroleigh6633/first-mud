@@ -1,0 +1,240 @@
+{
+  "equipmentTemplates": [
+    { "name": "Iron Dagger",         "description": "A short blade honed from iron. Reliable in close quarters.",              "category": "Weapon",    "slot": "MeleeWeapon",  "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Iron Sword",          "description": "A straight iron sword, workhorse of the Aeldran roads.",                  "category": "Weapon",    "slot": "MeleeWeapon",  "minWorkmanship": 2, "maxWorkmanship": 5 },
+    { "name": "Stone Axe",           "description": "A heavy axe with a hand-knapped stone head. Brutal and primitive.",        "category": "Weapon",    "slot": "MeleeWeapon",  "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Battle Hammer",       "description": "A two-handed maul fitted with an iron-capped head. Bone-breaking.",        "category": "Weapon",    "slot": "MeleeWeapon",  "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "War Pick",            "description": "A compact pick with a hardened iron point. Punches through plate.",        "category": "Weapon",    "slot": "MeleeWeapon",  "minWorkmanship": 2, "maxWorkmanship": 5 },
+
+    { "name": "Thornwood Bow",       "description": "A recurve bow carved from resilient thornwood.",                           "category": "Weapon",    "slot": "RangedWeapon", "minWorkmanship": 2, "maxWorkmanship": 4 },
+    { "name": "Hunter's Crossbow",   "description": "A compact crossbow favored by Aeldran forest scouts.",                     "category": "Weapon",    "slot": "RangedWeapon", "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Sling",               "description": "A simple sling of woven sinew. Cheap but accurate.",                       "category": "Weapon",    "slot": "RangedWeapon", "minWorkmanship": 1, "maxWorkmanship": 2 },
+
+    { "name": "Oak Wand",            "description": "A slender oak wand that channels Weave with little resistance.",           "category": "Weapon",    "slot": "Focus",        "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Crystal Focus",       "description": "A multifaceted crystal sphere that amplifies magical resonance.",           "category": "Weapon",    "slot": "Focus",        "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Ashwood Staff",       "description": "A tall ashwood staff worn smooth by long use. Reliable conduit.",          "category": "Weapon",    "slot": "Focus",        "minWorkmanship": 2, "maxWorkmanship": 5 },
+
+    { "name": "Leather Cap",         "description": "Cured hide shaped into a simple helm.",                                    "category": "Armor",     "slot": "Head",         "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Scale Coif",          "description": "Overlapping iron scales form a tight hood.",                               "category": "Armor",     "slot": "Head",         "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Iron Helm",           "description": "A forged iron helm with a narrow visor. Heavy but protective.",            "category": "Armor",     "slot": "Head",         "minWorkmanship": 4, "maxWorkmanship": 7 },
+    { "name": "Fur Hood",            "description": "A thick fur hood sewn from heavy pelts. Warm and surprisingly resilient.", "category": "Armor",     "slot": "Head",         "minWorkmanship": 1, "maxWorkmanship": 3 },
+
+    { "name": "Leather Vest",        "description": "A padded leather body vest offering moderate protection.",                 "category": "Armor",     "slot": "Chest",        "minWorkmanship": 2, "maxWorkmanship": 4 },
+    { "name": "Chain Shirt",         "description": "Interlocked iron rings form a flexible hauberk.",                          "category": "Armor",     "slot": "Chest",        "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Padded Gambeson",     "description": "Layers of quilted cloth that absorb shock surprisingly well.",             "category": "Armor",     "slot": "Chest",        "minWorkmanship": 1, "maxWorkmanship": 3 },
+
+    { "name": "Leather Leggings",    "description": "Thick leather greaves strapped over the thighs and shins.",                "category": "Armor",     "slot": "Legs",         "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Iron Greaves",        "description": "Solid iron plates that guard the legs from knee to ankle.",                "category": "Armor",     "slot": "Legs",         "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Padded Trousers",     "description": "Quilted trousers reinforced at vulnerable joints.",                        "category": "Armor",     "slot": "Legs",         "minWorkmanship": 1, "maxWorkmanship": 2 },
+
+    { "name": "Leather Gloves",      "description": "Supple leather gauntlets offering grip and minor protection.",             "category": "Armor",     "slot": "Hands",        "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Iron Vambraces",      "description": "Hinged iron arm guards strapped over the forearms.",                       "category": "Armor",     "slot": "Hands",        "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Wrapped Handguards",  "description": "Strips of heavy cloth wound tight around the knuckles and wrists.",        "category": "Armor",     "slot": "Hands",        "minWorkmanship": 1, "maxWorkmanship": 2 },
+
+    { "name": "Leather Boots",       "description": "Sturdy boots of thick-tanned hide. Dependable on rough trails.",           "category": "Armor",     "slot": "Feet",         "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Iron Sabatons",       "description": "Articulated iron foot armor. Loud on stone, solid everywhere.",            "category": "Armor",     "slot": "Feet",         "minWorkmanship": 3, "maxWorkmanship": 6 },
+    { "name": "Traveler's Sandals",  "description": "Light sandals of braided leather. Fast and quiet.",                        "category": "Armor",     "slot": "Feet",         "minWorkmanship": 1, "maxWorkmanship": 2 },
+
+    { "name": "Bone Ring",           "description": "A ring carved from yellowed bone. Carries a faint Wyrd resonance.",        "category": "Accessory", "slot": "Accessory",    "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Silver Amulet",       "description": "A small silver disc on a chain, engraved with a warding sigil.",           "category": "Accessory", "slot": "Accessory",    "minWorkmanship": 2, "maxWorkmanship": 5 },
+    { "name": "Wyrd Charm",          "description": "A knotted cord strung with crystalline fragments. Unsettling to hold.",    "category": "Accessory", "slot": "Accessory",    "minWorkmanship": 3, "maxWorkmanship": 7 },
+
+    { "name": "Iron Ore",            "description": "Rough lumps of iron ore, ready for the smelter.",                         "category": "Component", "slot": "None",         "minWorkmanship": 1, "maxWorkmanship": 2 },
+    { "name": "Beast Hide",          "description": "Thick hide stripped from a slain creature.",                              "category": "Component", "slot": "None",         "minWorkmanship": 1, "maxWorkmanship": 2 },
+    { "name": "Sinew",               "description": "Dried sinew — useful in bowstrings and bindings.",                        "category": "Component", "slot": "None",         "minWorkmanship": 1, "maxWorkmanship": 2 },
+    { "name": "Thornwood Herb",      "description": "A bitter medicinal herb found only in the Thornwood.",                    "category": "Reagent",   "slot": "None",         "minWorkmanship": 1, "maxWorkmanship": 3 },
+    { "name": "Dravenite Dust",      "description": "Fine crystalline powder with latent magical resonance. Used in restoration imbuing.", "category": "Reagent", "slot": "None", "minWorkmanship": 2, "maxWorkmanship": 4 },
+    { "name": "Bone Fragment",       "description": "A large bone fragment — useful as a crafting material.",                  "category": "Component", "slot": "None",         "minWorkmanship": 1, "maxWorkmanship": 2 },
+    { "name": "Wyrd Shard",          "description": "A jagged shard of crystallised Wyrd-energy. Handle with care.",           "category": "Reagent",   "slot": "None",         "minWorkmanship": 3, "maxWorkmanship": 7 }
+  ],
+
+  "rareSlotBoost": {
+    "dangerThreshold": 7,
+    "slots": ["Focus", "Accessory"],
+    "extraWeight": 1,
+    "comment": "At danger>=threshold each listed slot's templates are added one extra copy to the pool (doubling their weight)."
+  },
+
+  "dropPools": [
+    {
+      "id": "common-materials",
+      "entries": [
+        { "itemName": "Iron Ore",      "description": "Rough lumps of iron ore, ready for the smelter.",             "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Stone",         "description": "A chunk of rough stone. Basic building and crafting material.","category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Wood",          "description": "A length of raw timber, cut and dried for crafting.",         "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Leather",       "description": "Tanned hide suitable for armor and bindings.",                "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Sinew",         "description": "Dried sinew — useful in bowstrings and bindings.",            "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Bone Fragment", "description": "A large bone fragment — useful as a crafting material.",      "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-mountain",
+      "entries": [
+        { "itemName": "Mithril Ore",    "description": "A rare, lightweight ore with a silver-blue sheen. Prized by armorers.",       "category": "Component", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Diamond Shard",  "description": "A faceted shard of raw diamond. Used in advanced enchanting.",                "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 8, "weight": 1 },
+        { "itemName": "Mountain Herb",  "description": "A hardy alpine herb with potent healing properties.",                         "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Granite Block",  "description": "A heavy block of dense grey granite. Durable construction material.",         "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Eagle Feather",  "description": "A large primary feather from a mountain eagle. Prized for fletching.",        "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Sulphur",        "description": "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-forest",
+      "entries": [
+        { "itemName": "Thornwood Heartwood", "description": "Dense heartwood from a thornwood tree. Superior to common timber.",         "category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 },
+        { "itemName": "Beast Leather",       "description": "Thick, supple leather stripped from a large forest creature.",              "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Amber Resin",         "description": "Golden tree resin with mild magical adhesive properties.",                  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Moonbloom Petal",     "description": "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 1 },
+        { "itemName": "Spider Silk",         "description": "Fine, strong thread spun by giant forest spiders. Used in light armor.",    "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Feather",             "description": "A large plume from a forest bird. Used in air-aligned crafting.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-desert",
+      "entries": [
+        { "itemName": "Obsidian Shard", "description": "A razor-sharp shard of volcanic glass. Holds an edge better than iron.",  "category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 },
+        { "itemName": "Fire Crystal",   "description": "A deep-red crystal radiating concentrated fire magic.",                   "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Scorched Bone",  "description": "Bone bleached and hardened by desert heat. Still serviceable.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Cactus Fiber",   "description": "Coarse fiber stripped from desert cactus. Basic but plentiful.",          "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Sulphur",        "description": "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Ashite Dust",    "description": "Fine grey powder imbued with residual magic from the Ardweld collapse.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-water",
+      "entries": [
+        { "itemName": "Sea Scale",      "description": "A large iridescent scale from an aquatic creature.",                         "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Coral Fragment", "description": "A rough chunk of sea coral. Used in underwater-themed crafting.",             "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Deep Ink",       "description": "Thick black ink harvested from a deep-sea cephalopod. Used for scrollwork.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Pearl",          "description": "A lustrous pearl from a coastal mollusk. Valuable and magically receptive.",  "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Driftwood",      "description": "Salt-treated wood washed ashore. Rot-resistant and light.",                   "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Coral",          "description": "A chunk of living coral harvested from tidal pools. Used in water-aligned crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-swamp",
+      "entries": [
+        { "itemName": "Bog Iron",         "description": "Iron ore smelted from swamp deposits. Crude but plentiful.",          "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Toad Venom",       "description": "A vial of milky toxin harvested from a marsh toad. Potent poison reagent.", "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Peat Moss",        "description": "Dark, spongy peat harvested from the bog. Used as fuel and insulation.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Marsh Gas Crystal","description": "A fragile crystal formed around a pocket of volatile marsh gas.",       "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 1 },
+        { "itemName": "Leech Extract",    "description": "A thick, dark fluid drained from marsh leeches. Prized by healers.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-plains",
+      "entries": [
+        { "itemName": "Cotton Fiber",   "description": "Soft white fiber from plains cotton plants. Basic cloth material.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Horse Hair",     "description": "Coarse hair from a plains horse. Used in bowstrings and rope.",    "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Flint",          "description": "A piece of flint knapped to a sharp edge. Essential for tool making.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Wheat Sheaf",    "description": "A bundle of harvested wheat. Ingredient in future food crafting.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Copper Nugget",  "description": "A small nugget of soft copper ore. Used in basic metalworking.",   "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Feather",        "description": "A large plume from a plains bird. Used in air-aligned crafting.",  "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 }
+      ]
+    },
+    {
+      "id": "biome-wyrd",
+      "entries": [
+        { "itemName": "Wyrd Shard",    "description": "A jagged shard of crystallised fate-energy. Handle with extreme care.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 8, "weight": 1 },
+        { "itemName": "Void Essence",  "description": "A swirling mote of energy drawn from a tear in reality. Extremely rare.","category": "Reagent",   "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 },
+        { "itemName": "Dravenite Dust","description": "Fine crystalline powder with latent magical resonance. Used in imbuing.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Tear Fragment", "description": "A sliver of broken reality. Hums faintly and distorts nearby shadows.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Phase Thread",  "description": "A gossamer thread that phases between planes. Used to weave enchantments.","category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 }
+      ]
+    },
+    {
+      "id": "loot-consumables",
+      "entries": [
+        { "itemName": "Minor Healing Draught",  "description": "A small vial of copper-coloured tonic. Restores 30 HP when consumed.",    "category": "Consumable", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Healing Potion",         "description": "A corked flask of luminous green liquid. Restores 60 HP when consumed.",  "category": "Consumable", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Greater Healing Elixir", "description": "A heavy bottle of deep-crimson elixir. Restores 100 HP when consumed.",  "category": "Consumable", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 },
+        { "itemName": "Weave Tincture",         "description": "A small vial of shimmering blue tincture. Restores 20 Weave when consumed.", "category": "Consumable", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Weave Elixir",           "description": "A flask of swirling violet liquid. Restores 50 Weave when consumed.",       "category": "Consumable", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Fortitude Brew",         "description": "A dark amber brew that hardens the body. +10% max HP for next combat.",    "category": "Consumable", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Speed Draught",          "description": "A clear, fizzing draught that quickens the limbs. +20% speed for next combat.", "category": "Consumable", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Strength Tonic",         "description": "A thick red tonic with a sharp bite. +15% strike damage for next combat.",  "category": "Consumable", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 }
+      ]
+    },
+    {
+      "id": "loot-tapers",
+      "entries": [
+        { "itemName": "Fire Shaping Taper",  "description": "A taper that burns with a constant crimson flame. Used to imbue fire resonance.", "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Water Shaping Taper", "description": "A cool, blue-green taper that hums with tidal energy.",                             "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Earth Shaping Taper", "description": "A heavy amber taper infused with stone and root essence.",                          "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Air Shaping Taper",   "description": "A nearly weightless taper that drifts if not held firm.",                           "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Fortitude Taper",     "description": "A dense, dark taper that reinforces whatever it imbues.",                           "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Warding Taper",       "description": "A pale silver taper woven with a protective sigil.",                                "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 }
+      ]
+    }
+  ],
+
+  "biomeZones": [
+    { "biome": "mountain", "zoneNames": ["Caervorn Highlands", "Gravenhold"] },
+    { "biome": "forest",   "zoneNames": ["The Thornwood"] },
+    { "biome": "plains",   "zoneNames": ["Portmere (Compact)", "Starting Road"] },
+    { "biome": "swamp",    "zoneNames": ["Gravenmarsh"] },
+    { "biome": "water",    "zoneNames": ["The Drowned Coast"] },
+    { "biome": "desert",   "zoneNames": ["The Ashen Reach"] },
+    { "biome": "wyrd",     "zoneNames": ["The Maw Borderlands"] }
+  ],
+
+  "biomeImbueTypes": [
+    { "biome": "desert",   "imbueType": "Fire" },
+    { "biome": "water",    "imbueType": "Water" },
+    { "biome": "mountain", "imbueType": "Earth" },
+    { "biome": "forest",   "imbueType": "Earth" },
+    { "biome": "swamp",    "imbueType": "Water" },
+    { "biome": "wyrd",     "imbueType": "Wyrd" },
+    { "biome": "plains",   "imbueType": "Air" }
+  ],
+
+  "biomeDropPoolMap": [
+    { "biome": "mountain", "poolId": "biome-mountain" },
+    { "biome": "forest",   "poolId": "biome-forest" },
+    { "biome": "plains",   "poolId": "biome-plains" },
+    { "biome": "swamp",    "poolId": "biome-swamp" },
+    { "biome": "water",    "poolId": "biome-water" },
+    { "biome": "desert",   "poolId": "biome-desert" },
+    { "biome": "wyrd",     "poolId": "biome-wyrd" }
+  ],
+
+  "independentRolls": [
+    { "id": "taper-drop",      "poolId": "loot-tapers",      "chancePercent": 15 },
+    { "id": "consumable-drop", "poolId": "loot-consumables", "chancePercent": 10 }
+  ],
+
+  "dropChance": {
+    "base": 40,
+    "perDangerLevel": 4,
+    "autoFarmMultiplier": 0.60
+  },
+
+  "biomeMaterialConfig": {
+    "commonMaterialChancePercent": 30,
+    "dangerSuppressCommonAt": 8,
+    "dangerTier2MinAt": 8,
+    "baseWeight": 10,
+    "rarityWeightPerTier": 2,
+    "maxMinWorkmanshipFormula": "1 + dangerLevel"
+  },
+
+  "tierWorkmanshipCurves": [
+    { "tier": 0,  "minWorkmanship": 1,  "maxWorkmanship": 3,  "dangerBonus": 0 },
+    { "tier": 1,  "minWorkmanship": 1,  "maxWorkmanship": 4,  "dangerBonus": 0 },
+    { "tier": 2,  "minWorkmanship": 1,  "maxWorkmanship": 5,  "dangerBonus": 1 },
+    { "tier": 3,  "minWorkmanship": 2,  "maxWorkmanship": 6,  "dangerBonus": 1 },
+    { "tier": 4,  "minWorkmanship": 2,  "maxWorkmanship": 7,  "dangerBonus": 2 },
+    { "tier": 5,  "minWorkmanship": 3,  "maxWorkmanship": 8,  "dangerBonus": 2 },
+    { "tier": 6,  "minWorkmanship": 3,  "maxWorkmanship": 9,  "dangerBonus": 3 },
+    { "tier": 7,  "minWorkmanship": 4,  "maxWorkmanship": 10, "dangerBonus": 3 },
+    { "tier": 8,  "minWorkmanship": 4,  "maxWorkmanship": 10, "dangerBonus": 4 },
+    { "tier": 9,  "minWorkmanship": 5,  "maxWorkmanship": 10, "dangerBonus": 4 },
+    { "tier": 10, "minWorkmanship": 5,  "maxWorkmanship": 10, "dangerBonus": 5 }
+  ],
+
+  "preImbue": {
+    "dangerThreshold": 8,
+    "chancePercent": 10,
+    "imbueStrength": 0.2
+  }
+}

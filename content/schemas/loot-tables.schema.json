@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LootTables",
+  "description": "Data-driven loot tables for first-mud. Loaded at startup by ContentProvider and consumed by LootService for drop rolls. Procedural logic (random picks, per-kill roll counts, pre-imbue roll) stays in C#; this file only authorises *what* can drop and at what weight/workmanship.",
+  "type": "object",
+  "required": ["equipmentTemplates", "dropPools", "biomeZones", "biomeImbueTypes", "biomeDropPoolMap", "independentRolls", "dropChance", "biomeMaterialConfig", "tierWorkmanshipCurves", "preImbue"],
+  "properties": {
+    "equipmentTemplates": {
+      "type": "array",
+      "description": "Main equipment drop pool — uniform-weighted unless rareSlotBoost bumps a slot.",
+      "items": { "$ref": "#/definitions/template" }
+    },
+    "rareSlotBoost": {
+      "type": "object",
+      "required": ["dangerThreshold", "slots", "extraWeight"],
+      "properties": {
+        "dangerThreshold": { "type": "integer", "minimum": 0 },
+        "slots": { "type": "array", "items": { "type": "string" } },
+        "extraWeight": { "type": "integer", "minimum": 0 },
+        "comment": { "type": "string" }
+      }
+    },
+    "dropPools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "entries"],
+        "properties": {
+          "id": { "type": "string" },
+          "entries": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/poolEntry" }
+          }
+        }
+      }
+    },
+    "biomeZones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["biome", "zoneNames"],
+        "properties": {
+          "biome": { "type": "string" },
+          "zoneNames": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "biomeImbueTypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["biome", "imbueType"],
+        "properties": {
+          "biome": { "type": "string" },
+          "imbueType": { "type": "string", "enum": ["Fire", "Water", "Earth", "Air", "Wyrd", "None"] }
+        }
+      }
+    },
+    "biomeDropPoolMap": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["biome", "poolId"],
+        "properties": {
+          "biome": { "type": "string" },
+          "poolId": { "type": "string" }
+        }
+      }
+    },
+    "independentRolls": {
+      "type": "array",
+      "description": "Flat-chance rolls performed alongside the main drop (e.g. tapers, consumables).",
+      "items": {
+        "type": "object",
+        "required": ["id", "poolId", "chancePercent"],
+        "properties": {
+          "id": { "type": "string" },
+          "poolId": { "type": "string" },
+          "chancePercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      }
+    },
+    "dropChance": {
+      "type": "object",
+      "required": ["base", "perDangerLevel", "autoFarmMultiplier"],
+      "properties": {
+        "base": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "perDangerLevel": { "type": "integer", "minimum": 0 },
+        "autoFarmMultiplier": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "biomeMaterialConfig": {
+      "type": "object",
+      "required": ["commonMaterialChancePercent", "dangerSuppressCommonAt", "dangerTier2MinAt", "baseWeight", "rarityWeightPerTier"],
+      "properties": {
+        "commonMaterialChancePercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "dangerSuppressCommonAt": { "type": "integer", "minimum": 0 },
+        "dangerTier2MinAt": { "type": "integer", "minimum": 0 },
+        "baseWeight": { "type": "integer", "minimum": 1 },
+        "rarityWeightPerTier": { "type": "integer", "minimum": 0 },
+        "maxMinWorkmanshipFormula": { "type": "string" }
+      }
+    },
+    "tierWorkmanshipCurves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tier", "minWorkmanship", "maxWorkmanship"],
+        "properties": {
+          "tier": { "type": "integer", "minimum": 0 },
+          "minWorkmanship": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "maxWorkmanship": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "dangerBonus": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "preImbue": {
+      "type": "object",
+      "required": ["dangerThreshold", "chancePercent", "imbueStrength"],
+      "properties": {
+        "dangerThreshold": { "type": "integer", "minimum": 0 },
+        "chancePercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "imbueStrength": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  },
+  "definitions": {
+    "template": {
+      "type": "object",
+      "required": ["name", "description", "category", "slot", "minWorkmanship", "maxWorkmanship"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Weapon", "Armor", "Accessory", "Component", "Reagent", "Consumable"] },
+        "slot": { "type": "string", "enum": ["None", "MeleeWeapon", "RangedWeapon", "Focus", "Head", "Chest", "Legs", "Hands", "Feet", "Accessory"] },
+        "minWorkmanship": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "maxWorkmanship": { "type": "integer", "minimum": 1, "maximum": 10 }
+      }
+    },
+    "poolEntry": {
+      "type": "object",
+      "required": ["itemName", "description", "category", "minWorkmanship", "maxWorkmanship", "weight"],
+      "properties": {
+        "itemName": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Weapon", "Armor", "Accessory", "Component", "Reagent", "Consumable"] },
+        "minWorkmanship": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "maxWorkmanship": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "weight": { "type": "integer", "minimum": 1 },
+        "minQty": { "type": "integer", "minimum": 1 },
+        "maxQty": { "type": "integer", "minimum": 1 },
+        "guaranteed": { "type": "boolean" }
+      }
+    }
+  }
+}
