@@ -18,6 +18,7 @@ public class GameDbContext : DbContext
     public DbSet<Homestead> Homesteads => Set<Homestead>();
     public DbSet<HomesteadStorageItem> HomesteadStorageItems => Set<HomesteadStorageItem>();
     public DbSet<ResourceNode> ResourceNodes => Set<ResourceNode>();
+    public DbSet<HomesteadBuilding> HomesteadBuildings => Set<HomesteadBuilding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,5 +34,6 @@ public class GameDbContext : DbContext
         modelBuilder.ApplyConfiguration(new HomesteadConfiguration());
         modelBuilder.ApplyConfiguration(new HomesteadStorageItemConfiguration());
         modelBuilder.ApplyConfiguration(new ResourceNodeConfiguration());
+        modelBuilder.ApplyConfiguration(new HomesteadBuildingConfiguration());
     }
 }

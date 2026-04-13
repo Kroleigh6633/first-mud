@@ -299,6 +299,13 @@ public class Player
     }
 
     /// <summary>
+    /// Returns true if the given item id is currently equipped in any slot.
+    /// Use this as a guard before salvaging or deleting any item.
+    /// </summary>
+    public bool IsItemEquipped(Guid itemId) =>
+        EquippedItems.ContainsValue(itemId);
+
+    /// <summary>
     /// Reassigns starting stats based on the player's current PrimaryElement.
     /// Used by the seeder to fix players created before the element-based stat system.
     /// </summary>

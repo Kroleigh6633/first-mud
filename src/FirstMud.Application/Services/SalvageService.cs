@@ -56,6 +56,9 @@ public class SalvageService
         if (item.IsLocked)
             return new SalvageResult(false, $"{item.Name} is locked. Unlock it first (★) to salvage.", []);
 
+        if (player.IsItemEquipped(itemId))
+            return new SalvageResult(false, $"{item.Name} is currently equipped. Unequip it before salvaging.", []);
+
         if (!item.IsSalvageable)
             return new SalvageResult(false, $"{item.Name} is broken and cannot be salvaged.", []);
 
@@ -146,7 +149,7 @@ public class SalvageService
 
         var allItems = await _items.GetByOwnerAsync(playerId, ct);
         var targets = allItems
-            .Where(i => i.Category == parsedCategory && i.IsSalvageable && !i.IsLocked)
+            .Where(i => i.Category == parsedCategory && i.IsSalvageable && !i.IsLocked && !player.IsItemEquipped(i.Id))
             .ToList();
 
         if (targets.Count == 0)
@@ -196,6 +199,10 @@ public class SalvageService
             return null;
 
         if (item.IsLocked)
+            return null;
+
+        // Never auto-salvage an item the player has equipped
+        if (player.IsItemEquipped(item.Id))
             return null;
 
         // Auto-equip has priority: never salvage an item that could fill an empty slot.

@@ -51,3 +51,6 @@ public record InteractQuestCommand(Guid PlayerId, string QuestId) : IGameCommand
 public record ExpandStorageCommand(Guid PlayerId) : IGameCommand;
 public record SmeltCommand(Guid PlayerId, int Amount) : IGameCommand;
 public record ToggleCompanionAutoRotateCommand(Guid PlayerId) : IGameCommand;
+public record PlaceBuildingCommand(Guid PlayerId, string BuildingType, int GridX, int GridY) : IGameCommand;
+public record AssignBuilderCommand(Guid PlayerId, Guid CompanionId, Guid BuildingId) : IGameCommand;
+public record ViewCityCommand(Guid PlayerId) : IGameCommand;

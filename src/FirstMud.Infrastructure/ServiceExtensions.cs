@@ -26,6 +26,7 @@ public static class ServiceExtensions
         services.AddScoped<IBaseAssetRepository, BaseAssetRepository>();
         services.AddScoped<IHomesteadRepository, HomesteadRepository>();
         services.AddScoped<IResourceNodeRepository, ResourceNodeRepository>();
+        services.AddScoped<IHomesteadBuildingRepository, HomesteadBuildingRepository>();
 
         return services;
     }
