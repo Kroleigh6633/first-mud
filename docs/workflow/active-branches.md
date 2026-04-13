@@ -27,5 +27,6 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-ad8def2d | ready-to-merge | main | Apply Pass #5 monster stat tweaks (portmere/starting-road/drowned-coast/ashen-reach) | - | content/monsters.json, content/loot-tables.json, docs/design/sim-reports/stat-tweak-application.md | 2026-04-13 |
 
 <!-- agents add rows above this line -->
