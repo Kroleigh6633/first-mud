@@ -158,3 +158,50 @@ Canon is `lore/*.md` and is read-only from here.
 3. Solo-lvl-5 Aether baseline for encounter-sim may over-estimate zone
    difficulty. Re-run pass #3 with a canonical 3-companion party once
    such a party is specced.
+
+## Pass #6 additions
+
+| Title | Status | Canon Files Touched (read-only) | Outstanding Questions |
+|---|---|---|---|
+| `sim-reports/progression-pass-2-all.md` | ready | combat, economy-and-crafting | Pyrrhic-win band missing from encounter-sim (Q10). |
+| `sim-reports/progression-pass-2-balanced.md` | ready | — | — |
+| `sim-reports/progression-pass-2-combat-heavy.md` | ready | — | — |
+| `sim-reports/progression-pass-2-craft-heavy.md` | ready | — | — |
+| `sim-reports/progression-pass-2-enchanting-focused.md` | ready | — | — |
+| `progression-tune-proposal-v1.md` | draft | combat, economy-and-crafting | Three tunes (A, B, C) awaiting user approval. Formula fix in §6 is code-layer, deferred to engineering agent. |
+| `quest-chains-batch4.md` | draft | factions, world-aeldran | Q8 (Below-Song canon), Q9 (two-good-end pattern). |
+| `tools/design/fixtures/quest-chain5-wrong-tide.json` | draft | — | 6 terminals traced clean via scenario-player; allowUnderflow=false. |
+| `canon-deliberations.md` (Q8–Q10 + Q7 update) | draft | — | Three rulings; Q7 updated to reflect `--allow-underflow` is now live. |
+
+### Pass #6 run log (2026-04-13, agent-a12aa569)
+
+- Re-ran `progression-sim --all-playstyles --seed 42 --hours 40` at baseline,
+  identical to Pass 1 (deterministic confirms stability).
+- Tested three data-only tunes locally in the worktree:
+  - **Tune A** (recipes.json low-tier min 1→3, max 4→5) — lifts
+    balanced/combat-heavy TopGear 2 → 3. No regression on craft-heavy.
+  - **Tune B** (recipes.json iron tier min 3→4, max 6/7 → 8) — no 40h
+    effect alone, but raises ceiling for future combined tune.
+  - **Tune C** (combat-curves.json hp 0.4→0.3, power 0.3→0.25) — lifts
+    combat-heavy reliable-danger d8 → d10. Seed-42 craft-heavy regresses
+    due to RNG path divergence (artifact, not real).
+- Authored `progression-tune-proposal-v1.md` ranking A/B/C with
+  predicted effects, plus a §6 "considered + rejected" (four ideas).
+- Verified `--allow-underflow=false` hard-errors on bribe-scribe with the
+  exact message; restored fixture afterwards.
+- Drafted Chain 5 "The Wrong Tide" (Drowned Coast); 6 terminals all reachable.
+- Added Q8 (Below-Song), Q9 (two-good-end pattern), Q10 (pyrrhic-win band).
+- Updated Q7 ruling to reflect `--allow-underflow` is now real.
+
+### Pass #6 open questions for next cycle
+
+1. **Code-layer tune** (`CraftingService.CalculateWorkmanship`:
+   `craftingSkill/20 → /10`) is the single highest-leverage fix but out of
+   creative's mandate. Needs an engineering agent cycle.
+2. **encounter-sim pyrrhic band** — tool should weight HP% alongside
+   win-rate. Without it, progression-sim's "reliable d10" claim for
+   balanced misleads the user.
+3. **Piecewise combat curve** — current `monsterScaling` is linear. A
+   curve that is softer at d3–d5 and same at d8+ would better match the
+   user's play-test ceiling without trivialising end-game content. Would
+   require `combat-curves.json` schema extension.

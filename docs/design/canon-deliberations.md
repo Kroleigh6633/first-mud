@@ -345,3 +345,59 @@ agent running any tool command should first `dotnet run -- <tool> --help`
 or grep the command source for the flag before assuming a result is
 meaningful.
 
+---
+
+## Pass #6 follow-up (2026-04-13, agent-a12aa569)
+
+### Q7 update — `--allow-underflow` is now real and the bribe-scribe error surfaces
+
+`scenario-player` now accepts `--allow-underflow` and the fixture-level
+`allowUnderflow` flag. Verified by temporarily flipping the Sealed Letter
+fixture's `allowUnderflow: true → false` and forcing
+`accept,refuse-varn,bribe-scribe`:
+
+```
+ERROR at beat 'past-varn' choice 'bribe-scribe': removeItem 'gold' x25 exceeds stock (0 available)
+```
+
+The error fires mid-run but the runner continues traversal (the subsequent
+nodes still evaluate because `past-varn` is not the forced beat after
+`refuse-varn` — actually the tool walked on to the Velm path and the
+bribe-scribe was reported as a side error). **Default semantics are now:
+hard-error on underflow, continue the walk only if the fixture or CLI
+opts in.** The Sealed Letter fixture keeps `allowUnderflow: true` so its
+existing sim-reports remain valid.
+
+**Standing rule:** New fixtures start with `allowUnderflow: false`. Only
+flip to `true` if the authoring gap (missing reward chain for the stock)
+is intentional and tracked. `quest-chain5-wrong-tide.json` is authored
+with `false` and passes all 6 terminal walks.
+
+### Q8 — Fairgean communication mechanism ("Below-Song")
+
+Chain 5 introduces a "below-song" — a low-frequency Fairgean communication
+the pilgrims can hear faintly. No lore file names this. **Ruling
+(conservative):** treat as creative-coined, non-canon, not referenced in
+`lore/*.md`. Flag for user ruling; rename or remove from the fixture on
+request. Currently scoped to Chain 5 only — does not leak into other
+fixtures or docs.
+
+### Q9 — Two "good" terminals per chain: design pattern?
+
+Chain 5 has **two** success terminals (`end-redirected` and
+`end-diplomatic`). Earlier chains (Sealed Letter, Thinking Girl) funneled
+to one canonical good end. **Ruling (conservative):** allowed, but each
+good terminal must gate a **distinct downstream hook** (Chain 5 does:
+diplomatic unlocks Below-Song Translator NPC, redirected does not). Prevents
+the design anti-pattern where two "success" buttons give the same reward.
+
+### Q10 — Pyrrhic-win band in encounter-sim
+
+The progression-audit surfaced a tool-gap: encounter-sim's win/loss band
+classifies a 99%-win, 19%-HP-remaining fight as "trivial." This gap is
+why the progression-sim's "reliable d10" doesn't match the user's "can't
+clear d5." **Ruling (out-of-scope tool change, not canon):** the creative
+agent should weight HP% alongside win-rate when citing encounter-sim
+results in design proposals. `progression-tune-proposal-v1.md` §5 does
+this manually for now.
+
