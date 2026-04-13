@@ -40,6 +40,12 @@ Errors: 0
 ```
 Exit 0 if clean, 1 if any errors (duplicate branch, bad status, malformed row). Warns on stale in-progress rows (> 24h) and superseded rows that merge agents forgot to drop.
 
+Pass `-ExpectEmpty` after a merge to assert that the incoming branch's row was cleaned up in the merge commit. Exits 1 if any rows survive.
+
+```powershell
+scripts/agent/ledger-lint.ps1 -ExpectEmpty
+```
+
 ## `worktree-health.ps1`
 
 Audit all git worktrees.
@@ -61,3 +67,15 @@ Git worktrees: 4
 ```
 
 Reports: orphan dirs (on disk, not in git), uncommitted working trees, divergence from main. `-DivergenceThreshold N` flags branches more than N commits ahead.
+
+Orphan classification: the script tags the running agent's own cwd (and its parents under `.claude/worktrees/`) as `LOCKED-CWD (expected)` — these directories are OS-locked while the agent is alive and cannot be removed. Everything else under `.claude/worktrees/` that isn't in git's worktree list is tagged `ORPHAN (stale)` and should be cleaned up.
+
+## `deploy-worktree.ps1`
+
+Copy a single file from a worktree into main's working tree so Docker HMR (which mounts main) picks it up. Used when a client-side fix needs visual verification **before** merge.
+
+```powershell
+scripts/agent/deploy-worktree.ps1 agent-a1fc25ed src/FirstMud.Client/src/components/WorldMap.tsx
+```
+
+Dirties main's working tree. If you are still iterating in the worktree, run `git restore <file>` in main afterward so main doesn't accumulate ad-hoc copies. The script invokes `check-hmr.ps1` automatically to surface the reload log line.

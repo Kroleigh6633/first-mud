@@ -5,7 +5,8 @@
 
 param(
     [string]$Path = 'docs/workflow/active-branches.md',
-    [int]$StaleDays = 1
+    [int]$StaleDays = 1,
+    [switch]$ExpectEmpty
 )
 
 if (-not (Test-Path $Path)) {
@@ -82,5 +83,18 @@ Write-Host "Warnings: $($warnings.Count)"
 foreach ($w in $warnings) { Write-Host "  WARN  $w" }
 Write-Host "Errors: $($errors.Count)"
 foreach ($e in $errors) { Write-Host "  ERR   $e" }
+
+if ($ExpectEmpty) {
+    if ($validCount -gt 0) {
+        Write-Host ""
+        Write-Host "ExpectEmpty: FAIL — $validCount row(s) still present (expected 0)."
+        foreach ($b in $branchesSeen.Keys) { Write-Host "  present: $b" }
+        exit 1
+    }
+    else {
+        Write-Host ""
+        Write-Host "ExpectEmpty: OK — ledger has 0 rows."
+    }
+}
 
 if ($errors.Count -gt 0) { exit 1 } else { exit 0 }

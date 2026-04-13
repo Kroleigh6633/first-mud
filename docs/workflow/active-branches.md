@@ -27,6 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-a1fc25ed | in-progress | HEAD | Polish 4 workflow rough edges: merge-ledger cleanup procedure, worktree-health cwd tagging, ledger-is-source-of-truth rule, HMR deploy helper script | - | docs/workflow/agent-briefing-template.md, docs/workflow/README.md, scripts/agent/ledger-lint.ps1, scripts/agent/worktree-health.ps1, scripts/agent/deploy-worktree.ps1, scripts/agent/README.md | 2026-04-13 |
 
 <!-- agents add rows above this line -->

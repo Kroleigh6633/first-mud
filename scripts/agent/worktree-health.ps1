@@ -75,16 +75,37 @@ foreach ($wt in $worktrees) {
     }
 }
 
-# Detect orphaned dirs: folders under .claude/worktrees/ not in git's worktree list
+# Detect orphaned dirs: folders under .claude/worktrees/ not in git's worktree list.
+# Distinguish the current process's cwd (OS-locks the directory, can't be removed
+# while we're running inside it) from truly stale orphans left over from dead agents.
 $worktreeRoot = Join-Path (git rev-parse --show-toplevel) '.claude/worktrees'
 if (Test-Path $worktreeRoot) {
     $gitPaths = $worktrees | ForEach-Object { (Resolve-Path $_.path -ErrorAction SilentlyContinue).Path } | Where-Object { $_ }
     $gitPathsNorm = $gitPaths | ForEach-Object { $_.ToLower().TrimEnd('\', '/') }
+
+    # Build the set of "expected-locked" paths: our own cwd and each ancestor that
+    # sits under .claude/worktrees/. This covers the common case where the agent's
+    # cwd IS one of the worktree dirs.
+    $myCwd = (Get-Location).Path.ToLower().TrimEnd('\', '/')
+    $lockedPaths = @()
+    $p = $myCwd
+    while ($p) {
+        $lockedPaths += $p
+        $parent = Split-Path $p -Parent
+        if (-not $parent -or $parent -eq $p) { break }
+        $p = $parent.ToLower().TrimEnd('\', '/')
+    }
+
     $onDisk = Get-ChildItem $worktreeRoot -Directory -ErrorAction SilentlyContinue
     foreach ($d in $onDisk) {
         $norm = $d.FullName.ToLower().TrimEnd('\', '/')
         if ($gitPathsNorm -notcontains $norm) {
-            Write-Host "-- ORPHAN DIR: $($d.FullName) (on disk, not in git worktree list)"
+            if ($lockedPaths -contains $norm) {
+                Write-Host "-- LOCKED-CWD (expected): $($d.FullName) (agent's own cwd, OS-locked — cannot be removed while running)"
+            }
+            else {
+                Write-Host "-- ORPHAN (stale): $($d.FullName) (on disk, not in git worktree list)"
+            }
         }
     }
 }
