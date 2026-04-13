@@ -33,7 +33,8 @@ public class CombatHelpers(
     ILogger<CombatHelpers> logger,
     QuestProgressTracker questProgressTracker,
     FirstMud.Domain.Interfaces.IQuestGraphRepository questGraphRepository,
-    InventoryDepositService inventoryDepositService)
+    InventoryDepositService inventoryDepositService,
+    FirstMud.Application.Services.BuildingService buildingService)
 {
     // -------------------------------------------------------------------------
     // Enemy auto-turn processing
@@ -515,7 +516,7 @@ public class CombatHelpers(
             // Captured monsters always start at Layer 1
             await companionRepository.AddAsync(companion, ct);
 
-            // Auto-activate if there's a free slot; otherwise assign to best homestead duty
+            // Auto-activate if there's a free slot; otherwise assign to best homestead duty + housing
             var activated = player.TryAddActiveCompanion(companion.Id);
             if (activated)
             {
@@ -539,11 +540,17 @@ public class CombatHelpers(
                 companion.AssignToHomestead(bestDuty);
                 await companionRepository.UpdateAsync(companion, ct);
 
+                // Auto-assign housing in first available hut vacancy
+                var assignedHut = await buildingService.AutoAssignHousingAsync(playerId, companion, ct);
+                var housingNote = assignedHut is not null
+                    ? $" Housed in hut."
+                    : string.Empty;
+
                 await notificationService.SendMessageAsync(playerId, "system",
-                    $"{companion.Name} has been assigned to {bestDuty} duty at your homestead ({companion.GetAptitude(bestDuty)} star aptitude).",
+                    $"{companion.Name} has been assigned to {bestDuty} duty at your homestead ({companion.GetAptitude(bestDuty)} star aptitude).{housingNote}",
                     ct);
 
-                slotNote = $"Your party is full — {companion.Name} is contributing as a {bestDuty} at your homestead.";
+                slotNote = $"Your party is full — {companion.Name} is contributing as a {bestDuty} at your homestead.{housingNote}";
             }
 
             await notificationService.SendMessageAsync(playerId, "system",

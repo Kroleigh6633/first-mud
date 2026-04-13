@@ -569,6 +569,46 @@ public class BuildingService
         return (added, assigned + housed, summary);
     }
 
+    /// <summary>
+    /// Finds the first constructed hut with a vacancy and assigns the given companion to it.
+    /// Called automatically when a new companion is captured (if not activated into the active party).
+    /// Returns the hut the companion was assigned to, or null if no vacancy is available.
+    /// </summary>
+    public async Task<HomesteadBuilding?> AutoAssignHousingAsync(
+        Guid playerId,
+        Companion companion,
+        CancellationToken ct = default)
+    {
+        var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+        if (homestead is null) return null;
+
+        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        var huts = buildings
+            .Where(b => IsHousingType(b.Type) && b.IsConstructed)
+            .ToList();
+        if (huts.Count == 0) return null;
+
+        var allCompanions = await _companions.GetByOwnerAsync(playerId, ct);
+
+        foreach (var hut in huts)
+        {
+            var capacity = GetHutCapacity(hut.Tier);
+            var currentResidents = allCompanions.Count(c => c.HousingBuildingId == hut.Id);
+            if (currentResidents >= capacity) continue;
+
+            companion.AssignHousing(hut.Id);
+            await _companions.UpdateAsync(companion, ct);
+
+            _logger.LogInformation(
+                "Auto-assigned {CompanionName} housing in {HutId} for player {PlayerId}.",
+                companion.Name, hut.Id, playerId);
+
+            return hut;
+        }
+
+        return null; // all huts full
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<Guid> GetHomesteadOwnerAsync(Guid homesteadId, CancellationToken ct)
