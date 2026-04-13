@@ -71,6 +71,8 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<string, QuestDefinition> _questsById = new(StringComparer.Ordinal);
     private IReadOnlyList<QuestEdgeDefinition> _questEdges = Array.Empty<QuestEdgeDefinition>();
     private CombatCurvesDefinition _combatCurves = DefaultCombatCurves();
+    private IReadOnlyList<WorldEventDefinition> _events = Array.Empty<WorldEventDefinition>();
+    private Dictionary<string, WorldEventDefinition> _eventsById = new(StringComparer.Ordinal);
 
     private static readonly HashSet<string> ValidReputationTierNames =
         new(Enum.GetNames<ReputationTier>(), StringComparer.Ordinal);
@@ -211,6 +213,11 @@ public sealed class ContentProvider : IContentProvider
 
     public CombatCurvesDefinition CombatCurves => _combatCurves;
 
+    public IReadOnlyList<WorldEventDefinition> AllEvents() => _events;
+
+    public WorldEventDefinition? GetEvent(string id) =>
+        !string.IsNullOrEmpty(id) && _eventsById.TryGetValue(id, out var def) ? def : null;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -241,13 +248,18 @@ public sealed class ContentProvider : IContentProvider
         _questsById = _quests.ToDictionary(q => q.QuestId, StringComparer.Ordinal);
         _questEdges = edges;
 
+        // World-events load AFTER zones / factions / quests so cross-ref
+        // validation against those registries can run.
+        _events = LoadWorldEvents();
+        _eventsById = _events.ToDictionary(e => e.Id, StringComparer.Ordinal);
+
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
         ContentAccessor.Publish(this);
 
         _logger?.LogInformation(
-            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions, {QuestCount} quests, {EdgeCount} quest edges from {Root}",
-            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _quests.Count, _questEdges.Count, _contentRoot);
+            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions, {QuestCount} quests, {EdgeCount} quest edges, {EventCount} world events from {Root}",
+            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _quests.Count, _questEdges.Count, _events.Count, _contentRoot);
     }
 
     private IReadOnlyList<ZoneDefinition> LoadZones()
@@ -1814,5 +1826,382 @@ public sealed class ContentProvider : IContentProvider
         public string From { get; set; } = "";
         public string To { get; set; } = "";
         public string? Outcome { get; set; }
+    }
+
+    // ─── World-event loader ──────────────────────────────────────────────────
+
+    private static readonly HashSet<string> ValidEventFamilies =
+        new(StringComparer.Ordinal)
+        { "economic", "political", "faction-long-arc", "encounter", "weather" };
+
+    private static readonly HashSet<string> ValidEventTriggerKinds =
+        new(StringComparer.Ordinal)
+        { "unconditional", "gameTick", "seasonalDay", "lunarCycle",
+          "repThreshold", "questCompleted", "complex" };
+
+    private static readonly HashSet<string> ValidWorldEventEffectTypes =
+        new(StringComparer.Ordinal)
+        {
+            "zoneAmbient", "npcAvailability", "npcDialogueLine",
+            "shopPriceShift", "shopStockShift", "encounterRateShift",
+            "reputationDrift", "spawnNode", "unlockDialogue", "setFlag",
+        };
+
+    /// <summary>
+    /// Effect types whose runtime application mutates durable world state and
+    /// therefore REQUIRE a matching <c>onExpire</c> inverse to restore the
+    /// baseline when the event ends. A symmetric-cleanup warning fires if a
+    /// transient (non-permanent, non-oneTime) event applies one of these
+    /// without an inverse on expire.
+    /// </summary>
+    private static readonly HashSet<string> EffectTypesRequiringCleanup =
+        new(StringComparer.Ordinal)
+        {
+            "zoneAmbient", "npcAvailability", "shopPriceShift",
+            "shopStockShift", "encounterRateShift",
+        };
+
+    /// <summary>
+    /// Loads content/world-events.json and validates it. Validation is
+    /// strict-enough-to-catch-typos:
+    /// unique event ids, trigger.kind + shape consistency, effects[] non-empty
+    /// and every type known, cross-ref every zoneId / factionId / questId
+    /// against the authored registries, onExpire[] presence check warned
+    /// (not thrown) when transient effects have no inverse. npcId references
+    /// are not cross-checked — the NPC catalog is not yet in JSON; when it
+    /// lands, this validator should tighten.
+    /// </summary>
+    private IReadOnlyList<WorldEventDefinition> LoadWorldEvents()
+    {
+        var path = Path.Combine(_contentRoot, "world-events.json");
+        if (!File.Exists(path))
+        {
+            // Optional file: earlier bases on the migration chain don't ship it.
+            _logger?.LogInformation("ContentProvider: no world-events.json at {Path} — event catalog will be empty.", path);
+            return Array.Empty<WorldEventDefinition>();
+        }
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<WorldEventsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Events is null || doc.Events.Count == 0)
+            throw new InvalidDataException($"{path}: no events defined.");
+
+        var zoneIds = new HashSet<string>(_zonesById.Keys, StringComparer.Ordinal);
+        var questIds = new HashSet<string>(_questsById.Keys, StringComparer.Ordinal);
+
+        var list = new List<WorldEventDefinition>(doc.Events.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Events)
+        {
+            if (string.IsNullOrWhiteSpace(raw.Id))
+                throw new InvalidDataException($"{path}: event missing id.");
+            if (!seenIds.Add(raw.Id))
+                throw new InvalidDataException($"{path}: duplicate event id '{raw.Id}'.");
+
+            if (string.IsNullOrWhiteSpace(raw.DisplayName))
+                throw new InvalidDataException($"{path}: event '{raw.Id}' missing displayName.");
+            if (string.IsNullOrWhiteSpace(raw.Description))
+                throw new InvalidDataException($"{path}: event '{raw.Id}' missing description.");
+
+            if (string.IsNullOrWhiteSpace(raw.Family) || !ValidEventFamilies.Contains(raw.Family))
+                throw new InvalidDataException(
+                    $"{path}: event '{raw.Id}' has invalid family '{raw.Family}'.");
+
+            if (raw.Priority < 1 || raw.Priority > 5)
+                throw new InvalidDataException(
+                    $"{path}: event '{raw.Id}' priority must be 1..5 (got {raw.Priority}).");
+
+            var trigger = ValidateTrigger(raw.Trigger, raw.Id, path, questIds);
+            var duration = ValidateDuration(raw.Duration, raw.Id, path);
+
+            if (raw.Effects is null || raw.Effects.Count == 0)
+                throw new InvalidDataException(
+                    $"{path}: event '{raw.Id}' must declare at least one effect.");
+
+            var effects = raw.Effects
+                .Select(e => ValidateEffect(e, raw.Id, "effects", path, zoneIds))
+                .ToList();
+            var onExpire = (raw.OnExpire ?? new List<RawWorldEventEffect>())
+                .Select(e => ValidateEffect(e, raw.Id, "onExpire", path, zoneIds))
+                .ToList();
+
+            // Symmetric-cleanup warning (not a throw): transient events that
+            // apply a cleanup-requiring effect type but ship no onExpire entry
+            // are almost certainly missing their inverse. Permanent / oneTime
+            // events are exempt — their whole point is to change the world.
+            var isPermanent = duration.Permanent;
+            var isOneTime = raw.OneTime;
+            if (!isPermanent && !isOneTime)
+            {
+                var needsCleanup = effects.Any(e => EffectTypesRequiringCleanup.Contains(e.Type));
+                if (needsCleanup && onExpire.Count == 0)
+                {
+                    _logger?.LogWarning(
+                        "world-events.json: event '{EventId}' applies a cleanup-requiring effect but declares no onExpire inverse.",
+                        raw.Id);
+                }
+            }
+
+            // Faction tag cross-ref
+            var factionTags = new List<FactionId>();
+            if (raw.FactionTags is not null)
+            {
+                foreach (var ft in raw.FactionTags)
+                {
+                    if (string.IsNullOrWhiteSpace(ft) || !ValidFactionIdNames.Contains(ft))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' factionTag '{ft}' is not a valid FactionId.");
+                    factionTags.Add(Enum.Parse<FactionId>(ft));
+                }
+            }
+
+            // Zone tag cross-ref
+            var zoneTags = new List<string>();
+            if (raw.ZoneTags is not null)
+            {
+                foreach (var zt in raw.ZoneTags)
+                {
+                    if (string.IsNullOrWhiteSpace(zt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' has empty zoneTag entry.");
+                    if (zoneIds.Count > 0 && !zoneIds.Contains(zt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' zoneTag '{zt}' is not a known zoneId.");
+                    zoneTags.Add(zt);
+                }
+            }
+
+            // Quest tag cross-ref
+            var questTags = new List<string>();
+            if (raw.QuestTags is not null)
+            {
+                foreach (var qt in raw.QuestTags)
+                {
+                    if (string.IsNullOrWhiteSpace(qt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' has empty questTag entry.");
+                    if (questIds.Count > 0 && !questIds.Contains(qt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' questTag '{qt}' is not a known questId.");
+                    questTags.Add(qt);
+                }
+            }
+
+            list.Add(new WorldEventDefinition(
+                Id: raw.Id,
+                DisplayName: raw.DisplayName,
+                Family: raw.Family,
+                Priority: raw.Priority,
+                Description: raw.Description,
+                Trigger: trigger,
+                Duration: duration,
+                Effects: effects,
+                OnExpire: onExpire,
+                FactionTags: factionTags,
+                ZoneTags: zoneTags,
+                QuestTags: questTags,
+                WorldStateFlag: string.IsNullOrWhiteSpace(raw.WorldStateFlag) ? null : raw.WorldStateFlag,
+                OneTime: raw.OneTime));
+        }
+
+        return list;
+    }
+
+    private WorldEventTrigger ValidateTrigger(RawWorldEventTrigger? raw, string eventId, string path, HashSet<string> questIds)
+    {
+        if (raw is null)
+            throw new InvalidDataException($"{path}: event '{eventId}' missing trigger.");
+
+        if (string.IsNullOrWhiteSpace(raw.Kind) || !ValidEventTriggerKinds.Contains(raw.Kind))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' has invalid trigger.kind '{raw.Kind}'.");
+
+        FactionId? faction = null;
+        ReputationTier? tier = null;
+
+        switch (raw.Kind)
+        {
+            case "gameTick":
+            case "lunarCycle":
+                if ((raw.EveryDays is null || raw.EveryDays <= 0) &&
+                    (raw.EveryMinutes is null || raw.EveryMinutes <= 0))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='{raw.Kind}' requires everyDays or everyMinutes > 0.");
+                break;
+            case "seasonalDay":
+                if (raw.Day is null || raw.Day < 0)
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='seasonalDay' requires day >= 0.");
+                break;
+            case "repThreshold":
+                if (string.IsNullOrWhiteSpace(raw.FactionId) || !ValidFactionIdNames.Contains(raw.FactionId))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='repThreshold' has invalid factionId '{raw.FactionId}'.");
+                faction = Enum.Parse<FactionId>(raw.FactionId);
+                if (!string.IsNullOrWhiteSpace(raw.MinTier))
+                {
+                    if (!ValidReputationTierNames.Contains(raw.MinTier))
+                        throw new InvalidDataException(
+                            $"{path}: event '{eventId}' trigger.kind='repThreshold' has invalid minTier '{raw.MinTier}'.");
+                    tier = Enum.Parse<ReputationTier>(raw.MinTier);
+                }
+                if (tier is null && raw.Min is null)
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='repThreshold' requires minTier or min.");
+                break;
+            case "questCompleted":
+                if (string.IsNullOrWhiteSpace(raw.QuestId))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='questCompleted' requires questId.");
+                if (questIds.Count > 0 && !questIds.Contains(raw.QuestId))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.questId '{raw.QuestId}' is not a known questId.");
+                break;
+            case "unconditional":
+            case "complex":
+                // No structural requirement beyond kind. Prose is expected but
+                // not enforced — keeps authoring friction low.
+                break;
+        }
+
+        return new WorldEventTrigger(
+            Kind: raw.Kind,
+            EveryDays: raw.EveryDays,
+            EveryMinutes: raw.EveryMinutes,
+            Day: raw.Day,
+            FactionId: faction,
+            MinTier: tier,
+            Min: raw.Min,
+            QuestId: string.IsNullOrWhiteSpace(raw.QuestId) ? null : raw.QuestId,
+            Outcome: string.IsNullOrWhiteSpace(raw.Outcome) ? null : raw.Outcome,
+            Prose: string.IsNullOrWhiteSpace(raw.Prose) ? null : raw.Prose);
+    }
+
+    private static WorldEventDuration ValidateDuration(RawWorldEventDuration? raw, string eventId, string path)
+    {
+        if (raw is null)
+            throw new InvalidDataException($"{path}: event '{eventId}' missing duration.");
+
+        var setCount = (raw.Days is not null ? 1 : 0)
+                     + (raw.Minutes is not null ? 1 : 0)
+                     + (raw.Permanent ? 1 : 0);
+        if (setCount == 0)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration must set exactly one of days/minutes/permanent.");
+        if (setCount > 1)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration must set only one of days/minutes/permanent.");
+
+        if (raw.Days is not null && raw.Days <= 0)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration.days must be > 0.");
+        if (raw.Minutes is not null && raw.Minutes <= 0)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration.minutes must be > 0.");
+
+        return new WorldEventDuration(raw.Days, raw.Minutes, raw.Permanent);
+    }
+
+    private WorldEventEffect ValidateEffect(RawWorldEventEffect raw, string eventId, string section, string path, HashSet<string> zoneIds)
+    {
+        if (string.IsNullOrWhiteSpace(raw.Type) || !ValidWorldEventEffectTypes.Contains(raw.Type))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} has invalid effect type '{raw.Type}'.");
+
+        if (!string.IsNullOrWhiteSpace(raw.ZoneId) && zoneIds.Count > 0 && !zoneIds.Contains(raw.ZoneId))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} references unknown zoneId '{raw.ZoneId}'.");
+
+        FactionId? faction = null;
+        if (!string.IsNullOrWhiteSpace(raw.FactionId))
+        {
+            if (!ValidFactionIdNames.Contains(raw.FactionId))
+                throw new InvalidDataException(
+                    $"{path}: event '{eventId}' {section} references invalid factionId '{raw.FactionId}'.");
+            faction = Enum.Parse<FactionId>(raw.FactionId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(raw.QuestId) && _questsById.Count > 0 && !_questsById.ContainsKey(raw.QuestId))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} references unknown questId '{raw.QuestId}'.");
+
+        return new WorldEventEffect(
+            Type: raw.Type,
+            ZoneId: string.IsNullOrWhiteSpace(raw.ZoneId) ? null : raw.ZoneId,
+            NpcId: string.IsNullOrWhiteSpace(raw.NpcId) ? null : raw.NpcId,
+            NpcName: string.IsNullOrWhiteSpace(raw.NpcName) ? null : raw.NpcName,
+            FactionId: faction,
+            Item: string.IsNullOrWhiteSpace(raw.Item) ? null : raw.Item,
+            Multiplier: raw.Multiplier,
+            Delta: raw.Delta,
+            Flag: string.IsNullOrWhiteSpace(raw.Flag) ? null : raw.Flag,
+            Value: raw.Value?.ToString(),
+            Text: string.IsNullOrWhiteSpace(raw.Text) ? null : raw.Text,
+            Available: raw.Available,
+            QuestId: string.IsNullOrWhiteSpace(raw.QuestId) ? null : raw.QuestId);
+    }
+
+    private sealed class WorldEventsFile
+    {
+        public List<RawWorldEvent>? Events { get; set; }
+    }
+
+    private sealed class RawWorldEvent
+    {
+        public string Id { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string Family { get; set; } = "";
+        public int Priority { get; set; }
+        public string Description { get; set; } = "";
+        public RawWorldEventTrigger? Trigger { get; set; }
+        public RawWorldEventDuration? Duration { get; set; }
+        public List<RawWorldEventEffect>? Effects { get; set; }
+        public List<RawWorldEventEffect>? OnExpire { get; set; }
+        public List<string>? FactionTags { get; set; }
+        public List<string>? ZoneTags { get; set; }
+        public List<string>? QuestTags { get; set; }
+        public string? WorldStateFlag { get; set; }
+        public bool OneTime { get; set; }
+    }
+
+    private sealed class RawWorldEventTrigger
+    {
+        public string Kind { get; set; } = "";
+        public int? EveryDays { get; set; }
+        public int? EveryMinutes { get; set; }
+        public int? Day { get; set; }
+        public string? FactionId { get; set; }
+        public string? MinTier { get; set; }
+        public int? Min { get; set; }
+        public string? QuestId { get; set; }
+        public string? Outcome { get; set; }
+        public string? Prose { get; set; }
+    }
+
+    private sealed class RawWorldEventDuration
+    {
+        public int? Days { get; set; }
+        public int? Minutes { get; set; }
+        public bool Permanent { get; set; }
+    }
+
+    private sealed class RawWorldEventEffect
+    {
+        public string Type { get; set; } = "";
+        public string? ZoneId { get; set; }
+        public string? NpcId { get; set; }
+        public string? NpcName { get; set; }
+        public string? FactionId { get; set; }
+        public string? Item { get; set; }
+        public double? Multiplier { get; set; }
+        public int? Delta { get; set; }
+        public string? Flag { get; set; }
+        public object? Value { get; set; }
+        public string? Text { get; set; }
+        public bool? Available { get; set; }
+        public string? QuestId { get; set; }
     }
 }

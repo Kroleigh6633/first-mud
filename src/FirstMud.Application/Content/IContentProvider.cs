@@ -143,6 +143,15 @@ public interface IContentProvider
     /// content/quests.json.</summary>
     IReadOnlyList<QuestEdgeDefinition> AllQuestEdges();
 
+    // ─── World Events ────────────────────────────────────────────────────────
+
+    /// <summary>All world-event definitions authored in
+    /// content/world-events.json, in file order.</summary>
+    IReadOnlyList<WorldEventDefinition> AllEvents();
+
+    /// <summary>Lookup an event by its stable id. Returns null if unknown.</summary>
+    WorldEventDefinition? GetEvent(string id);
+
     // ─── Combat Curves ───────────────────────────────────────────────────────
 
     /// <summary>
