@@ -10,11 +10,15 @@ interface Props {
 }
 
 function Bar({ current, max, width, color }: { current: number; max: number; width: number; color: string }) {
-  const filled = Math.round((current / Math.max(max, 1)) * width);
+  // Clamp to [0, width] so a bad input (e.g. current > max, or NaN) never throws
+  // from String.repeat(negative). The bar will just render "full" or "empty" gracefully.
+  const safeWidth = Math.max(0, Math.floor(width));
+  const rawFilled = Math.round((current / Math.max(max, 1)) * safeWidth);
+  const filled = Number.isFinite(rawFilled) ? Math.min(Math.max(rawFilled, 0), safeWidth) : 0;
   return (
     <>
       <span style={{ color }}>{'\u2588'.repeat(filled)}</span>
-      <span style={{ color: '#222' }}>{'\u2588'.repeat(width - filled)}</span>
+      <span style={{ color: '#222' }}>{'\u2588'.repeat(safeWidth - filled)}</span>
     </>
   );
 }
@@ -259,12 +263,21 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
       </div>
       <div style={{ marginBottom: '2px' }}>
         {(() => {
-          const xpForNext = player.level * player.level * 100;
+          // Mirror server's CalculateLevel: Level = 1 + floor(sqrt(exp/100))
+          // Cumulative threshold to REACH level L is (L-1)^2 * 100.
+          // Threshold to reach next level is L^2 * 100.
+          // The bar shows progress within the current level, not cumulative XP,
+          // otherwise `current/max` exceeds 1 as soon as the player hits L >= 2
+          // and the Bar's .repeat() would be called with a negative count.
+          const levelStart  = (player.level - 1) * (player.level - 1) * 100;
+          const levelEnd    = player.level * player.level * 100;
+          const intoLevel   = Math.max(0, player.experience - levelStart);
+          const spanForLevel = Math.max(1, levelEnd - levelStart);
           return (
             <>
               <span style={{ color: '#888888' }}>XP: </span>
-              <Bar current={player.experience} max={xpForNext} width={12} color="#00ccff" />
-              <span style={{ color: '#888888' }}> {player.experience}/{xpForNext}</span>
+              <Bar current={intoLevel} max={spanForLevel} width={12} color="#00ccff" />
+              <span style={{ color: '#888888' }}> {intoLevel}/{spanForLevel}</span>
             </>
           );
         })()}
