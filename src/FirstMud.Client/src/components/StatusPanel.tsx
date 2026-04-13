@@ -127,8 +127,13 @@ function BondStars({ layer }: { layer: number }) {
   );
 }
 
-function companionStatusLabel(companion: CompanionState): { label: string; color: string } {
-  if (companion.isActive) {
+function companionStatusLabel(
+  companion: CompanionState,
+  activeCompanionIds: string[],
+): { label: string; color: string } {
+  // A companion is truly "active" only if its ID appears in the player's
+  // 3-slot combat party list — not just because isActive is set on the entity.
+  if (activeCompanionIds.includes(companion.id)) {
     return { label: 'ACTIVE (adventuring)', color: '#00ff41' };
   }
   if (companion.assignedDuty) {
@@ -141,13 +146,19 @@ function companionStatusLabel(companion: CompanionState): { label: string; color
     const color = dutyColors[companion.assignedDuty] ?? '#ccaa44';
     return { label: `${companion.assignedDuty.toUpperCase()} (homestead)`, color };
   }
-  return { label: 'IDLE', color: '#ff4444' };
+  return { label: 'IDLE', color: '#888888' };
 }
 
-function CompanionRow({ companion }: { companion: CompanionState }) {
+function CompanionRow({
+  companion,
+  activeCompanionIds,
+}: {
+  companion: CompanionState;
+  activeCompanionIds: string[];
+}) {
   const isDrifting = companion.driftAccumulator >= 30;
   const isDanger   = companion.driftAccumulator >= 40;
-  const status = companionStatusLabel(companion);
+  const status = companionStatusLabel(companion, activeCompanionIds);
 
   const layerBarContent = (() => {
     if (companion.currentLayer >= 6) {
@@ -368,13 +379,18 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
         companionRoster
           .slice()
           .sort((a, b) => {
-            // Active first, then homestead, then idle; within group sort by layer desc
-            const rank = (c: CompanionState) => c.isActive ? 0 : c.assignedDuty ? 1 : 2;
+            // Active (in party) first, then homestead duty, then idle; within group sort by layer desc
+            const rank = (c: CompanionState) =>
+              player.activeCompanionIds.includes(c.id) ? 0 : c.assignedDuty ? 1 : 2;
             const r = rank(a) - rank(b);
             return r !== 0 ? r : b.currentLayer - a.currentLayer;
           })
           .map(companion => (
-            <CompanionRow key={companion.id} companion={companion} />
+            <CompanionRow
+              key={companion.id}
+              companion={companion}
+              activeCompanionIds={player.activeCompanionIds}
+            />
           ))
       ) : (player.activeCompanions?.length ?? 0) === 0 ? (
         <div style={{ color: '#888888', fontSize: '11px' }}>No companions</div>
@@ -383,7 +399,11 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
           .slice()
           .sort((a, b) => b.currentLayer - a.currentLayer)
           .map(companion => (
-            <CompanionRow key={companion.id} companion={companion} />
+            <CompanionRow
+              key={companion.id}
+              companion={companion}
+              activeCompanionIds={player.activeCompanionIds}
+            />
           ))
       )}
 

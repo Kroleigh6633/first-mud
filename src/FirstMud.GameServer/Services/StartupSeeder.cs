@@ -30,6 +30,7 @@ public class StartupSeeder(
         await SeedStarterRecipesAsync(ct);
         await SeedHomesteadsAsync(ct);
         await SeedResourceNodesAsync(ct);
+        await FixIdleCompanionsAsync(ct);
     }
 
     // -------------------------------------------------------------------------
@@ -735,5 +736,66 @@ public class StartupSeeder(
         await db.ResourceNodes.AddRangeAsync(nodes, ct);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded {Count} resource nodes across {ZoneCount} zones.", nodes.Count, zones.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // Idle companion fixup
+    // -------------------------------------------------------------------------
+
+    // Any companion that is not in a player's active combat party (max 3 slots)
+    // AND has no assigned homestead duty is considered "forgotten idle".
+    // This fixup auto-assigns them to their best homestead duty so they are
+    // contributing rather than just sitting.  Safe to run on every startup —
+    // companions that already have a duty or are in the active party are skipped.
+    private async Task FixIdleCompanionsAsync(CancellationToken ct)
+    {
+        var allPlayers    = await db.Players.ToListAsync(ct);
+        var allCompanions = await db.Companions.ToListAsync(ct);
+
+        // Build the complete set of companion IDs that are in any player's active slots
+        var activeIds = allPlayers
+            .SelectMany(p => p.ActiveCompanionIds)
+            .ToHashSet();
+
+        // Companions that need a duty: alive, no duty, not in any combat party
+        var idle = allCompanions
+            .Where(c => !c.IsPermanentlyGone
+                     && c.AssignedDuty is null
+                     && !activeIds.Contains(c.Id))
+            .ToList();
+
+        if (idle.Count == 0)
+        {
+            logger.LogInformation("FixIdleCompanions: no idle companions found — nothing to do.");
+            return;
+        }
+
+        var duties = new[] { HomesteadDuty.Harvester, HomesteadDuty.Salvager, HomesteadDuty.Guard, HomesteadDuty.Crafter };
+        var assignedCount = 0;
+
+        foreach (var companion in idle)
+        {
+            // Ensure IsActive flag is cleared — it may be stale if the companion was
+            // removed from a player's active list without calling SetActive(false).
+            if (companion.IsActive)
+                companion.SetActive(false);
+
+            var bestDuty = duties
+                .OrderByDescending(d => companion.GetAptitude(d))
+                .First();
+
+            companion.AssignToHomestead(bestDuty);
+            db.Companions.Update(companion);
+            assignedCount++;
+
+            logger.LogWarning(
+                "FixIdleCompanions: assigned {Name} ({Id}) to {Duty} duty (aptitude {Apt}/3).",
+                companion.Name, companion.Id, bestDuty, companion.GetAptitude(bestDuty));
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation(
+            "FixIdleCompanions: auto-assigned {Count} idle companion(s) to homestead duty.",
+            assignedCount);
     }
 }
