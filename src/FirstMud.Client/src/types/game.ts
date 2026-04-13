@@ -410,6 +410,11 @@ export type BuildingType =
   | 'Warehouse'
   | 'Hut';
 
+export interface HutResident {
+  id: string;
+  name: string;
+}
+
 export interface HomesteadBuilding {
   id: string;
   homesteadId: string;
@@ -419,8 +424,12 @@ export interface HomesteadBuilding {
   gridY: number;
   isConstructed: boolean;
   constructionProgress: number;   // 0–100
+  // Production buildings (non-Hut)
   assignedCompanionId?: string | null;
   assignedCompanionName?: string | null;
+  // Housing buildings (Hut)
+  residents?: HutResident[] | null;
+  residentCapacity?: number;
 }
 
 export interface CityViewSnapshot {

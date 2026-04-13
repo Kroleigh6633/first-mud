@@ -111,30 +111,8 @@ public class BuildStaffEverythingCommandHandler(
         if (homestead is not null)
         {
             var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
-            var buildingDtos = new List<object>();
-            foreach (var b in buildings)
-            {
-                string? assignedName = null;
-                if (b.AssignedCompanionId.HasValue)
-                {
-                    var companion = await companionRepository.GetByIdAsync(b.AssignedCompanionId.Value, ct);
-                    assignedName = companion?.Name;
-                }
-
-                buildingDtos.Add(new
-                {
-                    id                   = b.Id,
-                    homesteadId          = b.HomesteadId,
-                    type                 = b.Type.ToString(),
-                    tier                 = b.Tier,
-                    gridX                = b.GridX,
-                    gridY                = b.GridY,
-                    isConstructed        = b.IsConstructed,
-                    constructionProgress = b.ConstructionProgress,
-                    assignedCompanionId  = b.AssignedCompanionId,
-                    assignedCompanionName= assignedName,
-                });
-            }
+            var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+            var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
 
             var cityViewPayload = new
             {
@@ -167,32 +145,9 @@ public class ViewCityCommandHandler(
             return new CommandResult(false, "No homestead found.");
 
         var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
+        var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
 
-        // Build DTO list for the client
-        var buildingDtos = new List<object>();
-        foreach (var b in buildings)
-        {
-            string? assignedName = null;
-            if (b.AssignedCompanionId.HasValue)
-            {
-                var companion = await companionRepository.GetByIdAsync(b.AssignedCompanionId.Value, ct);
-                assignedName = companion?.Name;
-            }
-
-            buildingDtos.Add(new
-            {
-                id                   = b.Id,
-                homesteadId          = b.HomesteadId,
-                type                 = b.Type.ToString(),
-                tier                 = b.Tier,
-                gridX                = b.GridX,
-                gridY                = b.GridY,
-                isConstructed        = b.IsConstructed,
-                constructionProgress = b.ConstructionProgress,
-                assignedCompanionId  = b.AssignedCompanionId,
-                assignedCompanionName= assignedName,
-            });
-        }
+        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
 
         var payload = new
         {
@@ -208,5 +163,77 @@ public class ViewCityCommandHandler(
             .SendAsync("CityView", payload, ct);
 
         return new CommandResult(true, $"City view loaded. {buildings.Count} building(s).", payload);
+    }
+}
+
+/// <summary>
+/// Shared helper that builds the building DTO list for CityView payloads.
+/// Housing buildings (Huts) include a residents list; production buildings include a single worker.
+/// </summary>
+internal static class CityViewBuilder
+{
+    public static async Task<List<object>> BuildDtosAsync(
+        IReadOnlyList<FirstMud.Domain.Entities.HomesteadBuilding> buildings,
+        IReadOnlyList<FirstMud.Domain.Entities.Companion> allCompanions,
+        ICompanionRepository companionRepository,
+        CancellationToken ct)
+    {
+        var dtos = new List<object>();
+        foreach (var b in buildings)
+        {
+            if (BuildingService.IsHousingType(b.Type))
+            {
+                // Housing building: show residents (companions whose HousingBuildingId == this hut)
+                var residents = allCompanions
+                    .Where(c => c.HousingBuildingId == b.Id)
+                    .Select(c => new { id = c.Id, name = c.Name })
+                    .ToList<object>();
+
+                var capacity = BuildingService.GetHutCapacity(b.Tier);
+
+                dtos.Add(new
+                {
+                    id                   = b.Id,
+                    homesteadId          = b.HomesteadId,
+                    type                 = b.Type.ToString(),
+                    tier                 = b.Tier,
+                    gridX                = b.GridX,
+                    gridY                = b.GridY,
+                    isConstructed        = b.IsConstructed,
+                    constructionProgress = b.ConstructionProgress,
+                    assignedCompanionId  = (Guid?)null,
+                    assignedCompanionName= (string?)null,
+                    residents,
+                    residentCapacity     = capacity,
+                });
+            }
+            else
+            {
+                // Production building: show single worker
+                string? assignedName = null;
+                if (b.AssignedCompanionId.HasValue)
+                {
+                    var companion = await companionRepository.GetByIdAsync(b.AssignedCompanionId.Value, ct);
+                    assignedName = companion?.Name;
+                }
+
+                dtos.Add(new
+                {
+                    id                   = b.Id,
+                    homesteadId          = b.HomesteadId,
+                    type                 = b.Type.ToString(),
+                    tier                 = b.Tier,
+                    gridX                = b.GridX,
+                    gridY                = b.GridY,
+                    isConstructed        = b.IsConstructed,
+                    constructionProgress = b.ConstructionProgress,
+                    assignedCompanionId  = b.AssignedCompanionId,
+                    assignedCompanionName= assignedName,
+                    residents            = (object?)null,
+                    residentCapacity     = 0,
+                });
+            }
+        }
+        return dtos;
     }
 }

@@ -31,6 +31,7 @@ public class StartupSeeder(
         await SeedStarterRecipesAsync(ct);
         await SeedHomesteadsAsync(ct);
         await SeedResourceNodesAsync(ct);
+        await MigrateHutAssignmentsToHousingAsync(ct);
         await FixIdleCompanionsAsync(ct);
     }
 
@@ -930,6 +931,54 @@ public class StartupSeeder(
         await db.ResourceNodes.AddRangeAsync(nodes, ct);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded {Count} resource nodes across {ZoneCount} zones.", nodes.Count, zones.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // Housing migration — migrate hut AssignedCompanionId to HousingBuildingId
+    // -------------------------------------------------------------------------
+
+    // Before this change, huts used AssignedCompanionId (a single worker slot) to track occupants.
+    // Now huts are housing: companions point back to the hut via their own HousingBuildingId.
+    // This fixup migrates any existing data:
+    //   - For each Hut with an AssignedCompanionId: set that companion's HousingBuildingId = hut.Id
+    //     and clear the hut's AssignedCompanionId.
+    // Safe to run repeatedly — idempotent.
+    private async Task MigrateHutAssignmentsToHousingAsync(CancellationToken ct)
+    {
+        var hutType = (int)Domain.Enums.BuildingType.Hut;
+        var hutsWithAssignees = await db.HomesteadBuildings
+            .Where(b => b.Type == (Domain.Enums.BuildingType)hutType && b.AssignedCompanionId != null)
+            .ToListAsync(ct);
+
+        if (hutsWithAssignees.Count == 0)
+        {
+            logger.LogInformation("MigrateHutAssignments: no legacy hut assignments found — nothing to do.");
+            return;
+        }
+
+        int migrated = 0;
+        foreach (var hut in hutsWithAssignees)
+        {
+            var companionId = hut.AssignedCompanionId!.Value;
+            var companion = await db.Companions.FindAsync([companionId], ct);
+            if (companion is not null && companion.HousingBuildingId is null)
+            {
+                companion.AssignHousing(hut.Id);
+                db.Companions.Update(companion);
+                migrated++;
+                logger.LogInformation(
+                    "MigrateHutAssignments: moved {Name} ({Id}) from hut AssignedCompanionId → HousingBuildingId.",
+                    companion.Name, companion.Id);
+            }
+
+            // Clear the worker slot on the hut
+            hut.UnassignCompanion();
+            db.HomesteadBuildings.Update(hut);
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation(
+            "MigrateHutAssignments: migrated {Count} companion(s) to HousingBuildingId.", migrated);
     }
 
     // -------------------------------------------------------------------------

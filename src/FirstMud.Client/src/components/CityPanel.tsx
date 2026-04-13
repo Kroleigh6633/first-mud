@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import type {
   CityViewSnapshot,
   HomesteadBuilding,
+  HutResident,
   BuildingType,
   CompanionState,
   CompanionType,
@@ -12,7 +13,8 @@ import type {
 
 // ─── Constants mirroring server-side data ────────────────────────────────────
 
-const BUILDING_DUTY: Record<BuildingType, HomesteadDuty> = {
+// Duty for production buildings only — Hut is housing, not a workstation.
+const BUILDING_DUTY: Partial<Record<BuildingType, HomesteadDuty>> = {
   Forge:          'Crafter',
   Fletcher:       'Crafter',
   Tannery:        'Crafter',
@@ -26,8 +28,9 @@ const BUILDING_DUTY: Record<BuildingType, HomesteadDuty> = {
   Barracks:       'Guard',
   Library:        'Salvager',
   Warehouse:      'Guard',
-  Hut:            'Guard',
 };
+
+const HOUSING_TYPES = new Set<BuildingType>(['Hut']);
 
 const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[]> = {
   Forge:          [{ material: 'Wood', qty: 20 }, { material: 'Stone', qty: 30 }, { material: 'Iron Ore', qty: 10 }],
@@ -181,14 +184,17 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
   const color = buildingColor(building.type);
   const icon = buildingIcon(building.type);
   const tierStr = '★'.repeat(building.tier);
-  const duty = BUILDING_DUTY[building.type];
+  const isHousing = HOUSING_TYPES.has(building.type);
+  const duty = isHousing ? undefined : BUILDING_DUTY[building.type];
 
   // Sort available companions by aptitude for this building's duty (best first)
-  const sorted = [...availableCompanions].sort((a, b) => {
-    const aApt = APTITUDE[a.type]?.[duty] ?? 1;
-    const bApt = APTITUDE[b.type]?.[duty] ?? 1;
-    return bApt - aApt;
-  });
+  const sorted = duty
+    ? [...availableCompanions].sort((a, b) => {
+        const aApt = APTITUDE[a.type]?.[duty] ?? 1;
+        const bApt = APTITUDE[b.type]?.[duty] ?? 1;
+        return bApt - aApt;
+      })
+    : [];
 
   const handleAssign = () => {
     if (!selectedCompanionId) return;
@@ -199,6 +205,9 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
   const handleUnassign = () => {
     sendCommand('unassignbuilder', { buildingId: building.id });
   };
+
+  const residents: HutResident[] = building.residents ?? [];
+  const residentCapacity = building.residentCapacity ?? 0;
 
   return (
     <div style={{ marginBottom: '10px', borderLeft: `3px solid ${color}`, paddingLeft: '8px' }}>
@@ -214,13 +223,40 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
         )}
       </div>
 
-      {/* Constructed — show worker info or assign dropdown */}
-      {building.isConstructed ? (
+      {/* Housing building (Hut) — show residents */}
+      {isHousing && building.isConstructed && (
+        <div style={{ fontSize: '11px', marginTop: '4px' }}>
+          {residents.length > 0 ? (
+            <div>
+              <span style={{ color: '#aaaaaa' }}>
+                Residents:{' '}
+                <span style={{ color: '#00ccff' }}>
+                  {residents.map(r => r.name).join(', ')}
+                </span>{' '}
+                <span style={{ color: '#888888' }}>({residents.length}/{residentCapacity})</span>
+              </span>
+            </div>
+          ) : (
+            <div style={{ color: '#555555' }}>
+              No residents yet ({residentCapacity} capacity) — use <em>Build &amp; Staff Everything</em> to auto-fill.
+            </div>
+          )}
+          <span style={{ color: '#444444', fontSize: '10px', display: 'block', marginTop: '2px' }}>
+            Pos: ({building.gridX},{building.gridY})
+          </span>
+        </div>
+      )}
+
+      {/* Production building (constructed) — show worker info or assign dropdown */}
+      {!isHousing && building.isConstructed && (
         <div style={{ fontSize: '11px', marginTop: '4px' }}>
           {building.assignedCompanionName ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ color: '#aaaaaa' }}>
                 Worker: <span style={{ color: '#00ccff' }}>{building.assignedCompanionName}</span>
+                {duty && (
+                  <> <span style={{ color: '#888888', fontSize: '10px' }}>({duty})</span></>
+                )}
               </span>
               <button
                 type="button"
@@ -250,7 +286,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
                   >
                     <option value="">-- Select companion --</option>
                     {sorted.map(c => {
-                      const apt = APTITUDE[c.type]?.[duty] ?? 1;
+                      const apt = duty ? (APTITUDE[c.type]?.[duty] ?? 1) : 1;
                       const stars = '★'.repeat(apt) + '☆'.repeat(3 - apt);
                       return (
                         <option key={c.id} value={c.id}>
@@ -259,7 +295,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
                       );
                     })}
                   </select>
-                  {selectedCompanionId && (
+                  {selectedCompanionId && duty && (
                     <>
                       <span style={{ color: '#888888', fontSize: '10px' }}>
                         {duty}: <AptitudeStars count={APTITUDE[sorted.find(c => c.id === selectedCompanionId)?.type ?? 'HiredHero']?.[duty] ?? 1} />
@@ -281,8 +317,10 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
             Pos: ({building.gridX},{building.gridY})
           </span>
         </div>
-      ) : (
-        /* Under construction — show progress + builder */
+      )}
+
+      {/* Under construction — show progress + builder (applies to both housing and production) */}
+      {!building.isConstructed && (
         <div style={{ fontSize: '11px', marginTop: '2px' }}>
           <ProgressBar pct={building.constructionProgress} />
           {building.assignedCompanionName ? (
@@ -304,7 +342,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
               <div style={{ color: '#888888', marginBottom: '4px' }}>
                 No builder — assign a Crafter companion:
               </div>
-              {sorted.length === 0 ? (
+              {availableCompanions.length === 0 ? (
                 <div style={{ color: '#555555', fontSize: '10px' }}>
                   No available companions
                 </div>
@@ -317,7 +355,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
                     aria-label={`Select builder for ${building.type}`}
                   >
                     <option value="">-- Select builder --</option>
-                    {sorted.map(c => {
+                    {availableCompanions.map(c => {
                       const apt = APTITUDE[c.type]?.['Crafter'] ?? 1;
                       const stars = '★'.repeat(apt) + '☆'.repeat(3 - apt);
                       return (
@@ -554,7 +592,12 @@ export default function CityPanel({
 
   const constructed = cityView.buildings.filter(b => b.isConstructed);
   const underConstruction = cityView.buildings.filter(b => !b.isConstructed);
-  const assignedCount = cityView.buildings.filter(b => b.assignedCompanionName).length;
+  // Workers = companions assigned to production buildings
+  const workerCount = cityView.buildings.filter(b => !HOUSING_TYPES.has(b.type) && b.assignedCompanionName).length;
+  // Residents = companions living in huts
+  const residentCount = cityView.buildings
+    .filter(b => HOUSING_TYPES.has(b.type))
+    .reduce((sum, b) => sum + (b.residents?.length ?? 0), 0);
 
   // Companions available for assignment:
   //   - not in the active adventuring party (use authoritative activeCompanionIds, not stale c.isActive)
@@ -572,14 +615,19 @@ export default function CityPanel({
       !c.assignedDuty
   );
 
-  // Auto-assign all: for each building without a worker, pick best-aptitude available companion
+  // Auto-assign all: for each PRODUCTION building without a worker, pick best-aptitude available companion.
+  // Housing buildings (Huts) are excluded — residents are assigned via BuildStaffEverything.
   const handleAutoAssignAll = useCallback(() => {
     // Track which companions we've already "used" in this batch
     const usedIds = new Set<string>();
-    const buildingsNeedingWorkers = cityView.buildings.filter(b => !b.assignedCompanionName);
+    const buildingsNeedingWorkers = cityView.buildings.filter(
+      b => !HOUSING_TYPES.has(b.type) && !b.assignedCompanionName
+    );
 
     for (const building of buildingsNeedingWorkers) {
-      const duty = building.isConstructed ? BUILDING_DUTY[building.type] : 'Crafter' as HomesteadDuty;
+      const duty = building.isConstructed
+        ? (BUILDING_DUTY[building.type] ?? 'Crafter' as HomesteadDuty)
+        : 'Crafter' as HomesteadDuty;
       const best = availableCompanions
         .filter(c => !usedIds.has(c.id))
         .sort((a, b) => {
@@ -600,7 +648,9 @@ export default function CityPanel({
     sendCommand('buildstaffeverything', null);
   }, [sendCommand]);
 
-  const unassignedBuildings = cityView.buildings.filter(b => !b.assignedCompanionName);
+  const unassignedBuildings = cityView.buildings.filter(
+    b => !HOUSING_TYPES.has(b.type) && !b.assignedCompanionName
+  );
   const canAutoAssign = unassignedBuildings.length > 0 && availableCompanions.length > 0;
 
   return (
@@ -618,7 +668,9 @@ export default function CityPanel({
         {' · '}
         <span style={{ color: '#ff8800' }}>{underConstruction.length}</span> under construction
         {' · '}
-        <span style={{ color: '#00ccff' }}>{assignedCount}</span> companions working
+        <span style={{ color: '#00ccff' }}>{workerCount}</span> working
+        {' · '}
+        <span style={{ color: '#cc9966' }}>{residentCount}</span> housed
         {' · '}
         <span style={{ color: availableCompanions.length > 0 ? '#00cc88' : '#555555' }}>
           {availableCompanions.length} available

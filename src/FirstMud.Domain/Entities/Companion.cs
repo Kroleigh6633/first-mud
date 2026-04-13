@@ -31,6 +31,9 @@ public class Companion
     public HomesteadDuty? AssignedDuty { get; private set; }
     public DateTime? DutyStartedAt { get; private set; }
 
+    // Housing — which hut this companion lives in (separate from work assignment)
+    public Guid? HousingBuildingId { get; private set; }
+
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
     public void ClearDomainEvents() => _domainEvents.Clear();
@@ -139,6 +142,23 @@ public class Companion
         // in the active party before calling this method.
         AssignedDuty = duty;
         DutyStartedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Assigns this companion to a housing building (hut).
+    /// Housing is separate from work assignment — a companion can be housed AND work simultaneously.
+    /// </summary>
+    public void AssignHousing(Guid hutBuildingId)
+    {
+        HousingBuildingId = hutBuildingId;
+    }
+
+    /// <summary>
+    /// Removes the companion's housing assignment (e.g. hut demolished or companion recalled).
+    /// </summary>
+    public void RemoveHousing()
+    {
+        HousingBuildingId = null;
     }
 
     /// <summary>

@@ -376,7 +376,34 @@ export default function CraftingPanel({
   }, [selectedRecipe, selectedComponentIds, selectedTaperId, onCraft]);
 
   function handleCraft() {
-    if (!canCraft()) return;
+    if (!selectedRecipe) {
+      setStatusMsg('Select a recipe first.');
+      setStatusColor('#ffaa00');
+      return;
+    }
+    if (crafting || craftAllActive) return;
+
+    // Compute per-ingredient shortfalls before firing
+    const shortfalls: string[] = [];
+    for (const ing of selectedRecipe.ingredients) {
+      const chosen = (selectedComponentIds[ing.ingredientName] ?? []).length;
+      if (chosen < ing.baseQuantity) {
+        shortfalls.push(`${ing.ingredientName}: need ${ing.baseQuantity}, selected ${chosen}`);
+      }
+    }
+    if (shortfalls.length > 0) {
+      setStatusMsg(`Cannot craft — insufficient selections: ${shortfalls.join('; ')}`);
+      setStatusColor('#ff4444');
+      return;
+    }
+
+    const allComponentIds = Object.values(selectedComponentIds).flat();
+    console.log(
+      `CRAFT clicked: recipeId=${selectedRecipe.recipeId}, ` +
+      `componentIds=[${allComponentIds.join(', ')}], ` +
+      `taperId=${selectedTaperId ?? 'null'}`,
+    );
+
     setStatusMsg(null);
     triggerTimedCraft(false);
   }
@@ -660,16 +687,16 @@ export default function CraftingPanel({
 
                 {/* Action buttons */}
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* CRAFT button */}
+                  {/* CRAFT button — always clickable so handleCraft can show feedback */}
                   <button
                     type="button"
                     style={{
                       ...craftBtnStyle,
-                      opacity: canCraft() ? 1 : 0.4,
-                      cursor: canCraft() ? 'pointer' : 'not-allowed',
+                      opacity: (crafting || craftAllActive) ? 0.4 : 1,
+                      cursor: (crafting || craftAllActive) ? 'not-allowed' : 'pointer',
                     }}
                     onClick={handleCraft}
-                    disabled={!canCraft()}
+                    disabled={crafting || craftAllActive}
                   >
                     CRAFT
                   </button>

@@ -50,5 +50,8 @@ internal sealed class CompanionConfiguration : IEntityTypeConfiguration<Companio
 
         builder.Property(c => c.DutyStartedAt)
             .IsRequired(false);
+
+        builder.Property(c => c.HousingBuildingId)
+            .IsRequired(false);
     }
 }

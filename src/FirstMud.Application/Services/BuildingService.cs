@@ -14,6 +14,7 @@ public class BuildingService
     private readonly IHomesteadBuildingRepository _buildings;
     private readonly IHomesteadRepository _homesteads;
     private readonly ICompanionRepository _companions;
+    private readonly IItemRepository _items;
     private readonly ILogger<BuildingService> _logger;
 
     // Construction cost in (material-name, quantity) pairs per building type.
@@ -36,7 +37,8 @@ public class BuildingService
         [BuildingType.Hut]            = [("Wood",  5), ("Stone",  3)],
     };
 
-    // Best HomesteadDuty for each building type — used for auto-assignment.
+    // Best HomesteadDuty for each production building type — used for auto-assignment.
+    // Hut is intentionally absent: huts are housing, not workstations.
     private static readonly Dictionary<BuildingType, HomesteadDuty> BuildingDuty = new()
     {
         [BuildingType.Forge]          = HomesteadDuty.Crafter,
@@ -52,7 +54,21 @@ public class BuildingService
         [BuildingType.Barracks]       = HomesteadDuty.Guard,
         [BuildingType.Library]        = HomesteadDuty.Salvager,
         [BuildingType.Warehouse]      = HomesteadDuty.Guard,
-        [BuildingType.Hut]            = HomesteadDuty.Guard,
+    };
+
+    /// <summary>Returns true if this building type is residential housing (holds residents, not workers).</summary>
+    public static bool IsHousingType(BuildingType type) => type == BuildingType.Hut;
+
+    /// <summary>Returns true if this building type is a production building (holds a single worker).</summary>
+    public static bool IsProductionType(BuildingType type) => !IsHousingType(type);
+
+    /// <summary>Returns the resident capacity of a hut by tier.</summary>
+    public static int GetHutCapacity(int tier) => tier switch
+    {
+        1 => 3,
+        2 => 5,
+        3 => 8,
+        _ => 3,
     };
 
     // Starter buildings placed (free, already constructed) on first homestead visit.
@@ -85,11 +101,13 @@ public class BuildingService
         IHomesteadBuildingRepository buildings,
         IHomesteadRepository homesteads,
         ICompanionRepository companions,
+        IItemRepository items,
         ILogger<BuildingService> logger)
     {
         _buildings  = buildings;
         _homesteads = homesteads;
         _companions = companions;
+        _items      = items;
         _logger     = logger;
     }
 
@@ -107,7 +125,8 @@ public class BuildingService
 
     /// <summary>
     /// Places a new building plot on the homestead grid.
-    /// Does not consume materials — caller should verify storage first.
+    /// Checks and consumes the construction cost from homestead storage (first) then
+    /// player inventory before placing.  Returns a failure result if materials are insufficient.
     /// When gridX/gridY are both the sentinel value <c>AutoPositionSentinel</c>, the server
     /// automatically picks the next available spiral position so the client never needs to
     /// specify coordinates.
@@ -126,6 +145,82 @@ public class BuildingService
         if (homestead is null)
             return (false, "No homestead found.", null);
 
+        // ── 1. Check construction cost ────────────────────────────────────────────
+        if (ConstructionCosts.TryGetValue(buildingType, out var costs))
+        {
+            foreach (var (material, required) in costs)
+            {
+                int available = 0;
+
+                // Count how much is in homestead storage
+                var storageRow = await _homesteads.GetStorageItemByNameAsync(homestead.Id, material, ct);
+                if (storageRow is not null)
+                {
+                    var storageItem = await _items.GetByIdAsync(storageRow.ItemId, ct);
+                    if (storageItem is not null)
+                        available += storageItem.Quantity;
+                }
+
+                // Count how much is in player inventory
+                var invItem = await _items.GetByOwnerAndNameAsync(playerId, material, ItemCategory.Component, ct);
+                if (invItem is not null)
+                    available += invItem.Quantity;
+
+                if (available < required)
+                    return (false, $"Not enough {material} (need {required}, have {available}).", null);
+            }
+
+            // ── 2. Consume materials — storage first, then inventory ─────────────
+            foreach (var (material, required) in costs)
+            {
+                int remaining = required;
+
+                // Deduct from storage first
+                var storageRow = await _homesteads.GetStorageItemByNameAsync(homestead.Id, material, ct);
+                if (storageRow is not null)
+                {
+                    var storageItem = await _items.GetByIdAsync(storageRow.ItemId, ct);
+                    if (storageItem is not null)
+                    {
+                        int fromStorage = Math.Min(remaining, storageItem.Quantity);
+                        storageItem.TryRemoveQuantity(fromStorage, out _);
+                        remaining -= fromStorage;
+
+                        if (storageItem.Quantity <= 0)
+                        {
+                            // Remove the join row first, then delete the item
+                            await _homesteads.RemoveStorageItemAsync(homestead.Id, storageItem.Id, ct);
+                            await _items.DeleteAsync(storageItem.Id, ct);
+                        }
+                        else
+                        {
+                            await _items.UpdateAsync(storageItem, ct);
+                        }
+                    }
+                }
+
+                // Deduct remainder from inventory
+                if (remaining > 0)
+                {
+                    var invItem = await _items.GetByOwnerAndNameAsync(playerId, material, ItemCategory.Component, ct);
+                    if (invItem is not null)
+                    {
+                        invItem.TryRemoveQuantity(remaining, out _);
+                        remaining = 0;
+
+                        if (invItem.Quantity <= 0)
+                            await _items.DeleteAsync(invItem.Id, ct);
+                        else
+                            await _items.UpdateAsync(invItem, ct);
+                    }
+                }
+
+                // remaining > 0 here would mean insufficient funds — but we already checked above,
+                // so this should never happen in practice.
+            }
+        }
+
+        // ── 3. Place the building ─────────────────────────────────────────────────
         var existing = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
 
         // Auto-pick position when client sends sentinel or (0,0) is already occupied
@@ -172,6 +267,9 @@ public class BuildingService
             return (false, "Building not found.");
         if (building.HomesteadId != homestead.Id)
             return (false, "That building does not belong to your homestead.");
+
+        if (IsHousingType(building.Type))
+            return (false, $"{building.Type} is a housing building — companions live there automatically. Use the housing assignment system instead.");
 
         var companion = await _companions.GetByIdAsync(companionId, ct);
         if (companion is null)
@@ -251,6 +349,8 @@ public class BuildingService
         CancellationToken ct = default)
     {
         if (!building.IsConstructed) return null;
+        // Huts are housing — they don't take workers via this method
+        if (IsHousingType(building.Type)) return null;
         if (!BuildingDuty.TryGetValue(building.Type, out var duty)) return null;
 
         var companions = await _companions.GetByOwnerAsync(playerId, ct);
@@ -406,8 +506,9 @@ public class BuildingService
                      && !c.AssignedDuty.HasValue)
             .ToList();
 
+        // Step 3 — assign WORKERS to production buildings (not huts)
         int assigned = 0;
-        foreach (var building in buildings.Where(b => !b.AssignedCompanionId.HasValue))
+        foreach (var building in buildings.Where(b => IsProductionType(b.Type) && !b.AssignedCompanionId.HasValue))
         {
             if (available.Count == 0) break;
 
@@ -430,11 +531,42 @@ public class BuildingService
             assigned++;
         }
 
-        var summary = $"Placed {added} building(s), assigned {assigned} worker(s).";
+        // Step 4 — assign RESIDENTS to huts (fill vacancies in constructed huts)
+        // Reload companions after worker assignments to get fresh HousingBuildingId state
+        var allCompanions = await _companions.GetByOwnerAsync(playerId, ct);
+        var huts = buildings
+            .Where(b => IsHousingType(b.Type) && b.IsConstructed)
+            .ToList();
+
+        int housed = 0;
+        foreach (var hut in huts)
+        {
+            var capacity = GetHutCapacity(hut.Tier);
+            var currentResidents = allCompanions.Count(c => c.HousingBuildingId == hut.Id);
+            if (currentResidents >= capacity) continue;
+
+            var vacancies = capacity - currentResidents;
+            // Companions eligible for housing: on homestead duty (any), not already housed, not permanently gone
+            var unhoused = allCompanions
+                .Where(c => !c.IsPermanentlyGone
+                         && !activeIds.Contains(c.Id)
+                         && c.HousingBuildingId is null)
+                .Take(vacancies)
+                .ToList();
+
+            foreach (var companion in unhoused)
+            {
+                companion.AssignHousing(hut.Id);
+                await _companions.UpdateAsync(companion, ct);
+                housed++;
+            }
+        }
+
+        var summary = $"Placed {added} building(s), assigned {assigned} worker(s), housed {housed} companion(s).";
         _logger.LogInformation(
             "BuildStaffEverything for player {PlayerId}: {Summary}", playerId, summary);
 
-        return (added, assigned, summary);
+        return (added, assigned + housed, summary);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────
