@@ -1,0 +1,41 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "full-party",
+  "displayName": "Full-party regression baseline",
+  "description": "Canonical mid-game loadout: playerLevel 8 + gearTier 3 proxy + imbueLevel 2 proxy + 3 companions at layer 3. Single axis: dangerLevel. This curve is the workhorse regression baseline every cycle.",
+  "holdouts": {
+    "playerLevel": 8,
+    "playerElement": "Aether",
+    "gearTier": 3,
+    "imbueLevel": 2,
+    "companionCount": 3,
+    "companionLayer": 3
+  },
+  "axes": [
+    { "name": "dangerLevel", "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] }
+  ],
+  "rolls": 200,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "dangerLevel": 0,  "expected": "trivial" },
+      { "dangerLevel": 1,  "expected": "trivial" },
+      { "dangerLevel": 2,  "expected": "trivial" },
+      { "dangerLevel": 3,  "expected": "trivial" },
+      { "dangerLevel": 4,  "expected": "easy" },
+      { "dangerLevel": 5,  "expected": "easy" },
+      { "dangerLevel": 6,  "expected": "balanced" },
+      { "dangerLevel": 7,  "expected": "balanced" },
+      { "dangerLevel": 8,  "expected": "balanced" },
+      { "dangerLevel": 9,  "expected": "hard" },
+      { "dangerLevel": 10, "expected": "hard" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

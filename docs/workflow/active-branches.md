@@ -28,4 +28,6 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 
+| worktree-agent-a9f8a24b | ready-to-merge | main | Add playbook-runner balance harness + seed playbooks | - | tools/design, docs/design | 2026-04-13 |
+
 <!-- agents add rows above this line -->

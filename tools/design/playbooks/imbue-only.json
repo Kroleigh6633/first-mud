@@ -1,0 +1,52 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "imbue-only",
+  "displayName": "Imbue-only contribution",
+  "description": "Baseline gear tier 3, no companions, varying imbue level (proxy: +1 effective level per imbue). Expectation: imbues contribute ~1-2 effective tiers of viability.",
+  "holdouts": {
+    "playerLevel": 5,
+    "playerElement": "Aether",
+    "gearTier": 3
+  },
+  "axes": [
+    { "name": "imbueLevel",  "values": [0, 1, 2, 3, 4] },
+    { "name": "dangerLevel", "values": [3, 5, 7, 9] }
+  ],
+  "rolls": 200,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "imbueLevel": 0, "dangerLevel": 3, "expected": "easy" },
+      { "imbueLevel": 0, "dangerLevel": 5, "expected": "balanced" },
+      { "imbueLevel": 0, "dangerLevel": 7, "expected": "balanced" },
+      { "imbueLevel": 0, "dangerLevel": 9, "expected": "hard" },
+
+      { "imbueLevel": 1, "dangerLevel": 3, "expected": "easy" },
+      { "imbueLevel": 1, "dangerLevel": 5, "expected": "balanced" },
+      { "imbueLevel": 1, "dangerLevel": 7, "expected": "balanced" },
+      { "imbueLevel": 1, "dangerLevel": 9, "expected": "hard" },
+
+      { "imbueLevel": 2, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 2, "dangerLevel": 5, "expected": "easy" },
+      { "imbueLevel": 2, "dangerLevel": 7, "expected": "balanced" },
+      { "imbueLevel": 2, "dangerLevel": 9, "expected": "balanced" },
+
+      { "imbueLevel": 3, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 3, "dangerLevel": 5, "expected": "easy" },
+      { "imbueLevel": 3, "dangerLevel": 7, "expected": "balanced" },
+      { "imbueLevel": 3, "dangerLevel": 9, "expected": "balanced" },
+
+      { "imbueLevel": 4, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 4, "dangerLevel": 5, "expected": "trivial" },
+      { "imbueLevel": 4, "dangerLevel": 7, "expected": "easy" },
+      { "imbueLevel": 4, "dangerLevel": 9, "expected": "balanced" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "gear-only",
+  "displayName": "Gear-only viability",
+  "description": "Player + tier-N gear (proxy: +2 effective levels per tier), no companions, no imbues. When does gear alone carry? Expectation: tier ≈ danger keeps it balanced.",
+  "holdouts": {
+    "playerLevel": 5,
+    "playerElement": "Aether"
+  },
+  "axes": [
+    { "name": "gearTier",    "values": [1, 2, 3, 4, 5] },
+    { "name": "dangerLevel", "values": [1, 3, 5, 7, 9] }
+  ],
+  "rolls": 200,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "gearTier": 1, "dangerLevel": 1, "expected": "easy" },
+      { "gearTier": 1, "dangerLevel": 3, "expected": "balanced" },
+      { "gearTier": 1, "dangerLevel": 5, "expected": "hard" },
+      { "gearTier": 1, "dangerLevel": 7, "expected": "punishing" },
+      { "gearTier": 1, "dangerLevel": 9, "expected": "punishing" },
+
+      { "gearTier": 2, "dangerLevel": 1, "expected": "trivial" },
+      { "gearTier": 2, "dangerLevel": 3, "expected": "easy" },
+      { "gearTier": 2, "dangerLevel": 5, "expected": "balanced" },
+      { "gearTier": 2, "dangerLevel": 7, "expected": "hard" },
+      { "gearTier": 2, "dangerLevel": 9, "expected": "punishing" },
+
+      { "gearTier": 3, "dangerLevel": 1, "expected": "trivial" },
+      { "gearTier": 3, "dangerLevel": 3, "expected": "easy" },
+      { "gearTier": 3, "dangerLevel": 5, "expected": "balanced" },
+      { "gearTier": 3, "dangerLevel": 7, "expected": "balanced" },
+      { "gearTier": 3, "dangerLevel": 9, "expected": "hard" },
+
+      { "gearTier": 4, "dangerLevel": 1, "expected": "trivial" },
+      { "gearTier": 4, "dangerLevel": 3, "expected": "trivial" },
+      { "gearTier": 4, "dangerLevel": 5, "expected": "easy" },
+      { "gearTier": 4, "dangerLevel": 7, "expected": "balanced" },
+      { "gearTier": 4, "dangerLevel": 9, "expected": "balanced" },
+
+      { "gearTier": 5, "dangerLevel": 1, "expected": "trivial" },
+      { "gearTier": 5, "dangerLevel": 3, "expected": "trivial" },
+      { "gearTier": 5, "dangerLevel": 5, "expected": "trivial" },
+      { "gearTier": 5, "dangerLevel": 7, "expected": "easy" },
+      { "gearTier": 5, "dangerLevel": 9, "expected": "balanced" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}
