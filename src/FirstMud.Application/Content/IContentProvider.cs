@@ -127,6 +127,14 @@ public interface IContentProvider
     /// <summary>Lookup a faction by its enum id. Returns null if no definition exists.</summary>
     FactionDefinition? GetFaction(FactionId id);
 
+    // ─── NPCs ────────────────────────────────────────────────────────────────
+
+    /// <summary>All NPC definitions, in file order.</summary>
+    IReadOnlyList<NpcDefinition> AllNpcs();
+
+    /// <summary>Lookup an NPC by its stable id. Returns null if unknown.</summary>
+    NpcDefinition? GetNpc(string id);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>

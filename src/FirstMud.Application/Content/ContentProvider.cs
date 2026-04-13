@@ -67,6 +67,11 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<(WorldId, int), ZoneDefinition> _zonesByWorldNumber = new();
     private IReadOnlyList<FactionDefinition> _factions = Array.Empty<FactionDefinition>();
     private Dictionary<FactionId, FactionDefinition> _factionsById = new();
+    private IReadOnlyList<NpcDefinition> _npcs = Array.Empty<NpcDefinition>();
+    private Dictionary<string, NpcDefinition> _npcsById = new(StringComparer.Ordinal);
+
+    private static readonly HashSet<string> ValidNpcRoleNames =
+        new(Enum.GetNames<NpcRole>(), StringComparer.OrdinalIgnoreCase);
 
     private static readonly HashSet<string> ValidBiomeNames = new(StringComparer.Ordinal)
     {
@@ -192,6 +197,12 @@ public sealed class ContentProvider : IContentProvider
     public FactionDefinition? GetFaction(FactionId id) =>
         _factionsById.TryGetValue(id, out var def) ? def : null;
 
+    public IReadOnlyList<NpcDefinition> AllNpcs() => _npcs;
+
+    public NpcDefinition? GetNpc(string id) =>
+        string.IsNullOrEmpty(id) ? null
+        : _npcsById.TryGetValue(id, out var def) ? def : null;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -213,14 +224,18 @@ public sealed class ContentProvider : IContentProvider
         // waypointZoneIds) can run against the authored zones registry.
         _factions = LoadFactions();
         _factionsById = _factions.ToDictionary(f => f.Id);
+        // NPCs load AFTER zones + factions so cross-ref validation
+        // (homeZoneId / factionId) can run against the authored registries.
+        _npcs = LoadNpcs();
+        _npcsById = _npcs.ToDictionary(n => n.Id, StringComparer.Ordinal);
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
         ContentAccessor.Publish(this);
 
         _logger?.LogInformation(
-            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions from {Root}",
-            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _contentRoot);
+            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions, {NpcCount} npcs from {Root}",
+            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _npcs.Count, _contentRoot);
     }
 
     private IReadOnlyList<ZoneDefinition> LoadZones()
@@ -551,6 +566,110 @@ public sealed class ContentProvider : IContentProvider
     private sealed record FactionWaypointRaw(
         [property: JsonPropertyName("x")] int X,
         [property: JsonPropertyName("y")] int Y);
+
+    private IReadOnlyList<NpcDefinition> LoadNpcs()
+    {
+        var path = Path.Combine(_contentRoot, "npcs.json");
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"Required content file not found: {path}", path);
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<NpcsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Npcs is null || doc.Npcs.Count == 0)
+            throw new InvalidDataException($"{path}: no npcs defined.");
+
+        var knownZoneIds = new HashSet<string>(_zones.Select(z => z.ZoneId), StringComparer.Ordinal);
+        var knownFactionIds = new HashSet<FactionId>(_factions.Select(f => f.Id));
+
+        var list = new List<NpcDefinition>(doc.Npcs.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Npcs)
+        {
+            if (string.IsNullOrWhiteSpace(raw.Id))
+                throw new InvalidDataException($"{path}: npc missing id.");
+            if (!seenIds.Add(raw.Id))
+                throw new InvalidDataException($"{path}: duplicate npc id '{raw.Id}'.");
+            if (string.IsNullOrWhiteSpace(raw.DisplayName))
+                throw new InvalidDataException($"{path}: npc '{raw.Id}' missing displayName.");
+            if (string.IsNullOrWhiteSpace(raw.HomeZoneId))
+                throw new InvalidDataException($"{path}: npc '{raw.Id}' missing homeZoneId.");
+            if (!knownZoneIds.Contains(raw.HomeZoneId))
+                throw new InvalidDataException(
+                    $"{path}: npc '{raw.Id}' homeZoneId '{raw.HomeZoneId}' is not a known zoneId.");
+            if (string.IsNullOrWhiteSpace(raw.Role) || !ValidNpcRoleNames.Contains(raw.Role))
+                throw new InvalidDataException(
+                    $"{path}: npc '{raw.Id}' has invalid role '{raw.Role}'. Must be one of: {string.Join(", ", Enum.GetNames<NpcRole>())}.");
+            var role = Enum.Parse<NpcRole>(raw.Role, ignoreCase: true);
+            if (string.IsNullOrWhiteSpace(raw.ShortDescription))
+                throw new InvalidDataException($"{path}: npc '{raw.Id}' missing shortDescription.");
+
+            FactionId? factionId = null;
+            if (!string.IsNullOrWhiteSpace(raw.FactionId))
+            {
+                if (!ValidFactionIdNames.Contains(raw.FactionId))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' has invalid factionId '{raw.FactionId}'.");
+                var fid = Enum.Parse<FactionId>(raw.FactionId);
+                if (!knownFactionIds.Contains(fid))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' factionId '{raw.FactionId}' is not present in factions.json.");
+                factionId = fid;
+            }
+
+            if (raw.VoiceTells is null || raw.VoiceTells.Count < 3 || raw.VoiceTells.Count > 5)
+                throw new InvalidDataException(
+                    $"{path}: npc '{raw.Id}' must declare between 3 and 5 voiceTells (got {raw.VoiceTells?.Count ?? 0}).");
+            foreach (var tell in raw.VoiceTells)
+            {
+                if (string.IsNullOrWhiteSpace(tell))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' has empty voiceTell entry.");
+            }
+
+            // dialogueRootId is optional; the schema constrains it to a single
+            // string so "at most one per NPC" is structurally enforced. We
+            // additionally trim/validate non-empty when present.
+            string? dialogueRoot = null;
+            if (raw.DialogueRootId is not null)
+            {
+                if (string.IsNullOrWhiteSpace(raw.DialogueRootId))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' has empty dialogueRootId.");
+                dialogueRoot = raw.DialogueRootId;
+            }
+
+            list.Add(new NpcDefinition(
+                Id: raw.Id,
+                DisplayName: raw.DisplayName,
+                FactionId: factionId,
+                HomeZoneId: raw.HomeZoneId,
+                Role: role,
+                ShortDescription: raw.ShortDescription,
+                VoiceTells: raw.VoiceTells.ToList(),
+                DialogueRootId: dialogueRoot,
+                StartingReputation: raw.StartingReputation));
+        }
+
+        return list;
+    }
+
+    private sealed record NpcsFile(
+        [property: JsonPropertyName("npcs")] List<NpcRaw>? Npcs);
+
+    private sealed record NpcRaw(
+        [property: JsonPropertyName("id")] string? Id,
+        [property: JsonPropertyName("displayName")] string? DisplayName,
+        [property: JsonPropertyName("factionId")] string? FactionId,
+        [property: JsonPropertyName("homeZoneId")] string? HomeZoneId,
+        [property: JsonPropertyName("role")] string? Role,
+        [property: JsonPropertyName("shortDescription")] string? ShortDescription,
+        [property: JsonPropertyName("voiceTells")] List<string>? VoiceTells,
+        [property: JsonPropertyName("dialogueRootId")] string? DialogueRootId,
+        [property: JsonPropertyName("startingReputation")] int? StartingReputation);
 
     private IReadOnlyList<RecipeDefinition> LoadRecipes()
     {
