@@ -27,5 +27,4 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-
 <!-- agents add rows above this line -->
