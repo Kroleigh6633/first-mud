@@ -22,7 +22,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         await svc.AdjustReputationAsync(player.Id, FactionId.AshenCourt, 1000);
 
@@ -37,7 +37,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         // First gain some rep
         await svc.AdjustReputationAsync(player.Id, FactionId.AshenCourt, 500);
@@ -53,7 +53,7 @@ public class ReputationServiceTests
         var players = Substitute.For<IPlayerRepository>();
         players.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Player?)null);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         Func<Task> act = () => svc.AdjustReputationAsync(Guid.NewGuid(), FactionId.AshenCourt, 100);
 
@@ -67,7 +67,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         var tier = await svc.GetTierAsync(player.Id, FactionId.AshenCourt);
 
@@ -83,7 +83,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         // Apply 200 rep to HouseCaervorn
         await svc.ApplyQuestReputationRewardsAsync(player.Id, FactionId.HouseCaervorn, 200);
@@ -100,7 +100,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         await svc.ApplyQuestReputationRewardsAsync(player.Id, FactionId.Golvari, 200);
 
@@ -116,7 +116,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         await svc.ApplyQuestReputationRewardsAsync(player.Id, FactionId.Fairgean, 200);
 
@@ -132,7 +132,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         // AshenCourt has no tension pairs defined
         await svc.ApplyQuestReputationRewardsAsync(player.Id, FactionId.AshenCourt, 500);
@@ -149,7 +149,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         // Player starts at Unknown, check if meets Trusted
         var result = await svc.MeetsTierRequirementAsync(player.Id, FactionId.AshenCourt, ReputationTier.Trusted);
@@ -164,7 +164,7 @@ public class ReputationServiceTests
         var player = CreatePlayer();
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
 
-        var svc = new ReputationService(players);
+        var svc = new ReputationService(players, TestContent.Shared);
 
         // Gain enough for Trusted
         await svc.AdjustReputationAsync(player.Id, FactionId.AshenCourt, 1000);

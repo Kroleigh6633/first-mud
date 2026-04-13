@@ -44,7 +44,7 @@ public class QuestServiceTests
         questGraph.GetAvailableQuestsAsync(player.Id, null, Arg.Any<CancellationToken>())
             .Returns(expectedQuests.AsReadOnly());
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         var result = await svc.GetAvailableQuestsAsync(player.Id, null);
@@ -61,7 +61,7 @@ public class QuestServiceTests
 
         players.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Player?)null);
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         Func<Task> act = () => svc.GetAvailableQuestsAsync(Guid.NewGuid(), null);
@@ -81,7 +81,7 @@ public class QuestServiceTests
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
         questGraph.IsQuestAvailableAsync(player.Id, "q_001", Arg.Any<CancellationToken>()).Returns(false);
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         var result = await svc.CompleteQuestAsync(player.Id, "q_001", "accept");
@@ -105,7 +105,7 @@ public class QuestServiceTests
         questGraph.GetUnlockedByCompletionAsync("q_001", "accept", Arg.Any<CancellationToken>())
             .Returns(new List<QuestNode>().AsReadOnly());
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         await svc.CompleteQuestAsync(player.Id, "q_001", "accept");
@@ -128,7 +128,7 @@ public class QuestServiceTests
         questGraph.GetUnlockedByCompletionAsync("q_001", "accept", Arg.Any<CancellationToken>())
             .Returns(new List<QuestNode>().AsReadOnly());
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         var result = await svc.CompleteQuestAsync(player.Id, "q_001", "accept");
@@ -156,7 +156,7 @@ public class QuestServiceTests
         questGraph.GetUnlockedByCompletionAsync("q_001", "accept", Arg.Any<CancellationToken>())
             .Returns(new List<QuestNode>().AsReadOnly());
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         var result = await svc.CompleteQuestAsync(player.Id, "q_001", "accept");
@@ -182,7 +182,7 @@ public class QuestServiceTests
         questGraph.GetUnlockedByCompletionAsync("q_001", "reject", Arg.Any<CancellationToken>())
             .Returns(unlocked.AsReadOnly());
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var svc = new QuestService(questGraph, reputationSvc, players);
 
         var result = await svc.CompleteQuestAsync(player.Id, "q_001", "reject");

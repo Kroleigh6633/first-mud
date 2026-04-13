@@ -95,6 +95,14 @@ public interface IContentProvider
     /// <summary>Tier/workmanship curve row, or null if tier out of range.</summary>
     TierCurveDefinition? GetTierCurve(int tier);
 
+    // ─── Factions ────────────────────────────────────────────────────────────
+
+    /// <summary>All faction definitions, in file order.</summary>
+    IReadOnlyList<FactionDefinition> AllFactions();
+
+    /// <summary>Lookup a faction by its enum id. Returns null if no definition exists.</summary>
+    FactionDefinition? GetFaction(FactionId id);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>
