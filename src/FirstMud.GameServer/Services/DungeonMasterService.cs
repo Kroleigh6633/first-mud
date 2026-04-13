@@ -844,40 +844,44 @@ public class DungeonMasterService : BackgroundService
     // Quest templates
     // -----------------------------------------------------------------------
 
-    private static readonly string[] QuestTitleTemplates =
+    // TEMPLATE_BLOCKLIST: escort/deliver/courier templates require a pickup-flow
+    // (item acquisition or NPC recruit) that doesn't exist yet. Re-enable when the
+    // creative agent lands the pickup flow (see project_first_mud_auto_progression
+    // + docs/design/canon-deliberations.md open questions).
+    //
+    // Removed (for now): "Deliver {item} to {npc_name} in {zone}",
+    //                    "Escort a {role} safely through {zone}",
+    //                    "Protect {npc_name} at {zone}"
+    // These generate unsolvable quests because procgen can't hand the player the
+    // item / NPC they need to carry. Self-contained templates below can be solved
+    // purely by traveling + fighting + gathering, which the current auto-quest
+    // resolver supports.
+    internal static readonly string[] QuestTitleTemplates =
     [
         "Investigate the {adjective} {noun} near {zone}",
         "Defeat the {monster} terrorizing {zone}",
-        "Deliver {item} to {npc_name} in {zone}",
         "Gather {amount} units of {resource} from {zone}",
-        "Escort a {role} safely through {zone}",
         "Retrieve the {adjective} {noun} from {zone}",
         "Negotiate with the {monster} at {zone}",
         "Uncover the truth about {zone}",
-        "Protect {npc_name} at {zone}",
         "Clear the {adjective} {noun} blocking the road through {zone}",
     ];
 
-    private static readonly string[] QuestDescTemplates =
+    // Index-aligned with QuestTitleTemplates above. Keep counts equal when editing.
+    internal static readonly string[] QuestDescTemplates =
     [
         "Something {adjective} has surfaced near {zone}. Locals are uneasy. " +
             "Investigate what the {noun} is and who left it there.",
         "A {monster} has been preying on travelers near {zone}. " +
             "The locals can't handle it. You've been asked to deal with it — permanently.",
-        "{npc_name} in {zone} sent word: they need {item} delivered before nightfall. " +
-            "The roads between here and {zone} are not empty.",
         "The {zone} region yields {resource} that isn't found elsewhere. Gather {amount} units. " +
             "The area is not uncontested.",
-        "A {role} needs to reach {zone} and cannot travel alone. " +
-            "What threatens the road is not only bandits.",
         "The {adjective} {noun} was reported missing from {zone} three days ago. " +
             "Someone took it deliberately. Find it before it leaves the region.",
         "The {monster} near {zone} haven't attacked in two days — unusual. " +
             "Find out why before the peace ends badly.",
         "Stories about {zone} don't match the maps. Someone is hiding something. " +
             "Go and find out what.",
-        "{npc_name} has information the wrong people want. Keep them safe at {zone} " +
-            "until they can be moved.",
         "A {adjective} {noun} has blocked the main road through {zone}. " +
             "Trade has stopped. Clear it.",
     ];

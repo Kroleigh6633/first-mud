@@ -17,6 +17,10 @@
     <Using Include="FirstMud.Engine.Commands" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="FirstMud.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
