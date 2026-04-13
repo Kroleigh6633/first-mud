@@ -81,10 +81,8 @@ public class CraftingService
         // 4. Check provided quantities match seeded requirements (±5% tolerance)
         bool quantitiesMatch = CheckQuantities(recipe, componentItems, seededQuantities);
 
-        // 5. Roll crafting outcome using weighted random seeded by (playerSeed XOR recipeId.GetHashCode())
-        var rollSeed = playerSeed ^ recipeId.GetHashCode();
-        var rng = new Random(rollSeed);
-        var roll = rng.NextDouble() * 100.0;
+        // 5. Roll crafting outcome — use fresh RNG each attempt (not deterministic per recipe)
+        var roll = Random.Shared.NextDouble() * 100.0;
 
         CraftingOutcome outcome;
         if (!quantitiesMatch)
@@ -277,11 +275,26 @@ public class CraftingService
 
         var seeded = CalculateSeededQuantities(recipe, player.CraftingSeed);
 
-        // Round to nearest 5 for haziness
+        // Round to nearest 5 for haziness (used by UI display)
         return seeded
             .Select(q => (int)(Math.Round(q / 5.0) * 5))
             .ToList()
             .AsReadOnly();
+    }
+
+    /// <summary>Returns the exact (unrounded) seeded quantities for auto-resolve.</summary>
+    public async Task<IReadOnlyList<int>> GetExactSeededQuantitiesAsync(
+        Guid playerId,
+        string recipeId,
+        CancellationToken ct = default)
+    {
+        var player = await _players.GetByIdAsync(playerId, ct);
+        if (player is null) return Array.Empty<int>();
+
+        var recipe = await _recipes.GetByRecipeIdAsync(recipeId, ct);
+        if (recipe is null) return Array.Empty<int>();
+
+        return CalculateSeededQuantities(recipe, player.CraftingSeed);
     }
 
     // --- private helpers ---

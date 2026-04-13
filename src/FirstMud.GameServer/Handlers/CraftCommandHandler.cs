@@ -238,6 +238,9 @@ public class CraftCommandHandler(
         var recipe = await recipeRepository.GetByRecipeIdAsync(recipeId, ct);
         if (recipe is null) return [];
 
+        // Get the player's exact seeded quantities so we provide the right amounts
+        var seededQuantities = await craftingService.GetExactSeededQuantitiesAsync(playerId, recipeId, ct);
+
         // Load all inventory items for the player
         var inventoryItems = await itemRepository.GetByOwnerAsync(playerId, ct);
 
@@ -253,9 +256,11 @@ public class CraftCommandHandler(
 
         var resolved = new List<Guid>();
 
-        foreach (var ingredient in recipe.Ingredients)
+        for (int idx = 0; idx < recipe.Ingredients.Count; idx++)
         {
-            var needed = ingredient.BaseQuantity;
+            var ingredient = recipe.Ingredients[idx];
+            // Use seeded quantity (rounded to nearest 5 for haziness) — fall back to base if unavailable
+            var needed = idx < seededQuantities.Count ? Math.Max(1, seededQuantities[idx]) : ingredient.BaseQuantity;
 
             // Prefer inventory items first, then storage items
             foreach (var source in new[] { inventoryItems, storageItems })
