@@ -140,6 +140,15 @@ export default function GameTerminal({
   const [_autoQuestTotal, setAutoQuestTotal] = useState(0);
   const [_autoQuestTitle, setAutoQuestTitle] = useState('');
 
+  // Single interval ref for the auto-quest runner — avoids the broken
+  // multi-effect chain.  Cleared whenever the run stops.
+  const autoQuestIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Phase of the current auto-quest step: 'accept' | 'navigate' | 'interact'
+  // Stored as a ref so the interval closure always reads the latest value.
+  const autoQuestPhaseRef = useRef<'idle' | 'accept' | 'navigate' | 'interact'>('idle');
+  // How many ticks we have been in 'accept' phase waiting for a waypoint
+  const acceptWaitTicksRef = useRef(0);
+
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
   // portal infinite loop: atHomestead toggling → effect re-runs →
@@ -157,6 +166,9 @@ export default function GameTerminal({
   const currentTileRef = useRef(currentTile);
   currentTileRef.current = currentTile;
   const questWaypointRef = useRef(questWaypoint);
+  if (questWaypointRef.current !== questWaypoint) {
+    console.log('[questWaypoint prop] Changed:', questWaypoint);
+  }
   questWaypointRef.current = questWaypoint;
   const autoNavigatingRef = useRef(autoNavigating);
   autoNavigatingRef.current = autoNavigating;
@@ -199,20 +211,26 @@ export default function GameTerminal({
     lastZoneIdRef.current = currentZoneId;
   }, [currentTile, appendMessage]);
 
-  // Auto-navigate interval: steps toward the waypoint every 300ms
+  // Auto-navigate interval: steps toward the waypoint every 300ms.
+  // Used by the [N] key manual navigate — auto-quest has its own loop.
   useEffect(() => {
     if (!autoNavigating) return;
+    // Skip if the auto-quest runner owns navigation (it drives its own interval)
+    if (autoQuestActiveRef.current) return;
 
+    console.log('[auto-navigate] Starting standalone navigate interval');
     const intervalId = setInterval(() => {
       const wp = questWaypointRef.current;
       const player = worldStateRef.current?.player;
       if (!wp || !player) {
+        console.log('[auto-navigate] No wp or player — stopping');
         setAutoNavigating(false);
         return;
       }
 
       const distX = Math.abs(wp.targetX - player.x);
       const distY = Math.abs(wp.targetY - player.y);
+      console.log(`[auto-navigate] dist=(${distX},${distY}) player=(${player.x},${player.y}) target=(${wp.targetX},${wp.targetY})`);
 
       if (distX <= 2 && distY <= 2) {
         setAutoNavigating(false);
@@ -237,6 +255,7 @@ export default function GameTerminal({
         return;
       }
 
+      console.log(`[auto-navigate] Moving delta=(${step.deltaX},${step.deltaY})`);
       sendCommand('move', step);
     }, 300);
 
@@ -387,6 +406,7 @@ export default function GameTerminal({
       case 'autoquest': {
         if (autoQuestActiveRef.current) {
           // Stop auto-quest run
+          console.log('[L key] Stopping auto-quest run');
           setAutoQuestActive(false);
           setAutoNavigating(false);
           appendMessage({
@@ -396,6 +416,7 @@ export default function GameTerminal({
           });
         } else {
           const quests = availableQuestsRef.current;
+          console.log(`[L key] Starting auto-quest run. availableQuests.length=${quests.length}`);
           if (quests.length === 0) {
             appendMessage({
               timestamp: new Date().toISOString(),
@@ -410,6 +431,7 @@ export default function GameTerminal({
             if (!a.isTaken && b.isTaken) return 1;
             return b.reputationReward - a.reputationReward;
           });
+          console.log('[L key] Ordered quests:', ordered.map(q => `${q.questId}(${q.title},taken=${q.isTaken})`));
           setAutoQuestActive(true);
           setAutoQuestIndex(0);
           setAutoQuestTotal(ordered.length);
@@ -457,16 +479,37 @@ export default function GameTerminal({
     });
   };
 
-  // Tracks the questId we are currently waiting on a waypoint for
-  const pendingWaypointQuestIdRef = useRef<string | null>(null);
-
-  // Auto-quest orchestration: when autoQuestActive, walk through unfinished quests
-  // in rep-reward order, accepting each and auto-navigating.
+  // ── Auto-quest runner ────────────────────────────────────────────────────
+  // A single setInterval drives the whole flow so there are no broken
+  // cross-effect dependencies.  Phases per quest:
+  //   'accept'   → send acceptquest, poll until questWaypointRef has the
+  //                right questId (up to ~5 s), then transition to 'navigate'
+  //   'navigate' → step toward waypoint each tick; on arrival → 'interact'
+  //   'interact' → send interactquest, wait 1 s, advance to next quest index
+  //
+  // The interval reads everything via refs so it always has fresh values
+  // without needing to be re-created on every render.
   useEffect(() => {
-    if (!autoQuestActive) return;
+    if (!autoQuestActive) {
+      // Clean up when stopped externally
+      if (autoQuestIntervalRef.current !== null) {
+        clearInterval(autoQuestIntervalRef.current);
+        autoQuestIntervalRef.current = null;
+      }
+      autoQuestPhaseRef.current = 'idle';
+      acceptWaitTicksRef.current = 0;
+      setAutoNavigating(false);
+      return;
+    }
 
+    // Already running (e.g. index change re-fires this effect)
+    if (autoQuestIntervalRef.current !== null) {
+      clearInterval(autoQuestIntervalRef.current);
+      autoQuestIntervalRef.current = null;
+    }
+
+    // Determine the ordered quest list and target quest
     const quests = availableQuestsRef.current;
-    // Sort by rep reward descending; taken quests first
     const ordered = [...quests].sort((a, b) => {
       if (a.isTaken && !b.isTaken) return -1;
       if (!a.isTaken && b.isTaken) return 1;
@@ -476,9 +519,9 @@ export default function GameTerminal({
     const nextQuest = ordered[autoQuestIndexRef.current];
 
     if (!nextQuest) {
-      // All done
+      console.log('[autoquest] No more quests — run complete');
       setAutoQuestActive(false);
-      pendingWaypointQuestIdRef.current = null;
+      setAutoNavigating(false);
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'quest',
@@ -488,57 +531,139 @@ export default function GameTerminal({
     }
 
     setAutoQuestTitle(nextQuest.title);
+    console.log(`[autoquest] Starting quest ${autoQuestIndexRef.current}: "${nextQuest.title}" isTaken=${nextQuest.isTaken}`);
 
-    // Accept if not taken
-    if (!nextQuest.isTaken) {
-      sendCommand('acceptquest', { questId: nextQuest.questId });
-    }
+    // Fire acceptquest to get (or refresh) the waypoint
+    sendCommand('acceptquest', { questId: nextQuest.questId });
+    console.log(`[autoquest] Sent acceptquest for ${nextQuest.questId}`);
+    autoQuestPhaseRef.current = 'accept';
+    acceptWaitTicksRef.current = 0;
 
-    // Mark that we are waiting for this quest's waypoint
-    pendingWaypointQuestIdRef.current = nextQuest.questId;
+    // ── The main tick (300 ms) ──────────────────────────────────────────
+    autoQuestIntervalRef.current = setInterval(() => {
+      const phase = autoQuestPhaseRef.current;
+      const wp = questWaypointRef.current;
+      const player = worldStateRef.current?.player;
 
-    // Start auto-navigate immediately if the waypoint is already present
-    const wp = questWaypointRef.current;
-    if (wp && wp.questId === nextQuest.questId) {
-      pendingWaypointQuestIdRef.current = null;
-      setAutoNavigating(true);
-    }
-    // Otherwise the questWaypoint watcher below will fire once the server
-    // responds with the waypoint and start navigation at that point.
+      console.log(`[autoquest tick] phase=${phase} wp=${wp?.questId ?? 'none'} target=${nextQuest.questId} player=(${player?.x},${player?.y})`);
+
+      if (!player) {
+        console.log('[autoquest tick] No player state yet — waiting');
+        return;
+      }
+
+      // ── Accept phase: wait for waypoint from server ─────────────────
+      if (phase === 'accept') {
+        acceptWaitTicksRef.current += 1;
+
+        if (wp && wp.questId === nextQuest.questId) {
+          console.log(`[autoquest] Waypoint arrived for "${nextQuest.title}" → (${wp.targetX},${wp.targetY}), switching to navigate`);
+          autoQuestPhaseRef.current = 'navigate';
+          setAutoNavigating(true);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: `Waypoint received — navigating to ${wp.questTitle}...`,
+          });
+          return;
+        }
+
+        // Retry acceptquest every ~3 s (10 ticks × 300 ms) in case the
+        // server missed it or returned a "already taken" no-op
+        if (acceptWaitTicksRef.current % 10 === 0) {
+          console.log(`[autoquest] Still waiting for waypoint (tick ${acceptWaitTicksRef.current}) — re-sending acceptquest`);
+          sendCommand('acceptquest', { questId: nextQuest.questId });
+        }
+
+        // Timeout after ~15 s (50 ticks) — skip this quest
+        if (acceptWaitTicksRef.current > 50) {
+          console.warn(`[autoquest] Waypoint timeout for "${nextQuest.title}" — skipping`);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: `No waypoint for "${nextQuest.title}" — skipping.`,
+          });
+          autoQuestPhaseRef.current = 'idle';
+          if (autoQuestIntervalRef.current !== null) {
+            clearInterval(autoQuestIntervalRef.current);
+            autoQuestIntervalRef.current = null;
+          }
+          setAutoQuestIndex(prev => prev + 1);
+        }
+        return;
+      }
+
+      // ── Navigate phase: step toward waypoint ────────────────────────
+      if (phase === 'navigate') {
+        if (!wp || wp.questId !== nextQuest.questId) {
+          console.warn('[autoquest navigate] Waypoint lost — returning to accept phase');
+          autoQuestPhaseRef.current = 'accept';
+          acceptWaitTicksRef.current = 0;
+          sendCommand('acceptquest', { questId: nextQuest.questId });
+          return;
+        }
+
+        const distX = Math.abs(wp.targetX - player.x);
+        const distY = Math.abs(wp.targetY - player.y);
+        console.log(`[autoquest navigate] dist=(${distX},${distY}) to (${wp.targetX},${wp.targetY})`);
+
+        if (distX <= 2 && distY <= 2) {
+          console.log(`[autoquest navigate] Arrived at waypoint for "${nextQuest.title}" — interacting`);
+          autoQuestPhaseRef.current = 'interact';
+          setAutoNavigating(false);
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: `Arrived at ${wp.questTitle} — completing quest...`,
+          });
+          sendCommand('interactquest', { questId: wp.questId });
+          return;
+        }
+
+        const step = stepToward(player.x, player.y, wp.targetX, wp.targetY, getBiome);
+        if (!step) {
+          console.warn('[autoquest navigate] Path blocked — stopping');
+          setAutoNavigating(false);
+          setAutoQuestActive(false);
+          if (autoQuestIntervalRef.current !== null) {
+            clearInterval(autoQuestIntervalRef.current);
+            autoQuestIntervalRef.current = null;
+          }
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'Auto-quest: path blocked. Run stopped.',
+          });
+          return;
+        }
+
+        console.log(`[autoquest navigate] Moving delta=(${step.deltaX},${step.deltaY})`);
+        sendCommand('move', step);
+        return;
+      }
+
+      // ── Interact phase: wait one beat for server to process, then advance ─
+      if (phase === 'interact') {
+        console.log(`[autoquest interact] Quest "${nextQuest.title}" processed — advancing to next`);
+        autoQuestPhaseRef.current = 'idle';
+        if (autoQuestIntervalRef.current !== null) {
+          clearInterval(autoQuestIntervalRef.current);
+          autoQuestIntervalRef.current = null;
+        }
+        // Advance index — this re-fires the parent effect for the next quest
+        setAutoQuestIndex(prev => prev + 1);
+      }
+    }, 300);
+
+    // Cleanup when effect re-runs or component unmounts
+    return () => {
+      if (autoQuestIntervalRef.current !== null) {
+        clearInterval(autoQuestIntervalRef.current);
+        autoQuestIntervalRef.current = null;
+      }
+    };
+  // Re-run when active state changes or we advance to the next quest index
   }, [autoQuestActive, autoQuestIndex, sendCommand, appendMessage]);
-
-  // Watch for the questWaypoint to arrive while auto-quest is waiting for it,
-  // then kick off navigation.  This is the fix for the L-key not moving bug:
-  // acceptquest is async — the waypoint arrives after the orchestration effect
-  // runs, so we need a separate effect that reacts to the new prop value.
-  useEffect(() => {
-    if (!questWaypoint) return;
-    if (!autoQuestActiveRef.current) return;
-    if (pendingWaypointQuestIdRef.current !== questWaypoint.questId) return;
-
-    // The waypoint we were waiting for has arrived — start navigating
-    pendingWaypointQuestIdRef.current = null;
-    setAutoNavigating(true);
-    appendMessage({
-      timestamp: new Date().toISOString(),
-      category: 'quest',
-      text: `Waypoint received — navigating to ${questWaypoint.questTitle}...`,
-    });
-  }, [questWaypoint, appendMessage]);
-
-  // When auto-quest is running and we arrive (autoNavigating stops), advance to next quest
-  useEffect(() => {
-    if (!autoQuestActiveRef.current) return;
-    if (autoNavigating) return; // still walking
-    // We just stopped navigating — assume current quest was handled, move on
-    // Small delay so server processes completion before we start next quest
-    const timer = setTimeout(() => {
-      if (!autoQuestActiveRef.current) return;
-      setAutoQuestIndex(prev => prev + 1);
-    }, 800);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoNavigating]);
 
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
