@@ -82,32 +82,7 @@ public class CraftingService
         bool quantitiesMatch = CheckQuantities(recipe, componentItems, seededQuantities);
 
         // 5. Roll crafting outcome — use fresh RNG each attempt (not deterministic per recipe)
-        var roll = Random.Shared.NextDouble() * 100.0;
-
-        CraftingOutcome outcome;
-        if (!quantitiesMatch)
-        {
-            // Quantities off — 70% NearMiss, 20% UnexpectedResult, 8% ComponentLoss, 2% Discovery
-            outcome = roll switch
-            {
-                < 70.0 => CraftingOutcome.NearMiss,
-                < 90.0 => CraftingOutcome.UnexpectedResult,
-                < 98.0 => CraftingOutcome.ComponentLoss,
-                _ => CraftingOutcome.Discovery
-            };
-        }
-        else
-        {
-            // Quantities match — 85% Success, 20% would be UnexpectedResult so adjusted:
-            // 85% Success, 10% UnexpectedResult, 3% ComponentLoss, 2% Discovery
-            outcome = roll switch
-            {
-                < 85.0 => CraftingOutcome.Success,
-                < 95.0 => CraftingOutcome.UnexpectedResult,
-                < 98.0 => CraftingOutcome.ComponentLoss,
-                _ => CraftingOutcome.Discovery
-            };
-        }
+        var outcome = RollOutcome(Random.Shared, quantitiesMatch);
 
         if (outcome == CraftingOutcome.NearMiss)
             return new CraftingResult(CraftingOutcome.NearMiss, null, "The components didn't quite come together. Check your quantities.", false, null);
@@ -298,6 +273,65 @@ public class CraftingService
     }
 
     // --- private helpers ---
+
+    /// <summary>
+    /// Rolls the crafting outcome given whether the submitted component quantities
+    /// fell within the ±5% tolerance of the seeded per-player requirement.
+    /// Exposed for the design-tools playbook harness so sim and game share one
+    /// source of truth for outcome distribution.
+    /// </summary>
+    public static CraftingOutcome RollOutcome(Random rng, bool quantitiesMatch)
+    {
+        var roll = rng.NextDouble() * 100.0;
+        if (!quantitiesMatch)
+        {
+            // Quantities off — 55% NearMiss, 40% UnexpectedResult (bonus), 3% ComponentLoss, 2% Discovery.
+            // Tuned from 70/20/8/2 on 2026-04-13 (crafting-baseline-playbook-pass-1): the
+            // UI rounds displayed quantities to nearest 5, so for small recipes even a
+            // well-intentioned player often misses the ±5% tolerance through no fault of
+            // their own. Shifting the bulk of the mismatch distribution into "NearMiss
+            // (free retry)" and "UnexpectedResult (alt item)" keeps the penalty honest
+            // while removing the "constantly fails" perception.
+            return roll switch
+            {
+                < 55.0 => CraftingOutcome.NearMiss,
+                < 95.0 => CraftingOutcome.UnexpectedResult,
+                < 98.0 => CraftingOutcome.ComponentLoss,
+                _      => CraftingOutcome.Discovery
+            };
+        }
+
+        // Quantities match — 90% Success, 7% UnexpectedResult, 1% ComponentLoss, 2% Discovery.
+        // Tuned from 85/10/3/2 on 2026-04-13.
+        return roll switch
+        {
+            < 90.0 => CraftingOutcome.Success,
+            < 97.0 => CraftingOutcome.UnexpectedResult,
+            < 98.0 => CraftingOutcome.ComponentLoss,
+            _      => CraftingOutcome.Discovery
+        };
+    }
+
+    /// <summary>
+    /// Seeded per-player ingredient quantity: base * (1 + ((seed*prime) mod 40 - 20)/100).
+    /// Public for sim harness (matches the per-player haziness used in crafting).
+    /// </summary>
+    public static int SeededQuantity(int baseQuantity, int playerSeed, int ingredientIndex)
+    {
+        var prime = IngredientPrimes[ingredientIndex % IngredientPrimes.Length];
+        var raw = (int)Math.Round(baseQuantity * (1.0 + ((playerSeed * prime) % 40 - 20) / 100.0));
+        return Math.Max(1, raw);
+    }
+
+    /// <summary>
+    /// Quantity-match test: provided value within ±5% of seeded (tolerance min 1).
+    /// Public for sim harness.
+    /// </summary>
+    public static bool QuantityMatches(int provided, int seeded)
+    {
+        var tolerance = Math.Max(1, (int)Math.Round(seeded * 0.05));
+        return Math.Abs(provided - seeded) <= tolerance;
+    }
 
     private static IReadOnlyList<int> CalculateSeededQuantities(Recipe recipe, int playerSeed)
     {

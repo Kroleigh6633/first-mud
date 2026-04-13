@@ -13,12 +13,58 @@ public sealed class Playbook
     [JsonPropertyName("id")]            public string Id            { get; set; } = "";
     [JsonPropertyName("displayName")]   public string DisplayName   { get; set; } = "";
     [JsonPropertyName("description")]   public string Description   { get; set; } = "";
+    /// <summary>"combat" (default) or "crafting". Dispatches to the matching cell evaluator.</summary>
+    [JsonPropertyName("kind")]          public string Kind          { get; set; } = "combat";
     [JsonPropertyName("holdouts")]      public Holdouts Holdouts    { get; set; } = new();
     [JsonPropertyName("axes")]          public List<Axis> Axes      { get; set; } = new();
     [JsonPropertyName("rolls")]         public int Rolls            { get; set; } = 200;
     [JsonPropertyName("seed")]          public int Seed             { get; set; } = 42;
     [JsonPropertyName("expectedViability")] public ExpectedViability ExpectedViability { get; set; } = new();
     [JsonPropertyName("toleranceBands")]    public Dictionary<string, double[]> ToleranceBands { get; set; } = new();
+    /// <summary>Crafting-kind only: per-cell expected outcome distribution bands (percentages 0..100).</summary>
+    [JsonPropertyName("expectedDistribution")] public ExpectedDistribution ExpectedDistribution { get; set; } = new();
+    /// <summary>Crafting-kind only: per-cell holdouts (base ingredient quantity, player seed, display rounding).</summary>
+    [JsonPropertyName("crafting")] public CraftingHoldouts Crafting { get; set; } = new();
+}
+
+public sealed class CraftingHoldouts
+{
+    /// <summary>Recipe base quantity for the single-ingredient sim (per ingredient, before seeding).</summary>
+    [JsonPropertyName("baseQuantity")] public int BaseQuantity { get; set; } = 10;
+    /// <summary>Player CraftingSeed used to compute seeded quantities. Varied-per-cell unless set.</summary>
+    [JsonPropertyName("playerSeed")]   public int PlayerSeed   { get; set; } = 42;
+    /// <summary>Rounding granularity the UI applies to the displayed quantity (current game: 5).</summary>
+    [JsonPropertyName("displayRounding")] public int DisplayRounding { get; set; } = 5;
+    /// <summary>How many different player seeds to average across per cell (reduces single-seed lottery).</summary>
+    [JsonPropertyName("seedSpread")]   public int SeedSpread   { get; set; } = 16;
+}
+
+public sealed class ExpectedDistribution
+{
+    [JsonPropertyName("cells")] public List<ExpectedDistributionCell> Cells { get; set; } = new();
+}
+
+/// <summary>Free-form cell: axis keys at top level + "expected" → { outcomeName: [minPct, maxPct] }.</summary>
+public sealed class ExpectedDistributionCell : Dictionary<string, JsonElement>
+{
+    public Dictionary<string, double[]> Expected()
+    {
+        var result = new Dictionary<string, double[]>(StringComparer.Ordinal);
+        if (!TryGetValue("expected", out var v) || v.ValueKind != JsonValueKind.Object) return result;
+        foreach (var prop in v.EnumerateObject())
+        {
+            if (prop.Value.ValueKind != JsonValueKind.Array) continue;
+            var arr = prop.Value.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Number).Select(e => e.GetDouble()).ToArray();
+            if (arr.Length == 2) result[prop.Name] = arr;
+        }
+        return result;
+    }
+
+    public int? Axis(string axisName)
+    {
+        if (!TryGetValue(axisName, out var v)) return null;
+        return v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;
+    }
 }
 
 public sealed class Holdouts

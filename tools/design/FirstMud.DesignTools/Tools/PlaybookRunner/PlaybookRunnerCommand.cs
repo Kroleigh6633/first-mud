@@ -58,7 +58,10 @@ public static class PlaybookRunnerCommand
 
         ConsolePretty.Header($"playbook-runner: {playbook.Id} — {playbook.DisplayName}");
         ConsolePretty.Info(playbook.Description);
-        ConsolePretty.Info($"rolls/cell={playbook.Rolls}  seed={seedOverride ?? playbook.Seed}  axes=[{string.Join(", ", playbook.Axes.Select(a => a.Name + ":" + a.Values.Length))}]");
+        ConsolePretty.Info($"kind={playbook.Kind}  rolls/cell={playbook.Rolls}  seed={seedOverride ?? playbook.Seed}  axes=[{string.Join(", ", playbook.Axes.Select(a => a.Name + ":" + a.Values.Length))}]");
+
+        if (string.Equals(playbook.Kind, "crafting", StringComparison.OrdinalIgnoreCase))
+            return RunCrafting(playbook, seedOverride);
 
         var engine = new PlaybookEngine(content);
         var result = engine.Execute(playbook, seedOverride);
@@ -125,6 +128,52 @@ public static class PlaybookRunnerCommand
         return result.Divergences.Count == 0 ? 0 : 3;
     }
 
+    private static int RunCrafting(Playbook playbook, int? seedOverride)
+    {
+        var evaluator = new CraftingEvaluator();
+        var result = evaluator.Execute(playbook, seedOverride);
+
+        ConsolePretty.Info("");
+        ConsolePretty.Info(CraftingEvaluator.RenderTable(result));
+        ConsolePretty.Info("");
+
+        if (result.Divergences.Count > 0)
+        {
+            ConsolePretty.Warn($"{result.Divergences.Count} cell(s) diverged from expected distribution:");
+            foreach (var c in result.Divergences)
+                ConsolePretty.Warn($"  {{{string.Join(", ", c.AxisValues.Select(kv => kv.Key + "=" + kv.Value))}}}  {string.Join("; ", c.Divergences)}");
+        }
+        else
+        {
+            ConsolePretty.Good("All cells within expected outcome bands.");
+        }
+
+        var log = new SimLog("playbook-runner");
+        var payload = new
+        {
+            playbookId = playbook.Id,
+            kind = "crafting",
+            displayName = playbook.DisplayName,
+            seed = result.Seed,
+            rolls = result.Rolls,
+            cells = result.Cells.Select(c => new
+            {
+                axis = c.AxisValues,
+                outcomes = c.OutcomePercentages,
+                totalRolls = c.TotalRolls,
+                quantitiesMatchedSample = c.QuantitiesMatchedSample,
+                divergences = c.Divergences,
+            }),
+        };
+        var jsonPath = log.WriteJson(payload);
+        var md = $"Playbook **{playbook.Id}** (crafting) — cells={result.Cells.Count} divergent={result.Divergences.Count}. " +
+                 $"Seed={result.Seed} rolls/cell={result.Rolls}. JSON: `{Path.GetFileName(jsonPath)}`\n\n" +
+                 "```\n" + CraftingEvaluator.RenderTable(result) + "\n```";
+        log.AppendMarkdown($"playbook {playbook.Id}", md);
+
+        return result.Divergences.Count == 0 ? 0 : 3;
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────────────
 
     private static string DefaultPlaybooksDir()
@@ -148,8 +197,11 @@ public static class PlaybookRunnerCommand
             throw new InvalidOperationException($"Playbook at '{path}' has no id.");
         if (pb.Axes.Count == 0)
             throw new InvalidOperationException($"Playbook '{pb.Id}' has no axes.");
-        if (pb.ToleranceBands.Count == 0)
-            throw new InvalidOperationException($"Playbook '{pb.Id}' has no toleranceBands.");
+        var kind = string.IsNullOrWhiteSpace(pb.Kind) ? "combat" : pb.Kind.ToLowerInvariant();
+        if (kind == "combat" && pb.ToleranceBands.Count == 0)
+            throw new InvalidOperationException($"Playbook '{pb.Id}' (kind=combat) has no toleranceBands.");
+        if (kind == "crafting" && pb.ExpectedDistribution.Cells.Count == 0)
+            throw new InvalidOperationException($"Playbook '{pb.Id}' (kind=crafting) has no expectedDistribution.cells.");
         return pb;
     }
 

@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | creative-pass-7 | ready-to-merge | content-layer-pilot | Creative pass #7: playbook balance sweep + combat-curves tune + playbook spec rewrites | - | content/combat-curves.json, tools/design/playbooks, docs/design, tests/FirstMud.Tests | 2026-04-13 |
+| worktree-agent-a932827f | ready-to-merge | creative-pass-7 | Crafting-success playbook + CraftingEvaluator (outcome distribution harness) + RollOutcome tune (Skill=2/Diff=1 Success 42%→48%, ComponentLoss halved) | - | src/FirstMud.Application/Services/CraftingService.cs, tools/design/FirstMud.DesignTools/Tools/PlaybookRunner, tools/design/FirstMud.DesignTools.Tests, tools/design/playbooks/crafting-success.json, docs/design/sim-reports | 2026-04-13 |
 <!-- agents add rows above this line -->
