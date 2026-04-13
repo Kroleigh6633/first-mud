@@ -469,36 +469,16 @@ public class StartupSeeder(
             return;
         }
 
-        var zones = new[]
-        {
-            Zone.Create(WorldId.Aeldran, 1, "Caervorn Highlands",
-                "The high moorland domains of House Caervorn, swept by cold winds and watched by stone keeps.",
-                "^", dangerLevel: 4),
-            Zone.Create(WorldId.Aeldran, 2, "The Thornwood",
-                "A dense and ancient forest where the Thornwood Covens weave their arts into the living wood.",
-                "#", dangerLevel: 3),
-            Zone.Create(WorldId.Aeldran, 3, "Portmere (Compact)",
-                "The trading city of the Emerald Compact, where coin and contract govern more than steel.",
-                "C", dangerLevel: 1),
-            Zone.Create(WorldId.Aeldran, 4, "Gravenmarsh",
-                "Boggy lowlands east of Gravenhold, haunted by old things that predate the Compact.",
-                ".", dangerLevel: 3),
-            Zone.Create(WorldId.Aeldran, 5, "The Drowned Coast",
-                "A jagged shoreline where the Fairgean sometimes surface, and the tides follow no natural pattern.",
-                "~", dangerLevel: 5),
-            Zone.Create(WorldId.Aeldran, 6, "The Ashen Reach",
-                "Scorched flatlands that have not recovered since the Ardweld's collapse. Something still moves here.",
-                "*", dangerLevel: 8),
-            Zone.Create(WorldId.Aeldran, 7, "Starting Road",
-                "The long road south from the Highlands, where every rider begins their first contract.",
-                ".", dangerLevel: 2, isPortalZone: false),
-            Zone.Create(WorldId.Aeldran, 8, "Gravenhold",
-                "The Gravenguard's fortified city, carved into the cliffside above the marsh.",
-                "!", dangerLevel: 2),
-            Zone.Create(WorldId.Aeldran, 9, "The Maw Borderlands",
-                "The unstable frontier where Aeldran begins to fray at the edges, and the Wyrd leaks through.",
-                "M", dangerLevel: 6),
-        };
+        var definitions = content.AllZones();
+        var zones = definitions.Select(def => Zone.Create(
+            worldId: def.World,
+            zoneId: def.ZoneNumber,
+            name: def.Name,
+            description: def.Description,
+            asciiSymbol: def.AsciiSymbol,
+            dangerLevel: def.DangerLevel,
+            isPortalZone: def.IsPortalZone,
+            portalDestination: def.PortalDestination)).ToArray();
 
         await db.Zones.AddRangeAsync(zones, ct);
         await db.SaveChangesAsync(ct);
@@ -625,22 +605,17 @@ public class StartupSeeder(
         var zones = await db.Zones.ToListAsync(ct);
         var nodes = new List<ResourceNode>();
 
-        // Assign resource types by zone name/danger
+        // Assign resource types by zone name/danger — driven by zones.json.
+        var zoneDefsByName = content.AllZones().ToDictionary(z => z.Name, StringComparer.Ordinal);
+
         foreach (var zone in zones)
         {
-            var (type1, type2) = zone.Name switch
+            ResourceType type1 = ResourceType.Wood, type2 = ResourceType.Stone;
+            if (zoneDefsByName.TryGetValue(zone.Name, out var def))
             {
-                "Caervorn Highlands"   => (ResourceType.Stone, ResourceType.Metal),   // highlands = rock + ore
-                "The Thornwood"        => (ResourceType.Wood, ResourceType.Herbs),    // forest = wood + herbs
-                "Portmere (Compact)"   => (ResourceType.Metal, ResourceType.Herbs),   // trade city = metal + herbs
-                "Gravenmarsh"          => (ResourceType.Herbs, ResourceType.Wood),    // swamp = herbs + damp wood
-                "The Drowned Coast"    => (ResourceType.Sand, ResourceType.Stone),    // coast = sand + sea-smoothed stone
-                "The Ashen Reach"      => (ResourceType.Sand, ResourceType.Metal),    // ashen wastes = sand + scorched metal
-                "Starting Road"        => (ResourceType.Wood, ResourceType.Stone),    // roadside = wood + stone
-                "Gravenhold"           => (ResourceType.Metal, ResourceType.Stone),   // fortress = metal + stone
-                "The Maw Borderlands"  => (ResourceType.Herbs, ResourceType.Stone),   // wyrd = strange herbs + reality-stone
-                _                      => (ResourceType.Wood, ResourceType.Stone),
-            };
+                type1 = def.PrimaryResource ?? ResourceType.Wood;
+                type2 = def.SecondaryResource ?? ResourceType.Stone;
+            }
 
             nodes.Add(ResourceNode.Create(zone.Id, type1, maxYield: 20, regenerationRate: 2));
             nodes.Add(ResourceNode.Create(zone.Id, type2, maxYield: 15, regenerationRate: 1));

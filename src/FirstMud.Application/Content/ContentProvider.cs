@@ -61,6 +61,16 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<string, DropPoolDefinition> _poolsById = new(StringComparer.Ordinal);
     private Dictionary<string, MonsterDropDefinition> _monsterDropsById = new(StringComparer.Ordinal);
     private Dictionary<int, TierCurveDefinition> _tierCurvesByTier = new();
+    private IReadOnlyList<ZoneDefinition> _zones = Array.Empty<ZoneDefinition>();
+    private Dictionary<string, ZoneDefinition> _zonesById = new(StringComparer.Ordinal);
+    private Dictionary<string, ZoneDefinition> _zonesByName = new(StringComparer.Ordinal);
+    private Dictionary<(WorldId, int), ZoneDefinition> _zonesByWorldNumber = new();
+
+    private static readonly HashSet<string> ValidBiomeNames = new(StringComparer.Ordinal)
+    {
+        "mountain", "forest", "plains", "swamp", "water", "desert", "wyrd",
+        "sand", "path", "grassland", "denseForest", "snowMountain"
+    };
 
     public ContentProvider(string contentRoot, ILogger<ContentProvider>? logger = null)
     {
@@ -157,6 +167,21 @@ public sealed class ContentProvider : IContentProvider
     public TierCurveDefinition? GetTierCurve(int tier)
         => _tierCurvesByTier.TryGetValue(tier, out var c) ? c : null;
 
+    public IReadOnlyList<ZoneDefinition> AllZones() => _zones;
+
+    public ZoneDefinition? GetZone(string zoneId) =>
+        !string.IsNullOrEmpty(zoneId) && _zonesById.TryGetValue(zoneId, out var def) ? def : null;
+
+    public string? GetBiomeForZone(string zoneName) =>
+        !string.IsNullOrEmpty(zoneName) && _zonesByName.TryGetValue(zoneName, out var def)
+            ? def.Biome
+            : null;
+
+    public (int X, int Y)? GetZoneLayoutPosition(WorldId world, int zoneNumber) =>
+        _zonesByWorldNumber.TryGetValue((world, zoneNumber), out var def)
+            ? (def.Layout.X, def.Layout.Y)
+            : null;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -170,9 +195,163 @@ public sealed class ContentProvider : IContentProvider
         _poolsById = _lootTables.DropPools.ToDictionary(p => p.Id, StringComparer.Ordinal);
         _monsterDropsById = _lootTables.MonsterDrops.ToDictionary(m => m.MonsterId, StringComparer.Ordinal);
         _tierCurvesByTier = _lootTables.TierCurves.ToDictionary(c => c.Tier);
+        _zones = LoadZones();
+        _zonesById = _zones.ToDictionary(z => z.ZoneId, StringComparer.Ordinal);
+        _zonesByName = _zones.ToDictionary(z => z.Name, StringComparer.Ordinal);
+        _zonesByWorldNumber = _zones.ToDictionary(z => (z.World, z.ZoneNumber));
+
+        // Publish the static accessor for the few legacy static call sites
+        // (ZoneGridLayout / BiomeService) that cannot easily take DI.
+        ContentAccessor.Publish(this);
+
         _logger?.LogInformation(
-            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops from {Root}",
-            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _contentRoot);
+            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones from {Root}",
+            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _contentRoot);
+    }
+
+    private IReadOnlyList<ZoneDefinition> LoadZones()
+    {
+        var path = Path.Combine(_contentRoot, "zones.json");
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"Required content file not found: {path}", path);
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<ZonesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Zones is null || doc.Zones.Count == 0)
+            throw new InvalidDataException($"{path}: no zones defined.");
+
+        // Gather known monster ids once (tolerate absence: monsters.json is
+        // not yet merged in this base — spawn-id validation is skipped when
+        // the file is missing).
+        HashSet<string>? knownMonsterIds = TryLoadKnownMonsterIds();
+
+        var list = new List<ZoneDefinition>(doc.Zones.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        var seenWorldNumber = new HashSet<(WorldId, int)>();
+
+        foreach (var raw in doc.Zones)
+        {
+            if (string.IsNullOrWhiteSpace(raw.ZoneId))
+                throw new InvalidDataException($"{path}: zone missing zoneId.");
+            if (!seenIds.Add(raw.ZoneId))
+                throw new InvalidDataException($"{path}: duplicate zoneId '{raw.ZoneId}'.");
+            if (string.IsNullOrWhiteSpace(raw.Name))
+                throw new InvalidDataException($"{path}: zone '{raw.ZoneId}' missing name.");
+            if (string.IsNullOrWhiteSpace(raw.AsciiSymbol) || raw.AsciiSymbol.Length != 1)
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' asciiSymbol must be exactly 1 character.");
+
+            if (string.IsNullOrWhiteSpace(raw.World) || !ValidWorldIdNames.Contains(raw.World))
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' has invalid world '{raw.World}'.");
+            var world = Enum.Parse<WorldId>(raw.World);
+
+            if (raw.ZoneNumber < 1)
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' zoneNumber must be >= 1.");
+            if (!seenWorldNumber.Add((world, raw.ZoneNumber)))
+                throw new InvalidDataException(
+                    $"{path}: duplicate (world, zoneNumber) pair for '{raw.ZoneId}'.");
+
+            if (string.IsNullOrWhiteSpace(raw.Biome) || !ValidBiomeNames.Contains(raw.Biome))
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' has invalid biome '{raw.Biome}'.");
+
+            if (raw.DangerLevel < 1 || raw.DangerLevel > 10)
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' dangerLevel must be between 1 and 10.");
+
+            WorldId? portalDest = null;
+            if (!string.IsNullOrWhiteSpace(raw.PortalDestination))
+            {
+                if (!ValidWorldIdNames.Contains(raw.PortalDestination))
+                    throw new InvalidDataException(
+                        $"{path}: zone '{raw.ZoneId}' has invalid portalDestination '{raw.PortalDestination}'.");
+                portalDest = Enum.Parse<WorldId>(raw.PortalDestination);
+            }
+
+            if (raw.Layout is null)
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' missing layout.");
+            if (raw.Layout.X < 0 || raw.Layout.Y < 0)
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' layout coordinates must be >= 0.");
+
+            ResourceType? primary = ParseOptionalResource(raw.PrimaryResource, raw.ZoneId, nameof(raw.PrimaryResource), path);
+            ResourceType? secondary = ParseOptionalResource(raw.SecondaryResource, raw.ZoneId, nameof(raw.SecondaryResource), path);
+
+            var spawns = new List<ZoneMonsterSpawnDefinition>();
+            if (raw.MonsterSpawns is not null)
+            {
+                foreach (var s in raw.MonsterSpawns)
+                {
+                    if (string.IsNullOrWhiteSpace(s.MonsterId))
+                        throw new InvalidDataException(
+                            $"{path}: zone '{raw.ZoneId}' has monsterSpawn with empty monsterId.");
+                    if (knownMonsterIds is not null && !knownMonsterIds.Contains(s.MonsterId))
+                        throw new InvalidDataException(
+                            $"{path}: zone '{raw.ZoneId}' references unknown monsterId '{s.MonsterId}'.");
+                    spawns.Add(new ZoneMonsterSpawnDefinition(s.MonsterId, s.Weight <= 0 ? 1 : s.Weight));
+                }
+            }
+
+            list.Add(new ZoneDefinition(
+                ZoneId: raw.ZoneId,
+                World: world,
+                ZoneNumber: raw.ZoneNumber,
+                Name: raw.Name,
+                Description: raw.Description ?? "",
+                AsciiSymbol: raw.AsciiSymbol,
+                Biome: raw.Biome,
+                DangerLevel: raw.DangerLevel,
+                IsPortalZone: raw.IsPortalZone,
+                PortalDestination: portalDest,
+                IsStartingZone: raw.IsStartingZone,
+                Layout: new ZoneLayoutDefinition(raw.Layout.X, raw.Layout.Y),
+                PrimaryResource: primary,
+                SecondaryResource: secondary,
+                MonsterSpawns: spawns));
+        }
+
+        return list;
+    }
+
+    private static ResourceType? ParseOptionalResource(string? raw, string zoneId, string fieldName, string path)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        if (!Enum.TryParse<ResourceType>(raw, ignoreCase: false, out var rt))
+            throw new InvalidDataException(
+                $"{path}: zone '{zoneId}' has invalid {fieldName} '{raw}'.");
+        return rt;
+    }
+
+    private HashSet<string>? TryLoadKnownMonsterIds()
+    {
+        var path = Path.Combine(_contentRoot, "monsters.json");
+        if (!File.Exists(path)) return null;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var doc = JsonDocument.Parse(stream);
+            if (!doc.RootElement.TryGetProperty("monsters", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return null;
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var el in arr.EnumerateArray())
+            {
+                if (el.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+                    ids.Add(id.GetString()!);
+                else if (el.TryGetProperty("monsterId", out var mid) && mid.ValueKind == JsonValueKind.String)
+                    ids.Add(mid.GetString()!);
+            }
+            return ids;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private IReadOnlyList<RecipeDefinition> LoadRecipes()
@@ -743,6 +922,7 @@ public sealed class ContentProvider : IContentProvider
         public string Name { get; set; } = "";
         public int BaseQuantity { get; set; }
     }
+
     // ─── Monsters ────────────────────────────────────────────────────────────
 
     private IReadOnlyList<MonsterDefinition> LoadMonsters()
@@ -994,5 +1174,42 @@ public sealed class ContentProvider : IContentProvider
         public List<string>? Pools { get; set; }
         public int RollsMin { get; set; }
         public int RollsMax { get; set; }
+    }
+
+    private sealed class ZonesFile
+    {
+        [JsonPropertyName("zones")]
+        public List<RawZone>? Zones { get; set; }
+    }
+
+    private sealed class RawZone
+    {
+        public string ZoneId { get; set; } = "";
+        public string World { get; set; } = "";
+        public int ZoneNumber { get; set; }
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public string AsciiSymbol { get; set; } = "";
+        public string Biome { get; set; } = "";
+        public int DangerLevel { get; set; }
+        public bool IsPortalZone { get; set; }
+        public string? PortalDestination { get; set; }
+        public bool IsStartingZone { get; set; }
+        public RawZoneLayout? Layout { get; set; }
+        public string? PrimaryResource { get; set; }
+        public string? SecondaryResource { get; set; }
+        public List<RawZoneMonsterSpawn>? MonsterSpawns { get; set; }
+    }
+
+    private sealed class RawZoneLayout
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+    }
+
+    private sealed class RawZoneMonsterSpawn
+    {
+        public string MonsterId { get; set; } = "";
+        public int Weight { get; set; }
     }
 }

@@ -95,6 +95,30 @@ public interface IContentProvider
     /// <summary>Tier/workmanship curve row, or null if tier out of range.</summary>
     TierCurveDefinition? GetTierCurve(int tier);
 
+    // ─── Zones ───────────────────────────────────────────────────────────────
+
+    /// <summary>All zone definitions, in file order.</summary>
+    IReadOnlyList<ZoneDefinition> AllZones();
+
+    /// <summary>
+    /// Returns the zone definition with the given <c>zoneId</c>, or null.
+    /// </summary>
+    ZoneDefinition? GetZone(string zoneId);
+
+    /// <summary>
+    /// Biome string for the zone identified by name (matches <see cref="Domain.Entities.Zone.Name"/>),
+    /// or null if the name is not present in zones.json. Replaces the switch
+    /// that previously lived in BiomeService.GetBiome(Zone).
+    /// </summary>
+    string? GetBiomeForZone(string zoneName);
+
+    /// <summary>
+    /// Hand-crafted grid position for a seeded zone identified by
+    /// (world, zoneNumber), or null if no such zone is authored. Replaces the
+    /// KnownPositions dictionary in ZoneGridLayout.
+    /// </summary>
+    (int X, int Y)? GetZoneLayoutPosition(WorldId world, int zoneNumber);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>

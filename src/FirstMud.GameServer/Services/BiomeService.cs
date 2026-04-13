@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 
 namespace FirstMud.GameServer.Services;
@@ -16,19 +17,11 @@ public static class BiomeService
     // Zone → biome mapping
     // -------------------------------------------------------------------------
 
-    public static string GetBiome(Zone? zone) => zone?.Name switch
+    public static string GetBiome(Zone? zone)
     {
-        "Caervorn Highlands" => "mountain",
-        "The Thornwood"      => "forest",
-        "Portmere (Compact)" => "plains",
-        "Gravenmarsh"        => "swamp",
-        "The Drowned Coast"  => "water",
-        "The Ashen Reach"    => "desert",
-        "Starting Road"      => "plains",
-        "Gravenhold"         => "mountain",
-        "The Maw Borderlands"=> "wyrd",
-        _                    => "plains",
-    };
+        if (zone is null) return "plains";
+        return ContentAccessor.Current.GetBiomeForZone(zone.Name) ?? "plains";
+    }
 
     /// <summary>
     /// Returns the biome string for a given position.
@@ -63,31 +56,20 @@ public static class BiomeService
         // Only inherit a zone's biome when the tile is very close to that zone.
         const int ZoneInfluenceRadius = 4;
 
-        // (zoneCentreX, zoneCentreY, biome)
-        (int cx, int cy, string biome)[] zoneThemes =
-        [
-            (8,  3,  "mountain"),   // Caervorn Highlands
-            (13, 5,  "forest"),     // The Thornwood
-            (24, 13, "plains"),     // Portmere Compact
-            (28, 9,  "swamp"),      // Gravenmarsh
-            (32, 15, "water"),      // The Drowned Coast
-            (34, 4,  "desert"),     // The Ashen Reach
-            (20, 10, "plains"),     // Starting Road
-            (26, 7,  "mountain"),   // Gravenhold
-            (36, 18, "wyrd"),       // The Maw Borderlands
-        ];
+        // Zone proximity centres + biomes now come from content/zones.json.
+        var zones = ContentAccessor.Current.AllZones();
 
         // Pass 1: zone proximity (tight radius).
         string closestBiome = "";
         int closestDist = int.MaxValue;
 
-        foreach (var (cx, cy, biome) in zoneThemes)
+        foreach (var zone in zones)
         {
-            int dist = Math.Abs(x - cx) + Math.Abs(y - cy);
+            int dist = Math.Abs(x - zone.Layout.X) + Math.Abs(y - zone.Layout.Y);
             if (dist < ZoneInfluenceRadius && dist < closestDist)
             {
                 closestDist = dist;
-                closestBiome = biome;
+                closestBiome = zone.Biome;
             }
         }
 

@@ -873,6 +873,12 @@ public class ContentProviderTests
         File.Copy(Path.Combine(realRoot, "monsters.json"), Path.Combine(dir, "monsters.json"));
     }
 
+    internal static void WriteValidZones(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "zones.json"), Path.Combine(dir, "zones.json"));
+    }
+
     /// <summary>
     /// Seed a temp content dir with all upstream-required content files so a
     /// negative test targeting a specific file can reach that file's validator.
@@ -885,5 +891,216 @@ public class ContentProviderTests
         if (!excludedSet.Contains("recipes")) WriteValidRecipes(dir);
         if (!excludedSet.Contains("monsters")) WriteValidMonsters(dir);
         if (!excludedSet.Contains("loot-tables")) WriteValidLootTables(dir);
+        if (!excludedSet.Contains("zones")) WriteValidZones(dir);
+    }
+
+    // ─── Zone definitions ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Happy path: the real content/zones.json loads, covers every zone that
+    /// used to live in the hardcoded SeedAeldranZonesAsync block + the
+    /// ZoneGridLayout.KnownPositions dictionary + the BiomeService.GetBiome
+    /// switch, and round-trips representative entries exactly.
+    /// </summary>
+    [Fact]
+    public void Real_zones_file_reproduces_legacy_seed_definitions()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        provider.AllZones().Should().HaveCount(9);
+
+        var starting = provider.AllZones().Single(z => z.IsStartingZone);
+        starting.Name.Should().Be("Starting Road");
+        starting.Layout.X.Should().Be(20);
+        starting.Layout.Y.Should().Be(10);
+
+        // Biome mapping preserves every entry in the former BiomeService switch.
+        provider.GetBiomeForZone("Caervorn Highlands").Should().Be("mountain");
+        provider.GetBiomeForZone("The Thornwood").Should().Be("forest");
+        provider.GetBiomeForZone("Portmere (Compact)").Should().Be("plains");
+        provider.GetBiomeForZone("Gravenmarsh").Should().Be("swamp");
+        provider.GetBiomeForZone("The Drowned Coast").Should().Be("water");
+        provider.GetBiomeForZone("The Ashen Reach").Should().Be("desert");
+        provider.GetBiomeForZone("Starting Road").Should().Be("plains");
+        provider.GetBiomeForZone("Gravenhold").Should().Be("mountain");
+        provider.GetBiomeForZone("The Maw Borderlands").Should().Be("wyrd");
+        provider.GetBiomeForZone("Not A Zone").Should().BeNull();
+
+        // Layout positions preserve every entry in the former KnownPositions map.
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 1).Should().Be((8, 3));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 2).Should().Be((13, 5));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 3).Should().Be((24, 13));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 4).Should().Be((28, 9));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 5).Should().Be((32, 15));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 6).Should().Be((34, 4));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 7).Should().Be((20, 10));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 8).Should().Be((26, 7));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 9).Should().Be((36, 18));
+        provider.GetZoneLayoutPosition(WorldId.Aeldran, 999).Should().BeNull();
+
+        // Danger ranges preserved
+        provider.AllZones().Single(z => z.Name == "The Ashen Reach").DangerLevel.Should().Be(8);
+        provider.AllZones().Single(z => z.Name == "Portmere (Compact)").DangerLevel.Should().Be(1);
+
+        // Lookup by zoneId returns the same record
+        var first = provider.AllZones()[0];
+        provider.GetZone(first.ZoneId).Should().BeSameAs(first);
+        provider.GetZone("no-such-zone").Should().BeNull();
+        provider.GetZone("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Missing_zones_file_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "zones");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<FileNotFoundException>()
+               .Which.FileName.Should().EndWith("zones.json");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Duplicate_zone_id_throws_on_load()
+    {
+        var dir = MakeContentDirWith("""
+        {
+          "zones": [
+            { "zoneId": "dup", "world": "Aeldran", "zoneNumber": 1, "name": "A",
+              "description": "", "asciiSymbol": ".", "biome": "plains",
+              "dangerLevel": 1, "layout": { "x": 1, "y": 1 } },
+            { "zoneId": "dup", "world": "Aeldran", "zoneNumber": 2, "name": "B",
+              "description": "", "asciiSymbol": ".", "biome": "plains",
+              "dangerLevel": 1, "layout": { "x": 2, "y": 2 } }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*duplicate zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_biome_throws_on_load()
+    {
+        var dir = MakeContentDirWith("""
+        {
+          "zones": [
+            { "zoneId": "z1", "world": "Aeldran", "zoneNumber": 1, "name": "A",
+              "description": "", "asciiSymbol": ".", "biome": "lava",
+              "dangerLevel": 1, "layout": { "x": 1, "y": 1 } }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*invalid biome*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_danger_range_throws_on_load()
+    {
+        var dir = MakeContentDirWith("""
+        {
+          "zones": [
+            { "zoneId": "z1", "world": "Aeldran", "zoneNumber": 1, "name": "A",
+              "description": "", "asciiSymbol": ".", "biome": "plains",
+              "dangerLevel": 99, "layout": { "x": 1, "y": 1 } }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*dangerLevel*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_world_enum_throws_on_load()
+    {
+        var dir = MakeContentDirWith("""
+        {
+          "zones": [
+            { "zoneId": "z1", "world": "Atlantis", "zoneNumber": 1, "name": "A",
+              "description": "", "asciiSymbol": ".", "biome": "plains",
+              "dangerLevel": 1, "layout": { "x": 1, "y": 1 } }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*invalid world*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_zoneId_returns_null()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        provider.GetZone("nope").Should().BeNull();
+    }
+
+    [Fact]
+    public void Unknown_monster_spawn_throws_when_monsters_file_present()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "zones");
+            // Real monsters.json does NOT contain a "dragon" — zones.json below
+            // references "dragon" which must fail the cross-ref check.
+            File.WriteAllText(Path.Combine(dir.FullName, "zones.json"), """
+            {
+              "zones": [
+                { "zoneId": "z1", "world": "Aeldran", "zoneNumber": 1, "name": "A",
+                  "description": "", "asciiSymbol": ".", "biome": "plains",
+                  "dangerLevel": 1, "layout": { "x": 1, "y": 1 },
+                  "monsterSpawns": [ { "monsterId": "dragon", "weight": 1 } ] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*unknown monsterId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    private static DirectoryInfo MakeContentDirWith(string zonesJson)
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        WriteAllPrerequisitesExcept(dir.FullName, "zones");
+        File.WriteAllText(Path.Combine(dir.FullName, "zones.json"), zonesJson);
+        return dir;
     }
 }
