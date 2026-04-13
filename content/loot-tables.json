@@ -75,7 +75,10 @@
         { "itemName": "Mountain Herb",  "description": "A hardy alpine herb with potent healing properties.",                         "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Granite Block",  "description": "A heavy block of dense grey granite. Durable construction material.",         "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
         { "itemName": "Eagle Feather",  "description": "A large primary feather from a mountain eagle. Prized for fletching.",        "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
-        { "itemName": "Sulphur",        "description": "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 }
+        { "itemName": "Sulphur",        "description": "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Quartz",         "description": "A clear, six-sided crystal of quartz. A neutral enchantment substrate — the cheapest of true gems.",                 "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 3 },
+        { "itemName": "Emerald",        "description": "A polished emerald with a deep green fire. A solidified weave-echo of earth; prized by Gravenhold armorers.",          "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Diamond",        "description": "A flawless diamond. The rarest of gems — an unaligned weave-echo that resonates with any imbuing current.",            "category": "Reagent", "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 }
       ]
     },
     {
@@ -86,7 +89,9 @@
         { "itemName": "Amber Resin",         "description": "Golden tree resin with mild magical adhesive properties.",                  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Moonbloom Petal",     "description": "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 3 },
         { "itemName": "Spider Silk",         "description": "Fine, strong thread spun by giant forest spiders. Used in light armor.",    "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
-        { "itemName": "Feather",             "description": "A large plume from a forest bird. Used in air-aligned crafting.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 }
+        { "itemName": "Feather",             "description": "A large plume from a forest bird. Used in air-aligned crafting.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Quartz",              "description": "A clear quartz crystal tumbled from a forest streambed. A neutral enchantment substrate.",                    "category": "Reagent",   "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 2 },
+        { "itemName": "Emerald",             "description": "A polished emerald found among tangled roots — a solidified weave-echo of earth.",                           "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 }
       ]
     },
     {
@@ -97,7 +102,10 @@
         { "itemName": "Scorched Bone",  "description": "Bone bleached and hardened by desert heat. Still serviceable.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
         { "itemName": "Cactus Fiber",   "description": "Coarse fiber stripped from desert cactus. Basic but plentiful.",          "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Sulphur",        "description": "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
-        { "itemName": "Ashite Dust",    "description": "Fine grey powder imbued with residual magic from the Ardweld collapse.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 3 }
+        { "itemName": "Ashite Dust",    "description": "Fine grey powder imbued with residual magic from the Ardweld collapse.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 3 },
+        { "itemName": "Obsidian",       "description": "A polished chunk of volcanic glass. A budget gem carrying hybrid fire/earth resonance.",                              "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 3 },
+        { "itemName": "Topaz",          "description": "A sun-gold topaz. A solidified weave-echo of fire and air, favored for damage and speed imbues.",                    "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Diamond",        "description": "A flawless diamond recovered from a deep Ashen lava tube. Universally compatible with any imbuing current.",          "category": "Reagent", "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 }
       ]
     },
     {
@@ -108,7 +116,10 @@
         { "itemName": "Deep Ink",       "description": "Thick black ink harvested from a deep-sea cephalopod. Used for scrollwork.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Pearl",          "description": "A lustrous pearl from a coastal mollusk. Valuable and magically receptive.",  "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
         { "itemName": "Driftwood",      "description": "Salt-treated wood washed ashore. Rot-resistant and light.",                   "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
-        { "itemName": "Coral",          "description": "A chunk of living coral harvested from tidal pools. Used in water-aligned crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 }
+        { "itemName": "Coral",          "description": "A chunk of living coral harvested from tidal pools. Used in water-aligned crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
+        { "itemName": "Aquamarine",     "description": "A sea-blue aquamarine. A solidified weave-echo of water; prized for heal-on-hit and weave-regen imbues.",             "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Quartz",         "description": "A clear quartz washed smooth by tides. A neutral enchantment substrate.",                                            "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 2 },
+        { "itemName": "Black Pearl",    "description": "A lustrous black pearl from the deepest Fairgean brood pools. A master-tier wyrd imbuing reagent.",                   "category": "Reagent", "minWorkmanship": 7, "maxWorkmanship": 10, "weight": 1 }
       ]
     },
     {
@@ -118,7 +129,8 @@
         { "itemName": "Toad Venom",       "description": "A vial of milky toxin harvested from a marsh toad. Potent poison reagent.", "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Peat Moss",        "description": "Dark, spongy peat harvested from the bog. Used as fuel and insulation.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Marsh Gas Crystal","description": "A fragile crystal formed around a pocket of volatile marsh gas.",       "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 3 },
-        { "itemName": "Leech Extract",    "description": "A thick, dark fluid drained from marsh leeches. Prized by healers.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 }
+        { "itemName": "Leech Extract",    "description": "A thick, dark fluid drained from marsh leeches. Prized by healers.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Amethyst",         "description": "A violet amethyst pulled from a bog-bed. A solidified weave-echo of wyrd/aether.",                         "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 }
       ]
     },
     {
@@ -129,7 +141,9 @@
         { "itemName": "Flint",          "description": "A piece of flint knapped to a sharp edge. Essential for tool making.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Wheat Sheaf",    "description": "A bundle of harvested wheat. Ingredient in future food crafting.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Copper Nugget",  "description": "A small nugget of soft copper ore. Used in basic metalworking.",   "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },
-        { "itemName": "Feather",        "description": "A large plume from a plains bird. Used in air-aligned crafting.",  "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 }
+        { "itemName": "Feather",        "description": "A large plume from a plains bird. Used in air-aligned crafting.",  "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Quartz",         "description": "A clear quartz crystal turned up by a plains plough. A neutral enchantment substrate.",                       "category": "Reagent",   "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 2 },
+        { "itemName": "Topaz",          "description": "A sun-gold topaz glinting from plains gravel. A solidified weave-echo of fire and air.",                      "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 }
       ]
     },
     {
@@ -139,7 +153,10 @@
         { "itemName": "Void Essence",  "description": "A swirling mote of energy drawn from a tear in reality. Extremely rare.","category": "Reagent",   "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 },
         { "itemName": "Dravenite Dust","description": "Fine crystalline powder with latent magical resonance. Used in imbuing.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 3 },
         { "itemName": "Tear Fragment", "description": "A sliver of broken reality. Hums faintly and distorts nearby shadows.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 },
-        { "itemName": "Phase Thread",  "description": "A gossamer thread that phases between planes. Used to weave enchantments.","category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 }
+        { "itemName": "Phase Thread",  "description": "A gossamer thread that phases between planes. Used to weave enchantments.","category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 },
+        { "itemName": "Amethyst",      "description": "A violet amethyst that hums faintly when held near the Maw. A solidified weave-echo of wyrd/aether.",               "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 2 },
+        { "itemName": "Black Pearl",   "description": "A lustrous black pearl, found only where the Maw touches water. Master-tier wyrd imbuing reagent.",                 "category": "Reagent",   "minWorkmanship": 7, "maxWorkmanship": 10, "weight": 1 },
+        { "itemName": "Diamond",       "description": "A flawless diamond with a faint violet cast — Maw-kissed and universally compatible with imbuing currents.",         "category": "Reagent",   "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 }
       ]
     },
     {

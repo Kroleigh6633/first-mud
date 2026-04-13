@@ -30,4 +30,5 @@ Columns:
 | worktree-agent-a28b3adf | in-progress | content-layer-pilot | Auto-quest completion flow playbook + flow evaluator + AutoQuestSimulationService + ASHEN_001 startingZoneId tune | - | tools/design, content/quests.json, docs/design/sim-reports | 2026-04-13 |
 | worktree-agent-a9a66dad | in-progress | content-layer-pilot | Auto-quest precondition checks | - | src/FirstMud.GameServer | 2026-04-13 |
 | worktree-agent-a32711f5 | in-progress | content-layer-pilot | Auto-progression MVP | - | src/FirstMud.GameServer, src/FirstMud.Client | 2026-04-13 |
+| worktree-agent-ab5ad4ad | ready-to-merge | content-layer-pilot | Gems as enchanting reagents — catalog (8 gems, 3 tiers), loot-table drops across 7 biomes, imbue-recipes content catalog (14 recipes), gem-supply economy playbook | - | content/loot-tables.json, content/imbue-recipes.json, tools/design/playbooks/economy, tools/design/FirstMud.DesignTools.Tests | 2026-04-13 |
 <!-- agents add rows above this line -->
