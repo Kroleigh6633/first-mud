@@ -32,7 +32,8 @@ public class CombatHelpers(
     IHubContext<GameHub> hubContext,
     ILogger<CombatHelpers> logger,
     QuestProgressTracker questProgressTracker,
-    FirstMud.Domain.Interfaces.IQuestGraphRepository questGraphRepository)
+    FirstMud.Domain.Interfaces.IQuestGraphRepository questGraphRepository,
+    InventoryDepositService inventoryDepositService)
 {
     // -------------------------------------------------------------------------
     // Enemy auto-turn processing
