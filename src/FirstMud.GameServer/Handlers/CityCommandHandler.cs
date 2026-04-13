@@ -14,8 +14,12 @@ namespace FirstMud.GameServer.Handlers;
 /// </summary>
 public class PlaceBuildingCommandHandler(
     BuildingService buildingService,
+    IPlayerRepository playerRepository,
     IHomesteadRepository homesteadRepository,
-    GameNotificationService notificationService) : ICommandHandler<PlaceBuildingCommand>
+    IHomesteadBuildingRepository buildingRepository,
+    ICompanionRepository companionRepository,
+    GameNotificationService notificationService,
+    IHubContext<GameHub> hubContext) : ICommandHandler<PlaceBuildingCommand>
 {
     public async Task<CommandResult> HandleAsync(PlaceBuildingCommand cmd, CancellationToken ct)
     {
@@ -37,10 +41,31 @@ public class PlaceBuildingCommandHandler(
         if (!success)
             return new CommandResult(false, message);
 
+        // Auto-assign a builder from the guard pool
+        var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is not null)
+            await buildingService.AutoAssignIdleCompanionsAsync(cmd.PlayerId, player.ActiveCompanionIds, ct);
+
         await notificationService.SendMessageAsync(
             cmd.PlayerId, "system",
-            $"{message} Construction cost: {costDesc}. Use [G] to view your city.",
+            $"{message} Construction cost: {costDesc}.",
             ct);
+
+        // Push a fresh CityView so the panel updates immediately
+        var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
+        var allCompanions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        var buildingDtos = await CityViewBuilder.BuildDtosAsync(buildings, allCompanions, companionRepository, ct);
+
+        await hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("CityView", new
+            {
+                homesteadId      = homestead.Id,
+                homesteadName    = homestead.Name,
+                buildingCount    = buildings.Count,
+                constructedCount = buildings.Count(b => b.IsConstructed),
+                buildings        = buildingDtos,
+            }, ct);
 
         return new CommandResult(true, message);
     }
