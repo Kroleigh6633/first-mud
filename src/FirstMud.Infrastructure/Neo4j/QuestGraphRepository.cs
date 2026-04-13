@@ -294,6 +294,31 @@ public sealed class QuestGraphRepository : IQuestGraphRepository
     }
 
     // -------------------------------------------------------------------------
+    // HasCompletedQuestAsync
+    // -------------------------------------------------------------------------
+
+    public async Task<bool> HasCompletedQuestAsync(
+        Guid playerId,
+        string questId,
+        CancellationToken cancellationToken = default)
+    {
+        var playerIdStr = playerId.ToString();
+
+        return await _driver.ExecuteReadAsync(async tx =>
+        {
+            var cursor = await tx.RunAsync(
+                """
+                MATCH (p:Player {playerId: $playerId})-[:COMPLETED]->(q:Quest {questId: $questId})
+                RETURN count(q) > 0 AS completed
+                """,
+                new { playerId = playerIdStr, questId });
+
+            if (!await cursor.FetchAsync()) return false;
+            return cursor.Current["completed"].As<bool>();
+        }, cancellationToken);
+    }
+
+    // -------------------------------------------------------------------------
     // MarkQuestInProgressAsync
     // -------------------------------------------------------------------------
 

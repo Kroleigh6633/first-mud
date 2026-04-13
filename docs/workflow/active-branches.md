@@ -27,6 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-a9a66dad | in-progress | content-layer-pilot | Auto-quest precondition checks | - | src/FirstMud.GameServer | 2026-04-13 |
 | worktree-agent-a32711f5 | in-progress | content-layer-pilot | Auto-progression MVP | - | src/FirstMud.GameServer, src/FirstMud.Client | 2026-04-13 |
 <!-- agents add rows above this line -->

@@ -34,7 +34,29 @@ public sealed record QuestDefinition(
     IReadOnlyList<string> Prerequisites,
     IReadOnlyList<QuestRewardDefinition> Rewards,
     IReadOnlyList<QuestNodeDefinition> Nodes,
-    IReadOnlyList<QuestEdgeDefinition> InternalEdges);
+    IReadOnlyList<QuestEdgeDefinition> InternalEdges,
+    QuestRequirementsDefinition? Requires);
+
+/// <summary>
+/// Precondition gate authored in content/quests.json. Every sub-field is
+/// optional; a missing/empty <see cref="QuestRequirementsDefinition"/> on a
+/// quest means "no preconditions — always eligible".
+///
+/// Consumed by:
+/// <list type="bullet">
+/// <item><c>AcceptQuestCommandHandler</c> — hard-blocks quest acceptance when
+///       the player cannot satisfy the requirements.</item>
+/// <item><c>GetAvailableQuestsCommandHandler</c> — serialized into the client
+///       payload so the auto-quest runner can filter before attempting.</item>
+/// </list>
+/// </summary>
+public sealed record QuestRequirementsDefinition(
+    IReadOnlyList<QuestRequiredItem> Items,
+    IReadOnlyList<string> Flags,
+    IReadOnlyDictionary<string, int> Reputation,
+    IReadOnlyList<string> PriorQuests);
+
+public sealed record QuestRequiredItem(string Name, int Quantity);
 
 /// <summary>
 /// Optional intra-quest step node, for quests that are themselves a small

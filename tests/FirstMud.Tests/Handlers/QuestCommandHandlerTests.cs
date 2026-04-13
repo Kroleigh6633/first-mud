@@ -85,7 +85,7 @@ public class QuestCommandHandlerTests
         questGraph.IsQuestAvailableAsync(player.Id, quest.QuestId, Arg.Any<CancellationToken>()).Returns(true);
         questGraph.GetQuestAsync(quest.QuestId, Arg.Any<CancellationToken>()).Returns(quest);
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, Substitute.For<IItemRepository>(), hub);
 
         // Act
         var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, quest.QuestId), CancellationToken.None);
@@ -112,7 +112,7 @@ public class QuestCommandHandlerTests
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
         questGraph.IsQuestAvailableAsync(player.Id, "q_locked", Arg.Any<CancellationToken>()).Returns(false);
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, Substitute.For<IItemRepository>(), hub);
 
         // Act
         var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, "q_locked"), CancellationToken.None);
@@ -139,7 +139,7 @@ public class QuestCommandHandlerTests
         // Quest already taken → not available to accept again
         questGraph.IsQuestAvailableAsync(player.Id, questId, Arg.Any<CancellationToken>()).Returns(false);
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, Substitute.For<IItemRepository>(), hub);
 
         // Act
         var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, questId), CancellationToken.None);
@@ -309,6 +309,70 @@ public class QuestCommandHandlerTests
     // Bulk accept (AcceptAll scenario)
     // =========================================================================
 
+    // =========================================================================
+    // Precondition gate (requires block in content/quests.json)
+    // =========================================================================
+
+    [Fact]
+    public async Task AcceptQuest_UnmetPriorQuestPrerequisite_IsBlocked()
+    {
+        // RIDER_002a in content/quests.json has requires.priorQuests: ["RIDER_001"].
+        // A player who has not completed RIDER_001 must be rejected at accept-time.
+        var player = CreatePlayer();
+        const string questId = "RIDER_002a";
+
+        var questGraph = Substitute.For<IQuestGraphRepository>();
+        var players = Substitute.For<IPlayerRepository>();
+        var items = Substitute.For<IItemRepository>();
+        var hub = CreateHubContext();
+
+        players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
+        questGraph.IsQuestAvailableAsync(player.Id, questId, Arg.Any<CancellationToken>()).Returns(true);
+        // Prerequisite is NOT completed
+        questGraph.HasCompletedQuestAsync(player.Id, "RIDER_001", Arg.Any<CancellationToken>()).Returns(false);
+        items.GetByOwnerAsync(player.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<Item>().AsReadOnly() as IReadOnlyList<Item>);
+
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, items, hub);
+
+        var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, questId), CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("missing required items/prereqs");
+        await questGraph.DidNotReceive().MarkQuestInProgressAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AcceptQuest_SatisfiedPriorQuestPrerequisite_Succeeds()
+    {
+        // Same quest, but this time RIDER_001 is completed → accept succeeds.
+        var player = CreatePlayer();
+        const string questId = "RIDER_002a";
+
+        var questGraph = Substitute.For<IQuestGraphRepository>();
+        var players = Substitute.For<IPlayerRepository>();
+        var items = Substitute.For<IItemRepository>();
+        var hub = CreateHubContext();
+
+        players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
+        questGraph.IsQuestAvailableAsync(player.Id, questId, Arg.Any<CancellationToken>()).Returns(true);
+        questGraph.HasCompletedQuestAsync(player.Id, "RIDER_001", Arg.Any<CancellationToken>()).Returns(true);
+        // GetQuestAsync is invoked after the gate passes to build the payload
+        questGraph.GetQuestAsync(questId, Arg.Any<CancellationToken>())
+            .Returns(CreateQuestNode(questId: questId, title: "What Was In The Package"));
+        items.GetByOwnerAsync(player.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<Item>().AsReadOnly() as IReadOnlyList<Item>);
+
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, items, hub);
+
+        var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, questId), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        await questGraph.Received(1).MarkQuestInProgressAsync(
+            player.Id, questId, takenByAi: false, ct: Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task AcceptAll_MultipleBulkAccepts_AllMarkedInProgress()
     {
@@ -332,7 +396,7 @@ public class QuestCommandHandlerTests
             questGraph.GetQuestAsync(id, Arg.Any<CancellationToken>()).Returns(node);
         }
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, Substitute.For<IItemRepository>(), hub);
 
         // Act — accept all 5 in sequence
         var results = new List<CommandResult>();

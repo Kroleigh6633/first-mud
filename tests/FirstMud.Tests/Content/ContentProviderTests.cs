@@ -2130,4 +2130,69 @@ public class ContentProviderTests
             dir.Delete(recursive: true);
         }
     }
+
+    // ─── requires block validation ────────────────────────────────────────
+
+    [Fact]
+    public void Quest_requires_priorQuests_unknown_id_throws_on_load()
+    {
+        // A quest whose requires.priorQuests references a non-existent questId
+        // must be rejected at load-time. This guards against typos silently
+        // making a quest permanently un-acceptable.
+        var questsJson =
+            """
+            {
+              "quests": [
+                { "questId": "Q_TEST", "title": "T", "description": "D",
+                  "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+                  "requiredWorld": "Aeldran", "reputationReward": 10,
+                  "possibleOutcomes": ["completed"], "isWyrdQuest": false,
+                  "startingZoneId": "aeldran-1-caervorn-highlands",
+                  "requires": { "priorQuests": ["DOES_NOT_EXIST"] } }
+              ],
+              "edges": []
+            }
+            """;
+        var dir = MakeContentDirWithQuests(questsJson);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*requires.priorQuests references unknown questId 'DOES_NOT_EXIST'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Quest_requires_items_empty_name_throws_on_load()
+    {
+        var questsJson =
+            """
+            {
+              "quests": [
+                { "questId": "Q_TEST", "title": "T", "description": "D",
+                  "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+                  "requiredWorld": "Aeldran", "reputationReward": 10,
+                  "possibleOutcomes": ["completed"], "isWyrdQuest": false,
+                  "startingZoneId": "aeldran-1-caervorn-highlands",
+                  "requires": { "items": [{ "name": "", "quantity": 1 }] } }
+              ],
+              "edges": []
+            }
+            """;
+        var dir = MakeContentDirWithQuests(questsJson);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*requires.items has an entry with empty name*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
 }

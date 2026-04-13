@@ -46,6 +46,18 @@ export interface PlayerState {
   activeCompanions?: CompanionState[];
 }
 
+export interface QuestRequiredItem {
+  name: string;
+  quantity: number;
+}
+
+export interface QuestRequires {
+  items?: QuestRequiredItem[];
+  flags?: string[];
+  reputation?: Record<string, number>;
+  priorQuests?: string[];
+}
+
 export interface QuestNode {
   questId: string;
   title: string;
@@ -56,6 +68,7 @@ export interface QuestNode {
   possibleOutcomes: string[];
   isWyrdQuest: boolean;
   isTaken: boolean;
+  requires?: QuestRequires | null;
 }
 
 export interface QuestCompleteResult {
