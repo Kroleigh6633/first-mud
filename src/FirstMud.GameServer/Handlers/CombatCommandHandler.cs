@@ -48,7 +48,7 @@ public class StartCombatCommandHandler(
         }
 
         int partySize = 1 + activeCompanions.Count;
-        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome, partySize);
+        var monsters = combatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome, partySize);
 
         var encounter = await combatService.StartEncounterAsync(
             cmd.PlayerId, cmd.ZoneId, player, activeCompanions, monsters, equippedItems, ct, dangerLevel);

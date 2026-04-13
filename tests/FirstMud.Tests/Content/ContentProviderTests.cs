@@ -141,6 +141,169 @@ public class ContentProviderTests
         }
     }
 
+    // ─── Monsters ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_monsters_file_loads_and_exposes_known_ids()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        provider.AllMonsters().Should().NotBeEmpty("monsters.json ships with content");
+
+        var goat = provider.GetMonster("mountain-goat");
+        goat.Should().NotBeNull();
+        goat!.Name.Should().Be("Mountain Goat");
+        goat.Biome.Should().Be("mountain");
+        goat.Tier.Should().Be(0);
+        goat.Hp.Should().Be(22);
+        goat.Speed.Should().Be(7);
+        goat.Level.Should().Be(1);
+        goat.Abilities.Should().HaveCount(2);
+        goat.Abilities[0].Name.Should().Be("Headbutt");
+
+        provider.MonstersByBiomeAndTier("mountain", 0).Should().HaveCountGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public void Unknown_monster_id_returns_null()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        provider.GetMonster("no-such-beastie").Should().BeNull();
+        provider.GetMonster("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Invalid_monster_element_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteStubConsumables(dir.FullName);
+            File.WriteAllText(Path.Combine(dir.FullName, "monsters.json"), """
+            {
+              "abilities": [
+                { "id": "bite", "name": "Bite", "basePower": 1, "weaveCost": 0,
+                  "element": "Earth", "targetType": "SingleEnemy", "category": "Attack" }
+              ],
+              "monsters": [
+                { "id": "oops", "name": "Oops", "biome": "plains", "tier": 0,
+                  "hp": 10, "speed": 5, "level": 1, "element": "Cosmic",
+                  "abilities": ["bite"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*invalid element*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_monster_tier_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteStubConsumables(dir.FullName);
+            File.WriteAllText(Path.Combine(dir.FullName, "monsters.json"), """
+            {
+              "abilities": [
+                { "id": "bite", "name": "Bite", "basePower": 1, "weaveCost": 0,
+                  "element": "Earth", "targetType": "SingleEnemy", "category": "Attack" }
+              ],
+              "monsters": [
+                { "id": "too-hot", "name": "Too Hot", "biome": "plains", "tier": 9,
+                  "hp": 10, "speed": 5, "level": 1, "element": "Fire",
+                  "abilities": ["bite"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*tier*outside range*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Duplicate_monster_ids_throw_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteStubConsumables(dir.FullName);
+            File.WriteAllText(Path.Combine(dir.FullName, "monsters.json"), """
+            {
+              "abilities": [
+                { "id": "bite", "name": "Bite", "basePower": 1, "weaveCost": 0,
+                  "element": "Earth", "targetType": "SingleEnemy", "category": "Attack" }
+              ],
+              "monsters": [
+                { "id": "dup", "name": "A", "biome": "plains", "tier": 0,
+                  "hp": 10, "speed": 5, "level": 1, "element": "Fire", "abilities": ["bite"] },
+                { "id": "dup", "name": "B", "biome": "plains", "tier": 0,
+                  "hp": 10, "speed": 5, "level": 1, "element": "Fire", "abilities": ["bite"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*duplicate monster id*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Monster_referencing_unknown_ability_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteStubConsumables(dir.FullName);
+            File.WriteAllText(Path.Combine(dir.FullName, "monsters.json"), """
+            {
+              "abilities": [
+                { "id": "bite", "name": "Bite", "basePower": 1, "weaveCost": 0,
+                  "element": "Earth", "targetType": "SingleEnemy", "category": "Attack" }
+              ],
+              "monsters": [
+                { "id": "ghost-ref", "name": "Ghost", "biome": "plains", "tier": 0,
+                  "hp": 10, "speed": 5, "level": 1, "element": "Aether",
+                  "abilities": ["no-such-ability"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*unknown ability*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    private static void WriteStubConsumables(string dir)
+    {
+        File.WriteAllText(Path.Combine(dir, "consumables.json"), """
+        {
+          "consumables": [
+            { "id": "x", "matchToken": "x", "effectType": "Heal", "amount": 1 }
+          ]
+        }
+        """);
+    }
+
     // ─── helpers ──────────────────────────────────────────────────────────
 
     private static void AssertHeal(ContentProvider p, string itemName, int expected)

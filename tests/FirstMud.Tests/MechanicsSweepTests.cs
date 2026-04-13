@@ -1,4 +1,5 @@
 using FirstMud.Application;
+using FirstMud.Application.Content;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
@@ -244,12 +245,15 @@ public class MechanicsSweepTests
         bossMultiplier.Should().BeApproximately(10.0, 0.001, "boss at danger 10 must have 10x base HP");
     }
 
+    private static MonsterFactory CreateMonsterFactory() =>
+        new(new ContentProvider(ContentRootResolver.Resolve()));
+
     [Fact]
     public void MonsterFactory_BuildMonsterPack_Danger10_IsBossAndMaxPack()
     {
         // BuildMonsterPack always picks the full pack at danger 9-10 (maxEnemies)
         // partySize=1: maxEnemies = 1 + 10/3 = 1 + 3 = 4
-        var pack = MonsterFactory.BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 1);
+        var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 1);
 
         pack.Should().NotBeEmpty("danger 10 should always produce at least one monster");
         // First monster is boss (danger 10 → isBoss=true → HP doubled)
@@ -261,7 +265,7 @@ public class MechanicsSweepTests
     public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf4_MaxPack()
     {
         // partySize=4, danger=10: maxEnemies = 4 + 10/3 = 4 + 3 = 7
-        var pack = MonsterFactory.BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 4);
+        var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 4);
 
         int maxEnemies = 4 + (10 / 3); // 7
         pack.Count.Should().Be(maxEnemies,
@@ -294,7 +298,7 @@ public class MechanicsSweepTests
         // Actually: maxEnemies = 1 + 7/3 = 1 + 2 = 3; Math.Min(3, Random.Next(4, 4)) → Next(4,4) throws
         // Let's recalculate: packSize when danger 6-8: Random.Next(4, maxEnemies + 1) but capped at maxEnemies
         // With partySize=4: maxEnemies = 4 + 7/3 = 4 + 2 = 6; Range.Next(4,7) → 4-6
-        var pack = MonsterFactory.BuildMonsterPack(dangerLevel: 7, playerLevel: 1, biome: "plains", partySize: 4);
+        var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 7, playerLevel: 1, biome: "plains", partySize: 4);
         pack.Count.Should().BeGreaterThanOrEqualTo(1);
         pack.Count.Should().BeLessThanOrEqualTo(6);
     }

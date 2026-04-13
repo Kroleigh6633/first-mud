@@ -34,8 +34,11 @@ public class CombatHelpers(
     QuestProgressTracker questProgressTracker,
     FirstMud.Domain.Interfaces.IQuestGraphRepository questGraphRepository,
     InventoryDepositService inventoryDepositService,
-    FirstMud.Application.Services.BuildingService buildingService)
+    FirstMud.Application.Services.BuildingService buildingService,
+    MonsterFactory monsterFactory)
 {
+    private readonly MonsterFactory _monsterFactory = monsterFactory;
+
     // -------------------------------------------------------------------------
     // Enemy auto-turn processing
     // -------------------------------------------------------------------------
@@ -822,8 +825,8 @@ public class CombatHelpers(
     // Monster pack builder — forwarding wrapper → MonsterFactory
     // -------------------------------------------------------------------------
 
-    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains", int partySize = 1)
-        => MonsterFactory.BuildMonsterPack(dangerLevel, playerLevel, biome, partySize);
+    public List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains", int partySize = 1)
+        => _monsterFactory.BuildMonsterPack(dangerLevel, playerLevel, biome, partySize);
 
     // -------------------------------------------------------------------------
     // DTO builder
