@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Infrastructure.Neo4j;
 using Neo4j.Driver;
 using Testcontainers.Neo4j;
@@ -55,5 +56,5 @@ public sealed class Neo4jFixture : IAsyncLifetime
 
     /// <summary>Creates a <see cref="LoreSeeder"/> backed by the container.</summary>
     public LoreSeeder CreateLoreSeeder() =>
-        new(CreateDriverWrapper());
+        new(CreateDriverWrapper(), new ContentProvider(ContentRootResolver.Resolve()));
 }

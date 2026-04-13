@@ -65,6 +65,18 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<string, ZoneDefinition> _zonesById = new(StringComparer.Ordinal);
     private Dictionary<string, ZoneDefinition> _zonesByName = new(StringComparer.Ordinal);
     private Dictionary<(WorldId, int), ZoneDefinition> _zonesByWorldNumber = new();
+    private IReadOnlyList<QuestDefinition> _quests = Array.Empty<QuestDefinition>();
+    private Dictionary<string, QuestDefinition> _questsById = new(StringComparer.Ordinal);
+    private IReadOnlyList<QuestEdgeDefinition> _questEdges = Array.Empty<QuestEdgeDefinition>();
+
+    private static readonly HashSet<string> ValidFactionIdNames =
+        new(Enum.GetNames<FactionId>(), StringComparer.Ordinal);
+
+    private static readonly HashSet<string> ValidReputationTierNames =
+        new(Enum.GetNames<ReputationTier>(), StringComparer.Ordinal);
+
+    private static readonly HashSet<string> ValidQuestEdgeKinds =
+        new(StringComparer.Ordinal) { "unlocks", "requires" };
 
     private static readonly HashSet<string> ValidBiomeNames = new(StringComparer.Ordinal)
     {
@@ -182,6 +194,13 @@ public sealed class ContentProvider : IContentProvider
             ? (def.Layout.X, def.Layout.Y)
             : null;
 
+    public IReadOnlyList<QuestDefinition> AllQuests() => _quests;
+
+    public QuestDefinition? GetQuest(string id) =>
+        !string.IsNullOrEmpty(id) && _questsById.TryGetValue(id, out var def) ? def : null;
+
+    public IReadOnlyList<QuestEdgeDefinition> AllQuestEdges() => _questEdges;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -200,13 +219,20 @@ public sealed class ContentProvider : IContentProvider
         _zonesByName = _zones.ToDictionary(z => z.Name, StringComparer.Ordinal);
         _zonesByWorldNumber = _zones.ToDictionary(z => (z.World, z.ZoneNumber));
 
+        // Quests load AFTER zones so startingZoneId cross-ref validation can
+        // run against the authored zones registry.
+        var (quests, edges) = LoadQuests();
+        _quests = quests;
+        _questsById = _quests.ToDictionary(q => q.QuestId, StringComparer.Ordinal);
+        _questEdges = edges;
+
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
         ContentAccessor.Publish(this);
 
         _logger?.LogInformation(
-            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones from {Root}",
-            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _contentRoot);
+            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {QuestCount} quests, {EdgeCount} quest edges from {Root}",
+            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _quests.Count, _questEdges.Count, _contentRoot);
     }
 
     private IReadOnlyList<ZoneDefinition> LoadZones()
@@ -1211,5 +1237,313 @@ public sealed class ContentProvider : IContentProvider
     {
         public string MonsterId { get; set; } = "";
         public int Weight { get; set; }
+    }
+
+    // ─── Quest loader ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Loads content/quests.json and validates it. Validation is strict:
+    /// unique quest ids, node ids unique within a quest, every edge refers
+    /// to valid quest ids, faction + world + tier enums parse, optional
+    /// startingZoneId resolves against zones.json, at least one possibleOutcome,
+    /// and no unreachable intra-quest nodes. Item-name references in rewards
+    /// are tolerated (warned only) since the item catalog is not yet in JSON.
+    /// </summary>
+    private (IReadOnlyList<QuestDefinition> Quests, IReadOnlyList<QuestEdgeDefinition> Edges) LoadQuests()
+    {
+        var path = Path.Combine(_contentRoot, "quests.json");
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"Required content file not found: {path}", path);
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<QuestsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Quests is null || doc.Quests.Count == 0)
+            throw new InvalidDataException($"{path}: no quests defined.");
+
+        var zoneIds = new HashSet<string>(_zonesById.Keys, StringComparer.Ordinal);
+        // Optional faction cross-ref — if factions.json was loaded in a future
+        // merge, validate against it; otherwise fall back to the enum names.
+        // Today we always validate against the enum (factions.json is in a
+        // parallel migration).
+
+        var defs = new List<QuestDefinition>(doc.Quests.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Quests)
+        {
+            if (string.IsNullOrWhiteSpace(raw.QuestId))
+                throw new InvalidDataException($"{path}: quest missing questId.");
+            if (!seenIds.Add(raw.QuestId))
+                throw new InvalidDataException($"{path}: duplicate questId '{raw.QuestId}'.");
+
+            if (string.IsNullOrWhiteSpace(raw.Title))
+                throw new InvalidDataException($"{path}: quest '{raw.QuestId}' missing title.");
+            if (string.IsNullOrWhiteSpace(raw.Description))
+                throw new InvalidDataException($"{path}: quest '{raw.QuestId}' missing description.");
+
+            if (string.IsNullOrWhiteSpace(raw.FactionId) || !ValidFactionIdNames.Contains(raw.FactionId))
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' has invalid factionId '{raw.FactionId}'.");
+            var faction = Enum.Parse<FactionId>(raw.FactionId);
+
+            if (string.IsNullOrWhiteSpace(raw.RequiredTier) || !ValidReputationTierNames.Contains(raw.RequiredTier))
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' has invalid requiredTier '{raw.RequiredTier}'.");
+            var tier = Enum.Parse<ReputationTier>(raw.RequiredTier);
+
+            if (string.IsNullOrWhiteSpace(raw.RequiredWorld) || !ValidWorldIdNames.Contains(raw.RequiredWorld))
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' has invalid requiredWorld '{raw.RequiredWorld}'.");
+            var world = Enum.Parse<WorldId>(raw.RequiredWorld);
+
+            if (raw.ReputationReward < 0)
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' reputationReward must be >= 0.");
+
+            if (raw.PossibleOutcomes is null || raw.PossibleOutcomes.Count == 0)
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' must declare at least one possibleOutcome.");
+
+            foreach (var outcome in raw.PossibleOutcomes)
+            {
+                if (string.IsNullOrWhiteSpace(outcome))
+                    throw new InvalidDataException(
+                        $"{path}: quest '{raw.QuestId}' has empty possibleOutcome entry.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(raw.StartingZoneId) &&
+                zoneIds.Count > 0 &&
+                !zoneIds.Contains(raw.StartingZoneId))
+            {
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' startingZoneId '{raw.StartingZoneId}' is not a known zoneId.");
+            }
+
+            // Nodes: optional. If present, ids unique within the quest.
+            var nodes = new List<QuestNodeDefinition>();
+            var seenNodeIds = new HashSet<string>(StringComparer.Ordinal);
+            if (raw.Nodes is not null)
+            {
+                foreach (var n in raw.Nodes)
+                {
+                    if (string.IsNullOrWhiteSpace(n.NodeId))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' has node with empty nodeId.");
+                    if (!seenNodeIds.Add(n.NodeId))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' has duplicate nodeId '{n.NodeId}'.");
+                    if (string.IsNullOrWhiteSpace(n.Type))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' node '{n.NodeId}' missing type.");
+
+                    nodes.Add(new QuestNodeDefinition(
+                        n.NodeId, n.Type,
+                        n.Content ?? "",
+                        n.RequiredFlags ?? new List<string>()));
+                }
+            }
+
+            // Internal edges: optional. If present, every endpoint must be
+            // a declared node id within THIS quest. Flags orphan nodes too.
+            var internalEdges = new List<QuestEdgeDefinition>();
+            if (raw.InternalEdges is not null)
+            {
+                foreach (var e in raw.InternalEdges)
+                {
+                    if (string.IsNullOrWhiteSpace(e.From) || !seenNodeIds.Contains(e.From))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' internal edge has unknown 'from' nodeId '{e.From}'.");
+                    if (string.IsNullOrWhiteSpace(e.To) || !seenNodeIds.Contains(e.To))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' internal edge has unknown 'to' nodeId '{e.To}'.");
+                    internalEdges.Add(new QuestEdgeDefinition(
+                        Kind: "internal",
+                        FromQuestId: e.From,
+                        ToQuestId: e.To,
+                        Outcome: string.IsNullOrWhiteSpace(e.Outcome) ? null : e.Outcome));
+                }
+
+                // Orphan node check: every declared node must be reachable from
+                // the first node OR be the first node itself. Since the corpus
+                // is flat (no nodes), this only activates for quests that opt
+                // into the node list.
+                if (nodes.Count > 0)
+                {
+                    var reachable = new HashSet<string>(StringComparer.Ordinal) { nodes[0].NodeId };
+                    bool changed;
+                    do
+                    {
+                        changed = false;
+                        foreach (var e in internalEdges)
+                        {
+                            if (reachable.Contains(e.FromQuestId) && reachable.Add(e.ToQuestId))
+                                changed = true;
+                        }
+                    } while (changed);
+
+                    foreach (var n in nodes)
+                    {
+                        if (!reachable.Contains(n.NodeId))
+                            throw new InvalidDataException(
+                                $"{path}: quest '{raw.QuestId}' has orphan/unreachable node '{n.NodeId}'.");
+                    }
+                }
+            }
+
+            // Rewards: forgiving. Validate structural shape only — item-name
+            // cross-ref is warned, not thrown, per migration spec.
+            var rewards = new List<QuestRewardDefinition>();
+            if (raw.Rewards is not null)
+            {
+                foreach (var r in raw.Rewards)
+                {
+                    if (string.IsNullOrWhiteSpace(r.Kind))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' has reward with missing kind.");
+                    if (r.Quantity < 0)
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' reward quantity must be >= 0.");
+                    rewards.Add(new QuestRewardDefinition(
+                        r.Kind,
+                        string.IsNullOrWhiteSpace(r.ItemName) ? null : r.ItemName,
+                        r.Quantity));
+                }
+            }
+
+            defs.Add(new QuestDefinition(
+                QuestId: raw.QuestId,
+                Title: raw.Title,
+                Description: raw.Description,
+                FactionId: faction,
+                RequiredTier: tier,
+                RequiredWorld: world,
+                ReputationReward: raw.ReputationReward,
+                PossibleOutcomes: raw.PossibleOutcomes.ToList(),
+                IsWyrdQuest: raw.IsWyrdQuest,
+                StartingZoneId: string.IsNullOrWhiteSpace(raw.StartingZoneId) ? null : raw.StartingZoneId,
+                Prerequisites: raw.Prerequisites is null
+                    ? Array.Empty<string>()
+                    : raw.Prerequisites.ToList(),
+                Rewards: rewards,
+                Nodes: nodes,
+                InternalEdges: internalEdges));
+        }
+
+        // Second pass: prerequisites must reference declared quest ids.
+        foreach (var q in defs)
+        {
+            foreach (var p in q.Prerequisites)
+            {
+                if (!seenIds.Contains(p))
+                    throw new InvalidDataException(
+                        $"{path}: quest '{q.QuestId}' lists unknown prerequisite questId '{p}'.");
+            }
+        }
+
+        // Cross-quest edges.
+        var edges = new List<QuestEdgeDefinition>();
+        if (doc.Edges is not null)
+        {
+            var edgeSeen = new HashSet<(string kind, string from, string to, string? outcome)>();
+            foreach (var e in doc.Edges)
+            {
+                if (string.IsNullOrWhiteSpace(e.Kind) || !ValidQuestEdgeKinds.Contains(e.Kind))
+                    throw new InvalidDataException(
+                        $"{path}: edge has invalid kind '{e.Kind}' (expected 'unlocks' or 'requires').");
+
+                if (string.IsNullOrWhiteSpace(e.From) || !seenIds.Contains(e.From))
+                    throw new InvalidDataException(
+                        $"{path}: edge references unknown 'from' questId '{e.From}'.");
+                if (string.IsNullOrWhiteSpace(e.To) || !seenIds.Contains(e.To))
+                    throw new InvalidDataException(
+                        $"{path}: edge references unknown 'to' questId '{e.To}'.");
+
+                string? outcome = string.IsNullOrWhiteSpace(e.Outcome) ? null : e.Outcome;
+
+                if (string.Equals(e.Kind, "unlocks", StringComparison.Ordinal))
+                {
+                    if (outcome is null)
+                        throw new InvalidDataException(
+                            $"{path}: 'unlocks' edge from '{e.From}' to '{e.To}' requires an outcome.");
+
+                    // Outcome must be declared by the source quest.
+                    var fromDef = defs.Single(q => q.QuestId == e.From);
+                    if (!fromDef.PossibleOutcomes.Contains(outcome, StringComparer.Ordinal))
+                        throw new InvalidDataException(
+                            $"{path}: 'unlocks' edge from '{e.From}' uses outcome '{outcome}' " +
+                            $"which is not in that quest's possibleOutcomes.");
+                }
+
+                var key = (e.Kind, e.From, e.To, outcome);
+                if (!edgeSeen.Add(key))
+                    throw new InvalidDataException(
+                        $"{path}: duplicate edge {e.Kind} {e.From} -> {e.To} (outcome={outcome ?? "<none>"}).");
+
+                edges.Add(new QuestEdgeDefinition(
+                    Kind: e.Kind,
+                    FromQuestId: e.From,
+                    ToQuestId: e.To,
+                    Outcome: outcome));
+            }
+        }
+
+        return (defs, edges);
+    }
+
+    private sealed class QuestsFile
+    {
+        public List<RawQuest>? Quests { get; set; }
+        public List<RawQuestEdge>? Edges { get; set; }
+    }
+
+    private sealed class RawQuest
+    {
+        public string QuestId { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string FactionId { get; set; } = "";
+        public string RequiredTier { get; set; } = "";
+        public string RequiredWorld { get; set; } = "";
+        public int ReputationReward { get; set; }
+        public List<string>? PossibleOutcomes { get; set; }
+        public bool IsWyrdQuest { get; set; }
+        public string? StartingZoneId { get; set; }
+        public List<string>? Prerequisites { get; set; }
+        public List<RawQuestReward>? Rewards { get; set; }
+        public List<RawQuestNode>? Nodes { get; set; }
+        public List<RawQuestInternalEdge>? InternalEdges { get; set; }
+    }
+
+    private sealed class RawQuestReward
+    {
+        public string Kind { get; set; } = "";
+        public string? ItemName { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    private sealed class RawQuestNode
+    {
+        public string NodeId { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string? Content { get; set; }
+        public List<string>? RequiredFlags { get; set; }
+    }
+
+    private sealed class RawQuestInternalEdge
+    {
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        public string? Outcome { get; set; }
+    }
+
+    private sealed class RawQuestEdge
+    {
+        public string Kind { get; set; } = "";
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        public string? Outcome { get; set; }
     }
 }

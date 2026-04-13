@@ -119,6 +119,22 @@ public interface IContentProvider
     /// </summary>
     (int X, int Y)? GetZoneLayoutPosition(WorldId world, int zoneNumber);
 
+    // ─── Quests ──────────────────────────────────────────────────────────────
+
+    /// <summary>All quest definitions authored in content/quests.json,
+    /// in file order.</summary>
+    IReadOnlyList<QuestDefinition> AllQuests();
+
+    /// <summary>
+    /// Returns the quest definition with the given <c>questId</c>, or null
+    /// if no such quest is authored.
+    /// </summary>
+    QuestDefinition? GetQuest(string id);
+
+    /// <summary>All cross-quest edges (unlocks + requires) authored in
+    /// content/quests.json.</summary>
+    IReadOnlyList<QuestEdgeDefinition> AllQuestEdges();
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>
