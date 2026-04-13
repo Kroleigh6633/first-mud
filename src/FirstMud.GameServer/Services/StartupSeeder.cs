@@ -22,6 +22,7 @@ public class StartupSeeder(
         await FixMisassignedEquipmentSlotsAsync(ct);
         await FixFlatStartingStatsAsync(ct);
         await FixDefaultInventorySlotsAsync(ct);
+        await FixInflatedCraftingSkillAsync(ct);
         await RenameAndMergeLegacyMaterialsAsync(ct);
         await MergeDuplicateStorageStacksAsync(ct);
         await SeedDevPlayerAsync(ct);
@@ -101,14 +102,20 @@ public class StartupSeeder(
         ["Leather Leggings"]    = EquipmentSlot.Legs,
         ["Iron Greaves"]        = EquipmentSlot.Legs,
         ["Padded Trousers"]     = EquipmentSlot.Legs,
+        ["Chain Leggings"]      = EquipmentSlot.Legs,
+        ["Mithril Greaves"]     = EquipmentSlot.Legs,
         // Hands armor
         ["Leather Gloves"]      = EquipmentSlot.Hands,
         ["Iron Vambraces"]      = EquipmentSlot.Hands,
+        ["Iron Gauntlets"]      = EquipmentSlot.Hands,
         ["Wrapped Handguards"]  = EquipmentSlot.Hands,
+        ["Mithril Vambraces"]   = EquipmentSlot.Hands,
         // Feet armor
         ["Leather Boots"]       = EquipmentSlot.Feet,
         ["Iron Sabatons"]       = EquipmentSlot.Feet,
         ["Traveler's Sandals"]  = EquipmentSlot.Feet,
+        ["Thornwood Treads"]    = EquipmentSlot.Feet,
+        ["Mithril Boots"]       = EquipmentSlot.Feet,
         // Accessories
         ["Bone Ring"]           = EquipmentSlot.Accessory,
         ["Silver Amulet"]       = EquipmentSlot.Accessory,
@@ -240,6 +247,38 @@ public class StartupSeeder(
         {
             await conn.CloseAsync();
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Inflated crafting skill fixup
+    // -------------------------------------------------------------------------
+
+    // A bug in the smelting system previously granted CraftingSkill XP on every
+    // smelt operation.  Reset any player whose CraftingSkill exceeds 10 back to 1
+    // so the skill ladder is meaningful again.  Safe to run on every startup —
+    // once the affected rows are reset they fall below the threshold and are skipped.
+    private async Task FixInflatedCraftingSkillAsync(CancellationToken ct)
+    {
+        var inflated = await db.Players
+            .Where(p => p.CraftingSkill > 10)
+            .ToListAsync(ct);
+
+        if (inflated.Count == 0)
+        {
+            logger.LogInformation("FixInflatedCraftingSkill: no players with CraftingSkill > 10 found.");
+            return;
+        }
+
+        foreach (var p in inflated)
+        {
+            logger.LogWarning(
+                "FixInflatedCraftingSkill: resetting CraftingSkill from {Old} to 1 for player {Name} ({Id}).",
+                p.CraftingSkill, p.Name, p.Id);
+            p.ResetCraftingSkill(1);
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("FixInflatedCraftingSkill: reset {Count} player(s).", inflated.Count);
     }
 
     // -------------------------------------------------------------------------
@@ -602,6 +641,16 @@ public class StartupSeeder(
             ItemCategory.Consumable, "Fortitude Brew",    2, 5, 5),
 
         // ── Skill 10-20: Journeyman ───────────────────────────────────────────
+        ("IRON_SABATONS_001",        "Iron Sabatons",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       4),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Iron Sabatons",        3, 6, 15),
+
+        ("IRON_GAUNTLETS_001",       "Iron Gauntlets",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       3),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        1)],
+            ItemCategory.Armor,       "Iron Gauntlets",       3, 6, 15),
+
         ("STEEL_SWORD_001",          "Steel Sword",
             [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       5),
              RecipeIngredient.Create(ItemCategory.Component, "Stone",          2)],
@@ -633,6 +682,16 @@ public class StartupSeeder(
             ItemCategory.Consumable,  "Greater Healing Potion", 3, 7, 15),
 
         // ── Skill 25-50: Expert ───────────────────────────────────────────────
+        ("THORNWOOD_TREADS_001",     "Thornwood Treads",
+            [RecipeIngredient.Create(ItemCategory.Component, "Wood",           3),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Thornwood Treads",     4, 7, 25),
+
+        ("CHAIN_LEGGINGS_001",       "Chain Leggings",
+            [RecipeIngredient.Create(ItemCategory.Component, "Iron Ore",       6),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Chain Leggings",       4, 7, 25),
+
         ("SILVER_BLADE_001",         "Silver Blade",
             [RecipeIngredient.Create(ItemCategory.Component, "Silver Ore",     4),
              RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
@@ -669,6 +728,21 @@ public class StartupSeeder(
             ItemCategory.Consumable,  "Weave Elixir",         3, 7, 30),
 
         // ── Skill 50-75: Artisan ──────────────────────────────────────────────
+        ("MITHRIL_BOOTS_001",        "Mithril Boots",
+            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    4),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Mithril Boots",        7, 9, 50),
+
+        ("MITHRIL_VAMBRACES_001",    "Mithril Vambraces",
+            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    3),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Mithril Vambraces",    7, 9, 50),
+
+        ("MITHRIL_GREAVES_001",      "Mithril Greaves",
+            [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    5),
+             RecipeIngredient.Create(ItemCategory.Component, "Leather",        2)],
+            ItemCategory.Armor,       "Mithril Greaves",      7, 9, 50),
+
         ("MITHRIL_SWORD_001",        "Mithril Sword",
             [RecipeIngredient.Create(ItemCategory.Component, "Mithril Ore",    6),
              RecipeIngredient.Create(ItemCategory.Reagent,   "Diamond Shard",  2)],

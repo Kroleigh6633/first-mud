@@ -377,6 +377,15 @@ public class Player
     }
 
     /// <summary>
+    /// Resets CraftingSkill to the given value (minimum 1).
+    /// Used by the startup seeder to fix inflation from the smelting bug.
+    /// </summary>
+    public void ResetCraftingSkill(int value)
+    {
+        CraftingSkill = Math.Max(1, value);
+    }
+
+    /// <summary>
     /// Sets the auto-salvage threshold for the given category (weapon or armor).
     /// A maxWorkmanship of 0 disables auto-salvage for that category.
     /// </summary>

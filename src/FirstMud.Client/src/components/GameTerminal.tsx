@@ -415,6 +415,9 @@ export default function GameTerminal({
         break;
       case 'crafting':
         sendCommand('viewrecipes', null);
+        // Also refresh storage so storage-sourced ingredients show up as
+        // selectable checkboxes in the crafting panel.
+        if (atHomestead) sendCommand('openstorage', null);
         setShowCrafting(prev => !prev);
         break;
       case 'navigate': {
