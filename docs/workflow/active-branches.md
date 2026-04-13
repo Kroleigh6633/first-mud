@@ -28,4 +28,6 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 
+| worktree-agent-a4aef728 | ready-to-merge | content-layer-pilot | Resolve L→F auto-transition edge cases (ownership, all-unwinnable stop, phase-reset ref) | - | src/FirstMud.Client/src/components/GameTerminal.tsx | 2026-04-13 |
+
 <!-- agents add rows above this line -->
