@@ -30,4 +30,6 @@ Columns:
 | worktree-agent-a4aef728 | in-progress | content-layer-pilot | Resolve L→F auto-transition edge cases (ownership, all-unwinnable stop, phase-reset ref) | - | src/FirstMud.Client/src/components/GameTerminal.tsx | 2026-04-13 |
 | worktree-agent-a8f77995 | ready-to-merge | 9c5e5b9 | Migrate progression scaling (workmanship divisor + companion layer thresholds) into content/progression-curves.json + apply Pass-1 tunes + bump enchanting drop weights | - | content/progression-curves.json, content/schemas/progression-curves.schema.json, content/loot-tables.json, src/FirstMud.Domain/Configuration/, src/FirstMud.Domain/Entities/Companion.cs, src/FirstMud.Domain/ValueObjects/Workmanship.cs, src/FirstMud.Application/Content/, src/FirstMud.Application/Services/CraftingService.cs, tools/design/FirstMud.DesignTools/Tools/ProgressionSim/ProgressionSimulator.cs, tests/, docs/design/sim-reports/progression-pass-tuned.md | 2026-04-13 |
 
+| worktree-agent-a4aef728 | ready-to-merge | content-layer-pilot | Resolve L→F auto-transition edge cases (ownership, all-unwinnable stop, phase-reset ref) | - | src/FirstMud.Client/src/components/GameTerminal.tsx | 2026-04-13 |
+
 <!-- agents add rows above this line -->
