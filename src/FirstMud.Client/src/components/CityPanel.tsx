@@ -32,6 +32,24 @@ const BUILDING_DUTY: Partial<Record<BuildingType, HomesteadDuty>> = {
 
 const HOUSING_TYPES = new Set<BuildingType>(['Hut']);
 
+// How many workers each building type can support
+const WORKER_CAPACITY: Record<BuildingType, number> = {
+  Forge:           2,
+  Tannery:         2,
+  Farm:            3,
+  Mine:            3,
+  Woodworker:      2,
+  AlchemistHut:    2,
+  Stoneworker:     2,
+  EnchantingTower: 1,
+  MarketStall:     1,
+  Library:         1,
+  Barracks:        5,
+  Warehouse:       1,
+  Fletcher:        2,
+  Hut:             0,
+};
+
 const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[]> = {
   Forge:          [{ material: 'Wood', qty: 20 }, { material: 'Stone', qty: 30 }, { material: 'Iron Ore', qty: 10 }],
   Fletcher:       [{ material: 'Wood', qty: 15 }, { material: 'Stone', qty: 10 }],
@@ -63,6 +81,10 @@ const APTITUDE: Record<CompanionType, Record<HomesteadDuty, number>> = {
   HiredHero:        { Harvester: 2, Salvager: 2, Guard: 2, Crafter: 2 },
   BoundShade:       { Harvester: 2, Salvager: 2, Guard: 2, Crafter: 1 },
 };
+
+// ─── Tab type ─────────────────────────────────────────────────────────────────
+
+type CityTab = 'OVERVIEW' | 'PRODUCTION' | 'HOUSING';
 
 // ─── Grid helpers ─────────────────────────────────────────────────────────────
 
@@ -186,6 +208,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
   const tierStr = '★'.repeat(building.tier);
   const isHousing = HOUSING_TYPES.has(building.type);
   const duty = isHousing ? undefined : BUILDING_DUTY[building.type];
+  const workerCapacity = WORKER_CAPACITY[building.type] ?? 1;
 
   // Sort available companions by aptitude for this building's duty (best first)
   const sorted = duty
@@ -216,6 +239,11 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
         <span style={{ fontSize: '14px' }}>{icon}</span>
         <span style={{ color, fontWeight: 'bold' }}>{building.type.toUpperCase()}</span>
         <span style={{ color: '#ffcc00', fontSize: '10px' }}>{tierStr}</span>
+        {!isHousing && building.isConstructed && (
+          <span style={{ color: '#888888', fontSize: '10px', marginLeft: '4px' }}>
+            {building.assignedCompanionName ? '1' : '0'}/{workerCapacity} workers
+          </span>
+        )}
         {!building.isConstructed && (
           <span style={{ color: '#ff8800', fontSize: '10px', marginLeft: 'auto' }}>
             {building.constructionProgress}% · {constructionTimeStr(building.constructionProgress)} remaining
@@ -522,6 +550,369 @@ const selectStyle: React.CSSProperties = {
   minWidth: '220px',
 };
 
+// ─── Workforce stats helper ───────────────────────────────────────────────────
+
+interface WorkforceStats {
+  total: number;
+  adventuring: number;
+  working: number;
+  guards: number;
+  housed: number;
+  housingCapacity: number;
+  hutCount: number;
+  homeless: number;
+  unemployed: number;
+  productionBuildings: HomesteadBuilding[];
+  housingBuildings: HomesteadBuilding[];
+  underConstruction: HomesteadBuilding[];
+  allProductionStaffed: boolean;
+  buildingsNeedingBuilders: HomesteadBuilding[];
+}
+
+function computeWorkforceStats(
+  buildings: HomesteadBuilding[],
+  companionRoster: CompanionState[],
+  activeCompanionIds: string[],
+): WorkforceStats {
+  const total = companionRoster.length;
+  const adventuring = activeCompanionIds.length;
+
+  const productionBuildings = buildings.filter(
+    b => b.isConstructed && !HOUSING_TYPES.has(b.type)
+  );
+  const housingBuildings = buildings.filter(
+    b => b.isConstructed && HOUSING_TYPES.has(b.type)
+  );
+  const underConstruction = buildings.filter(b => !b.isConstructed);
+
+  const working = productionBuildings.filter(
+    b => b.type !== 'Barracks' && b.assignedCompanionName
+  ).length;
+  const guards = productionBuildings.filter(
+    b => (b.type === 'Barracks' || b.type === 'Warehouse') && b.assignedCompanionName
+  ).length;
+
+  const housed = housingBuildings.reduce((sum, b) => sum + (b.residents?.length ?? 0), 0);
+  const housingCapacity = housingBuildings.reduce((sum, b) => sum + (b.residentCapacity ?? 0), 0);
+  const hutCount = housingBuildings.length;
+  const homeless = Math.max(0, total - adventuring - housed);
+
+  const assignedOrActive = new Set([
+    ...activeCompanionIds,
+    ...buildings
+      .filter(b => b.assignedCompanionId)
+      .map(b => b.assignedCompanionId as string),
+  ]);
+  const unemployed = companionRoster.filter(
+    c => !assignedOrActive.has(c.id)
+  ).length;
+
+  const allProductionStaffed = productionBuildings.length > 0 &&
+    productionBuildings.every(b => !!b.assignedCompanionName);
+
+  const buildingsNeedingBuilders = underConstruction.filter(b => !b.assignedCompanionName);
+
+  return {
+    total, adventuring, working, guards, housed, housingCapacity, hutCount,
+    homeless, unemployed, productionBuildings, housingBuildings, underConstruction,
+    allProductionStaffed, buildingsNeedingBuilders,
+  };
+}
+
+// ─── Overview tab ─────────────────────────────────────────────────────────────
+
+interface OverviewTabProps {
+  stats: WorkforceStats;
+}
+
+function OverviewTab({ stats }: OverviewTabProps) {
+  const dividerStyle: React.CSSProperties = {
+    color: '#333333',
+    margin: '4px 0',
+    fontSize: '11px',
+  };
+
+  const rowStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '6px',
+    fontSize: '11px',
+    margin: '2px 0',
+  };
+
+  const labelStyle: React.CSSProperties = { color: '#888888', minWidth: '160px' };
+
+  // Derive recommendation list
+  const recommendations: { ok: boolean; text: string }[] = [];
+
+  if (stats.homeless > 0) {
+    const hutsNeeded = Math.ceil(stats.homeless / 3); // 3 capacity per hut
+    recommendations.push({ ok: false, text: `${stats.homeless} companions need housing — build ${hutsNeeded} more hut${hutsNeeded !== 1 ? 's' : ''}` });
+  }
+
+  if (stats.unemployed > 10) {
+    recommendations.push({ ok: false, text: `${stats.unemployed} companions unemployed — build more production buildings` });
+  } else if (stats.unemployed > 0) {
+    recommendations.push({ ok: false, text: `${stats.unemployed} companions unemployed — assign them to production buildings` });
+  }
+
+  if (stats.guards === 0 && stats.productionBuildings.length > 0) {
+    recommendations.push({ ok: false, text: 'No guards assigned — assign guards for storage bonus' });
+  }
+
+  if (stats.buildingsNeedingBuilders.length > 0) {
+    recommendations.push({
+      ok: false,
+      text: `${stats.buildingsNeedingBuilders.length} building${stats.buildingsNeedingBuilders.length !== 1 ? 's' : ''} under construction with no builder — assign a builder`,
+    });
+  }
+
+  if (stats.allProductionStaffed && stats.productionBuildings.length > 0) {
+    recommendations.push({ ok: true, text: 'All production buildings staffed' });
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push({ ok: true, text: 'City is running well — no immediate actions needed' });
+  }
+
+  // Collect production building type names for summary
+  const prodTypeNames = stats.productionBuildings.map(b => b.type);
+  const prodTypesSummary = prodTypeNames.length > 0
+    ? prodTypeNames.slice(0, 4).join(', ') + (prodTypeNames.length > 4 ? ', ...' : '')
+    : 'none';
+
+  return (
+    <div style={{ padding: '8px 14px 14px' }}>
+      {/* Workforce summary */}
+      <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+        Workforce Summary
+      </div>
+      <div style={dividerStyle}>{'─'.repeat(36)}</div>
+
+      <div style={rowStyle}>
+        <span style={labelStyle}>Total companions:</span>
+        <span style={{ color: '#ffcc00' }}>{stats.total}</span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Adventuring:</span>
+        <span style={{ color: '#00ccff' }}>{stats.adventuring}</span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Working (production):</span>
+        <span style={{ color: '#00cc88' }}>{stats.working}</span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Guards:</span>
+        <span style={{ color: '#cc4444' }}>{stats.guards}</span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Housed:</span>
+        <span style={{ color: '#cc9966' }}>
+          {stats.housed}/{stats.housingCapacity}{' '}
+          <span style={{ color: '#666666' }}>({stats.hutCount} hut{stats.hutCount !== 1 ? 's' : ''})</span>
+        </span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Homeless:</span>
+        <span style={{ color: stats.homeless > 0 ? '#ff8800' : '#555555' }}>{stats.homeless}</span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Unemployed:</span>
+        <span style={{ color: stats.unemployed > 0 ? '#ffcc00' : '#555555' }}>{stats.unemployed}</span>
+      </div>
+
+      {/* Building summary */}
+      <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: '12px', marginBottom: '6px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+        Building Summary
+      </div>
+      <div style={dividerStyle}>{'─'.repeat(36)}</div>
+
+      <div style={rowStyle}>
+        <span style={labelStyle}>Production:</span>
+        <span style={{ color: '#ff8844' }}>
+          {stats.productionBuildings.length}{' '}
+          <span style={{ color: '#666666' }}>({prodTypesSummary})</span>
+        </span>
+      </div>
+      <div style={rowStyle}>
+        <span style={labelStyle}>Housing:</span>
+        <span style={{ color: '#cc9966' }}>
+          {stats.hutCount} hut{stats.hutCount !== 1 ? 's' : ''}{' '}
+          <span style={{ color: '#666666' }}>({stats.housingCapacity} capacity)</span>
+        </span>
+      </div>
+      <div style={rowStyle}>
+        <span style={labelStyle}>Under construction:</span>
+        <span style={{ color: stats.underConstruction.length > 0 ? '#ff8800' : '#555555' }}>
+          {stats.underConstruction.length}
+        </span>
+      </div>
+
+      {/* Recommendations */}
+      <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: '12px', marginBottom: '6px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+        Recommendations
+      </div>
+      <div style={dividerStyle}>{'─'.repeat(36)}</div>
+      {recommendations.map((r, i) => (
+        <div key={i} style={{ ...rowStyle, gap: '6px', alignItems: 'flex-start' }}>
+          <span style={{ color: r.ok ? '#00cc88' : '#ff8800', flexShrink: 0 }}>{r.ok ? '✓' : '⚠'}</span>
+          <span style={{ color: r.ok ? '#00cc88' : '#ffcc44' }}>{r.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Production tab ───────────────────────────────────────────────────────────
+
+interface ProductionTabProps {
+  buildings: HomesteadBuilding[];
+  availableCompanions: CompanionState[];
+  sendCommand: (command: string, payload?: unknown) => void;
+  storageItems: StorageItem[];
+  inventoryItems: InventoryItem[];
+}
+
+function ProductionTab({ buildings, availableCompanions, sendCommand, storageItems, inventoryItems }: ProductionTabProps) {
+  const productionBuildings = buildings.filter(b => !HOUSING_TYPES.has(b.type));
+  const constructed = productionBuildings.filter(b => b.isConstructed);
+  const underConstruction = productionBuildings.filter(b => !b.isConstructed);
+
+  if (productionBuildings.length === 0) {
+    return (
+      <div style={{ padding: '14px', color: '#888888', fontSize: '12px' }}>
+        No production buildings yet. Use <em>Build &amp; Staff Everything</em> or place buildings below.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '4px 14px 14px' }}>
+      {constructed.length > 0 && (
+        <>
+          <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '10px 0 4px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+            Completed ({constructed.length})
+          </div>
+          {constructed.map(b => (
+            <BuildingRow
+              key={b.id}
+              building={b}
+              availableCompanions={availableCompanions}
+              sendCommand={sendCommand}
+            />
+          ))}
+        </>
+      )}
+      {underConstruction.length > 0 && (
+        <>
+          <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '10px 0 4px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+            Under Construction ({underConstruction.length})
+          </div>
+          {underConstruction.map(b => (
+            <BuildingRow
+              key={b.id}
+              building={b}
+              availableCompanions={availableCompanions}
+              sendCommand={sendCommand}
+            />
+          ))}
+        </>
+      )}
+      <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '14px 0 4px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+        Place New Building
+      </div>
+      <PlaceBuildingSection
+        buildings={buildings}
+        storageItems={storageItems}
+        inventoryItems={inventoryItems}
+        sendCommand={sendCommand}
+      />
+    </div>
+  );
+}
+
+// ─── Housing tab ──────────────────────────────────────────────────────────────
+
+interface HousingTabProps {
+  buildings: HomesteadBuilding[];
+  availableCompanions: CompanionState[];
+  sendCommand: (command: string, payload?: unknown) => void;
+  storageItems: StorageItem[];
+  inventoryItems: InventoryItem[];
+}
+
+function HousingTab({ buildings, availableCompanions, sendCommand, storageItems, inventoryItems }: HousingTabProps) {
+  const huts = buildings.filter(b => HOUSING_TYPES.has(b.type));
+  const constructedHuts = huts.filter(b => b.isConstructed);
+  const hutUnderConstruction = huts.filter(b => !b.isConstructed);
+
+  const totalHoused = constructedHuts.reduce((sum, b) => sum + (b.residents?.length ?? 0), 0);
+  const totalCapacity = constructedHuts.reduce((sum, b) => sum + (b.residentCapacity ?? 0), 0);
+
+  return (
+    <div style={{ padding: '4px 14px 14px' }}>
+      {huts.length > 0 && (
+        <div style={{ fontSize: '11px', color: '#cc9966', marginBottom: '8px', marginTop: '6px' }}>
+          Total housed:{' '}
+          <span style={{ color: '#ffcc00' }}>{totalHoused}</span>
+          {' / '}
+          <span style={{ color: '#aaaaaa' }}>{totalCapacity}</span>
+          {' capacity across '}
+          <span style={{ color: '#ffcc00' }}>{constructedHuts.length}</span>
+          {' hut'}{constructedHuts.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {constructedHuts.length > 0 && (
+        <>
+          <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '6px 0 4px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+            Huts ({constructedHuts.length})
+          </div>
+          {constructedHuts.map(b => (
+            <BuildingRow
+              key={b.id}
+              building={b}
+              availableCompanions={availableCompanions}
+              sendCommand={sendCommand}
+            />
+          ))}
+        </>
+      )}
+
+      {hutUnderConstruction.length > 0 && (
+        <>
+          <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '10px 0 4px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+            Under Construction ({hutUnderConstruction.length})
+          </div>
+          {hutUnderConstruction.map(b => (
+            <BuildingRow
+              key={b.id}
+              building={b}
+              availableCompanions={availableCompanions}
+              sendCommand={sendCommand}
+            />
+          ))}
+        </>
+      )}
+
+      {huts.length === 0 && (
+        <div style={{ padding: '10px 0', color: '#888888', fontSize: '12px' }}>
+          No huts yet — build huts to house companions.
+        </div>
+      )}
+
+      <div style={{ color: '#888888', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', margin: '14px 0 4px', borderBottom: '1px solid #1a1a1a', paddingBottom: '3px' }}>
+        Build More Huts
+      </div>
+      <PlaceBuildingSection
+        buildings={buildings}
+        storageItems={storageItems}
+        inventoryItems={inventoryItems}
+        sendCommand={sendCommand}
+      />
+    </div>
+  );
+}
+
 // ─── Main CityPanel ───────────────────────────────────────────────────────────
 
 export default function CityPanel({
@@ -533,6 +924,8 @@ export default function CityPanel({
   storageItems = [],
   inventoryItems = [],
 }: Props) {
+  const [activeTab, setActiveTab] = useState<CityTab>('OVERVIEW');
+
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
     top: '50%',
@@ -543,7 +936,7 @@ export default function CityPanel({
     fontFamily: 'monospace',
     fontSize: '13px',
     color: '#00ff41',
-    width: '560px',
+    width: '580px',
     maxHeight: '85vh',
     overflowY: 'auto',
     zIndex: 100,
@@ -562,20 +955,6 @@ export default function CityPanel({
     zIndex: 1,
   };
 
-  const sectionStyle: React.CSSProperties = {
-    color: '#888888',
-    fontSize: '11px',
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-    margin: '10px 14px 4px',
-    borderBottom: '1px solid #1a1a1a',
-    paddingBottom: '3px',
-  };
-
-  const bodyStyle: React.CSSProperties = {
-    padding: '4px 14px 14px',
-  };
-
   if (!cityView) {
     return (
       <div style={panelStyle}>
@@ -590,14 +969,7 @@ export default function CityPanel({
     );
   }
 
-  const constructed = cityView.buildings.filter(b => b.isConstructed);
   const underConstruction = cityView.buildings.filter(b => !b.isConstructed);
-  // Workers = companions assigned to production buildings
-  const workerCount = cityView.buildings.filter(b => !HOUSING_TYPES.has(b.type) && b.assignedCompanionName).length;
-  // Residents = companions living in huts
-  const residentCount = cityView.buildings
-    .filter(b => HOUSING_TYPES.has(b.type))
-    .reduce((sum, b) => sum + (b.residents?.length ?? 0), 0);
 
   // Companions available for assignment:
   //   - not in the active adventuring party (use authoritative activeCompanionIds, not stale c.isActive)
@@ -614,6 +986,8 @@ export default function CityPanel({
       !assignedCompanionIds.has(c.id) &&
       !c.assignedDuty
   );
+
+  const stats = computeWorkforceStats(cityView.buildings, companionRoster, activeCompanionIds);
 
   // Auto-assign all: for each PRODUCTION building without a worker, pick best-aptitude available companion.
   // Housing buildings (Huts) are excluded — residents are assigned via BuildStaffEverything.
@@ -653,8 +1027,23 @@ export default function CityPanel({
   );
   const canAutoAssign = unassignedBuildings.length > 0 && availableCompanions.length > 0;
 
+  // Tab style helpers
+  const tabStyle = (tab: CityTab): React.CSSProperties => ({
+    background: 'none',
+    border: 'none',
+    borderBottom: activeTab === tab ? '2px solid #cc8844' : '2px solid transparent',
+    color: activeTab === tab ? '#cc8844' : '#666666',
+    fontFamily: 'monospace',
+    fontSize: '11px',
+    letterSpacing: '0.1em',
+    padding: '6px 14px 5px',
+    cursor: 'pointer',
+    transition: 'color 0.1s',
+  });
+
   return (
     <div style={panelStyle}>
+      {/* Header */}
       <div style={headerStyle}>
         <span style={{ color: '#cc8844', letterSpacing: '0.15em' }}>
           HOMESTEAD CITY — {cityView.homesteadName}
@@ -662,24 +1051,15 @@ export default function CityPanel({
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '16px' }}>✕</button>
       </div>
 
-      {/* Summary row */}
-      <div style={{ ...bodyStyle, borderBottom: '1px solid #1a1a1a', color: '#aaaaaa', fontSize: '12px', paddingTop: '8px', paddingBottom: '8px' }}>
-        <span style={{ color: '#ffcc00' }}>{cityView.constructedCount}</span> buildings complete
-        {' · '}
-        <span style={{ color: '#ff8800' }}>{underConstruction.length}</span> under construction
-        {' · '}
-        <span style={{ color: '#00ccff' }}>{workerCount}</span> working
-        {' · '}
-        <span style={{ color: '#cc9966' }}>{residentCount}</span> housed
-        {' · '}
-        <span style={{ color: availableCompanions.length > 0 ? '#00cc88' : '#555555' }}>
-          {availableCompanions.length} available
-        </span>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1a1a1a', background: '#111111', position: 'sticky', top: '41px', zIndex: 1 }}>
+        <button type="button" style={tabStyle('OVERVIEW')} onClick={() => setActiveTab('OVERVIEW')}>OVERVIEW</button>
+        <button type="button" style={tabStyle('PRODUCTION')} onClick={() => setActiveTab('PRODUCTION')}>PRODUCTION</button>
+        <button type="button" style={tabStyle('HOUSING')} onClick={() => setActiveTab('HOUSING')}>HOUSING</button>
       </div>
 
-      {/* Master action + Auto-assign all + Refresh */}
-      <div style={{ padding: '6px 14px 8px', borderBottom: '1px solid #1a1a1a', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-        {/* Build & Staff Everything — the one-click master button */}
+      {/* Action toolbar — always visible */}
+      <div style={{ padding: '6px 14px 6px', borderBottom: '1px solid #1a1a1a', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={handleBuildStaffEverything}
@@ -729,63 +1109,38 @@ export default function CityPanel({
         >
           ↻ Refresh
         </button>
-        {unassignedBuildings.length > 0 && availableCompanions.length === 0 && (
-          <span style={{ color: '#555555', fontSize: '10px' }}>
-            All companions active or on duty — deactivate one to assign
-          </span>
-        )}
+        {/* Quick status pills */}
+        <span style={{ color: '#555555', fontSize: '10px', marginLeft: 'auto' }}>
+          <span style={{ color: '#ffcc00' }}>{cityView.constructedCount}</span> built
+          {' · '}
+          <span style={{ color: underConstruction.length > 0 ? '#ff8800' : '#555555' }}>{underConstruction.length}</span> building
+          {' · '}
+          <span style={{ color: availableCompanions.length > 0 ? '#00cc88' : '#555555' }}>{availableCompanions.length}</span> idle
+        </span>
       </div>
 
-      {/* Completed buildings */}
-      {constructed.length > 0 && (
-        <>
-          <div style={sectionStyle}>Completed Buildings</div>
-          <div style={bodyStyle}>
-            {constructed.map(b => (
-              <BuildingRow
-                key={b.id}
-                building={b}
-                availableCompanions={availableCompanions}
-                sendCommand={sendCommand}
-              />
-            ))}
-          </div>
-        </>
+      {/* Tab content */}
+      {activeTab === 'OVERVIEW' && (
+        <OverviewTab stats={stats} />
       )}
-
-      {/* Under construction */}
-      {underConstruction.length > 0 && (
-        <>
-          <div style={sectionStyle}>Under Construction</div>
-          <div style={bodyStyle}>
-            {underConstruction.map(b => (
-              <BuildingRow
-                key={b.id}
-                building={b}
-                availableCompanions={availableCompanions}
-                sendCommand={sendCommand}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {cityView.buildings.length === 0 && (
-        <div style={{ padding: '14px', color: '#888888', fontSize: '12px' }}>
-          No buildings yet. Portal home [P] to seed starter buildings.
-        </div>
-      )}
-
-      {/* Place new building */}
-      <div style={sectionStyle}>Place New Building</div>
-      <div style={bodyStyle}>
-        <PlaceBuildingSection
+      {activeTab === 'PRODUCTION' && (
+        <ProductionTab
           buildings={cityView.buildings}
+          availableCompanions={availableCompanions}
+          sendCommand={sendCommand}
           storageItems={storageItems}
           inventoryItems={inventoryItems}
-          sendCommand={sendCommand}
         />
-      </div>
+      )}
+      {activeTab === 'HOUSING' && (
+        <HousingTab
+          buildings={cityView.buildings}
+          availableCompanions={availableCompanions}
+          sendCommand={sendCommand}
+          storageItems={storageItems}
+          inventoryItems={inventoryItems}
+        />
+      )}
     </div>
   );
 }
