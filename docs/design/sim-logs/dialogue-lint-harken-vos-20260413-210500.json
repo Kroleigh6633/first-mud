@@ -1,0 +1,35 @@
+{
+  "_note": "PLACEHOLDER lint output. Hand-derived. Re-run with: dotnet run --project tools/design/FirstMud.DesignTools -- dialogue-lint --fixture tools/design/fixtures/dialogue-harken-vos.json when the solution is merged into this worktree.",
+  "tool": "dialogue-lint",
+  "fixtureId": "harken-vos",
+  "nodes": {
+    "total": 14,
+    "reachable": 14,
+    "orphans": []
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "node": "greet",
+      "option": "You've seen a lot of claims, clerk. Anything strange lately?",
+      "code": "W-REP-GATE-UNREACHABLE-FROM-START",
+      "message": "Option gated by gravenguard>=1000 (Trusted) but starting reputation is 0. Ensure an off-tree path grants this reputation before this dialogue is re-entered."
+    },
+    {
+      "node": "check-in",
+      "code": "W-FLAG-GATE-NO-OFFRAMP",
+      "message": "Node requires flag 'harken.reedend.accepted'. If player loses the flag out-of-tree, check-in becomes unreachable. Consider a fallback root or a node that clears cleanly."
+    },
+    {
+      "node": "greet-low-rep",
+      "code": "W-MAX-REP-SCHEMA-UNSUPPORTED",
+      "message": "'requiresReputationMax' is not in dialogue-tree/v1. Harken's low-rep variant is authored but will not gate correctly until the schema gains a 'max' predicate. Track as schema work."
+    }
+  ],
+  "info": [
+    {
+      "code": "I-ROOT-COUNT",
+      "message": "Single root 'greet' declared; low-rep variant 'greet-low-rep' is authored but not a declared root. Lift it to roots[] or route via conditional routing once schema supports it."
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "$schema": "dialogue-tree/v1",
+  "npcId": "harken-vos",
+  "roots": ["greet"],
+  "startingReputation": { "gravenguard": 0 },
+  "nodes": [
+    {
+      "id": "greet",
+      "text": "Harken Vos peers up, parchment tilted toward his working eye. 'Rider. State your business, please. Succinctly. I am half-blind, not half-deaf, and if you mutter, you forfeit.'",
+      "options": [
+        { "text": "I have a bounty claim to file.", "next": "mission-intro" },
+        { "text": "Just passing through.", "next": "farewell-neutral" },
+        { "text": "You've seen a lot of claims, clerk. Anything strange lately?", "next": "insider-query", "requiresReputation": { "faction": "gravenguard", "min": 1000 } }
+      ]
+    },
+    {
+      "id": "mission-intro",
+      "text": "'A bounty. Good. There is, in point of fact, one the roster has been *conspicuously* unable to fill. A wayhouse burning near Reed-End. Two dead, one missing. The suspect description is — and I quote the original complainant — \"mean-looking.\" I have declined to transcribe this. I require a Rider willing to ride out, observe, and return with particulars a reasonable clerk can enter into the ledger.'",
+      "options": [
+        { "text": "I'll take it.", "next": "mission-accept" },
+        { "text": "Sounds like Gravenguard work, not mine.", "next": "mission-decline" },
+        { "text": "Why hasn't the Gravenguard handled this?", "next": "mission-why" }
+      ]
+    },
+    {
+      "id": "mission-why",
+      "text": "Harken's pen stops. 'Because, Rider, the original complainant is the Gravenguard. And the suspect description, I suspect, is a deflection. I would like a Rider's eyes on it, not a Guardsman's. That is all I shall say on that in this room.'",
+      "options": [
+        { "text": "Understood. I'll take it.", "next": "mission-accept" },
+        { "text": "Not my line. Sorry.", "next": "mission-decline" }
+      ]
+    },
+    {
+      "id": "mission-accept",
+      "text": "'Excellent. I will log this as — ' his pen hovers — ' \"Rider engaged; particulars pending.\" Return within a sevennight. If you do not, I shall be forced to record that you failed to return, and I would prefer not to write those words about you.'",
+      "options": [
+        { "text": "I'll be back.", "next": "mission-accept-close", "effects": [{ "type": "setFlag", "key": "harken.reedend.accepted" }] }
+      ]
+    },
+    {
+      "id": "mission-accept-close",
+      "text": "Harken nods, already writing. 'Safe roads, Rider. And for the record: \"irregardless\" is not a word. Do not use it in your report.'",
+      "terminal": true
+    },
+    {
+      "id": "mission-decline",
+      "text": "'I see. Very well. I shall log this exchange as — ' his pen twitches — ' \"Rider declined; particulars unpursued.\" Good day.'",
+      "terminal": true
+    },
+    {
+      "id": "check-in",
+      "text": "Harken looks up, then down again. 'The Reed-End matter. You have not yet returned particulars. I am required to ask: are you still engaged with the claim, or should I re-list?'",
+      "requiresFlag": "harken.reedend.accepted",
+      "options": [
+        { "text": "Still working on it.", "next": "check-in-continue" },
+        { "text": "I have particulars now.", "next": "turn-in" }
+      ]
+    },
+    {
+      "id": "check-in-continue",
+      "text": "'Noted. I shall leave the ledger line open. Please do not make me close it in your absence.'",
+      "terminal": true
+    },
+    {
+      "id": "turn-in",
+      "text": "Harken sets aside the claim roll and pulls a *second* ledger — unmarked, kept low in the drawer. 'Proceed. I shall determine which of these two books receives your account.'",
+      "requiresFlag": "harken.reedend.accepted",
+      "options": [
+        { "text": "The suspect was a Gravenguard footman. Varn's man.", "next": "turn-in-varn" },
+        { "text": "It was exactly who the complaint said it was.", "next": "turn-in-complaint" }
+      ]
+    },
+    {
+      "id": "turn-in-varn",
+      "text": "The unmarked ledger opens. Harken writes rapidly, left-handed, both hands shaking, only one admitting it. 'Thank you, Rider. This will be… filed appropriately. You have my gratitude and — ' he slides two silver coins across the desk — ' a modest honorarium I am not, technically, authorized to disburse. Take them anyway.'",
+      "options": [
+        { "text": "Take the coins.", "next": "turn-in-close", "effects": [{ "type": "clearFlag", "key": "harken.reedend.accepted" }, { "type": "addReputation", "key": "gravenguard", "amount": 75 }] }
+      ]
+    },
+    {
+      "id": "turn-in-complaint",
+      "text": "'Mm. Transcribed. The claim is closed.' His pen scratches once, decisively, in the *public* ledger. The unmarked ledger stays shut. 'Good day, Rider.'",
+      "options": [
+        { "text": "Good day.", "next": "turn-in-close", "effects": [{ "type": "clearFlag", "key": "harken.reedend.accepted" }, { "type": "addReputation", "key": "gravenguard", "amount": 25 }] }
+      ]
+    },
+    {
+      "id": "turn-in-close",
+      "text": "Harken blots the page. 'Safe roads.' He does not look up.",
+      "terminal": true
+    },
+    {
+      "id": "insider-query",
+      "text": "He pauses. Sets the pen down flat — the rare tell. 'Strange, Rider, is a category, not an observation. But — since you ask, and since I trust you to ask *properly* — yes. Three claims this month were filed by complainants who, upon verification, did not exist. Names correct. Seals correct. Persons: absent. I am told this is not my concern.'",
+      "options": [
+        { "text": "Whose name sealed them?", "next": "insider-seal" },
+        { "text": "Thank you. I'll keep ears open.", "next": "farewell-neutral" }
+      ]
+    },
+    {
+      "id": "insider-seal",
+      "text": "' *Varn*. Each time. I have not written that down. I am, however, saying it aloud to you, which is arguably worse. Please do not give me cause to regret it.'",
+      "terminal": true
+    },
+    {
+      "id": "farewell-neutral",
+      "text": "'Safe roads.'",
+      "terminal": true
+    },
+    {
+      "id": "greet-low-rep",
+      "text": "Harken does not look up. 'Rider. State your business. Do not use contractions; I find them, in the current climate, unreliable. I am writing.'",
+      "requiresReputationMax": { "faction": "gravenguard", "max": -1 },
+      "options": [
+        { "text": "I have a claim.", "next": "low-rep-claim" },
+        { "text": "Forget it.", "next": "farewell-neutral" }
+      ]
+    },
+    {
+      "id": "low-rep-claim",
+      "text": "'I shall transcribe what you say. I shall not vouch for it. Proceed.'",
+      "terminal": true
+    }
+  ]
+}

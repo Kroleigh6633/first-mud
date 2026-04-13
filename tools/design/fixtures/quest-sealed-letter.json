@@ -1,0 +1,252 @@
+{
+  "$schema": "quest-chain/v1",
+  "id": "sealed-letter",
+  "title": "The Sealed Letter",
+  "description": "Kesh of Reed-End intercepts the player on the Gravenmarsh Causeway with a sealed letter for Commander Solan Drest, bypassing Lieutenant Varn. The chain ends when Brother Velm translates an Ardweld funerary glyph recovered from the Lost Expedition.",
+  "startState": {
+    "player": "mid-tier-rider",
+    "flags": [],
+    "inventory": [],
+    "reputation": { "gravenguard": 100, "thornwood": 0, "caervorn": 0 }
+  },
+  "root": "intro",
+  "beats": [
+    {
+      "id": "intro",
+      "description": "On the Gravenmarsh Causeway, Kesh of Reed-End presses a sealed letter and a silver signet into the player's hand. 'Drest. Eyes only. Not Varn. Especially not Varn.'",
+      "choices": [
+        {
+          "id": "accept",
+          "text": "Take the letter and swear by the signet.",
+          "next": "gate-arrival",
+          "effects": [
+            { "type": "setFlag", "key": "sealed.accepted" },
+            { "type": "addItem", "key": "sealed-letter", "amount": 1 },
+            { "type": "addItem", "key": "silver-signet", "amount": 1 },
+            { "type": "addReputation", "key": "gravenguard", "amount": 150 }
+          ]
+        },
+        {
+          "id": "decline",
+          "text": "Refuse. 'Find another Rider.'",
+          "next": "end-decline"
+        }
+      ]
+    },
+    {
+      "id": "gate-arrival",
+      "description": "At Gravenhold's outer gate, Lieutenant Varn intercepts. 'The Commander's schedule is tight. I'll take that.' His hand is already out.",
+      "requires": { "flags": ["sealed.accepted"], "items": [{ "key": "sealed-letter", "amount": 1 }] },
+      "choices": [
+        {
+          "id": "hand-over",
+          "text": "Hand the letter to Varn.",
+          "next": "beat-2a-summons",
+          "effects": [
+            { "type": "removeItem", "key": "sealed-letter", "amount": 1 },
+            { "type": "setFlag", "key": "varn.intercepted" }
+          ]
+        },
+        {
+          "id": "refuse-varn",
+          "text": "Refuse. Push past.",
+          "next": "past-varn",
+          "effects": [
+            { "type": "setFlag", "key": "varn.antagonized" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "beat-2a-summons",
+      "description": "A day later: Kesh is found face-down in the bog. 'Exposure,' the bogmen say. Drest summons the player. Calm. Asks what was in the letter the player never delivered.",
+      "requires": { "flags": ["varn.intercepted"] },
+      "choices": [
+        {
+          "id": "confess",
+          "text": "Confess. Varn took it. You didn't know.",
+          "next": "end-confess",
+          "effects": [
+            { "type": "addReputation", "key": "gravenguard", "amount": 100 },
+            { "type": "setFlag", "key": "varn.flagged" }
+          ]
+        },
+        {
+          "id": "lie-caught",
+          "text": "Lie. Drest catches it (his intent-read assumed).",
+          "next": "end-lie-caught",
+          "effects": [
+            { "type": "addReputation", "key": "gravenguard", "amount": -400 },
+            { "type": "setFlag", "key": "gravenguard.permfloor.trusted" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "past-varn",
+      "description": "Varn does not forget. To reach Drest unaccompanied, the player must pick a method.",
+      "requires": { "flags": ["varn.antagonized"] },
+      "choices": [
+        {
+          "id": "bribe-scribe",
+          "text": "Bribe the night-scribe (gold cost).",
+          "next": "drest-reads",
+          "effects": [
+            { "type": "removeItem", "key": "gold", "amount": 25 },
+            { "type": "setFlag", "key": "scribe.bribed" }
+          ]
+        },
+        {
+          "id": "servants-stair",
+          "text": "Take the servants' stair (Thornwood-sympathetic scullery mage).",
+          "next": "drest-reads",
+          "effects": [
+            { "type": "setFlag", "key": "scullery.helped" },
+            { "type": "addReputation", "key": "thornwood", "amount": 50 }
+          ]
+        },
+        {
+          "id": "rider-privilege",
+          "text": "Invoke the Rider's once-per-arc commission privilege.",
+          "next": "drest-reads",
+          "requires": { "flags": [] },
+          "effects": [
+            { "type": "setFlag", "key": "commission.spent" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "drest-reads",
+      "description": "In Drest's private chamber the seal cracks. Drest reads. He goes very still. 'Orla saw a glyph. On a skeleton that should not have had bones.' He needs Brother Velm of Eastmile — fast.",
+      "requires": { "items": [{ "key": "sealed-letter", "amount": 1 }] },
+      "choices": [
+        {
+          "id": "accept-velm",
+          "text": "Accept the ride to Eastmile.",
+          "next": "ride-to-velm",
+          "effects": [
+            { "type": "removeItem", "key": "sealed-letter", "amount": 1 },
+            { "type": "addReputation", "key": "gravenguard", "amount": 250 },
+            { "type": "setFlag", "key": "velm.tasked" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "end-confess",
+      "description": "Drest nods once. 'You will be of use.' Varn is now a marked problem. Chain ends with Varn-treachery seed planted.",
+      "terminal": true,
+      "outcome": "partial-success-varn-seeded"
+    },
+    {
+      "id": "end-lie-caught",
+      "description": "Drest's eyes do not change. 'Go.' The Gravenguard file on the player is now permanent. Remnant chain access sealed.",
+      "terminal": true,
+      "outcome": "failure-caught-lying"
+    },
+    {
+      "id": "ride-to-velm",
+      "description": "East road. Varn (if flagged) has already dispatched two assumed-deniable footmen to a forest choke-point. Velm is at the chapel; which of him survives depends on the player.",
+      "requires": { "flags": ["velm.tasked"] },
+      "choices": [
+        {
+          "id": "fight-through-fast",
+          "text": "Ride fast, fight the ambush, reach Velm inside three days.",
+          "next": "translation-clean",
+          "effects": [
+            { "type": "setFlag", "key": "velm.retrieved.clean" }
+          ]
+        },
+        {
+          "id": "detour-safe-slow",
+          "text": "Detour via the Holt (safe but slow — five+ days).",
+          "next": "translation-tainted",
+          "effects": [
+            { "type": "setFlag", "key": "velm.retrieved.dreamwalked" }
+          ]
+        },
+        {
+          "id": "fail-ambush",
+          "text": "Take the ambush badly. Velm not retrieved.",
+          "next": "end-velm-lost",
+          "effects": [
+            { "type": "setFlag", "key": "velm.lost" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "translation-clean",
+      "description": "Velm reads the glyph at Gravenhold. He breaks down. 'This is a naming. A *funerary* naming. Something in that expedition was already dead, and someone had already un-killed it.' Drest promotes the player's access.",
+      "requires": { "flags": ["velm.retrieved.clean"] },
+      "choices": [
+        {
+          "id": "accept-promotion",
+          "text": "Accept the Gravenguard promotion.",
+          "next": "end-good",
+          "effects": [
+            { "type": "addReputation", "key": "gravenguard", "amount": 500 },
+            { "type": "setFlag", "key": "ardweld.remnant.unlocked" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "translation-tainted",
+      "description": "Velm reads the glyph, but his reading is subtly wrong. He says it's a ward-sign, not a naming. An Ashen Dream-Walker reached him during the detour. The player may or may not notice.",
+      "requires": { "flags": ["velm.retrieved.dreamwalked"] },
+      "choices": [
+        {
+          "id": "catch-the-lie",
+          "text": "Notice the lie (high Perception / Thornwood Trusted).",
+          "next": "end-tainted-caught",
+          "effects": [
+            { "type": "addReputation", "key": "gravenguard", "amount": 300 },
+            { "type": "setFlag", "key": "velm.compromised.known" }
+          ]
+        },
+        {
+          "id": "miss-the-lie",
+          "text": "Accept Velm's reading at face value.",
+          "next": "end-tainted-missed",
+          "effects": [
+            { "type": "addReputation", "key": "gravenguard", "amount": 200 },
+            { "type": "setFlag", "key": "velm.compromised.unknown" },
+            { "type": "setFlag", "key": "ashen.mid-chain.seeded" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "end-decline",
+      "description": "Kesh mutters half a sentence and walks back into the reeds. The letter finds another hand. The chain does not unlock for this player.",
+      "terminal": true,
+      "outcome": "declined"
+    },
+    {
+      "id": "end-good",
+      "description": "The Ardweld Remnant precursor is live. Drest trusts the player with the Lost Expedition's real worth. Player reputation with Gravenguard pushed toward Trusted.",
+      "terminal": true,
+      "outcome": "success"
+    },
+    {
+      "id": "end-tainted-caught",
+      "description": "Player knows Velm is compromised. Drest seals the matter quietly; Velm is placed under protective watch. Remnant precursor unlocked at +300 instead of +500.",
+      "terminal": true,
+      "outcome": "success-compromised-known"
+    },
+    {
+      "id": "end-tainted-missed",
+      "description": "Drest acts on the false reading. Ashen Court has planted a lie in Gravenguard's most trusted catalogue. Remnant chain proceeds on rotted foundations. Mid-chain Ashen reveal later.",
+      "terminal": true,
+      "outcome": "soft-failure-ashen-mole"
+    },
+    {
+      "id": "end-velm-lost",
+      "description": "Velm is killed in the ambush. Drest seals the matter. No rep loss, but Remnant access gated behind a later, harder alternate entry.",
+      "terminal": true,
+      "outcome": "failure-velm-lost"
+    }
+  ]
+}

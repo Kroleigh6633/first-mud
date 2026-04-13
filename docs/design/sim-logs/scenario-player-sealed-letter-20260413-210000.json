@@ -1,0 +1,113 @@
+{
+  "_note": "PLACEHOLDER sim-log. The DesignTools solution is in a sibling worktree (agent-ad2bd5b9) not yet merged. These entries were hand-derived from the fixture at tools/design/fixtures/quest-sealed-letter.json by the creative agent. A future run must invoke: dotnet run --project tools/design/FirstMud.DesignTools -- scenario-player --fixture tools/design/fixtures/quest-sealed-letter.json --choose <path> for each path below, and REPLACE this file with the real tool output.",
+  "tool": "scenario-player",
+  "fixtureId": "sealed-letter",
+  "runs": [
+    {
+      "label": "path-A-confess",
+      "choose": ["accept", "hand-over", "confess"],
+      "outcome": "partial-success-varn-seeded",
+      "steps": 3,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.intercepted", "varn.flagged"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 350, "thornwood": 0, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-B-lie-caught",
+      "choose": ["accept", "hand-over", "lie-caught"],
+      "outcome": "failure-caught-lying",
+      "steps": 3,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.intercepted", "gravenguard.permfloor.trusted"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": -150, "thornwood": 0, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-C-scribe-clean",
+      "choose": ["accept", "refuse-varn", "bribe-scribe", "accept-velm", "fight-through-fast", "accept-promotion"],
+      "outcome": "success",
+      "steps": 6,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.antagonized", "scribe.bribed", "velm.tasked", "velm.retrieved.clean", "ardweld.remnant.unlocked"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 900, "thornwood": 0, "caervorn": 0 },
+        "gold_spent": 25
+      }
+    },
+    {
+      "label": "path-D-scullery-clean",
+      "choose": ["accept", "refuse-varn", "servants-stair", "accept-velm", "fight-through-fast", "accept-promotion"],
+      "outcome": "success",
+      "steps": 6,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.antagonized", "scullery.helped", "velm.tasked", "velm.retrieved.clean", "ardweld.remnant.unlocked"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 900, "thornwood": 50, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-E-commission-clean",
+      "choose": ["accept", "refuse-varn", "rider-privilege", "accept-velm", "fight-through-fast", "accept-promotion"],
+      "outcome": "success",
+      "steps": 6,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.antagonized", "commission.spent", "velm.tasked", "velm.retrieved.clean", "ardweld.remnant.unlocked"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 900, "thornwood": 0, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-F-scribe-tainted-caught",
+      "choose": ["accept", "refuse-varn", "bribe-scribe", "accept-velm", "detour-safe-slow", "catch-the-lie"],
+      "outcome": "success-compromised-known",
+      "steps": 6,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.antagonized", "scribe.bribed", "velm.tasked", "velm.retrieved.dreamwalked", "velm.compromised.known"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 700, "thornwood": 0, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-G-scribe-tainted-missed",
+      "choose": ["accept", "refuse-varn", "bribe-scribe", "accept-velm", "detour-safe-slow", "miss-the-lie"],
+      "outcome": "soft-failure-ashen-mole",
+      "steps": 6,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.antagonized", "scribe.bribed", "velm.tasked", "velm.retrieved.dreamwalked", "velm.compromised.unknown", "ashen.mid-chain.seeded"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 600, "thornwood": 0, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-H-velm-lost",
+      "choose": ["accept", "refuse-varn", "servants-stair", "accept-velm", "fail-ambush"],
+      "outcome": "failure-velm-lost",
+      "steps": 5,
+      "finalState": {
+        "flags": ["sealed.accepted", "varn.antagonized", "scullery.helped", "velm.tasked", "velm.lost"],
+        "inventory": [{ "key": "silver-signet", "amount": 1 }],
+        "reputation": { "gravenguard": 400, "thornwood": 50, "caervorn": 0 }
+      }
+    },
+    {
+      "label": "path-I-decline",
+      "choose": ["decline"],
+      "outcome": "declined",
+      "steps": 1,
+      "finalState": {
+        "flags": [],
+        "inventory": [],
+        "reputation": { "gravenguard": 100, "thornwood": 0, "caervorn": 0 }
+      }
+    }
+  ],
+  "summary": {
+    "totalTerminalPaths": 9,
+    "reachedTerminals": 9,
+    "deadBranches": 0,
+    "unreachableNodes": []
+  }
+}
