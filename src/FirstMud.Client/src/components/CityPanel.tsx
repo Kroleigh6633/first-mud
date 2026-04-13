@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type {
   CityViewSnapshot,
   HomesteadBuilding,
@@ -557,7 +557,7 @@ export default function CityPanel({
   );
 
   // Auto-assign all: for each building without a worker, pick best-aptitude available companion
-  const handleAutoAssignAll = () => {
+  const handleAutoAssignAll = useCallback(() => {
     // Track which companions we've already "used" in this batch
     const usedIds = new Set<string>();
     const buildingsNeedingWorkers = cityView.buildings.filter(b => !b.assignedCompanionName);
@@ -577,7 +577,12 @@ export default function CityPanel({
         usedIds.add(best.id);
       }
     }
-  };
+  }, [cityView.buildings, availableCompanions, sendCommand]);
+
+  // One-click master action: server seeds all missing buildings then auto-staffs empty slots
+  const handleBuildStaffEverything = useCallback(() => {
+    sendCommand('buildstaffeverything', null);
+  }, [sendCommand]);
 
   const unassignedBuildings = cityView.buildings.filter(b => !b.assignedCompanionName);
   const canAutoAssign = unassignedBuildings.length > 0 && availableCompanions.length > 0;
@@ -604,8 +609,26 @@ export default function CityPanel({
         </span>
       </div>
 
-      {/* Auto-assign all + Refresh actions */}
+      {/* Master action + Auto-assign all + Refresh */}
       <div style={{ padding: '6px 14px 8px', borderBottom: '1px solid #1a1a1a', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Build & Staff Everything — the one-click master button */}
+        <button
+          type="button"
+          onClick={handleBuildStaffEverything}
+          style={{
+            background: '#1a0a00',
+            border: '1px solid #cc8844',
+            color: '#cc8844',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            padding: '4px 12px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+          }}
+          title="Seed all missing starter buildings then auto-assign the best companion to every empty slot"
+        >
+          Build &amp; Staff Everything
+        </button>
         <button
           type="button"
           onClick={handleAutoAssignAll}

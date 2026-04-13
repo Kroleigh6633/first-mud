@@ -285,6 +285,8 @@ public class GameHub : Hub
 
             "viewcity" => new ViewCityCommand(playerId),
 
+            "buildstaffeverything" => new BuildStaffEverythingCommand(playerId),
+
             _ => null
         };
     }

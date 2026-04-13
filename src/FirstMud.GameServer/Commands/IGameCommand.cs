@@ -51,7 +51,10 @@ public record InteractQuestCommand(Guid PlayerId, string QuestId) : IGameCommand
 public record ExpandStorageCommand(Guid PlayerId) : IGameCommand;
 public record SmeltCommand(Guid PlayerId, int Amount) : IGameCommand;
 public record ToggleCompanionAutoRotateCommand(Guid PlayerId) : IGameCommand;
+/// <summary>Place a building. Omit GridX/GridY (or pass AutoPositionSentinel) to let the server pick the position.</summary>
 public record PlaceBuildingCommand(Guid PlayerId, string BuildingType, int GridX, int GridY) : IGameCommand;
 public record AssignBuilderCommand(Guid PlayerId, Guid CompanionId, Guid BuildingId) : IGameCommand;
 public record UnassignBuilderCommand(Guid PlayerId, Guid BuildingId) : IGameCommand;
 public record ViewCityCommand(Guid PlayerId) : IGameCommand;
+/// <summary>One-click: seed all missing starter buildings then auto-staff every empty slot.</summary>
+public record BuildStaffEverythingCommand(Guid PlayerId) : IGameCommand;

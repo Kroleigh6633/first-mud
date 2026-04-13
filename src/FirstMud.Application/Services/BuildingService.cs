@@ -108,8 +108,13 @@ public class BuildingService
     /// <summary>
     /// Places a new building plot on the homestead grid.
     /// Does not consume materials — caller should verify storage first.
+    /// When gridX/gridY are both the sentinel value <c>AutoPositionSentinel</c>, the server
+    /// automatically picks the next available spiral position so the client never needs to
+    /// specify coordinates.
     /// Returns (success, message, building?).
     /// </summary>
+    public const int AutoPositionSentinel = -999;
+
     public async Task<(bool Success, string Message, HomesteadBuilding? Building)> PlaceBuildingAsync(
         Guid playerId,
         BuildingType buildingType,
@@ -121,10 +126,22 @@ public class BuildingService
         if (homestead is null)
             return (false, "No homestead found.", null);
 
-        // Prevent duplicate placement at same grid position
         var existing = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
-        if (existing.Any(b => b.GridX == gridX && b.GridY == gridY))
-            return (false, $"Position ({gridX},{gridY}) is already occupied.", null);
+
+        // Auto-pick position when client sends sentinel or (0,0) is already occupied
+        if (gridX == AutoPositionSentinel && gridY == AutoPositionSentinel)
+        {
+            var pos = NextSpiralPosition(existing);
+            gridX = pos.gx;
+            gridY = pos.gy;
+        }
+        else if (existing.Any(b => b.GridX == gridX && b.GridY == gridY))
+        {
+            // Specific position requested but occupied — fall back to auto
+            var pos = NextSpiralPosition(existing);
+            gridX = pos.gx;
+            gridY = pos.gy;
+        }
 
         var building = HomesteadBuilding.Create(homestead.Id, buildingType, gridX, gridY);
         await _buildings.AddAsync(building, ct);
@@ -135,12 +152,15 @@ public class BuildingService
 
     /// <summary>
     /// Assigns a companion as builder on a building under construction.
-    /// The companion must not be actively adventuring.
+    /// The companion must not be in the player's active adventuring party.
+    /// Pass <paramref name="playerActiveCompanionIds"/> (from <c>player.ActiveCompanionIds</c>)
+    /// as the authoritative active list — avoids relying on the stale <c>IsActive</c> boolean.
     /// </summary>
     public async Task<(bool Success, string Message)> AssignBuilderAsync(
         Guid playerId,
         Guid companionId,
         Guid buildingId,
+        IReadOnlyList<Guid>? playerActiveCompanionIds = null,
         CancellationToken ct = default)
     {
         var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
@@ -152,25 +172,33 @@ public class BuildingService
             return (false, "Building not found.");
         if (building.HomesteadId != homestead.Id)
             return (false, "That building does not belong to your homestead.");
-        if (building.IsConstructed)
-            return (false, "That building is already complete.");
 
         var companion = await _companions.GetByIdAsync(companionId, ct);
         if (companion is null)
             return (false, "Companion not found.");
         if (companion.OwnerId != playerId)
             return (false, "That companion does not belong to you.");
-        if (companion.IsActive)
+
+        // Use the authoritative ActiveCompanionIds list when provided; fall back to IsActive flag
+        bool isActivelyAdventuring = playerActiveCompanionIds is not null
+            ? playerActiveCompanionIds.Contains(companionId)
+            : companion.IsActive;
+
+        if (isActivelyAdventuring)
             return (false, $"{companion.Name} is currently adventuring — deactivate them first.");
 
-        // Assign the companion to Builder duty on homestead
-        companion.AssignToHomestead(HomesteadDuty.Crafter); // Builder uses Crafter duty
+        // Determine duty: buildings under construction use Crafter; completed buildings use their proper duty
+        var duty = building.IsConstructed
+            ? (BuildingDuty.TryGetValue(building.Type, out var d) ? d : HomesteadDuty.Crafter)
+            : HomesteadDuty.Crafter;
+
+        companion.AssignToHomestead(duty);
         building.AssignCompanion(companionId);
 
         await _companions.UpdateAsync(companion, ct);
         await _buildings.UpdateAsync(building, ct);
 
-        return (true, $"{companion.Name} assigned to build {building.Type}.");
+        return (true, $"{companion.Name} assigned to {building.Type}.");
     }
 
     /// <summary>
@@ -244,39 +272,61 @@ public class BuildingService
     }
 
     /// <summary>
-    /// Seeds a full starter village for a new homestead on first visit.
-    /// Places core infrastructure (5 complete + 3 under construction) plus
-    /// 10 Huts for initial companion housing.
-    /// Only runs if no buildings exist yet.
+    /// Seeds (or fills in missing) starter village buildings for a homestead.
+    /// Uses an UPSERT pattern — checks which buildings already exist by type+position
+    /// and only adds the missing ones.  Safe to call repeatedly; never duplicates.
+    /// Places core infrastructure (5 complete + 3 under construction) plus 10 Huts.
+    /// Returns the number of buildings actually added.
     /// </summary>
-    public async Task SeedStarterBuildingsAsync(Guid homesteadId, CancellationToken ct = default)
+    public async Task<int> SeedStarterBuildingsAsync(Guid homesteadId, CancellationToken ct = default)
     {
         var existing = await _buildings.GetByHomesteadIdAsync(homesteadId, ct);
-        if (existing.Count > 0) return; // already seeded
 
-        // Place the core starter buildings (some constructed, some at 50%)
+        // Index existing buildings by their canonical grid position so we can skip them
+        var occupiedPositions = existing
+            .Select(b => (b.GridX, b.GridY))
+            .ToHashSet();
+
+        int added = 0;
+
+        // Place the core starter buildings (some constructed, some at 50%) — skip any already present
         foreach (var (type, gx, gy, built, progress) in StarterBuildings)
         {
+            if (occupiedPositions.Contains((gx, gy)))
+                continue;
+
             var building = HomesteadBuilding.Create(homesteadId, type, gx, gy, tier: 1, alreadyConstructed: built);
             if (!built && progress > 0)
                 building.AdvanceConstruction(progress);
             await _buildings.AddAsync(building, ct);
+            occupiedPositions.Add((gx, gy));
+            added++;
         }
 
-        // Seed 10 Huts (fully constructed) to house up to 30 companions initially.
-        // Players with larger rosters will see a prompt to build more via the City panel.
+        // Seed up to 10 Huts — skip positions already occupied
         int hutCount = 0;
         foreach (var (gx, gy) in HutRingPositions)
         {
             if (hutCount >= 10) break;
+            if (occupiedPositions.Contains((gx, gy)))
+            {
+                hutCount++;
+                continue;
+            }
+
             var hut = HomesteadBuilding.Create(homesteadId, BuildingType.Hut, gx, gy, tier: 1, alreadyConstructed: true);
             await _buildings.AddAsync(hut, ct);
+            occupiedPositions.Add((gx, gy));
             hutCount++;
+            added++;
         }
 
-        _logger.LogInformation(
-            "Seeded {Total} starter buildings (8 core + {Huts} huts) for homestead {HomesteadId}.",
-            StarterBuildings.Length + hutCount, hutCount, homesteadId);
+        if (added > 0)
+            _logger.LogInformation(
+                "Seeded {Added} missing starter buildings for homestead {HomesteadId} (total now: {Total}).",
+                added, homesteadId, existing.Count + added);
+
+        return added;
     }
 
     /// <summary>
@@ -321,6 +371,67 @@ public class BuildingService
         return results;
     }
 
+    /// <summary>
+    /// Master one-click operation: seeds all missing starter buildings then auto-assigns the
+    /// best-fit idle companion to every building that has no worker.
+    /// Returns a summary of what was done.
+    /// </summary>
+    public async Task<(int BuildingsAdded, int CompanionsAssigned, string Summary)> BuildStaffEverythingAsync(
+        Guid playerId,
+        IReadOnlyList<Guid>? playerActiveCompanionIds = null,
+        CancellationToken ct = default)
+    {
+        var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+        if (homestead is null)
+            return (0, 0, "No homestead found.");
+
+        // Step 1 — seed missing buildings
+        int added = await SeedStarterBuildingsAsync(homestead.Id, ct);
+
+        // Step 2 — reload buildings after potential seed
+        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        var companions = await _companions.GetByOwnerAsync(playerId, ct);
+
+        var activeIds = playerActiveCompanionIds ?? [];
+
+        // Available = not adventuring (checked against authoritative list), not already on duty
+        var available = companions
+            .Where(c => !c.IsPermanentlyGone
+                     && !activeIds.Contains(c.Id)
+                     && !c.AssignedDuty.HasValue)
+            .ToList();
+
+        int assigned = 0;
+        foreach (var building in buildings.Where(b => !b.AssignedCompanionId.HasValue))
+        {
+            if (available.Count == 0) break;
+
+            var duty = building.IsConstructed
+                ? (BuildingDuty.TryGetValue(building.Type, out var d) ? d : HomesteadDuty.Crafter)
+                : HomesteadDuty.Crafter;
+
+            var best = available
+                .OrderByDescending(c => c.GetAptitude(duty))
+                .ThenByDescending(c => c.Level)
+                .First();
+
+            best.AssignToHomestead(duty);
+            building.AssignCompanion(best.Id);
+
+            await _companions.UpdateAsync(best, ct);
+            await _buildings.UpdateAsync(building, ct);
+
+            available.Remove(best);
+            assigned++;
+        }
+
+        var summary = $"Placed {added} building(s), assigned {assigned} worker(s).";
+        _logger.LogInformation(
+            "BuildStaffEverything for player {PlayerId}: {Summary}", playerId, summary);
+
+        return (added, assigned, summary);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<Guid> GetHomesteadOwnerAsync(Guid homesteadId, CancellationToken ct)
@@ -360,6 +471,29 @@ public class BuildingService
 
     // Cache built during a single service scope lifetime.
     private readonly Dictionary<Guid, Guid> _homesteadOwnerCache = [];
+
+    /// <summary>
+    /// Returns the first unoccupied grid cell by scanning outward from (0,0) in a spiral.
+    /// </summary>
+    private static (int gx, int gy) NextSpiralPosition(IReadOnlyList<HomesteadBuilding> existing)
+    {
+        var occupied = existing.Select(b => (b.GridX, b.GridY)).ToHashSet();
+        for (int r = 0; r <= 20; r++)
+        {
+            for (int x = -r; x <= r; x++)
+            {
+                for (int y = -r; y <= r; y++)
+                {
+                    if (Math.Abs(x) == r || Math.Abs(y) == r)
+                    {
+                        if (!occupied.Contains((x, y)))
+                            return (x, y);
+                    }
+                }
+            }
+        }
+        return (0, 0); // fallback — should never be reached for reasonable grid sizes
+    }
 
     /// <summary>
     /// Populates the homestead→player cache so TickConstructionAsync can emit
