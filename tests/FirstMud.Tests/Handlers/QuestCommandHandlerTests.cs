@@ -61,7 +61,7 @@ public class QuestCommandHandlerTests
     {
         var questGraph = Substitute.For<IQuestGraphRepository>();
         var players = Substitute.For<IPlayerRepository>();
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var questService = new QuestService(questGraph, reputationSvc, players);
         return (questService, questGraph, players);
     }
@@ -85,7 +85,7 @@ public class QuestCommandHandlerTests
         questGraph.IsQuestAvailableAsync(player.Id, quest.QuestId, Arg.Any<CancellationToken>()).Returns(true);
         questGraph.GetQuestAsync(quest.QuestId, Arg.Any<CancellationToken>()).Returns(quest);
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
 
         // Act
         var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, quest.QuestId), CancellationToken.None);
@@ -112,7 +112,7 @@ public class QuestCommandHandlerTests
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
         questGraph.IsQuestAvailableAsync(player.Id, "q_locked", Arg.Any<CancellationToken>()).Returns(false);
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
 
         // Act
         var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, "q_locked"), CancellationToken.None);
@@ -139,7 +139,7 @@ public class QuestCommandHandlerTests
         // Quest already taken → not available to accept again
         questGraph.IsQuestAvailableAsync(player.Id, questId, Arg.Any<CancellationToken>()).Returns(false);
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
 
         // Act
         var result = await handler.HandleAsync(new AcceptQuestCommand(player.Id, questId), CancellationToken.None);
@@ -281,7 +281,7 @@ public class QuestCommandHandlerTests
         questGraph.GetUnlockedByCompletionAsync(quest.QuestId, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new List<QuestNode>().AsReadOnly());
 
-        var reputationSvc = new ReputationService(players);
+        var reputationSvc = new ReputationService(players, TestContent.Shared);
         var questService = new QuestService(questGraph, reputationSvc, players);
         var handler = new CompleteQuestCommandHandler(players, questService, hub);
 
@@ -332,7 +332,7 @@ public class QuestCommandHandlerTests
             questGraph.GetQuestAsync(id, Arg.Any<CancellationToken>()).Returns(node);
         }
 
-        var handler = new AcceptQuestCommandHandler(players, questGraph, hub);
+        var handler = new AcceptQuestCommandHandler(players, questGraph, TestContent.Shared, hub);
 
         // Act — accept all 5 in sequence
         var results = new List<CommandResult>();

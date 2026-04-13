@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
@@ -14,37 +15,38 @@ namespace FirstMud.GameServer.Handlers;
 public class AcceptQuestCommandHandler(
     IPlayerRepository playerRepository,
     IQuestGraphRepository questGraphRepository,
+    IContentProvider content,
     IHubContext<GameHub> hubContext) : ICommandHandler<AcceptQuestCommand>
 {
-    // Zone centre coordinates matching ZoneGridLayout.cs (also in biome.ts)
-    private static readonly Dictionary<FactionId, (int x, int y, string desc)> FactionWaypoints = new()
+    // Faction waypoints are now authored in content/factions.json; the old
+    // hardcoded FactionWaypoints dictionary lived here and has been removed.
+
+    private (int x, int y, string desc) GetFactionWaypoint(FactionId factionId)
     {
-        [FactionId.HouseCaervorn]    = (8,  3,  "Caervorn Highlands"),
-        [FactionId.ThornwoodCovens]  = (13, 5,  "The Thornwood"),
-        [FactionId.EmeraldCompact]   = (24, 13, "Portmere (Compact)"),
-        [FactionId.Gravenguard]      = (28, 9,  "Gravenmarsh area"),
-        [FactionId.Fairgean]         = (32, 15, "The Drowned Coast"),
-        [FactionId.AshenCourt]       = (34, 4,  "The Ashen Reach"),
-        [FactionId.Golvari]          = (36, 18, "The Maw Borderlands"),
-    };
+        var def = content.GetFaction(factionId);
+        if (def?.Waypoint is null)
+            return (20, 10, "Starting Road");
+        return (def.Waypoint.X, def.Waypoint.Y, def.HqDisplayName ?? def.DisplayName);
+    }
 
     /// <summary>
     /// Determines a target waypoint from the quest description and faction.
     /// Gather/kill quests near dangerous zones use the danger zone; delivery quests
     /// use the destination faction; all others fall back to the quest faction HQ.
     /// </summary>
-    private static (int x, int y, string desc) ResolveWaypoint(string title, string description, FactionId factionId)
+    private (int x, int y, string desc) ResolveWaypoint(string title, string description, FactionId factionId)
     {
         var lower = (title + " " + description).ToLowerInvariant();
 
         // Delivery quest: target destination based on description keyword
         if (lower.Contains("deliver") || lower.Contains("package") || lower.Contains("message"))
         {
-            // Try to find a zone name mentioned in the description
-            foreach (var (fid, waypoint) in FactionWaypoints)
+            foreach (var def in content.AllFactions())
             {
-                if (fid != factionId && lower.Contains(waypoint.desc.ToLowerInvariant()))
-                    return waypoint;
+                if (def.Id == factionId || def.Waypoint is null) continue;
+                var descText = def.HqDisplayName ?? def.DisplayName;
+                if (lower.Contains(descText.ToLowerInvariant()))
+                    return (def.Waypoint.X, def.Waypoint.Y, descText);
             }
         }
 
@@ -52,28 +54,26 @@ public class AcceptQuestCommandHandler(
         if (lower.Contains("kill") || lower.Contains("slay") || lower.Contains("defeat") || lower.Contains("bandit") || lower.Contains("ruin"))
         {
             if (lower.Contains("maw") || lower.Contains("borderland") || lower.Contains("wyrd"))
-                return FactionWaypoints[FactionId.Golvari];
+                return GetFactionWaypoint(FactionId.Golvari);
             if (lower.Contains("coast") || lower.Contains("drowned") || lower.Contains("shore"))
-                return FactionWaypoints[FactionId.Fairgean];
+                return GetFactionWaypoint(FactionId.Fairgean);
             if (lower.Contains("thornwood") || lower.Contains("forest"))
-                return FactionWaypoints[FactionId.ThornwoodCovens];
+                return GetFactionWaypoint(FactionId.ThornwoodCovens);
             if (lower.Contains("ashen") || lower.Contains("desert") || lower.Contains("reach"))
-                return FactionWaypoints[FactionId.AshenCourt];
+                return GetFactionWaypoint(FactionId.AshenCourt);
         }
 
         // Gather quest: point toward the resource zone
         if (lower.Contains("gather") || lower.Contains("collect") || lower.Contains("find") || lower.Contains("bring"))
         {
             if (lower.Contains("highland") || lower.Contains("stone") || lower.Contains("ore"))
-                return FactionWaypoints[FactionId.HouseCaervorn];
+                return GetFactionWaypoint(FactionId.HouseCaervorn);
             if (lower.Contains("herb") || lower.Contains("root") || lower.Contains("wood") || lower.Contains("forest"))
-                return FactionWaypoints[FactionId.ThornwoodCovens];
+                return GetFactionWaypoint(FactionId.ThornwoodCovens);
         }
 
         // Default: faction HQ
-        return FactionWaypoints.TryGetValue(factionId, out var fallback)
-            ? fallback
-            : (20, 10, "Starting Road");
+        return GetFactionWaypoint(factionId);
     }
 
     public async Task<CommandResult> HandleAsync(AcceptQuestCommand cmd, CancellationToken ct)

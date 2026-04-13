@@ -65,12 +65,17 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<string, ZoneDefinition> _zonesById = new(StringComparer.Ordinal);
     private Dictionary<string, ZoneDefinition> _zonesByName = new(StringComparer.Ordinal);
     private Dictionary<(WorldId, int), ZoneDefinition> _zonesByWorldNumber = new();
+    private IReadOnlyList<FactionDefinition> _factions = Array.Empty<FactionDefinition>();
+    private Dictionary<FactionId, FactionDefinition> _factionsById = new();
 
     private static readonly HashSet<string> ValidBiomeNames = new(StringComparer.Ordinal)
     {
         "mountain", "forest", "plains", "swamp", "water", "desert", "wyrd",
         "sand", "path", "grassland", "denseForest", "snowMountain"
     };
+
+    private static readonly HashSet<string> ValidFactionIdNames =
+        new(Enum.GetNames<FactionId>(), StringComparer.Ordinal);
 
     public ContentProvider(string contentRoot, ILogger<ContentProvider>? logger = null)
     {
@@ -182,6 +187,11 @@ public sealed class ContentProvider : IContentProvider
             ? (def.Layout.X, def.Layout.Y)
             : null;
 
+    public IReadOnlyList<FactionDefinition> AllFactions() => _factions;
+
+    public FactionDefinition? GetFaction(FactionId id) =>
+        _factionsById.TryGetValue(id, out var def) ? def : null;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -199,14 +209,18 @@ public sealed class ContentProvider : IContentProvider
         _zonesById = _zones.ToDictionary(z => z.ZoneId, StringComparer.Ordinal);
         _zonesByName = _zones.ToDictionary(z => z.Name, StringComparer.Ordinal);
         _zonesByWorldNumber = _zones.ToDictionary(z => (z.World, z.ZoneNumber));
+        // Factions load AFTER zones so cross-ref validation (hqZoneId /
+        // waypointZoneIds) can run against the authored zones registry.
+        _factions = LoadFactions();
+        _factionsById = _factions.ToDictionary(f => f.Id);
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
         ContentAccessor.Publish(this);
 
         _logger?.LogInformation(
-            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones from {Root}",
-            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _contentRoot);
+            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions from {Root}",
+            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _contentRoot);
     }
 
     private IReadOnlyList<ZoneDefinition> LoadZones()
@@ -353,6 +367,190 @@ public sealed class ContentProvider : IContentProvider
             return null;
         }
     }
+
+    private IReadOnlyList<FactionDefinition> LoadFactions()
+    {
+        var path = Path.Combine(_contentRoot, "factions.json");
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"Required content file not found: {path}", path);
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<FactionsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Factions is null || doc.Factions.Count == 0)
+            throw new InvalidDataException($"{path}: no factions defined.");
+
+        // Optional cross-ref: if zones.json is present, validate hqZoneId and
+        // waypointZoneIds against the authored zone ids. When zones.json is
+        // absent (earlier on the migration chain) this check is skipped —
+        // factions still load, they just aren't zone-validated.
+        HashSet<string>? knownZoneIds = TryLoadKnownZoneIds();
+
+        var list = new List<FactionDefinition>(doc.Factions.Count);
+        var seenIds = new HashSet<FactionId>();
+        // First pass: parse + structural validation so we can validate
+        // hostileTo cross-refs against the full id set in a second pass.
+        var raws = new List<(FactionDefinition def, IReadOnlyList<string> hostileRaw)>(doc.Factions.Count);
+
+        foreach (var raw in doc.Factions)
+        {
+            if (string.IsNullOrWhiteSpace(raw.Id) || !ValidFactionIdNames.Contains(raw.Id))
+                throw new InvalidDataException(
+                    $"{path}: faction has invalid or missing id '{raw.Id}'. Must match a FactionId enum name.");
+            var id = Enum.Parse<FactionId>(raw.Id);
+            if (!seenIds.Add(id))
+                throw new InvalidDataException($"{path}: duplicate faction id '{raw.Id}'.");
+
+            if (string.IsNullOrWhiteSpace(raw.DisplayName))
+                throw new InvalidDataException($"{path}: faction '{raw.Id}' missing displayName.");
+            if (string.IsNullOrWhiteSpace(raw.Description))
+                throw new InvalidDataException($"{path}: faction '{raw.Id}' missing description.");
+            if (string.IsNullOrWhiteSpace(raw.HqZoneId))
+                throw new InvalidDataException($"{path}: faction '{raw.Id}' missing hqZoneId.");
+
+            if (knownZoneIds is not null && !knownZoneIds.Contains(raw.HqZoneId))
+                throw new InvalidDataException(
+                    $"{path}: faction '{raw.Id}' hqZoneId '{raw.HqZoneId}' is not a known zoneId.");
+
+            if (raw.WaypointZoneIds is null || raw.WaypointZoneIds.Count == 0)
+                throw new InvalidDataException(
+                    $"{path}: faction '{raw.Id}' must declare at least one waypointZoneId.");
+
+            foreach (var wpZone in raw.WaypointZoneIds)
+            {
+                if (string.IsNullOrWhiteSpace(wpZone))
+                    throw new InvalidDataException(
+                        $"{path}: faction '{raw.Id}' has empty waypointZoneId entry.");
+                if (knownZoneIds is not null && !knownZoneIds.Contains(wpZone))
+                    throw new InvalidDataException(
+                        $"{path}: faction '{raw.Id}' waypointZoneId '{wpZone}' is not a known zoneId.");
+            }
+
+            FactionWaypoint? waypoint = null;
+            if (raw.Waypoint is not null)
+            {
+                if (raw.Waypoint.X < 0 || raw.Waypoint.Y < 0)
+                    throw new InvalidDataException(
+                        $"{path}: faction '{raw.Id}' waypoint coords must be >= 0.");
+                waypoint = new FactionWaypoint(raw.Waypoint.X, raw.Waypoint.Y);
+            }
+
+            IReadOnlyList<string> hostileRaw = raw.HostileTo is null
+                ? Array.Empty<string>()
+                : raw.HostileTo;
+
+            var def = new FactionDefinition(
+                Id: id,
+                DisplayName: raw.DisplayName,
+                Description: raw.Description,
+                HqZoneId: raw.HqZoneId,
+                HqDisplayName: string.IsNullOrWhiteSpace(raw.HqDisplayName) ? null : raw.HqDisplayName,
+                HostileTo: Array.Empty<FactionId>(), // filled in pass 2
+                StartingReputation: raw.StartingReputation,
+                Hidden: raw.Hidden,
+                WaypointZoneIds: raw.WaypointZoneIds.ToList(),
+                Waypoint: waypoint);
+
+            raws.Add((def, hostileRaw));
+            list.Add(def);
+        }
+
+        // Enum-completeness check: every FactionId must have a definition
+        // unless we explicitly add an opt-out in the future. Catches the
+        // "added a new faction to the enum and forgot to author it" bug.
+        foreach (FactionId expected in Enum.GetValues<FactionId>())
+        {
+            if (!seenIds.Contains(expected))
+                throw new InvalidDataException(
+                    $"{path}: FactionId.{expected} has no entry in factions.json.");
+        }
+
+        // Second pass: resolve hostileTo cross-refs now that the full id set
+        // is known. Rebuild the FactionDefinition with the populated list.
+        var finalList = new List<FactionDefinition>(list.Count);
+        foreach (var (def, hostileRaw) in raws)
+        {
+            var hostileIds = new List<FactionId>(hostileRaw.Count);
+            var seenHostile = new HashSet<FactionId>();
+            foreach (var h in hostileRaw)
+            {
+                if (string.IsNullOrWhiteSpace(h) || !ValidFactionIdNames.Contains(h))
+                    throw new InvalidDataException(
+                        $"{path}: faction '{def.Id}' hostileTo entry '{h}' is not a valid FactionId.");
+                var hid = Enum.Parse<FactionId>(h);
+                if (hid == def.Id)
+                    throw new InvalidDataException(
+                        $"{path}: faction '{def.Id}' cannot be hostile to itself.");
+                if (!seenHostile.Add(hid))
+                    throw new InvalidDataException(
+                        $"{path}: faction '{def.Id}' has duplicate hostileTo entry '{h}'.");
+                hostileIds.Add(hid);
+            }
+            finalList.Add(def with { HostileTo = hostileIds });
+        }
+
+        return finalList;
+    }
+
+    /// <summary>
+    /// Returns the set of zone ids from <c>zones.json</c> if the file exists
+    /// at the content root, else null. Lets faction validation cross-check
+    /// hqZoneId / waypointZoneIds without hard-requiring zones.json on bases
+    /// where the zones migration hasn't landed yet.
+    /// </summary>
+    private HashSet<string>? TryLoadKnownZoneIds()
+    {
+        var path = Path.Combine(_contentRoot, "zones.json");
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var doc = JsonDocument.Parse(stream);
+            if (!doc.RootElement.TryGetProperty("zones", out var zonesEl) ||
+                zonesEl.ValueKind != JsonValueKind.Array)
+                return null;
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var z in zonesEl.EnumerateArray())
+            {
+                if (z.TryGetProperty("zoneId", out var zid) &&
+                    zid.ValueKind == JsonValueKind.String)
+                {
+                    var s = zid.GetString();
+                    if (!string.IsNullOrWhiteSpace(s)) ids.Add(s!);
+                }
+            }
+            return ids.Count == 0 ? null : ids;
+        }
+        catch
+        {
+            // Malformed zones.json is a zone-migration concern; don't block
+            // faction loading on it.
+            return null;
+        }
+    }
+
+    private sealed record FactionsFile(
+        [property: JsonPropertyName("factions")] List<FactionRaw>? Factions);
+
+    private sealed record FactionRaw(
+        [property: JsonPropertyName("id")] string? Id,
+        [property: JsonPropertyName("displayName")] string? DisplayName,
+        [property: JsonPropertyName("description")] string? Description,
+        [property: JsonPropertyName("hqZoneId")] string? HqZoneId,
+        [property: JsonPropertyName("hqDisplayName")] string? HqDisplayName,
+        [property: JsonPropertyName("hostileTo")] List<string>? HostileTo,
+        [property: JsonPropertyName("startingReputation")] int StartingReputation,
+        [property: JsonPropertyName("hidden")] bool Hidden,
+        [property: JsonPropertyName("waypointZoneIds")] List<string>? WaypointZoneIds,
+        [property: JsonPropertyName("waypoint")] FactionWaypointRaw? Waypoint);
+
+    private sealed record FactionWaypointRaw(
+        [property: JsonPropertyName("x")] int X,
+        [property: JsonPropertyName("y")] int Y);
 
     private IReadOnlyList<RecipeDefinition> LoadRecipes()
     {

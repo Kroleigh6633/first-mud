@@ -1,0 +1,89 @@
+{
+  "$schema": "./schemas/factions.schema.json",
+  "factions": [
+    {
+      "id": "HouseCaervorn",
+      "displayName": "House Caervorn",
+      "description": "Highland kingdom. Old noble blood, militaristic, actively hostile to magic.",
+      "hqZoneId": "aeldran-1-caervorn-highlands",
+      "hqDisplayName": "Caervorn Highlands",
+      "hostileTo": ["ThornwoodCovens"],
+      "startingReputation": 0,
+      "hidden": false,
+      "waypointZoneIds": ["aeldran-1-caervorn-highlands"],
+      "waypoint": { "x": 8, "y": 3 }
+    },
+    {
+      "id": "ThornwoodCovens",
+      "displayName": "The Thornwood Covens",
+      "description": "Matriarchal mage collective. Keepers of the Rootweave.",
+      "hqZoneId": "aeldran-2-thornwood",
+      "hqDisplayName": "The Thornwood",
+      "hostileTo": ["HouseCaervorn"],
+      "startingReputation": 0,
+      "hidden": false,
+      "waypointZoneIds": ["aeldran-2-thornwood"],
+      "waypoint": { "x": 13, "y": 5 }
+    },
+    {
+      "id": "EmeraldCompact",
+      "displayName": "The Emerald Compact",
+      "description": "Merchant confederation of the three free cities along the southern coast.",
+      "hqZoneId": "aeldran-3-portmere",
+      "hqDisplayName": "Portmere (Compact)",
+      "hostileTo": ["Fairgean"],
+      "startingReputation": 0,
+      "hidden": false,
+      "waypointZoneIds": ["aeldran-3-portmere"],
+      "waypoint": { "x": 24, "y": 13 }
+    },
+    {
+      "id": "Gravenguard",
+      "displayName": "The Gravenguard",
+      "description": "Ardweld artifact hunters. Military-scholarly order based out of Gravenhold.",
+      "hqZoneId": "aeldran-4-gravenmarsh",
+      "hqDisplayName": "Gravenmarsh area",
+      "hostileTo": ["Golvari"],
+      "startingReputation": 0,
+      "hidden": false,
+      "waypointZoneIds": ["aeldran-4-gravenmarsh"],
+      "waypoint": { "x": 28, "y": 9 }
+    },
+    {
+      "id": "Fairgean",
+      "displayName": "The Fairgean",
+      "description": "Sea-folk, amphibious, two-hundred-year grievance with surface dwellers.",
+      "hqZoneId": "aeldran-5-drowned-coast",
+      "hqDisplayName": "The Drowned Coast",
+      "hostileTo": ["EmeraldCompact"],
+      "startingReputation": -500,
+      "hidden": false,
+      "waypointZoneIds": ["aeldran-5-drowned-coast"],
+      "waypoint": { "x": 32, "y": 15 }
+    },
+    {
+      "id": "Golvari",
+      "displayName": "The Golvari",
+      "description": "Goblinoid nation of the Maw and the Deeps — civilization, not monsters.",
+      "hqZoneId": "aeldran-9-maw-borderlands",
+      "hqDisplayName": "The Maw Borderlands",
+      "hostileTo": ["Gravenguard"],
+      "startingReputation": 0,
+      "hidden": false,
+      "waypointZoneIds": ["aeldran-9-maw-borderlands"],
+      "waypoint": { "x": 36, "y": 18 }
+    },
+    {
+      "id": "AshenCourt",
+      "displayName": "The Ashen Court",
+      "description": "Aether-corrupted former nobility. Antagonist faction. At war with everyone, eventually.",
+      "hqZoneId": "aeldran-6-ashen-reach",
+      "hqDisplayName": "The Ashen Reach",
+      "hostileTo": [],
+      "startingReputation": 0,
+      "hidden": true,
+      "waypointZoneIds": ["aeldran-6-ashen-reach"],
+      "waypoint": { "x": 34, "y": 4 }
+    }
+  ]
+}

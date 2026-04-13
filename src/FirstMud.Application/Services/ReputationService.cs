@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 
@@ -6,21 +7,28 @@ namespace FirstMud.Application.Services;
 public class ReputationService
 {
     private readonly IPlayerRepository _players;
+    private readonly IContentProvider _content;
 
-    // Faction tension multipliers (opposing faction -> delta multiplier)
-    private static readonly Dictionary<(FactionId, FactionId), float> TensionPairs = new()
-    {
-        [(FactionId.ThornwoodCovens, FactionId.HouseCaervorn)] = -0.5f,
-        [(FactionId.HouseCaervorn, FactionId.ThornwoodCovens)] = -0.5f,
-        [(FactionId.Golvari, FactionId.Gravenguard)] = -0.4f,
-        [(FactionId.Gravenguard, FactionId.Golvari)] = -0.4f,
-        [(FactionId.Fairgean, FactionId.EmeraldCompact)] = -0.2f,
-        [(FactionId.EmeraldCompact, FactionId.Fairgean)] = -0.2f,
-    };
+    // Canonical faction-hostility data now lives in content/factions.json
+    // (FactionDefinition.HostileTo). The numeric tension multipliers that
+    // drive cross-faction reputation knock-on remain in
+    // Player.ApplyFactionTensions for now — see content-factions migration
+    // report for the planned follow-up.
 
-    public ReputationService(IPlayerRepository players)
+    public ReputationService(IPlayerRepository players, IContentProvider content)
     {
-        _players = players;
+        _players = players ?? throw new ArgumentNullException(nameof(players));
+        _content = content ?? throw new ArgumentNullException(nameof(content));
+    }
+
+    /// <summary>
+    /// True if <paramref name="a"/> is declared hostile to <paramref name="b"/>
+    /// in content/factions.json. Replaces inspecting the old TensionPairs table.
+    /// </summary>
+    public bool IsHostileTo(FactionId a, FactionId b)
+    {
+        var def = _content.GetFaction(a);
+        return def is not null && def.HostileTo.Contains(b);
     }
 
     public async Task AdjustReputationAsync(

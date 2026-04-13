@@ -879,6 +879,12 @@ public class ContentProviderTests
         File.Copy(Path.Combine(realRoot, "zones.json"), Path.Combine(dir, "zones.json"));
     }
 
+    internal static void WriteValidFactions(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "factions.json"), Path.Combine(dir, "factions.json"));
+    }
+
     /// <summary>
     /// Seed a temp content dir with all upstream-required content files so a
     /// negative test targeting a specific file can reach that file's validator.
@@ -892,6 +898,7 @@ public class ContentProviderTests
         if (!excludedSet.Contains("monsters")) WriteValidMonsters(dir);
         if (!excludedSet.Contains("loot-tables")) WriteValidLootTables(dir);
         if (!excludedSet.Contains("zones")) WriteValidZones(dir);
+        if (!excludedSet.Contains("factions")) WriteValidFactions(dir);
     }
 
     // ─── Zone definitions ─────────────────────────────────────────────────
@@ -1102,5 +1109,181 @@ public class ContentProviderTests
         WriteAllPrerequisitesExcept(dir.FullName, "zones");
         File.WriteAllText(Path.Combine(dir.FullName, "zones.json"), zonesJson);
         return dir;
+    }
+
+    // ─── Factions ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_factions_file_loads_with_all_enum_values_covered()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var all = provider.AllFactions();
+        all.Should().HaveCount(Enum.GetValues<FactionId>().Length);
+
+        foreach (FactionId id in Enum.GetValues<FactionId>())
+        {
+            provider.GetFaction(id).Should().NotBeNull($"FactionId.{id} must be authored in factions.json");
+        }
+
+        var caervorn = provider.GetFaction(FactionId.HouseCaervorn)!;
+        caervorn.DisplayName.Should().Be("House Caervorn");
+        caervorn.HostileTo.Should().Contain(FactionId.ThornwoodCovens);
+        caervorn.Waypoint.Should().NotBeNull();
+        caervorn.Waypoint!.X.Should().Be(8);
+        caervorn.Waypoint.Y.Should().Be(3);
+    }
+
+    [Fact]
+    public void Missing_factions_file_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "factions");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<FileNotFoundException>();
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Missing_faction_enum_value_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "factions");
+            // Author only one faction; the other FactionId enum values are missing.
+            File.WriteAllText(Path.Combine(dir.FullName, "factions.json"), """
+            {
+              "factions": [
+                {
+                  "id": "HouseCaervorn", "displayName": "House Caervorn",
+                  "description": "Highland kingdom.", "hqZoneId": "aeldran-1-caervorn-highlands",
+                  "hostileTo": [], "startingReputation": 0,
+                  "waypointZoneIds": ["aeldran-1-caervorn-highlands"]
+                }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*FactionId.ThornwoodCovens has no entry*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_hqZoneId_against_zones_file_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "factions", "zones");
+            // Seed a zones.json so the cross-ref check activates. One zoneId only,
+            // which none of the factions reference.
+            File.WriteAllText(Path.Combine(dir.FullName, "zones.json"), """
+            { "zones": [ { "zoneId": "some-other-zone", "world": "Aeldran", "zoneNumber": 1, "name": "X", "description": "", "asciiSymbol": ".", "biome": "plains", "dangerLevel": 1, "layout": { "x": 1, "y": 1 } } ] }
+            """);
+            // Copy real factions.json — its hqZoneIds won't match the fake zone set.
+            WriteValidFactions(dir.FullName);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*hqZoneId*is not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_hostileTo_ref_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "factions");
+            var allIds = Enum.GetNames<FactionId>();
+            var entries = string.Join(",\n", allIds.Select((id, i) =>
+            {
+                var hostile = i == 0 ? "\"NotAFaction\"" : "";
+                return $$"""
+                { "id": "{{id}}", "displayName": "{{id}}", "description": "x",
+                  "hqZoneId": "aeldran-1-caervorn-highlands", "hostileTo": [{{hostile}}],
+                  "startingReputation": 0, "waypointZoneIds": ["aeldran-1-caervorn-highlands"] }
+                """;
+            }));
+            File.WriteAllText(Path.Combine(dir.FullName, "factions.json"),
+                $$"""{ "factions": [ {{entries}} ] }""");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*hostileTo entry 'NotAFaction'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Self_hostile_entry_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "factions");
+            var allIds = Enum.GetNames<FactionId>();
+            var entries = string.Join(",\n", allIds.Select((id, i) =>
+            {
+                var hostile = i == 0 ? $"\"{id}\"" : "";
+                return $$"""
+                { "id": "{{id}}", "displayName": "{{id}}", "description": "x",
+                  "hqZoneId": "aeldran-1-caervorn-highlands", "hostileTo": [{{hostile}}],
+                  "startingReputation": 0, "waypointZoneIds": ["aeldran-1-caervorn-highlands"] }
+                """;
+            }));
+            File.WriteAllText(Path.Combine(dir.FullName, "factions.json"),
+                $$"""{ "factions": [ {{entries}} ] }""");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*cannot be hostile to itself*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Empty_waypointZoneIds_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "factions");
+            var allIds = Enum.GetNames<FactionId>();
+            var entries = string.Join(",\n", allIds.Select(id => $$"""
+                { "id": "{{id}}", "displayName": "{{id}}", "description": "x",
+                  "hqZoneId": "aeldran-1-caervorn-highlands", "hostileTo": [],
+                  "startingReputation": 0, "waypointZoneIds": [] }
+                """));
+            File.WriteAllText(Path.Combine(dir.FullName, "factions.json"),
+                $$"""{ "factions": [ {{entries}} ] }""");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*at least one waypointZoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
     }
 }

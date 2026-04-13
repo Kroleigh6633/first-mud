@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Factions",
+  "description": "Authoring surface for every faction in the game. Each entry maps to a FirstMud.Domain.Enums.FactionId value.",
+  "type": "object",
+  "required": ["factions"],
+  "properties": {
+    "factions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/faction" },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "faction": {
+      "type": "object",
+      "required": [
+        "id",
+        "displayName",
+        "description",
+        "hqZoneId",
+        "hostileTo",
+        "startingReputation",
+        "waypointZoneIds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Must match a FactionId enum name exactly.",
+          "enum": [
+            "HouseCaervorn",
+            "ThornwoodCovens",
+            "EmeraldCompact",
+            "Gravenguard",
+            "Fairgean",
+            "Golvari",
+            "AshenCourt"
+          ]
+        },
+        "displayName": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "hqZoneId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Cross-ref to zones.json when present; otherwise a free-form zone slug."
+        },
+        "hqDisplayName": { "type": "string" },
+        "hostileTo": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Ids of other factions with active hostility. Must reference valid FactionIds."
+        },
+        "startingReputation": {
+          "type": "integer",
+          "description": "Initial reputation points when a player is created."
+        },
+        "hidden": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, the faction is not shown in UI until a trigger reveals it."
+        },
+        "waypointZoneIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "Zones used as quest-waypoint targets for this faction. Replaces FactionWaypoints."
+        },
+        "waypoint": {
+          "type": "object",
+          "required": ["x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "integer", "minimum": 0 },
+            "y": { "type": "integer", "minimum": 0 }
+          },
+          "description": "Canonical world-grid coordinate of the faction HQ (matches ZoneGridLayout)."
+        }
+      }
+    }
+  }
+}
