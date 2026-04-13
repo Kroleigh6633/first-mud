@@ -209,6 +209,12 @@ public class LootTablesContentTests
           ]
         }
         """);
+        // ContentProvider loads buildings/recipes/monsters before loot-tables.
+        // Copy the shipped files so loot-tables validation under test is the
+        // first thing to fail.
+        ContentProviderTests.WriteValidBuildings(dir.FullName);
+        ContentProviderTests.WriteValidRecipes(dir.FullName);
+        ContentProviderTests.WriteValidMonsters(dir.FullName);
         File.WriteAllText(Path.Combine(dir.FullName, "loot-tables.json"), lootTables);
         return dir;
     }

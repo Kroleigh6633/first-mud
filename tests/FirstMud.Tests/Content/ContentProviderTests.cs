@@ -304,6 +304,13 @@ public class ContentProviderTests
           ]
         }
         """);
+        // Monsters tests exercise the ContentProvider end-to-end, which
+        // requires the full content fan-out (buildings/recipes/loot) to be
+        // present for their own validators. Copy shipped content to unblock
+        // the monster-specific assertion under test.
+        WriteValidBuildings(dir);
+        WriteValidRecipes(dir);
+        WriteValidLootTables(dir);
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────
@@ -838,7 +845,7 @@ public class ContentProviderTests
         }
     }
 
-    private static void WriteValidBuildings(string dir)
+    internal static void WriteValidBuildings(string dir)
     {
         // Mirror content/buildings.json's structural requirements: every
         // BuildingType enum value must be present. Easiest path: copy the
@@ -846,5 +853,37 @@ public class ContentProviderTests
         // validation coverage just need this to pass load.
         var realRoot = ContentRootResolver.Resolve();
         File.Copy(Path.Combine(realRoot, "buildings.json"), Path.Combine(dir, "buildings.json"));
+    }
+
+    internal static void WriteValidRecipes(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "recipes.json"), Path.Combine(dir, "recipes.json"));
+    }
+
+    internal static void WriteValidLootTables(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "loot-tables.json"), Path.Combine(dir, "loot-tables.json"));
+    }
+
+    internal static void WriteValidMonsters(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "monsters.json"), Path.Combine(dir, "monsters.json"));
+    }
+
+    /// <summary>
+    /// Seed a temp content dir with all upstream-required content files so a
+    /// negative test targeting a specific file can reach that file's validator.
+    /// </summary>
+    internal static void WriteAllPrerequisitesExcept(string dir, params string[] excluded)
+    {
+        var excludedSet = new HashSet<string>(excluded, StringComparer.OrdinalIgnoreCase);
+        if (!excludedSet.Contains("consumables")) WriteValidConsumables(dir);
+        if (!excludedSet.Contains("buildings")) WriteValidBuildings(dir);
+        if (!excludedSet.Contains("recipes")) WriteValidRecipes(dir);
+        if (!excludedSet.Contains("monsters")) WriteValidMonsters(dir);
+        if (!excludedSet.Contains("loot-tables")) WriteValidLootTables(dir);
     }
 }
