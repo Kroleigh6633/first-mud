@@ -51,7 +51,12 @@ for ($i = 0; $i -lt $rows.Count; $i++) {
     $branchesSeen[$branch] = $true
 
     $parsed = $null
-    if (-not [DateTime]::TryParse($updated, [ref]$parsed)) {
+    try {
+        $parsed = [DateTime]::Parse($updated)
+    } catch {
+        $parsed = $null
+    }
+    if (-not $parsed) {
         $errors += "row $branch : invalid date '$updated'"
     }
     else {
