@@ -254,6 +254,7 @@ export interface StorageItem {
   name: string;
   description: string;
   category: string;
+  slot?: string;
   workmanship: number;
   quantity?: number;
   isStackable?: boolean;

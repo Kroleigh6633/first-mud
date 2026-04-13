@@ -272,6 +272,10 @@ public class GameHub : Hub
                 TryGetGuid(payload, "companionId"),
                 TryGetGuid(payload, "buildingId")),
 
+            "unassignbuilder" => new UnassignBuilderCommand(
+                playerId,
+                TryGetGuid(payload, "buildingId")),
+
             "viewcity" => new ViewCityCommand(playerId),
 
             _ => null

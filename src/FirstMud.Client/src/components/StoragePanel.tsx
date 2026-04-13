@@ -7,7 +7,7 @@ const RARE_ORES = new Set(['Silver Ore', 'Mithril Ore']);
 
 interface Props {
   snapshot: StorageViewSnapshot | null;
-  inventoryItems: { id: string; name: string; description: string; workmanship: number; category?: string; quantity?: number; isStackable?: boolean; isUnstable?: boolean; maxImbueSlots?: number; imbues?: AppliedImbue[] }[];
+  inventoryItems: { id: string; name: string; description: string; workmanship: number; category?: string; slot?: string; quantity?: number; isStackable?: boolean; isUnstable?: boolean; maxImbueSlots?: number; imbues?: AppliedImbue[] }[];
   onDeposit: (itemId: string) => void;
   onWithdraw: (itemId: string) => void;
   onClose: () => void;
@@ -428,7 +428,7 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
                       W{item.workmanship}
                     </span>
                     <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
-                      [{item.category}]
+                      [{item.slot && item.slot !== 'None' ? item.slot.replace(/([A-Z])/g, ' $1').trim() : item.category}]
                     </span>
                     {displayQty > 1 && (
                       <span style={{ color: '#ffdd44', fontSize: '11px', marginLeft: '6px' }}>
@@ -476,9 +476,9 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
                     <span style={{ color: '#888888', fontSize: '11px', marginLeft: '10px' }}>
                       W{item.workmanship}
                     </span>
-                    {item.category && (
+                    {(item.slot && item.slot !== 'None' ? true : !!item.category) && (
                       <span style={{ color: '#555555', fontSize: '11px', marginLeft: '6px' }}>
-                        [{item.category}]
+                        [{item.slot && item.slot !== 'None' ? item.slot.replace(/([A-Z])/g, ' $1').trim() : item.category}]
                       </span>
                     )}
                     {displayQty > 1 && (

@@ -124,7 +124,12 @@ export default function InventoryItemRow({
         </span>
         <span style={{ display: 'flex', alignItems: 'center' }}>
           <span style={{ color: '#888888', fontSize: '11px' }}>
-            {item.category ?? ''} W{item.workmanship}
+            {(() => {
+              const slotLabel = item.slot && item.slot !== 'None'
+                ? item.slot.replace(/([A-Z])/g, ' $1').trim()
+                : item.category;
+              return slotLabel ?? '';
+            })()} W{item.workmanship}
           </span>
           {/* Lock/star toggle */}
           <button

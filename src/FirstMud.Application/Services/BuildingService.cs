@@ -155,6 +155,43 @@ public class BuildingService
     }
 
     /// <summary>
+    /// Removes the companion assigned to a building, recalling them to idle.
+    /// </summary>
+    public async Task<(bool Success, string Message)> UnassignBuilderAsync(
+        Guid playerId,
+        Guid buildingId,
+        CancellationToken ct = default)
+    {
+        var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+        if (homestead is null)
+            return (false, "No homestead found.");
+
+        var building = await _buildings.GetByIdAsync(buildingId, ct);
+        if (building is null)
+            return (false, "Building not found.");
+        if (building.HomesteadId != homestead.Id)
+            return (false, "That building does not belong to your homestead.");
+        if (!building.AssignedCompanionId.HasValue)
+            return (false, "No companion is assigned to that building.");
+
+        var companionId = building.AssignedCompanionId.Value;
+        building.UnassignCompanion();
+        await _buildings.UpdateAsync(building, ct);
+
+        // Recall companion back to idle (clear duty)
+        var companion = await _companions.GetByIdAsync(companionId, ct);
+        if (companion is not null)
+        {
+            companion.RecallFromHomestead();
+            await _companions.UpdateAsync(companion, ct);
+        }
+
+        var name = companion?.Name ?? "Companion";
+        _logger.LogInformation("Player {PlayerId} unassigned {CompanionName} from {BuildingType}.", playerId, name, building.Type);
+        return (true, $"{name} recalled from {building.Type}.");
+    }
+
+    /// <summary>
     /// Assigns the best-aptitude idle companion to a newly completed building.
     /// Called automatically when construction finishes.
     /// </summary>

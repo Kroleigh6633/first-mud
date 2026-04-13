@@ -92,6 +92,7 @@ builder.Services.AddScoped<ICommandHandler<SmeltCommand>, SmeltCommandHandler>()
 builder.Services.AddScoped<ICommandHandler<ToggleCompanionAutoRotateCommand>, ToggleCompanionAutoRotateCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<PlaceBuildingCommand>, PlaceBuildingCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<AssignBuilderCommand>, AssignBuilderCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<UnassignBuilderCommand>, UnassignBuilderCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<ViewCityCommand>, ViewCityCommandHandler>();
 
 var app = builder.Build();

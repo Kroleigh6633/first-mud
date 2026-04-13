@@ -61,6 +61,23 @@ public class AssignBuilderCommandHandler(
     }
 }
 
+public class UnassignBuilderCommandHandler(
+    BuildingService buildingService,
+    GameNotificationService notificationService) : ICommandHandler<UnassignBuilderCommand>
+{
+    public async Task<CommandResult> HandleAsync(UnassignBuilderCommand cmd, CancellationToken ct)
+    {
+        var (success, message) = await buildingService.UnassignBuilderAsync(
+            cmd.PlayerId, cmd.BuildingId, ct);
+
+        if (!success)
+            return new CommandResult(false, message);
+
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system", message, ct);
+        return new CommandResult(true, message);
+    }
+}
+
 public class ViewCityCommandHandler(
     IHomesteadRepository homesteadRepository,
     IHomesteadBuildingRepository buildingRepository,
