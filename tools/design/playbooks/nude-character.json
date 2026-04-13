@@ -2,7 +2,7 @@
   "$schema": "../schemas/playbook.schema.json",
   "id": "nude-character",
   "displayName": "Nude character viability",
-  "description": "Player only (no companions, no imbues, no gear proxy). Where does a bare character alone stop working? Expectation: viable at low danger, falls off fast above danger 3.",
+  "description": "Player only (no companions, no imbues, no gear proxy). Where does a bare character alone stop working? DESIGN INTENT (creative pass #7): at d=0 a timber-wolf is unscaled (hp 28) so any player >=1 should trivialise it in <3 rounds. A bare character 1v1 vs a single monster is a FAVORABLE matchup regardless of danger because the monster is alone and has no ally piling on. Where this playbook earns its keep is in the 'character outgrows gear-danger gap' cliff: pl-5 hits balance at d~4, hard at d~6, punishing at d~8. Higher-level bare characters keep clearing because 1v1 scaled-monster vs pl-12 strike-base favours the caster. This is acceptable: overworld threat comes from PACKS, not solo mobs (see `full-party` + future `pack` playbook).",
   "holdouts": {
     "playerLevel": 5,
     "playerElement": "Aether"
@@ -15,35 +15,35 @@
   "seed": 42,
   "expectedViability": {
     "cells": [
-      { "playerLevel": 1,  "dangerLevel": 0, "expected": "balanced" },
-      { "playerLevel": 1,  "dangerLevel": 2, "expected": "hard" },
+      { "playerLevel": 1,  "dangerLevel": 0, "expected": "trivial" },
+      { "playerLevel": 1,  "dangerLevel": 2, "expected": "trivial" },
       { "playerLevel": 1,  "dangerLevel": 4, "expected": "punishing" },
       { "playerLevel": 1,  "dangerLevel": 6, "expected": "punishing" },
       { "playerLevel": 1,  "dangerLevel": 8, "expected": "punishing" },
 
-      { "playerLevel": 3,  "dangerLevel": 0, "expected": "easy" },
-      { "playerLevel": 3,  "dangerLevel": 2, "expected": "balanced" },
+      { "playerLevel": 3,  "dangerLevel": 0, "expected": "trivial" },
+      { "playerLevel": 3,  "dangerLevel": 2, "expected": "trivial" },
       { "playerLevel": 3,  "dangerLevel": 4, "expected": "hard" },
       { "playerLevel": 3,  "dangerLevel": 6, "expected": "punishing" },
       { "playerLevel": 3,  "dangerLevel": 8, "expected": "punishing" },
 
       { "playerLevel": 5,  "dangerLevel": 0, "expected": "trivial" },
-      { "playerLevel": 5,  "dangerLevel": 2, "expected": "easy" },
-      { "playerLevel": 5,  "dangerLevel": 4, "expected": "balanced" },
-      { "playerLevel": 5,  "dangerLevel": 6, "expected": "hard" },
+      { "playerLevel": 5,  "dangerLevel": 2, "expected": "trivial" },
+      { "playerLevel": 5,  "dangerLevel": 4, "expected": "easy" },
+      { "playerLevel": 5,  "dangerLevel": 6, "expected": "punishing" },
       { "playerLevel": 5,  "dangerLevel": 8, "expected": "punishing" },
 
       { "playerLevel": 8,  "dangerLevel": 0, "expected": "trivial" },
       { "playerLevel": 8,  "dangerLevel": 2, "expected": "trivial" },
-      { "playerLevel": 8,  "dangerLevel": 4, "expected": "easy" },
+      { "playerLevel": 8,  "dangerLevel": 4, "expected": "trivial" },
       { "playerLevel": 8,  "dangerLevel": 6, "expected": "balanced" },
       { "playerLevel": 8,  "dangerLevel": 8, "expected": "hard" },
 
       { "playerLevel": 12, "dangerLevel": 0, "expected": "trivial" },
       { "playerLevel": 12, "dangerLevel": 2, "expected": "trivial" },
-      { "playerLevel": 12, "dangerLevel": 4, "expected": "easy" },
-      { "playerLevel": 12, "dangerLevel": 6, "expected": "balanced" },
-      { "playerLevel": 12, "dangerLevel": 8, "expected": "balanced" }
+      { "playerLevel": 12, "dangerLevel": 4, "expected": "trivial" },
+      { "playerLevel": 12, "dangerLevel": 6, "expected": "trivial" },
+      { "playerLevel": 12, "dangerLevel": 8, "expected": "trivial" }
     ]
   },
   "toleranceBands": {

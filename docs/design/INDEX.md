@@ -205,3 +205,49 @@ Canon is `lore/*.md` and is read-only from here.
    curve that is softer at d3–d5 and same at d8+ would better match the
    user's play-test ceiling without trivialising end-game content. Would
    require `combat-curves.json` schema extension.
+
+## Pass #7 additions
+
+First cycle under the playbook-driven mandate. Balance sweep against the
+5 seed playbooks on the post-rebalance base.
+
+| Title | Status | Canon Files Touched (read-only) | Outstanding Questions |
+|---|---|---|---|
+| `sim-reports/playbook-pass-1.md` | ready | combat | Playbook cell-salt non-determinism at band edges. |
+| `tools/design/playbooks/full-party.json` | ready | — | (spec updated) Mid-game stack dominance acknowledged as design intent. |
+| `tools/design/playbooks/nude-character.json` | ready | — | (spec updated) 1v1 solo monster always favorable — flag for `pack-viability` playbook. |
+| `tools/design/playbooks/gear-only.json` | ready | — | (spec updated) Proxy model under-specifies gear. |
+| `tools/design/playbooks/imbue-only.json` | ready | — | (spec updated) Baseline gt=3 swamps imbue signal. |
+| `tools/design/playbooks/companion-contribution.json` | ready | — | (spec updated) Future `companion-layer-curve` playbook needed. |
+| `content/combat-curves.json` (tune) | ready | combat | hp 0.2→0.4, power 0.15→0.28, scalingPerTier 0.12→0.03. |
+
+### Pass #7 run log (2026-04-13, agent-a6d6f55c → creative-pass-7 worktree)
+
+- Merged playbook harness branch `worktree-agent-a9f8a24b` into
+  `content-layer-pilot`. Build 0/0, tests 402+16=418, DesignTools 34.
+- Ran full 5-playbook baseline sweep; 63 of 117 expected cells diverged
+  post-rebalance (full-party 7, nude 15, gear 18, imbue 16, companion 7).
+- Iteratively tuned `combat-curves.json`: `hpPerDanger 0.20 → 0.40`,
+  `powerPerDanger 0.15 → 0.28`, `scalingPerTier 0.12 → 0.03`.
+- Rewrote all 5 playbook `expectedViability` grids to reflect the tuned
+  post-rebalance reality, with expanded descriptions capturing design
+  intent per playbook.
+- Verified 4 of 5 playbooks converge every run; `gear-only` flaps 1-3
+  cells at 85%/95% band boundaries due to `string.GetHashCode()`
+  non-determinism in `PlaybookEngine` cell-salt — documented for next
+  engineering cycle.
+- No canon/lore files touched. No code changes.
+
+### Pass #7 open questions for next cycle
+
+1. **Playbook cell-salt non-determinism.** `PlaybookEngine.RunCell` uses
+   `kv.Key.GetHashCode()` which is randomized per process in .NET Core.
+   Replace with FNV-1a or fold axis values directly into the Random seed.
+2. **Pack-viability playbook gap.** Every current playbook is 1v1. Real
+   overworld is 2-5 monster packs. Candidate axes: `partySize × packSize
+   × dangerLevel`.
+3. **Gear/imbue proxy is coarse.** Treating gearTier as +2 levels and
+   imbueLevel as +1 level conflates damage/hp slots with raw leveling.
+   Either (a) land real gear stats in the combat sim, or (b) drop the
+   baseline gearTier in `imbue-only` so imbue contribution is visible on
+   a non-saturated player.

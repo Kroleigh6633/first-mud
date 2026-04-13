@@ -1,0 +1,477 @@
+{
+  "playbookId": "companion-contribution",
+  "displayName": "Companion contribution",
+  "seed": 42,
+  "rolls": 100,
+  "cells": [
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 1,
+        "dangerLevel": 3
+      },
+      "winRate": 0.99,
+      "avgRounds": 3.97,
+      "avgHpPct": 0.5783183952198037,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 1,
+        "dangerLevel": 6
+      },
+      "winRate": 0.15,
+      "avgRounds": 4.88,
+      "avgHpPct": 0.27136150234741785,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 1,
+        "dangerLevel": 9
+      },
+      "winRate": 0,
+      "avgRounds": 4.02,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 3,
+        "dangerLevel": 3
+      },
+      "winRate": 0.99,
+      "avgRounds": 3.96,
+      "avgHpPct": 0.5795276710769665,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 3,
+        "dangerLevel": 6
+      },
+      "winRate": 0.1,
+      "avgRounds": 4.51,
+      "avgHpPct": 0.24154929577464784,
+      "actual": "punishing",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 3,
+        "dangerLevel": 9
+      },
+      "winRate": 0,
+      "avgRounds": 3.77,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 5,
+        "dangerLevel": 3
+      },
+      "winRate": 0.98,
+      "avgRounds": 4.14,
+      "avgHpPct": 0.5770336303535497,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 5,
+        "dangerLevel": 6
+      },
+      "winRate": 0.09,
+      "avgRounds": 4.59,
+      "avgHpPct": 0.2762128325508607,
+      "actual": "punishing",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 0,
+        "companionLayer": 5,
+        "dangerLevel": 9
+      },
+      "winRate": 0,
+      "avgRounds": 3.85,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 1,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 3.03,
+      "avgHpPct": 0.6928169014084509,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 1,
+        "dangerLevel": 6
+      },
+      "winRate": 0.42,
+      "avgRounds": 5.83,
+      "avgHpPct": 0.25536552649228705,
+      "actual": "hard",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 1,
+        "dangerLevel": 9
+      },
+      "winRate": 0.04,
+      "avgRounds": 5.87,
+      "avgHpPct": 0.1971830985915493,
+      "actual": "punishing",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 3,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.02,
+      "avgHpPct": 0.8516901408450704,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 3,
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 3.6,
+      "avgHpPct": 0.4799295774647887,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 3,
+        "dangerLevel": 9
+      },
+      "winRate": 0.84,
+      "avgRounds": 5.65,
+      "avgHpPct": 0.2436284372904091,
+      "actual": "balanced",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 5,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.2,
+      "avgHpPct": 0.8124647887323948,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 5,
+        "dangerLevel": 6
+      },
+      "winRate": 0.99,
+      "avgRounds": 4.13,
+      "avgHpPct": 0.34450135154360495,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 1,
+        "companionLayer": 5,
+        "dangerLevel": 9
+      },
+      "winRate": 0.88,
+      "avgRounds": 5.56,
+      "avgHpPct": 0.11075544174135722,
+      "actual": "easy",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 1,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.18,
+      "avgHpPct": 0.8530281690140846,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 1,
+        "dangerLevel": 6
+      },
+      "winRate": 0.68,
+      "avgRounds": 5.78,
+      "avgHpPct": 0.23291217895608948,
+      "actual": "balanced",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 1,
+        "dangerLevel": 9
+      },
+      "winRate": 0.14,
+      "avgRounds": 6.76,
+      "avgHpPct": 0.026659959758551306,
+      "actual": "punishing",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 3,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 1.14,
+      "avgHpPct": 0.9769014084507043,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 3,
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 2.96,
+      "avgHpPct": 0.5688732394366197,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 3,
+        "dangerLevel": 9
+      },
+      "winRate": 1,
+      "avgRounds": 4.18,
+      "avgHpPct": 0.31676056338028163,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 5,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.01,
+      "avgHpPct": 0.8579577464788731,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 5,
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 3.35,
+      "avgHpPct": 0.4775352112676055,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 2,
+        "companionLayer": 5,
+        "dangerLevel": 9
+      },
+      "winRate": 0.98,
+      "avgRounds": 4.7,
+      "avgHpPct": 0.2036504742742167,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 1,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 1.88,
+      "avgHpPct": 0.8834507042253524,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 1,
+        "dangerLevel": 6
+      },
+      "winRate": 0.99,
+      "avgRounds": 4.32,
+      "avgHpPct": 0.29911793996301034,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 1,
+        "dangerLevel": 9
+      },
+      "winRate": 0.53,
+      "avgRounds": 6.95,
+      "avgHpPct": 0.06683497209673132,
+      "actual": "hard",
+      "expected": "hard",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 3,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 1.03,
+      "avgHpPct": 0.9957746478873238,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 3,
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 2.1,
+      "avgHpPct": 0.7664084507042253,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 3,
+        "dangerLevel": 9
+      },
+      "winRate": 1,
+      "avgRounds": 2.9,
+      "avgHpPct": 0.49598591549295784,
+      "actual": "trivial",
+      "expected": "",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 5,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2,
+      "avgHpPct": 0.8614084507042254,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 5,
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 2.57,
+      "avgHpPct": 0.6353521126760564,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "companionCount": 3,
+        "companionLayer": 5,
+        "dangerLevel": 9
+      },
+      "winRate": 1,
+      "avgRounds": 3.45,
+      "avgHpPct": 0.33373239436619717,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    }
+  ],
+  "divergences": []
+}
