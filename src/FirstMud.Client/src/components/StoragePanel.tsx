@@ -180,6 +180,18 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
   const [activeTab, setActiveTab] = useState<TabCategory>('All');
   const [smeltAmount, setSmeltAmount] = useState<number>(10);
 
+  // Total Metal available across storage + inventory (for smelt UI)
+  const storageMetal = snapshot
+    ? snapshot.items
+        .filter(i => i.name.toLowerCase() === 'metal' && i.category === 'Component')
+        .reduce((sum, i) => sum + (i.quantity ?? 1), 0)
+    : 0;
+  const inventoryMetal = inventoryItems
+    .filter(i => i.name.toLowerCase() === 'metal' && i.category === 'Component')
+    .reduce((sum, i) => sum + (i.quantity ?? 1), 0);
+  const totalMetal = storageMetal + inventoryMetal;
+  const canSmelt = atHomestead && totalMetal > 0 && !!onSmelt;
+
   const filteredStorageItems = snapshot
     ? snapshot.items.filter(i => activeTab === 'All' || i.category === activeTab)
     : [];
@@ -238,6 +250,54 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
             </button>
           ))}
         </div>
+
+        {/* Smelt Metal section — visible when player has Metal and is at homestead */}
+        {canSmelt && (
+          <div style={{ padding: '8px 14px', borderBottom: '1px solid #1a3a1a', background: '#0a1a0a' }}>
+            <span style={{ color: '#ffaa22', fontSize: '11px', letterSpacing: '0.12em' }}>
+              SMELT METAL
+            </span>
+            <span style={{ color: '#888888', fontSize: '10px', marginLeft: '8px' }}>
+              ({totalMetal}x Metal available — discover what it contains)
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <label style={{ color: '#888888', fontSize: '11px' }}>Amount:</label>
+              <input
+                type="number"
+                min={1}
+                max={totalMetal}
+                value={smeltAmount}
+                onChange={e => setSmeltAmount(Math.max(1, Math.min(totalMetal, Number(e.target.value))))}
+                style={{
+                  background: '#0d0d0d',
+                  border: '1px solid #555555',
+                  color: '#00ff41',
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  width: '60px',
+                  padding: '2px 4px',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setSmeltAmount(totalMetal)}
+                style={{ ...actionBtnStyle, borderColor: '#888888', color: '#888888' }}
+              >
+                all
+              </button>
+              <button
+                type="button"
+                onClick={() => onSmelt(smeltAmount)}
+                style={{ ...actionBtnStyle, borderColor: '#ffaa22', color: '#ffaa22' }}
+              >
+                smelt
+              </button>
+              <span style={{ color: '#555555', fontSize: '10px', marginLeft: '4px' }}>
+                → Iron / Copper / Tin / Silver / Mithril (skill-based)
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Storage contents */}
         <div style={sectionHeadingStyle}>In Storage</div>

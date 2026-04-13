@@ -198,6 +198,12 @@ public class SalvageService
         if (item.IsLocked)
             return null;
 
+        // Auto-equip has priority: never salvage an item that could fill an empty slot.
+        // This prevents Feet/Hands/Legs/Focus/Accessory items from being salvaged before
+        // the caller has a chance to equip them.
+        if (item.Slot != Domain.Enums.EquipmentSlot.None && player.GetEquipped(item.Slot) is null)
+            return null;
+
         var threshold = item.Category == ItemCategory.Weapon
             ? player.AutoSalvageWeaponThreshold
             : player.AutoSalvageArmorThreshold;

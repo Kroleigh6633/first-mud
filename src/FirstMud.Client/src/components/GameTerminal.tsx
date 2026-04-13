@@ -857,6 +857,8 @@ export default function GameTerminal({
           onDeposit={handleDeposit}
           onWithdraw={handleWithdraw}
           onClose={() => setShowStorage(false)}
+          atHomestead={atHomestead}
+          onSmelt={(amount) => sendCommand('smelt', { amount })}
         />
       )}
       {showCompanions && (

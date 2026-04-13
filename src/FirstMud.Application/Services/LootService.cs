@@ -313,7 +313,9 @@ public class LootService
         await _itemRepository.AddAsync(item, ct);
 
         var message = $"You found: {item.Name} [Workmanship {workValue}]!";
-        _logger.LogInformation("Loot drop for player {PlayerId}: {ItemName} W{Workmanship}", ownerId, item.Name, workValue);
+        _logger.LogInformation(
+            "Loot drop for player {PlayerId}: {ItemName} W{Workmanship} Slot={Slot} Category={Category}",
+            ownerId, item.Name, workValue, item.Slot, item.Category);
 
         return new LootDropResult(true, item, message);
     }
