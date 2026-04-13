@@ -296,7 +296,19 @@ public class StartupSeeder(
     private static readonly Dictionary<string, string> LegacyMaterialRenames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Wood Bundle"]  = "Wood",
-        ["Herbs Bundle"] = "Herbs",
+        ["Herbs Bundle"] = "Sage",
+        // Herb tiering migration (2026-04-13): generic "Herbs" splits into
+        // tier-1 named herbs. Existing player stock migrates to "Sage" (the
+        // most-common tier-1). Legacy biome-specific names map onto their
+        // canonical tier-2 equivalents where they exist, otherwise Sage.
+        ["Herbs"]         = "Sage",
+        ["Mountain Herbs"] = "Fire Moss",
+        ["Mountain Herb"]  = "Fire Moss",
+        ["Forest Herbs"]  = "Nightshade",
+        ["Meadow Herbs"]  = "Sage",
+        ["Wild Herbs"]    = "Lavender",
+        ["Swamp Herbs"]   = "Bogweed",
+        ["Wyrd Bloom"]    = "Thornroot",
     };
 
     private async Task RenameAndMergeLegacyMaterialsAsync(CancellationToken ct)

@@ -47,7 +47,7 @@
       "type": "AlchemistHut",
       "constructionCost": [
         { "material": "Wood", "quantity": 8 },
-        { "material": "Herbs", "quantity": 3 }
+        { "material": "Sage", "quantity": 3 }
       ],
       "duty": "Crafter",
       "workerCapacity": 2,

@@ -20,7 +20,7 @@ public class SalvageService
     private static readonly string[] WeaponWoodComponents  = ["Wood"];
     private static readonly string[] ArmorLeatherComponents = ["Leather"];
     private static readonly string[] ArmorMetalComponents  = ["Iron Ore"];
-    private static readonly string[] ConsumableComponents  = ["Stone", "Wood", "Iron Ore", "Leather", "Sand", "Herbs"];
+    private static readonly string[] ConsumableComponents  = ["Stone", "Wood", "Iron Ore", "Leather", "Sand", "Sage"];
 
     public SalvageService(
         IPlayerRepository players,
