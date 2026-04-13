@@ -533,6 +533,7 @@ interface WorkforceStats {
   homeless: number;
   unemployed: number;
   productionBuildings: HomesteadBuilding[];
+  productionSlots: number;
   housingBuildings: HomesteadBuilding[];
   underConstruction: HomesteadBuilding[];
   allProductionStaffed: boolean;
@@ -599,9 +600,16 @@ function computeWorkforceStats(
 
   const buildingsNeedingBuilders = underConstruction.filter(b => !b.assignedCompanionName && !((b as any).workers?.length > 0));
 
+  // Total production worker slots = sum of workerCapacity across constructed production buildings.
+  // This is the MAX possible workers — not a count of companions.
+  const productionSlots = productionBuildings.reduce(
+    (sum, b) => sum + ((b as any).workerCapacity ?? WORKER_CAPACITY[b.type] ?? 1),
+    0,
+  );
+
   return {
     total, adventuring, working, builders, guards, housed, housingCapacity, hutCount,
-    homeless, unemployed, productionBuildings, housingBuildings, underConstruction,
+    homeless, unemployed, productionBuildings, productionSlots, housingBuildings, underConstruction,
     allProductionStaffed, buildingsNeedingBuilders,
   };
 }
@@ -678,8 +686,13 @@ function OverviewTab({ stats }: OverviewTabProps) {
         <span style={{ color: '#00ccff' }}>{stats.adventuring}</span>
       </div>
       <div style={{ ...rowStyle, marginLeft: '12px' }}>
-        <span style={labelStyle}>Working (production):</span>
-        <span style={{ color: '#00cc88' }}>{stats.working}</span>
+        <span style={labelStyle}>Production workers:</span>
+        <span style={{ color: '#00cc88' }}>
+          {stats.working}
+          <span style={{ color: '#666666' }}>
+            {' '}/ {stats.productionSlots} slot{stats.productionSlots !== 1 ? 's' : ''}
+          </span>
+        </span>
       </div>
       <div style={{ ...rowStyle, marginLeft: '12px' }}>
         <span style={labelStyle}>Builders:</span>
@@ -713,17 +726,19 @@ function OverviewTab({ stats }: OverviewTabProps) {
       <div style={dividerStyle}>{'─'.repeat(36)}</div>
 
       <div style={rowStyle}>
-        <span style={labelStyle}>Production:</span>
+        <span style={labelStyle}>Production buildings:</span>
         <span style={{ color: '#ff8844' }}>
           {stats.productionBuildings.length}{' '}
-          <span style={{ color: '#666666' }}>({prodTypesSummary})</span>
+          <span style={{ color: '#666666' }}>
+            ({stats.productionSlots} worker slot{stats.productionSlots !== 1 ? 's' : ''}; {prodTypesSummary})
+          </span>
         </span>
       </div>
       <div style={rowStyle}>
-        <span style={labelStyle}>Housing:</span>
+        <span style={labelStyle}>Housing buildings:</span>
         <span style={{ color: '#cc9966' }}>
           {stats.hutCount} hut{stats.hutCount !== 1 ? 's' : ''}{' '}
-          <span style={{ color: '#666666' }}>({stats.housingCapacity} capacity)</span>
+          <span style={{ color: '#666666' }}>({stats.housingCapacity} bed capacity)</span>
         </span>
       </div>
       <div style={rowStyle}>
