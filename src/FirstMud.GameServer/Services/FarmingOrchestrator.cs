@@ -1339,7 +1339,7 @@ public class FarmingOrchestrator(
                                             {
                                                 timestamp = DateTime.UtcNow.ToString("O"),
                                                 category  = farmMsgCategory,
-                                                text      = $"[Auto-farm] You equip the {droppedItem.Name}."
+                                                text      = $"[Auto-farm] You equip the {droppedItem.DisplayName}."
                                             }, farmCt);
                                     }
                                     else
@@ -1358,7 +1358,7 @@ public class FarmingOrchestrator(
                                                 {
                                                     timestamp = DateTime.UtcNow.ToString("O"),
                                                     category  = farmMsgCategory,
-                                                    text      = $"[Auto-farm] You swap your {currentEquipped.Name} W{currentEquipped.Workmanship.Value} for {droppedItem.Name} W{droppedItem.Workmanship.Value}. Much better."
+                                                    text      = $"[Auto-farm] You swap your {currentEquipped.DisplayName} W{currentEquipped.Workmanship.Value} for {droppedItem.DisplayName} W{droppedItem.Workmanship.Value}. Much better."
                                                 }, farmCt);
                                         }
                                     }
@@ -1370,7 +1370,7 @@ public class FarmingOrchestrator(
                                 .SendAsync("LootDropped", new
                                 {
                                     droppedItem.Id,
-                                    droppedItem.Name,
+                                    Name = droppedItem.DisplayName,
                                     droppedItem.Description,
                                     Workmanship = droppedItem.Workmanship.Value,
                                     Category = droppedItem.Category.ToString(),

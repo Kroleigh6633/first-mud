@@ -17,6 +17,7 @@ public class GameLoopService : BackgroundService
     private const int WeaveRegenIntervalSeconds = 10;        // Out-of-combat Weave regen: 1 point every 10 seconds
     private const int HomesteadCompanionIntervalSeconds = 60; // Homestead companion duties every 60 seconds
     private const int CompanionDriftIntervalSeconds = 60;    // Companion drift accumulation every 60 seconds
+    private const int BuildingConstructionIntervalSeconds = 60; // Building construction progress every 60 seconds
 
     private readonly ConcurrentQueue<IGameCommand> _commandQueue = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -105,6 +106,11 @@ public class GameLoopService : BackgroundService
         var ticksPerDrift = (long)(CompanionDriftIntervalSeconds * 1000.0 / TickIntervalMs);
         if (_tickCount % ticksPerDrift == 0 && _tickCount > 0)
             await ProcessCompanionDriftAsync(ct);
+
+        // 9. Every 60 seconds: advance building construction progress
+        var ticksPerConstruction = (long)(BuildingConstructionIntervalSeconds * 1000.0 / TickIntervalMs);
+        if (_tickCount % ticksPerConstruction == 0 && _tickCount > 0)
+            await ProcessBuildingConstructionAsync(ct);
     }
 
     private async Task ProcessCommandsAsync(CancellationToken ct)
@@ -345,6 +351,59 @@ public class GameLoopService : BackgroundService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error in companion drift tick.");
+        }
+    }
+
+    /// <summary>
+    /// Advances construction progress for all buildings that have a builder assigned.
+    /// Each builder companion contributes 5% progress per tick (60-second cycle).
+    /// Broadcasts a notification to the owning player when a building completes.
+    /// </summary>
+    private async Task ProcessBuildingConstructionAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var buildingService = scope.ServiceProvider.GetRequiredService<FirstMud.Application.Services.BuildingService>();
+            var hubContext      = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+
+            // Populate the homestead→player cache so notifications can be targeted
+            var playerRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.IPlayerRepository>();
+            var homesteadRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.IHomesteadRepository>();
+            var players = await playerRepo.GetActivePlayersAsync(ct);
+            foreach (var player in players)
+            {
+                var homestead = await homesteadRepo.GetByPlayerIdAsync(player.Id, ct);
+                if (homestead is not null)
+                    buildingService.RegisterHomesteadOwner(homestead.Id, player.Id);
+            }
+
+            var results = await buildingService.TickConstructionAsync(ct);
+
+            foreach (var result in results)
+            {
+                if (result.PlayerId == Guid.Empty) continue;
+
+                var msg = result.AutoAssignedCompanionName is not null
+                    ? $"{result.BuildingType} construction complete! {result.AutoAssignedCompanionName} has been assigned to work there."
+                    : $"{result.BuildingType} construction complete! Visit your homestead [P] and open the city panel [G] to assign a worker.";
+
+                await hubContext.Clients
+                    .Group(result.PlayerId.ToString())
+                    .SendAsync("GameMessage", new
+                    {
+                        timestamp = DateTime.UtcNow.ToString("O"),
+                        category  = "system",
+                        text      = msg,
+                    }, ct);
+            }
+
+            if (results.Count > 0)
+                _logger.LogDebug("Building construction tick complete. {Count} building(s) finished.", results.Count);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Error in building construction tick.");
         }
     }
 

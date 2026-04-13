@@ -400,7 +400,7 @@ public class CombatHelpers(
                 // Slot is empty — auto-equip
                 player.Equip(slot, item.Id);
                 await playerRepository.UpdateAsync(player, ct);
-                await notificationService.SendMessageAsync(playerId, lootCategory, $"You equip the {item.Name}.", ct);
+                await notificationService.SendMessageAsync(playerId, lootCategory, $"You equip the {item.DisplayName}.", ct);
             }
             else
             {
@@ -414,7 +414,7 @@ public class CombatHelpers(
                     player.Equip(slot, item.Id);
                     await playerRepository.UpdateAsync(player, ct);
                     await notificationService.SendMessageAsync(playerId, lootCategory,
-                        $"You swap your {currentEquipped.Name} W{currentEquipped.Workmanship.Value} for {item.Name} W{item.Workmanship.Value}. Much better.", ct);
+                        $"You swap your {currentEquipped.DisplayName} W{currentEquipped.Workmanship.Value} for {item.DisplayName} W{item.Workmanship.Value}. Much better.", ct);
                 }
             }
         }
@@ -424,7 +424,7 @@ public class CombatHelpers(
             .SendAsync("LootDropped", new
             {
                 item.Id,
-                item.Name,
+                Name = item.DisplayName,
                 item.Description,
                 Workmanship = item.Workmanship.Value,
                 Category = item.Category.ToString(),

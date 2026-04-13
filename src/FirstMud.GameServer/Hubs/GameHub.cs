@@ -261,6 +261,19 @@ public class GameHub : Hub
 
             "toggleautorotate" => new ToggleCompanionAutoRotateCommand(playerId),
 
+            "placebuilding" => new PlaceBuildingCommand(
+                playerId,
+                TryGetString(payload, "buildingType") ?? string.Empty,
+                TryGetInt(payload, "gridX"),
+                TryGetInt(payload, "gridY")),
+
+            "assignbuilder" => new AssignBuilderCommand(
+                playerId,
+                TryGetGuid(payload, "companionId"),
+                TryGetGuid(payload, "buildingId")),
+
+            "viewcity" => new ViewCityCommand(playerId),
+
             _ => null
         };
     }

@@ -142,7 +142,7 @@ public class ImbueService
                     // Still apply imbue record to consume a slot and mark WyrdTouched
                     item.ApplyImbue(ImbueType.Fortifying, 0f);
                     var critNote = outcome == ImbueOutcome.CriticalSuccess ? " (Critical! +2 Workmanship)" : " (+1 Workmanship)";
-                    resultMessage = $"Success! {item.Name} is fortified{critNote} — now W{item.Workmanship.Value}.";
+                    resultMessage = $"Success! {item.DisplayName} is fortified{critNote} — now W{item.Workmanship.Value}.";
                 }
                 else
                 {
@@ -161,7 +161,7 @@ public class ImbueService
                     var powerPct = (int)(power * 100);
                     var critSuffix    = outcome == ImbueOutcome.CriticalSuccess ? " (Critical! Double power)" : string.Empty;
                     var unstableSuffix = item.IsUnstable ? " [UNSTABLE]" : string.Empty;
-                    resultMessage = $"Success! {item.Name} is now imbued with {imbueType} +{powerPct}%{critSuffix}{unstableSuffix}.";
+                    resultMessage = $"You imbued {item.Name} → {item.DisplayName}! +{powerPct}%{critSuffix}{unstableSuffix}";
 
                     _logger.LogInformation("Imbue success for player {PlayerId}: {ItemId} with {ImbueType} +{Power:P0}",
                         playerId, itemId, imbueType, power);

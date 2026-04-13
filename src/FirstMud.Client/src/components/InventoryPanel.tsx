@@ -121,7 +121,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
                     style={{ background: '#0d0d0d', border: '1px solid #1a3a1a', color: '#ff8800', fontFamily: 'monospace', fontSize: '11px', padding: '1px 4px' }}
                     aria-label={`auto-salvage ${cat} threshold`}
                   >
-                    {[0, 1, 2, 3, 4, 5].map(v => (
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(v => (
                       <option key={v} value={v}>{v === 0 ? 'Off' : `W${v}`}</option>
                     ))}
                   </select>

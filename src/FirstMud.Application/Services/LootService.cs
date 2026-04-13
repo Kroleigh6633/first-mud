@@ -344,7 +344,7 @@ public class LootService
         // and flag pre-imbued drops so the player knows why this find is special.
         var dangerSuffix = dangerLevel >= 4 ? $" (danger {dangerLevel} bonus)" : string.Empty;
         var imbueSuffix  = wasPreImbued ? " [pre-imbued!]" : string.Empty;
-        var message = $"You found: {item.Name} W{workValue}{dangerSuffix}{imbueSuffix}!";
+        var message = $"You found: {item.DisplayName} W{workValue}{dangerSuffix}{imbueSuffix}!";
         _logger.LogInformation(
             "Loot drop for player {PlayerId}: {ItemName} W{Workmanship} Slot={Slot} Category={Category} DangerBonus={DangerBonus} PreImbued={PreImbued}",
             ownerId, item.Name, workValue, item.Slot, item.Category, dangerBonus, wasPreImbued);

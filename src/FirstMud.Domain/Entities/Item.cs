@@ -55,6 +55,43 @@ public class Item
 
     public IReadOnlyList<AppliedImbue> Imbues => ImbuesList.AsReadOnly();
 
+    /// <summary>
+    /// Computed display name incorporating any applied imbue modifiers.
+    /// Prefixes (Fire, Water, Earth, Air, Protective, Wyrd) appear before the base name;
+    /// suffixes (Fortifying, Restoration) appear after.
+    /// The stored <see cref="Name"/> column is never modified.
+    /// </summary>
+    public string DisplayName
+    {
+        get
+        {
+            if (ImbuesList.Count == 0) return Name;
+
+            var prefixes = new List<string>();
+            var suffixes = new List<string>();
+
+            foreach (var imbue in ImbuesList)
+            {
+                switch (imbue.Type)
+                {
+                    case ImbueType.Fire:        prefixes.Add("Blazing");      break;
+                    case ImbueType.Water:       prefixes.Add("Tidal");        break;
+                    case ImbueType.Earth:       prefixes.Add("Earthen");      break;
+                    case ImbueType.Air:         prefixes.Add("Windswept");    break;
+                    case ImbueType.Protective:  prefixes.Add("Warded");       break;
+                    case ImbueType.Fortifying:  suffixes.Add("of Might");     break;
+                    case ImbueType.Wyrd:        prefixes.Add("Fate-Touched"); break;
+                    case ImbueType.Restoration: suffixes.Add("of Mending");   break;
+                }
+            }
+
+            var result = Name;
+            if (prefixes.Count > 0) result = string.Join(" ", prefixes) + " " + result;
+            if (suffixes.Count > 0) result = result + " " + string.Join(" ", suffixes);
+            return result;
+        }
+    }
+
     private void FlushImbues() =>
         ImbuesJson = JsonSerializer.Serialize(ImbuesList);
 

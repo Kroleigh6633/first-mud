@@ -148,7 +148,7 @@ public class DepositCommandHandler(
 
                 await notificationService.SendMessageAsync(
                     cmd.PlayerId, "system",
-                    $"Merged {item.Quantity}x {item.Name} into existing storage stack (now {existingStack.Quantity}x).", ct);
+                    $"Merged {item.Quantity}x {item.DisplayName} into existing storage stack (now {existingStack.Quantity}x).", ct);
 
                 await hubContext.Clients
                     .Group(cmd.PlayerId.ToString())
@@ -169,7 +169,7 @@ public class DepositCommandHandler(
         await homesteadRepository.AddStorageItemAsync(storageItem, ct);
 
         await notificationService.SendMessageAsync(
-            cmd.PlayerId, "system", $"Deposited {item.Name} into homestead storage.", ct);
+            cmd.PlayerId, "system", $"Deposited {item.DisplayName} into homestead storage.", ct);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
@@ -217,7 +217,7 @@ public class WithdrawCommandHandler(
         await homesteadRepository.RemoveStorageItemAsync(homestead.Id, cmd.ItemId, ct);
 
         await notificationService.SendMessageAsync(
-            cmd.PlayerId, "system", $"Withdrew {item.Name} from homestead storage.", ct);
+            cmd.PlayerId, "system", $"Withdrew {item.DisplayName} from homestead storage.", ct);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())

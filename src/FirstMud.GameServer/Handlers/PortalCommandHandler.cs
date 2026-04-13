@@ -1,3 +1,4 @@
+using FirstMud.Application.Services;
 using FirstMud.Domain.Interfaces;
 using FirstMud.Domain.ValueObjects;
 using FirstMud.GameServer.Commands;
@@ -9,6 +10,8 @@ namespace FirstMud.GameServer.Handlers;
 
 public class PortalHomeCommandHandler(
     IPlayerRepository playerRepository,
+    IHomesteadRepository homesteadRepository,
+    BuildingService buildingService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<PortalHomeCommand>
 {
@@ -40,6 +43,13 @@ public class PortalHomeCommandHandler(
             "system",
             "You step through the portal and arrive at your homestead. The world is quiet here.",
             ct);
+
+        // Seed starter buildings on first visit
+        var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is not null)
+        {
+            await buildingService.SeedStarterBuildingsAsync(homestead.Id, ct);
+        }
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())

@@ -86,16 +86,16 @@ public class EquipCommandHandler(
                 kv => kv.Key.ToString(),
                 kv => kv.Value.ToString()),
             ChangedItemId = item.Id.ToString(),
-            ChangedItemName = item.Name,
+            ChangedItemName = item.DisplayName,
             Slot = item.Slot.ToString(),
             Category = item.Category.ToString(),
             ReplacedItemId = previousId?.ToString()
         };
 
-        await notificationService.SendMessageAsync(cmd.PlayerId, "system", $"You equipped {item.Name}.", ct);
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system", $"You equipped {item.DisplayName}.", ct);
         await notificationService.SendEventAsync(cmd.PlayerId, "EquipmentChanged", equippedPayload, ct);
 
-        return new CommandResult(true, $"Equipped {item.Name}.", equippedPayload);
+        return new CommandResult(true, $"Equipped {item.DisplayName}.", equippedPayload);
     }
 }
 
@@ -118,7 +118,7 @@ public class LockItemCommandHandler(
         await itemRepository.UpdateAsync(item, ct);
 
         var lockState = item.IsLocked ? "locked" : "unlocked";
-        await notificationService.SendMessageAsync(cmd.PlayerId, "system", $"{item.Name} is now {lockState}.", ct);
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system", $"{item.DisplayName} is now {lockState}.", ct);
 
         // Refresh inventory so the client reflects the updated lock state
         var items = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);

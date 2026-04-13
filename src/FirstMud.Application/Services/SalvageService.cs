@@ -48,19 +48,19 @@ public class SalvageService
             return new SalvageResult(false, "Item not found in your inventory.", []);
 
         if (item.Category == ItemCategory.Component)
-            return new SalvageResult(false, $"{item.Name} is already a component and cannot be salvaged.", []);
+            return new SalvageResult(false, $"{item.DisplayName} is already a component and cannot be salvaged.", []);
 
         if (item.Category == ItemCategory.Reagent)
-            return new SalvageResult(false, $"{item.Name} is a reagent and cannot be salvaged.", []);
+            return new SalvageResult(false, $"{item.DisplayName} is a reagent and cannot be salvaged.", []);
 
         if (item.IsLocked)
-            return new SalvageResult(false, $"{item.Name} is locked. Unlock it first (★) to salvage.", []);
+            return new SalvageResult(false, $"{item.DisplayName} is locked. Unlock it first (★) to salvage.", []);
 
         if (player.IsItemEquipped(itemId))
-            return new SalvageResult(false, $"{item.Name} is currently equipped. Unequip it before salvaging.", []);
+            return new SalvageResult(false, $"{item.DisplayName} is currently equipped. Unequip it before salvaging.", []);
 
         if (!item.IsSalvageable)
-            return new SalvageResult(false, $"{item.Name} is broken and cannot be salvaged.", []);
+            return new SalvageResult(false, $"{item.DisplayName} is broken and cannot be salvaged.", []);
 
         // Skill gate: check SalvageSkill against item Workmanship
         var skillCheckResult = CheckSalvageSkill(player.SalvageSkill, item);
