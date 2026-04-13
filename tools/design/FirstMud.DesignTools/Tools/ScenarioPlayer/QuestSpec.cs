@@ -9,6 +9,8 @@ public sealed class QuestSpec
     public QuestStartState StartState { get; set; } = new();
     public List<QuestBeat> Beats { get; set; } = new();
     public string Root { get; set; } = "";
+    /// <summary>Per-fixture override: when true, removeItem underflow degrades to a warning instead of a hard error.</summary>
+    public bool AllowUnderflow { get; set; }
 }
 
 public sealed class QuestStartState
@@ -47,6 +49,7 @@ public sealed class QuestChoice
     public string Id { get; set; } = "";
     public string Text { get; set; } = "";
     public string? Next { get; set; }
+    public QuestRequires? Requires { get; set; }
     public List<QuestEffect> Effects { get; set; } = new();
 }
 

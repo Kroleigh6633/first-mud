@@ -43,7 +43,7 @@ dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario f
 
 | command           | status   | key flags                                          |
 |-------------------|----------|----------------------------------------------------|
-| `scenario-player` | full     | `--fixture <path>` `--choose id,id,id`             |
+| `scenario-player` | full     | `--fixture <path>` `--choose id,id,id` `--allow-underflow` |
 | `dialogue-lint`   | full     | `--fixture <path>`                                 |
 | `faction-state`   | scaffold | `--at <marker>`                                    |
 | `encounter-sim`   | full     | `--monster <id>` (repeatable) `--party <L:elem,...>` `--rolls <N>` `--player-level <L>` `--player-element <E>` `--seed <S>` |
@@ -71,7 +71,42 @@ dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario f
 ```
 
 Effect types: `setFlag`, `clearFlag`, `addItem`, `removeItem`, `addReputation`.
-Requires: `flags[]`, `items[{key,amount}]`, `reputation{faction: min}`.
+Requires: `flags[]`, `items[{key,amount}]`, `reputation{faction: min}`. Both
+beats and choices may carry a `requires` block; a choice whose `requires`
+fails is **not traversable** (the runner skips it; forcing into it errors).
+
+See [docs/scenario-spec.md](docs/scenario-spec.md) for the full schema and
+the underflow / gating semantics.
+
+#### removeItem underflow
+
+By default `removeItem` is a **hard error** when the requested amount exceeds
+the current stock (an absent key counts as stock 0). The runner exits non-zero
+and prints e.g. `ERROR at beat 'past-varn' choice 'bribe-scribe': removeItem
+'gold' x25 exceeds stock (0 available)`.
+
+To suppress the hard error and clamp the subtract to zero (useful when
+exploring fixtures with intentionally-incomplete startState):
+
+- pass `--allow-underflow` on the CLI, **or**
+- set `"allowUnderflow": true` at the top level of the fixture.
+
+In both cases the underflow is still reported as a per-step warning.
+
+### Common footguns
+
+- **removeItem underflow.** A choice removes `gold x25` but the player has
+  none. Default = hard error. Use `--allow-underflow` only when intentionally
+  sketching. Real fix is usually to add the stock to `startState.inventory`
+  via an earlier reward chain.
+- **Missing prerequisite flags.** A beat's `requires.flags` lists a flag the
+  default-first-choice path never sets. Currently a *warning* (so visited
+  beats still report). Watch for `warn: missing flag '...'` in the markdown.
+- **Terminal unreachable due to rep gating.** A choice gated on
+  `reputation.<faction> >= N` will be silently skipped during default
+  traversal if the start rep is too low. The successful terminal becomes
+  unreachable. Use `--choose` to force into the gated branch and confirm the
+  rep wall is intentional, not an authoring slip.
 
 ### Dialogue tree (v1, JSON)
 

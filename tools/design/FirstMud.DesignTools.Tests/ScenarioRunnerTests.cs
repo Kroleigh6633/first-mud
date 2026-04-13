@@ -38,6 +38,115 @@ public class ScenarioRunnerTests
         Assert.Equal("declined", result.FinalOutcome);
     }
 
+    [Fact]
+    public void RemoveItem_underflow_without_flag_errors_hard()
+    {
+        var spec = BuildBribeSpec();
+        var result = new ScenarioRunner().Run(spec, new[] { "bribe" });
+
+        Assert.NotEmpty(result.Errors);
+        Assert.Contains(result.Errors, e =>
+            e.Contains("removeItem", StringComparison.Ordinal)
+            && e.Contains("'gold'", StringComparison.Ordinal)
+            && e.Contains("exceeds stock", StringComparison.Ordinal)
+            && e.Contains("0 available", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RemoveItem_underflow_with_allow_flag_warns_and_clamps_to_zero()
+    {
+        var spec = BuildBribeSpec();
+        var result = new ScenarioRunner().Run(
+            spec,
+            new[] { "bribe" },
+            new ScenarioRunner.Options { AllowUnderflow = true });
+
+        Assert.Empty(result.Errors);
+        Assert.Contains(result.Steps.SelectMany(s => s.RequirementWarnings),
+            w => w.Contains("removeItem", StringComparison.Ordinal)
+                 && w.Contains("clamped to 0", StringComparison.Ordinal));
+        var inv = (Dictionary<string, object>)result.FinalState["inventory"];
+        Assert.Equal(0, (int)inv["gold"]);
+    }
+
+    [Fact]
+    public void RequiresItems_gate_blocks_branch_when_stock_missing()
+    {
+        var spec = BuildGatedChoiceSpec();
+        // Default path picks first ELIGIBLE choice: 'gated' is gated by gold x25,
+        // so the runner must skip it and pick 'walk-away'.
+        var result = new ScenarioRunner().Run(spec);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal("walked-away", result.FinalOutcome);
+        Assert.DoesNotContain(result.Steps, s => s.ChosenChoiceId == "gated");
+    }
+
+    [Fact]
+    public void Forcing_into_gated_branch_without_stock_errors()
+    {
+        var spec = BuildGatedChoiceSpec();
+        var result = new ScenarioRunner().Run(spec, new[] { "gated" });
+
+        Assert.NotEmpty(result.Errors);
+        Assert.Contains(result.Errors, e => e.Contains("not traversable", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fixture_level_allowUnderflow_overrides_off_to_on()
+    {
+        var spec = BuildBribeSpec();
+        spec.AllowUnderflow = true;
+        var result = new ScenarioRunner().Run(spec, new[] { "bribe" });
+
+        Assert.Empty(result.Errors);
+    }
+
+    private static QuestSpec BuildBribeSpec() => new()
+    {
+        Id = "bribe-quest",
+        Title = "Bribe Test",
+        Root = "intro",
+        StartState = new() { Inventory = new() /* zero gold */ },
+        Beats = new()
+        {
+            new QuestBeat
+            {
+                Id = "intro", Description = "A scribe waits.",
+                Choices = new()
+                {
+                    new() { Id = "bribe", Text = "Bribe.", Next = "end",
+                        Effects = new() { new() { Type = "removeItem", Key = "gold", Amount = 25 } } }
+                }
+            },
+            new QuestBeat { Id = "end", Description = "Done.", Terminal = true, Outcome = "bribed" }
+        }
+    };
+
+    private static QuestSpec BuildGatedChoiceSpec() => new()
+    {
+        Id = "gated-quest",
+        Title = "Gated Test",
+        Root = "intro",
+        StartState = new() { Inventory = new() /* zero gold */ },
+        Beats = new()
+        {
+            new QuestBeat
+            {
+                Id = "intro", Description = "Choose.",
+                Choices = new()
+                {
+                    new() { Id = "gated", Text = "Pay 25g.", Next = "end-paid",
+                        Requires = new() { Items = new() { new() { Key = "gold", Amount = 25 } } },
+                        Effects = new() { new() { Type = "removeItem", Key = "gold", Amount = 25 } } },
+                    new() { Id = "walk-away", Text = "Walk away.", Next = "end-walk" }
+                }
+            },
+            new QuestBeat { Id = "end-paid", Description = "Paid.", Terminal = true, Outcome = "paid" },
+            new QuestBeat { Id = "end-walk", Description = "Walked.", Terminal = true, Outcome = "walked-away" }
+        }
+    };
+
     private static QuestSpec BuildFetchPeltsSpec() => new()
     {
         Id = "test-quest",
