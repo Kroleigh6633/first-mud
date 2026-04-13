@@ -1,0 +1,39 @@
+{
+  "$schema": "dialogue-tree/v1",
+  "npcId": "harken",
+  "roots": [ "greet" ],
+  "startingReputation": { "wytchwood": 0 },
+  "nodes": [
+    {
+      "id": "greet",
+      "text": "Harken eyes you. 'What brings you to the Wytchwood?'",
+      "options": [
+        { "text": "Work?", "next": "work" },
+        { "text": "Just passing through.", "next": "farewell" },
+        { "text": "I'm a friend of the wood.", "next": "insider", "requiresReputation": { "faction": "wytchwood", "min": 25 } }
+      ]
+    },
+    {
+      "id": "work",
+      "text": "'I need wolf pelts. Three. Before the snows.'",
+      "options": [
+        { "text": "I'll do it.", "next": "accept" },
+        { "text": "Not my line of work.", "next": "farewell" }
+      ]
+    },
+    {
+      "id": "insider",
+      "text": "'Ah — one of ours. Come, I have deeper work.'",
+      "options": [
+        { "text": "Tell me more.", "next": "deep-quest" }
+      ]
+    },
+    {
+      "id": "deep-quest",
+      "text": "'The old shrine stirs. Meet me at dusk.'",
+      "terminal": true
+    },
+    { "id": "accept", "text": "'Good. Bring them to me here.'", "terminal": true },
+    { "id": "farewell", "text": "'Safe roads.'", "terminal": true }
+  ]
+}

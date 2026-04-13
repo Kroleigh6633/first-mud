@@ -1,0 +1,80 @@
+{
+  "QuestId": "harken-wolf-pelts",
+  "Title": "Harken\u0027s Wolf Pelt Request",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "Harken explains he needs 3 wolf pelts before winter.",
+      "AvailableChoices": [
+        "accept: Accept the quest.",
+        "decline: Decline politely."
+      ],
+      "ChosenChoiceId": "accept",
+      "ChosenChoiceText": "Accept the quest.",
+      "Deltas": [
+        "flag\u002B harken.accepted"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "hunt",
+      "Description": "Track wolves through the Wytchwood at dusk.",
+      "AvailableChoices": [
+        "hunt-fair: Hunt fairly.",
+        "hunt-poach: Set illegal snares."
+      ],
+      "ChosenChoiceId": "hunt-poach",
+      "ChosenChoiceText": "Set illegal snares.",
+      "Deltas": [
+        "item\u002B wolf-pelt x3",
+        "flag\u002B harken.poached"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "return",
+      "Description": "Deliver pelts to Harken.",
+      "AvailableChoices": [
+        "honest: Hand over the pelts."
+      ],
+      "ChosenChoiceId": "honest",
+      "ChosenChoiceText": "Hand over the pelts.",
+      "Deltas": [
+        "item- wolf-pelt x3",
+        "rep\u002B wytchwood \u002B10"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-good",
+      "Description": "Harken nods with respect. Reputation with Wytchwood increases.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "success"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "harken.accepted",
+      "harken.poached"
+    ],
+    "inventory": {
+      "wolf-pelt": 0
+    },
+    "reputation": {
+      "wytchwood": 10
+    }
+  },
+  "FinalOutcome": "success",
+  "Errors": []
+}

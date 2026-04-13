@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/tools/">
+    <Project Path="FirstMud.DesignTools/FirstMud.DesignTools.csproj" />
+    <Project Path="FirstMud.DesignTools.Tests/FirstMud.DesignTools.Tests.csproj" />
+  </Folder>
+  <Folder Name="/referenced-src/">
+    <Project Path="../../src/FirstMud.Application/FirstMud.Application.csproj" />
+    <Project Path="../../src/FirstMud.Domain/FirstMud.Domain.csproj" />
+  </Folder>
+</Solution>

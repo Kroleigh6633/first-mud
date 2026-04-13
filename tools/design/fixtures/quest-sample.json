@@ -1,0 +1,42 @@
+{
+  "$schema": "quest-chain/v1",
+  "id": "harken-wolf-pelts",
+  "title": "Harken's Wolf Pelt Request",
+  "description": "Fetch 3 wolf pelts for Harken, the Wytchwood trapper.",
+  "startState": {
+    "player": "fresh-farmer",
+    "flags": [],
+    "inventory": [],
+    "reputation": { "wytchwood": 0 }
+  },
+  "beats": [
+    {
+      "id": "intro",
+      "description": "Harken explains he needs 3 wolf pelts before winter.",
+      "choices": [
+        { "id": "accept", "text": "Accept the quest.", "next": "hunt", "effects": [ { "type": "setFlag", "key": "harken.accepted" } ] },
+        { "id": "decline", "text": "Decline politely.", "next": "end-decline" }
+      ]
+    },
+    {
+      "id": "hunt",
+      "description": "Track wolves through the Wytchwood at dusk.",
+      "requires": { "flags": [ "harken.accepted" ] },
+      "choices": [
+        { "id": "hunt-fair", "text": "Hunt fairly.", "next": "return", "effects": [ { "type": "addItem", "key": "wolf-pelt", "amount": 3 } ] },
+        { "id": "hunt-poach", "text": "Set illegal snares.", "next": "return", "effects": [ { "type": "addItem", "key": "wolf-pelt", "amount": 3 }, { "type": "setFlag", "key": "harken.poached" } ] }
+      ]
+    },
+    {
+      "id": "return",
+      "description": "Deliver pelts to Harken.",
+      "requires": { "items": [ { "key": "wolf-pelt", "amount": 3 } ] },
+      "choices": [
+        { "id": "honest", "text": "Hand over the pelts.", "next": "end-good", "effects": [ { "type": "removeItem", "key": "wolf-pelt", "amount": 3 }, { "type": "addReputation", "key": "wytchwood", "amount": 10 } ] }
+      ]
+    },
+    { "id": "end-decline", "description": "Harken grunts and turns away.", "terminal": true, "outcome": "declined" },
+    { "id": "end-good", "description": "Harken nods with respect. Reputation with Wytchwood increases.", "terminal": true, "outcome": "success" }
+  ],
+  "root": "intro"
+}
