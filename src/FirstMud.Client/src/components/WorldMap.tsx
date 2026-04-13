@@ -322,6 +322,7 @@ function buildingBaseColors(type: BuildingType): { wall: string; roof: string; a
     case 'Barracks':       return { wall: '#3a2020', roof: '#5a3030', accent: '#cc4444' };
     case 'Library':        return { wall: '#2a3040', roof: '#4a5060', accent: '#44aacc' };
     case 'Warehouse':      return { wall: '#404040', roof: '#606060', accent: '#aaaaaa' };
+    case 'Hut':            return { wall: '#7a5030', roof: '#a06838', accent: '#ddaa77' };
     default:               return { wall: '#3a3a3a', roof: '#5a5a5a', accent: '#888888' };
   }
 }
@@ -870,6 +871,60 @@ function drawHomesteadBuilding(
       ctx.beginPath();
       ctx.arc(sx - hw * 0.4, roofBase + wh * 0.5, tileH * 0.15, 0, Math.PI * 2);
       ctx.stroke();
+      break;
+    }
+
+    // ── Hut: small brown dwelling with peaked thatched roof ─────────────────
+    case 'Hut': {
+      const hw = tileW * 0.26;   // narrower than full buildings
+      const wh = tileH * 0.85;   // shorter walls
+      const roofBase = floor - wh;
+
+      // Left wall face (darker)
+      ctx.fillStyle = '#5a3820';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      // Right wall face
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+
+      // Thatched roof — wide, low-pitched triangle with layered stripes
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 1.15, roofBase);
+      ctx.lineTo(sx,              roofBase - tileH * 0.55);
+      ctx.lineTo(sx + hw * 1.15,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+
+      // Thatch texture: horizontal stroke lines across the roof
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 1.15, roofBase);
+      ctx.lineTo(sx,              roofBase - tileH * 0.55);
+      ctx.lineTo(sx + hw * 1.15,  roofBase);
+      ctx.closePath();
+      ctx.clip();
+      ctx.strokeStyle = '#7a5020';
+      ctx.lineWidth = 0.9;
+      for (let i = 1; i <= 4; i++) {
+        const ty = roofBase - (tileH * 0.55) * (i / 5);
+        const span = hw * 1.15 * (1 - i / 5);
+        ctx.beginPath();
+        ctx.moveTo(sx - span, ty);
+        ctx.lineTo(sx + span, ty);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Small door
+      ctx.fillStyle = '#2a1808';
+      ctx.fillRect(sx - tileW * 0.04, floor - tileH * 0.42, tileW * 0.08, tileH * 0.42);
+
+      // Tiny window on right face
+      ctx.fillStyle = colors.accent;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(sx + hw * 0.35, roofBase + wh * 0.28, hw * 0.3, tileH * 0.16);
+      ctx.globalAlpha = 1;
       break;
     }
 

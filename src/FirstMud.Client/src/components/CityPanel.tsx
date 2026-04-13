@@ -345,9 +345,13 @@ interface PlaceBuildingSectionProps {
   sendCommand: (command: string, payload?: unknown) => void;
 }
 
+// Building types that can be placed multiple times (e.g. housing)
+const MULTI_PLACE_TYPES = new Set<BuildingType>(['Hut']);
+
 function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCommand }: PlaceBuildingSectionProps) {
   const placedTypes = new Set(buildings.map(b => b.type));
-  const availableTypes = ALL_BUILDING_TYPES.filter(t => !placedTypes.has(t));
+  // Multi-place types are always available; single-place types only if not yet placed
+  const availableTypes = ALL_BUILDING_TYPES.filter(t => MULTI_PLACE_TYPES.has(t) || !placedTypes.has(t));
   const [selectedType, setSelectedType] = useState<BuildingType | ''>('');
 
   if (availableTypes.length === 0) {
