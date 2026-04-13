@@ -142,6 +142,55 @@
       ]
     },
     {
+      "id": "brother-velm",
+      "displayName": "Brother Velm",
+      "homeZoneId": "aeldran-2-thornwood",
+      "role": "civilian",
+      "shortDescription": "A lay brother who keeps a dream-journal and reports omens to anyone who'll listen; unreliable as a witness, uncannily accurate as a weather-vane.",
+      "voiceTells": [
+        "Opens every conversation with last night's dream, whether asked or not.",
+        "Sniffs the air twice before answering a direct question.",
+        "Refuses to sit on wooden benches — says the wood \"remembers too much.\""
+      ]
+    },
+    {
+      "id": "maren",
+      "displayName": "Maren",
+      "homeZoneId": "aeldran-7-starting-road",
+      "role": "shopkeeper",
+      "shortDescription": "A travelling tinker who reappears on the road only during the Red Market days, trading oddments for oddments.",
+      "voiceTells": [
+        "Never gives a straight price — always proposes a trade.",
+        "Carries a sealed tin she never opens in front of customers.",
+        "Laughs once, short, then falls silent, every time a deal closes."
+      ]
+    },
+    {
+      "id": "halven-orys",
+      "displayName": "Halven Orys",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "civilian",
+      "shortDescription": "Older brother to Thenna Orys; a dockside reckoner whose generosity is always calibrated to a worry he won't name.",
+      "voiceTells": [
+        "Pays for rounds when something is weighing on him — the more rounds, the bigger the worry.",
+        "Sets his cup down with deliberate care, then adjusts its position twice.",
+        "Mentions his sister Thenna only obliquely, never by name in public."
+      ]
+    },
+    {
+      "id": "compact-factor",
+      "displayName": "Compact Factor",
+      "factionId": "EmeraldCompact",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "civilian",
+      "shortDescription": "A faceless junior factor of the Emerald Compact who delivers polite, deniable warnings on behalf of senior signatories.",
+      "voiceTells": [
+        "Speaks only in the plural (\"we'll want,\" \"we note\"), never in the first person singular.",
+        "Always refers to the next ledger line, never the current one.",
+        "Leaves a green-ink tally mark on any door he has visited officially."
+      ]
+    },
+    {
       "id": "lirya-vane",
       "displayName": "Senior Factor Lirya Vane",
       "factionId": "EmeraldCompact",

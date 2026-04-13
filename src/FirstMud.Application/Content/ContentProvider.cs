@@ -1987,11 +1987,9 @@ public sealed class ContentProvider : IContentProvider
     /// Loads content/world-events.json and validates it. Validation is
     /// strict-enough-to-catch-typos:
     /// unique event ids, trigger.kind + shape consistency, effects[] non-empty
-    /// and every type known, cross-ref every zoneId / factionId / questId
-    /// against the authored registries, onExpire[] presence check warned
-    /// (not thrown) when transient effects have no inverse. npcId references
-    /// are not cross-checked — the NPC catalog is not yet in JSON; when it
-    /// lands, this validator should tighten.
+    /// and every type known, cross-ref every zoneId / factionId / questId /
+    /// npcId against the authored registries, onExpire[] presence check warned
+    /// (not thrown) when transient effects have no inverse.
     /// </summary>
     private IReadOnlyList<WorldEventDefinition> LoadWorldEvents()
     {
@@ -2249,6 +2247,10 @@ public sealed class ContentProvider : IContentProvider
         if (!string.IsNullOrWhiteSpace(raw.QuestId) && _questsById.Count > 0 && !_questsById.ContainsKey(raw.QuestId))
             throw new InvalidDataException(
                 $"{path}: event '{eventId}' {section} references unknown questId '{raw.QuestId}'.");
+
+        if (!string.IsNullOrWhiteSpace(raw.NpcId) && _npcsById.Count > 0 && !_npcsById.ContainsKey(raw.NpcId))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} references unknown npcId '{raw.NpcId}'.");
 
         return new WorldEventEffect(
             Type: raw.Type,

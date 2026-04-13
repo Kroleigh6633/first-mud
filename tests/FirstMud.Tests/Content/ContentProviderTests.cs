@@ -1565,6 +1565,30 @@ public class ContentProviderTests
     // ─── World Events ─────────────────────────────────────────────────────
 
     /// <summary>
+    /// Tightening assertion: every world-event's referenced npcId must resolve
+    /// against the authoritative npcs.json. Guards against events drifting out
+    /// of sync with the NPC catalog after rename/retire.
+    /// </summary>
+    [Fact]
+    public void Every_world_event_npcId_is_present_in_npcs_json()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        var authoredNpcIds = provider.AllNpcs().Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var evt in provider.AllEvents())
+        {
+            foreach (var effect in evt.Effects.Concat(evt.OnExpire))
+            {
+                if (!string.IsNullOrWhiteSpace(effect.NpcId))
+                {
+                    authoredNpcIds.Should().Contain(effect.NpcId,
+                        $"event '{evt.Id}' effect type '{effect.Type}' references npcId '{effect.NpcId}' which must be authored in npcs.json");
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Happy path: the shipped world-events.json loads, 12 events are seeded
     /// from world-events.md, and lookup by id works.
     /// </summary>
@@ -1655,11 +1679,11 @@ public class ContentProviderTests
     }
 
     [Fact]
-    public void Unknown_npc_ref_in_event_does_not_throw_until_npc_catalog_exists()
+    public void Unknown_npc_ref_in_event_throws_on_load()
     {
-        // npcId refs are deliberately permissive today — the NPC catalog is
-        // not yet JSON-backed. This test fences that tolerance so a future
-        // tightening is an intentional decision, not a drive-by change.
+        // After the NPC catalog merged into content/npcs.json, world-events
+        // validation now cross-checks npcId against the authored catalog so
+        // typos and rename-drift fail loudly.
         var dir = MakeContentDirWithEvents("""
         {
           "events": [
@@ -1678,8 +1702,9 @@ public class ContentProviderTests
         """);
         try
         {
-            var provider = new ContentProvider(dir.FullName);
-            provider.GetEvent("permissive-npc").Should().NotBeNull();
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*unknown npcId 'not-in-any-registry'*");
         }
         finally
         {
