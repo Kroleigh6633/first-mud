@@ -155,7 +155,7 @@
       "reputationReward": 0,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": true,
-      "startingZoneId": null
+      "startingZoneId": "aeldran-6-ashen-reach"
     }
   ],
   "edges": [

@@ -24,7 +24,7 @@ public class PlaybookRunnerTests
         Holdouts = new Holdouts { PlayerLevel = 5, PlayerElement = "Aether" },
         Axes = new List<Axis>
         {
-            new() { Name = "dangerLevel", Values = new[] { 0, 8 } },
+            new() { Name = "dangerLevel", Values = new AxisValues { Ints = new[] { 0, 8 } } },
         },
         ExpectedViability = new ExpectedViability
         {

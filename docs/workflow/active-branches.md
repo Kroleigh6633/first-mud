@@ -27,8 +27,6 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-a28b3adf | in-progress | content-layer-pilot | Auto-quest completion flow playbook + flow evaluator + AutoQuestSimulationService + ASHEN_001 startingZoneId tune | - | tools/design, content/quests.json, docs/design/sim-reports | 2026-04-13 |
 | worktree-agent-a9a66dad | in-progress | content-layer-pilot | Auto-quest precondition checks | - | src/FirstMud.GameServer | 2026-04-13 |
 | worktree-agent-a32711f5 | in-progress | content-layer-pilot | Auto-progression MVP | - | src/FirstMud.GameServer, src/FirstMud.Client | 2026-04-13 |
-| worktree-agent-aebcdfe5 | ready-to-merge | content-layer-pilot | Blocklist escort/deliver/protect procgen quest templates (no pickup-flow yet) | - | src/FirstMud.GameServer, tests/FirstMud.Tests | 2026-04-13 |
 <!-- agents add rows above this line -->
