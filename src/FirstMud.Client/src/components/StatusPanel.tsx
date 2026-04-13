@@ -204,7 +204,20 @@ function CompanionRow({
   );
 }
 
-export default function StatusPanel({ player, currentTile, equipment, companionRoster = [] }: Props) {
+// Estimated world size — bounding box of known zones × 2 for wilderness
+const ESTIMATED_WORLD_SIZE = 2000;
+
+// Next milestone thresholds for display
+const MILESTONES = [50, 100, 200, 500, 1000];
+function nextMilestone(tiles: number): { threshold: number; xp: number } | null {
+  const xpForMilestone = (t: number) => t <= 200 ? (t === 50 || t === 100 ? 50 : 200) : (t === 500 ? 200 : 500);
+  for (const m of MILESTONES) {
+    if (tiles < m) return { threshold: m, xp: xpForMilestone(m) };
+  }
+  return null;
+}
+
+export default function StatusPanel({ player, currentTile, equipment, companionRoster = [], visitedTileCount = 0 }: Props) {
   const panelStyle: React.CSSProperties = {
     padding: '8px 10px',
     fontFamily: 'monospace',
@@ -338,6 +351,34 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
           })()}
         </div>
       )}
+
+      <div style={sectionHeaderStyle}>Exploration</div>
+      {(() => {
+        const serverTiles = player.tilesDiscovered ?? 0;
+        const clientTiles = visitedTileCount;
+        const explorePercent = Math.min(100, Math.round((clientTiles / ESTIMATED_WORLD_SIZE) * 100));
+        const next = nextMilestone(serverTiles);
+        return (
+          <>
+            <div style={{ marginBottom: '2px' }}>
+              <span style={{ color: '#888888' }}>World explored: </span>
+              <span style={{ color: '#00ccff' }}>{explorePercent}%</span>
+              <span style={{ color: '#555555' }}> ({clientTiles} tiles)</span>
+            </div>
+            <div style={{ marginBottom: '2px' }}>
+              <span style={{ color: '#888888' }}>Tiles moved: </span>
+              <span style={{ color: '#aaaaaa' }}>{serverTiles}</span>
+            </div>
+            {next && (
+              <div style={{ marginBottom: '2px', fontSize: '11px' }}>
+                <span style={{ color: '#888888' }}>Next milestone: </span>
+                <span style={{ color: '#ffcc00' }}>{next.threshold} tiles</span>
+                <span style={{ color: '#00ff41' }}> (+{next.xp} XP)</span>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div style={sectionHeaderStyle}>Factions</div>
       {FACTIONS.map(faction => {
