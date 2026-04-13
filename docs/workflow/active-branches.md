@@ -28,4 +28,6 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 
+| worktree-agent-a9c4d378 | ready-to-merge | main | Danger-6 TPK fix: small-party pack cap, pre-combat win-rate gate, fix double-scaled survivability check | - | src/FirstMud.GameServer/Services/MonsterFactory.cs, src/FirstMud.GameServer/Handlers/MoveCommandHandler.cs, tests/FirstMud.Tests/MechanicsSweepTests.cs | 2026-04-13 |
+
 <!-- agents add rows above this line -->

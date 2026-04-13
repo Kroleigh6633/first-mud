@@ -37,12 +37,20 @@ public sealed class MonsterFactory
             _    => 3,
         };
 
-        // Pack size scales with party size + danger:
+        // Pack size scales with party size + danger, but small parties are
+        // capped tighter to avoid TPK alpha-strikes (the reported danger-6 TPK
+        // had 4 party vs 6 enemies — a 1.5x outnumbering that mass-focused
+        // underleveled companions).
+        //
+        // Small parties (≤4): +1 cap regardless of danger (max partySize+1).
+        // Large parties (≥5): legacy scaling — up to partySize + dangerLevel/3.
+        //
         // danger 1-2:  party + 0  (fair fight)
         // danger 3-5:  party + 1  (slightly outnumbered)
-        // danger 6-8:  party + 2  (outnumbered)
-        // danger 9-10: party + 3  (heavily outnumbered)
-        int maxEnemies = partySize + (dangerLevel / 3);
+        // danger 6-10: party + 1  for small parties, party + dangerLevel/3 for larger.
+        int smallPartyCap = partySize + 1;
+        int legacyCap     = partySize + (dangerLevel / 3);
+        int maxEnemies    = partySize <= 4 ? Math.Min(smallPartyCap, legacyCap) : legacyCap;
 
         int packSize = dangerLevel switch
         {
