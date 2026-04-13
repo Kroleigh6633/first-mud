@@ -351,17 +351,17 @@ function drawHomesteadBuilding(
   const floor = sy - tileH / 2;
 
   if (!isConstructed) {
-    // ── Under construction: isometric wireframe scaffold ──────────────────
+    // ── Under construction: narrow wireframe scaffold, sized to fit within 1 tile ─
     ctx.save();
     ctx.globalAlpha = 0.55 + 0.35 * (progress / 100);
 
-    const hw = tileW * 0.44;   // half-width of scaffold footprint
-    const sh = tileH * 1.2;    // total scaffold height above floor
+    const hw = tileW * 0.24;   // half-width — fits inside a single iso tile diamond
+    const sh = tileH * 0.95;   // total scaffold height above floor
 
     // Outer outline (dashed)
     ctx.strokeStyle = '#886644';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 3]);
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 2]);
     ctx.strokeRect(sx - hw, floor - sh, hw * 2, sh);
 
     // Diagonal cross-beams
@@ -378,12 +378,12 @@ function drawHomesteadBuilding(
     ctx.fillStyle = colors.wall + '88';
     ctx.fillRect(sx - hw, floor - fillH, hw * 2, fillH);
 
-    // "%" label
-    ctx.font = `bold ${tileH * 0.5}px monospace`;
+    // "%" label — small, above the scaffold so it doesn't extend the silhouette sideways
+    ctx.font = `bold ${tileH * 0.38}px monospace`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#ffcc44';
-    ctx.fillText(`${progress}%`, sx, floor - sh * 0.5);
+    ctx.fillText(`${progress}%`, sx, floor - sh - 2);
 
     ctx.restore();
     return;
@@ -541,7 +541,7 @@ function drawHomesteadBuilding(
 
     // ── Farm: green crop rows + fence perimeter ─────────────────────────────
     case 'Farm': {
-      const extent = tileW * 0.85;   // span most of 2×2 footprint
+      const extent = tileW * 0.38;   // fit within a single iso tile
 
       // Soil base
       ctx.fillStyle = '#4a3018';
@@ -875,41 +875,72 @@ function drawHomesteadBuilding(
       break;
     }
 
-    // ── Hut: small brown dwelling with peaked thatched roof ─────────────────
+    // ── Hut: small cone-roof dwelling, narrow-waisted silhouette ────────────
+    // Redesigned so the body reads as a small HOUSE, not a horizontal bar:
+    //   • walls are a trapezoid that narrows toward the base (iso perspective)
+    //   • roof width matches wall top width exactly (no overhang "ears" that
+    //     made the wall rectangle read as a pedestal/bar underneath)
+    //   • taller-than-wide proportions
+    //   • door is an arch notch cut from the wall silhouette, not a floor-hugging
+    //     rect that itself looks like a bar.
     case 'Hut': {
-      const hw = tileW * 0.26;   // narrower than full buildings
-      const wh = tileH * 0.85;   // shorter walls
+      const topHw  = tileW * 0.22;    // wall half-width at the roof line
+      const baseHw = tileW * 0.16;    // wall half-width at the floor — narrower => no base-bar
+      const wh     = tileH * 1.05;    // taller walls so silhouette is vertical, not horizontal
+      const rh     = tileH * 0.55;    // roof peak height above wall top
       const roofBase = floor - wh;
 
-      // Left wall face (darker)
-      ctx.fillStyle = '#5a3820';
-      ctx.fillRect(sx - hw, roofBase, hw, wh);
-      // Right wall face
-      ctx.fillStyle = colors.wall;
-      ctx.fillRect(sx, roofBase, hw, wh);
-
-      // Thatched roof — wide, low-pitched triangle with layered stripes
+      // Wall — trapezoid (wider at top, narrower at base)
       ctx.beginPath();
-      ctx.moveTo(sx - hw * 1.15, roofBase);
-      ctx.lineTo(sx,              roofBase - tileH * 0.55);
-      ctx.lineTo(sx + hw * 1.15,  roofBase);
+      ctx.moveTo(sx - topHw,  roofBase);
+      ctx.lineTo(sx + topHw,  roofBase);
+      ctx.lineTo(sx + baseHw, floor);
+      ctx.lineTo(sx - baseHw, floor);
+      ctx.closePath();
+      ctx.fillStyle = colors.wall;
+      ctx.fill();
+
+      // Vertical seam down the middle to suggest two faces of the hut in iso
+      ctx.strokeStyle = '#3a2410';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(sx, roofBase);
+      ctx.lineTo(sx, floor);
+      ctx.stroke();
+
+      // Shade the "left" face slightly darker for depth
+      ctx.beginPath();
+      ctx.moveTo(sx - topHw,  roofBase);
+      ctx.lineTo(sx,          roofBase);
+      ctx.lineTo(sx,          floor);
+      ctx.lineTo(sx - baseHw, floor);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fill();
+
+      // Thatched roof — width EXACTLY matches top of walls (no overhang = no
+      // "bar under a hat" silhouette).
+      ctx.beginPath();
+      ctx.moveTo(sx - topHw, roofBase);
+      ctx.lineTo(sx,          roofBase - rh);
+      ctx.lineTo(sx + topHw,  roofBase);
       ctx.closePath();
       ctx.fillStyle = colors.roof;
       ctx.fill();
 
-      // Thatch texture: horizontal stroke lines across the roof
+      // Thatch texture (horizontal stripes, clipped to roof)
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(sx - hw * 1.15, roofBase);
-      ctx.lineTo(sx,              roofBase - tileH * 0.55);
-      ctx.lineTo(sx + hw * 1.15,  roofBase);
+      ctx.moveTo(sx - topHw, roofBase);
+      ctx.lineTo(sx,          roofBase - rh);
+      ctx.lineTo(sx + topHw,  roofBase);
       ctx.closePath();
       ctx.clip();
       ctx.strokeStyle = '#7a5020';
       ctx.lineWidth = 0.9;
-      for (let i = 1; i <= 4; i++) {
-        const ty = roofBase - (tileH * 0.55) * (i / 5);
-        const span = hw * 1.15 * (1 - i / 5);
+      for (let i = 1; i <= 3; i++) {
+        const ty = roofBase - rh * (i / 4);
+        const span = topHw * (1 - i / 4);
         ctx.beginPath();
         ctx.moveTo(sx - span, ty);
         ctx.lineTo(sx + span, ty);
@@ -917,14 +948,27 @@ function drawHomesteadBuilding(
       }
       ctx.restore();
 
-      // Small door
-      ctx.fillStyle = '#2a1808';
-      ctx.fillRect(sx - tileW * 0.04, floor - tileH * 0.42, tileW * 0.08, tileH * 0.42);
+      // Arch door — small rounded notch carved into the wall, sitting on the
+      // baseline. Using arc+line keeps the bottom edge coincident with the
+      // iso tile top so there's no extra horizontal stripe at the hut base.
+      const doorW = tileW * 0.05;
+      const doorH = tileH * 0.38;
+      const dTop  = floor - doorH;
+      ctx.fillStyle = '#1a0d05';
+      ctx.beginPath();
+      ctx.moveTo(sx - doorW, floor);
+      ctx.lineTo(sx - doorW, dTop);
+      ctx.arc(sx, dTop, doorW, Math.PI, 0, false);
+      ctx.lineTo(sx + doorW, floor);
+      ctx.closePath();
+      ctx.fill();
 
-      // Tiny window on right face
+      // Tiny round window above door
       ctx.fillStyle = colors.accent;
-      ctx.globalAlpha = 0.55;
-      ctx.fillRect(sx + hw * 0.35, roofBase + wh * 0.28, hw * 0.3, tileH * 0.16);
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.arc(sx, roofBase + wh * 0.28, tileW * 0.03, 0, Math.PI * 2);
+      ctx.fill();
       ctx.globalAlpha = 1;
       break;
     }
@@ -1222,19 +1266,20 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       npcMap.get(key)!.push(npc);
     }
 
-    // Homestead building lookup (grid coords are relative to homestead centre -100,-100)
+    // Homestead building lookup (grid coords are relative to homestead centre -100,-100).
+    //
+    // Layout: buildings occupy a single 1×1 tile, but we SPACE THEM OUT visually
+    // by mapping each logical grid unit to BUILDING_PITCH world tiles.  This
+    // inserts a 1-tile gap between adjacent buildings so a dense cluster of
+    // huts reads as a tidy village, not a wall of tile-to-tile boxes.
     const homesteadCx = -100;
     const homesteadCy = -100;
+    const BUILDING_PITCH = 2; // 1 gap tile between every building on each axis
     const buildingMap = new Map<string, HomesteadBuilding>();
     for (const b of homesteadBuildingsRef.current) {
-      // Each building occupies a 2×2 footprint centred on (homesteadCx + gridX, homesteadCy + gridY)
-      const bx = homesteadCx + b.gridX;
-      const by = homesteadCy + b.gridY;
-      for (let dx = 0; dx <= 1; dx++) {
-        for (let dy = 0; dy <= 1; dy++) {
-          buildingMap.set(`${bx + dx},${by + dy}`, b);
-        }
-      }
+      const bx = homesteadCx + b.gridX * BUILDING_PITCH;
+      const by = homesteadCy + b.gridY * BUILDING_PITCH;
+      buildingMap.set(`${bx},${by}`, b);
     }
 
     const visited = visitedRef.current;
@@ -1366,19 +1411,13 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       // ── Collect homestead buildings for a deferred second pass ──────────────
       const homesteadBuilding = buildingMap.get(key);
       if (homesteadBuilding && !centerTile) {
-        const anchorX = homesteadCx + homesteadBuilding.gridX;
-        const anchorY = homesteadCy + homesteadBuilding.gridY;
+        const anchorX = homesteadCx + homesteadBuilding.gridX * BUILDING_PITCH;
+        const anchorY = homesteadCy + homesteadBuilding.gridY * BUILDING_PITCH;
         if (gx === anchorX && gy === anchorY) {
-          // Compute center screen position for a 2×2 footprint:
-          // anchor is top-left corner tile; center is midpoint of the 4 tiles.
-          // For a 2×2 block the visual center between (ax,ay),(ax+1,ay),(ax,ay+1),(ax+1,ay+1)
-          // in isometric is the average of their screen centers.
-          const [s00x, s00y] = gridToScreen(anchorX,     anchorY,     vpCx, vpCy);
-          const [s10x, s10y] = gridToScreen(anchorX + 1, anchorY,     vpCx, vpCy);
-          const [s01x, s01y] = gridToScreen(anchorX,     anchorY + 1, vpCx, vpCy);
-          const [s11x, s11y] = gridToScreen(anchorX + 1, anchorY + 1, vpCx, vpCy);
-          const bldSx = (s00x + s10x + s01x + s11x) / 4 + camOffX;
-          const bldSy = (s00y + s10y + s01y + s11y) / 4 + camOffY;
+          // 1×1 footprint — center the sprite on the anchor tile's screen position.
+          const [s00x, s00y] = gridToScreen(anchorX, anchorY, vpCx, vpCy);
+          const bldSx = s00x + camOffX;
+          const bldSy = s00y + camOffY;
           deferredBuildings.push({
             sx: bldSx, sy: bldSy,
             sortKey: anchorX + anchorY,
