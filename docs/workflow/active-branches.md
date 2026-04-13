@@ -27,7 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-acaf56f7 | ready-to-merge | f7c50e9 | workflow infra: branch ledger, briefing template, diagnostic scripts | - | docs/workflow/, scripts/agent/ | 2026-04-13 |
-| worktree-agent-a2b2c677 | ready-to-merge | f7c50e9 | progression-sim tool for DesignTools (simulator, command, tests, reports) | - | tools/design/, docs/design/sim-logs/, docs/design/sim-reports/ | 2026-04-13 |
 
 <!-- agents add rows above this line -->
