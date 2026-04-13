@@ -5,6 +5,7 @@ interface Props {
   combat: CombatUpdate;
   sendCommand: (command: string, payload?: unknown) => void;
   autoFarmStatus?: AutoFarmStatus | null;
+  forceAutoCombat?: boolean;
 }
 
 function HpBar({ current, max, color }: { current: number; max: number; color: string }) {
@@ -101,7 +102,7 @@ function PartyRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: bo
 
 // Abilities are now sourced from the current actor's CombatantState.
 
-export default function CombatPanel({ combat, sendCommand, autoFarmStatus }: Props) {
+export default function CombatPanel({ combat, sendCommand, autoFarmStatus, forceAutoCombat }: Props) {
   const isAutoFarm = autoFarmStatus?.active === true;
   const isOver = combat.state === 'Victory' || combat.state === 'Defeat' || combat.state === 'Fled';
   const playerSide = combat.combatants.filter(c => c.isPlayerSide);
@@ -118,7 +119,15 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus }: Pro
     : firstLivingEnemy?.id ?? null;
   const targetName = enemySide.find(c => c.id === targetId)?.name ?? '???';
 
-  const [autoCombat, setAutoCombat] = useState(false);
+  const [autoCombat, setAutoCombat] = useState(() => forceAutoCombat === true);
+
+  // When forceAutoCombat is enabled at mount (e.g. quest auto-run triggers combat),
+  // ensure auto-combat is on even if state was already initialised as false.
+  useEffect(() => {
+    if (forceAutoCombat) {
+      setAutoCombat(true);
+    }
+  }, [forceAutoCombat]);
 
   // Auto-combat: fire whenever combat state changes and it's the player's turn.
   // Watches the entire combat object so the effect re-triggers on every

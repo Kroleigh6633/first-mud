@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, QuestCompleteResult, ZoneTile, ZoneView, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, CompanionCapturedEvent, CompanionState, WanderingNpc, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap, SmeltCompleteEvent } from '../types/game';
 
 // Same-origin path — Vite dev server proxies /gamehub to the gameserver
 // container, so this works from the host browser and from inside the e2e
@@ -73,6 +73,7 @@ export interface GameConnectionResult {
   companionRoster: CompanionState[];
   recipes: RecipeInfo[];
   lastCraftResult: CraftingCompleteEvent | null;
+  lastSmeltResult: SmeltCompleteEvent | null;
   questWaypoint: QuestWaypoint | null;
   questProgress: QuestProgressMap;
 }
@@ -99,6 +100,7 @@ export function useGameConnection(): GameConnectionResult {
   const [companionRoster, setCompanionRoster] = useState<CompanionState[]>([]);
   const [recipes, setRecipes] = useState<RecipeInfo[]>([]);
   const [lastCraftResult, setLastCraftResult] = useState<CraftingCompleteEvent | null>(null);
+  const [lastSmeltResult, setLastSmeltResult] = useState<SmeltCompleteEvent | null>(null);
   const [questWaypoint, setQuestWaypoint] = useState<QuestWaypoint | null>(null);
   const [questProgress, setQuestProgress] = useState<QuestProgressMap>({});
   const connectionRef = useRef<signalR.HubConnection | null>(null);
@@ -368,6 +370,8 @@ export function useGameConnection(): GameConnectionResult {
         category: 'loot',
         text: `Smelted: ${summary}`,
       });
+      // Store for animated reveal in StoragePanel
+      setLastSmeltResult({ yields: payload.yields ?? [], message: payload.message ?? '' });
     });
 
     connection.on('HarvestComplete', (payload: { itemId?: string; name?: string; amount?: number; resourceType?: string }) => {
@@ -631,6 +635,7 @@ export function useGameConnection(): GameConnectionResult {
     companionRoster,
     recipes,
     lastCraftResult,
+    lastSmeltResult,
     questWaypoint,
     questProgress,
   };

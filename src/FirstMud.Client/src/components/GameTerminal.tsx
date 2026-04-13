@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap } from '../types/game';
+import type { WorldStateSnapshot, GameMessage, ConnectionState, QuestNode, ZoneTile, InventorySnapshot, CombatUpdate, StorageViewSnapshot, AutoFarmStatus, EquipmentSlots, WanderingNpc, CompanionState, RecipeInfo, CraftingCompleteEvent, QuestWaypoint, QuestProgressMap, SmeltCompleteEvent } from '../types/game';
 import WorldMap from './WorldMap';
 import { getBiome } from '../utils/biome';
 import StatusPanel from './StatusPanel';
@@ -41,6 +41,7 @@ interface Props {
   companionRoster?: CompanionState[];
   recipes?: RecipeInfo[];
   lastCraftResult?: CraftingCompleteEvent | null;
+  lastSmeltResult?: SmeltCompleteEvent | null;
   questWaypoint?: QuestWaypoint | null;
   questProgress?: QuestProgressMap;
 }
@@ -122,6 +123,7 @@ export default function GameTerminal({
   companionRoster = [],
   recipes = [],
   lastCraftResult = null,
+  lastSmeltResult = null,
   questWaypoint = null,
   questProgress = {},
 }: Props) {
@@ -1148,6 +1150,7 @@ export default function GameTerminal({
           onClose={() => setShowStorage(false)}
           atHomestead={atHomestead}
           onSmelt={(amount) => sendCommand('smelt', { amount })}
+          lastSmeltResult={lastSmeltResult ?? null}
         />
       )}
       {showCompanions && (
@@ -1168,6 +1171,7 @@ export default function GameTerminal({
           lastCraftResult={lastCraftResult ?? null}
           onCraft={(recipeId, componentIds, taperId) =>
             sendCommand('craft', { recipeId, componentIds, taperId })}
+          onSalvage={(itemId) => sendCommand('salvage', { itemId })}
           onRequestRecipes={() => sendCommand('viewrecipes', null)}
           onClose={() => setShowCrafting(false)}
         />

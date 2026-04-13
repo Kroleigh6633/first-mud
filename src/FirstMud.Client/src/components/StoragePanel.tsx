@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import type { StorageViewSnapshot, AppliedImbue } from '../types/game';
+import React, { useState, useEffect, useRef } from 'react';
+import type { StorageViewSnapshot, AppliedImbue, SmeltCompleteEvent } from '../types/game';
+import { SoundEffects } from '../audio/SoundEffects';
+
+/** Ores considered "rare" — get a gold flash + sound effect during animation. */
+const RARE_ORES = new Set(['Silver Ore', 'Mithril Ore']);
 
 interface Props {
   snapshot: StorageViewSnapshot | null;
@@ -9,6 +13,7 @@ interface Props {
   onClose: () => void;
   onSmelt?: (amount: number) => void;
   atHomestead?: boolean;
+  lastSmeltResult?: SmeltCompleteEvent | null;
 }
 
 interface GroupedItem<T> {
@@ -176,9 +181,74 @@ function groupItems<T extends { id: string; name: string; workmanship: number; c
   return Array.from(map.values());
 }
 
-export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWithdraw, onClose, onSmelt, atHomestead }: Props) {
+export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWithdraw, onClose, onSmelt, atHomestead, lastSmeltResult }: Props) {
   const [activeTab, setActiveTab] = useState<TabCategory>('All');
   const [smeltAmount, setSmeltAmount] = useState<number>(10);
+
+  // ── Smelt animation state ──────────────────────────────────────────────────
+  /**
+   * Expanded list of individual ore discoveries to animate through.
+   * Each SmeltYield { name, quantity } is "unrolled" so we reveal them
+   * one at a time at 0.5 s intervals.
+   */
+  const [smeltQueue, setSmeltQueue] = useState<string[]>([]);
+  // Running tally: oreName → count seen so far
+  const [smeltTally, setSmeltTally] = useState<Map<string, number>>(new Map());
+  const [smeltRevealIdx, setSmeltRevealIdx] = useState(0);
+  // Track which result we've already started animating
+  const lastSmeltRef = useRef<SmeltCompleteEvent | null>(null);
+
+  useEffect(() => {
+    if (!lastSmeltResult) return;
+    if (lastSmeltResult === lastSmeltRef.current) return;
+    lastSmeltRef.current = lastSmeltResult;
+
+    // Unroll yields into individual ore names for one-by-one reveal
+    const queue: string[] = [];
+    for (const y of lastSmeltResult.yields) {
+      for (let i = 0; i < y.quantity; i++) {
+        queue.push(y.name);
+      }
+    }
+    // Shuffle so rare ores can appear at any point (more exciting)
+    for (let i = queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [queue[i], queue[j]] = [queue[j], queue[i]];
+    }
+
+    setSmeltQueue(queue);
+    setSmeltTally(new Map());
+    setSmeltRevealIdx(0);
+  }, [lastSmeltResult]);
+
+  // Tick: reveal next ore every 500 ms
+  useEffect(() => {
+    if (smeltRevealIdx >= smeltQueue.length) return;
+
+    const timer = setTimeout(() => {
+      const ore = smeltQueue[smeltRevealIdx];
+      setSmeltTally(prev => {
+        const next = new Map(prev);
+        next.set(ore, (next.get(ore) ?? 0) + 1);
+        return next;
+      });
+
+      // Play sound — rare ores get the special loot sound
+      try {
+        if (RARE_ORES.has(ore)) {
+          SoundEffects.rareLoot();
+        } else {
+          SoundEffects.lootDrop();
+        }
+      } catch {
+        // Audio not available
+      }
+
+      setSmeltRevealIdx(prev => prev + 1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [smeltRevealIdx, smeltQueue]);
 
   // Total Metal available across storage + inventory (for smelt UI)
   const storageMetal = snapshot
@@ -296,6 +366,43 @@ export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWi
                 → Iron / Copper / Tin / Silver / Mithril (skill-based)
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Smelt animation — one-by-one ore reveal */}
+        {smeltQueue.length > 0 && (
+          <div style={{ padding: '8px 14px', borderBottom: '1px solid #1a3a1a', background: '#080a08' }}>
+            <div style={{ color: '#888', fontSize: '11px', letterSpacing: '0.1em', marginBottom: '4px' }}>
+              SMELTING — Progress: {Math.min(smeltRevealIdx, smeltQueue.length)}/{smeltQueue.length}
+            </div>
+            <div style={{ fontSize: '12px', color: '#aaaaaa', minHeight: '18px' }}>
+              {smeltRevealIdx > 0 && smeltRevealIdx <= smeltQueue.length && (() => {
+                const latest = smeltQueue[smeltRevealIdx - 1];
+                const isRare = RARE_ORES.has(latest);
+                return (
+                  <span style={{ color: isRare ? '#ffcc00' : '#00cc33' }}>
+                    {isRare ? '★ ' : ''}Smelted → {latest}!
+                  </span>
+                );
+              })()}
+            </div>
+            {smeltTally.size > 0 && (
+              <div style={{ marginTop: '4px', fontSize: '11px', color: '#666', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {Array.from(smeltTally.entries()).map(([ore, count]) => (
+                  <span
+                    key={ore}
+                    style={{ color: RARE_ORES.has(ore) ? '#ffcc00' : '#558855' }}
+                  >
+                    {ore} x{count}
+                  </span>
+                ))}
+              </div>
+            )}
+            {smeltRevealIdx >= smeltQueue.length && smeltQueue.length > 0 && (
+              <div style={{ marginTop: '4px', fontSize: '11px', color: '#44cc44' }}>
+                Done! Ores added to storage.
+              </div>
+            )}
           </div>
         )}
 

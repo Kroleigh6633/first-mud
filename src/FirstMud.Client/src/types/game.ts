@@ -378,3 +378,14 @@ export interface NewZoneEvent {
   y: number;
   worldId: string;
 }
+
+export interface SmeltYield {
+  name: string;
+  quantity: number;
+}
+
+/** Full result from a SmeltComplete server event. */
+export interface SmeltCompleteEvent {
+  yields: SmeltYield[];
+  message: string;
+}

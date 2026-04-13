@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { RecipeInfo, InventoryItem, StorageItem, CraftingCompleteEvent } from '../types/game';
+import { SoundEffects } from '../audio/SoundEffects';
 
 interface Props {
   recipes: RecipeInfo[];
@@ -8,9 +9,12 @@ interface Props {
   craftingSkill: number;
   lastCraftResult: CraftingCompleteEvent | null;
   onCraft: (recipeId: string, componentIds: string[], taperId: string | null) => void;
+  onSalvage: (itemId: string) => void;
   onRequestRecipes: () => void;
   onClose: () => void;
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
@@ -86,6 +90,24 @@ const craftBtnStyle: React.CSSProperties = {
   letterSpacing: '0.08em',
 };
 
+const craftAllBtnStyle: React.CSSProperties = {
+  ...craftBtnStyle,
+  marginLeft: '8px',
+  background: '#002200',
+  border: '1px solid #006622',
+  color: '#44cc66',
+};
+
+const cancelBtnStyle: React.CSSProperties = {
+  ...btnBase,
+  background: '#220000',
+  border: '1px solid #aa2200',
+  color: '#ff4444',
+  marginTop: '12px',
+  marginLeft: '8px',
+  padding: '5px 18px',
+};
+
 const sectionLabel: React.CSSProperties = {
   color: '#888',
   fontSize: '11px',
@@ -94,12 +116,61 @@ const sectionLabel: React.CSSProperties = {
   marginBottom: '4px',
 };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function outcomeColor(outcome: string): string {
   if (outcome === 'Success' || outcome === 'Discovery') return '#00ff41';
   if (outcome === 'NearMiss') return '#ffaa00';
   if (outcome === 'ComponentLoss') return '#ff4400';
   if (outcome === 'UnexpectedResult') return '#ff9900';
   return '#cccccc';
+}
+
+/**
+ * Color and label for a recipe based on how it compares to the player's current skill.
+ *
+ *  skillDiff = recipe.requiredCraftingSkill − playerCraftingSkill
+ *
+ *  skillDiff ≤ −10  →  grey   (#666)     "no skill-up"
+ *  skillDiff ≤  −5  →  green  (#44aa44)  "small skill-up"
+ *  skillDiff ≤  −2  →  yellow (#cccc44)  "good skill-up"
+ *  skillDiff ≤   0  →  orange (#cc8844)  "max skill-up"
+ *  skillDiff ≤   2  →  red    (#cc4444)  "challenging"
+ *  skillDiff >   2  →  dark red (#661111) "locked"
+ */
+function recipeSkillColor(requiredSkill: number, playerSkill: number): string {
+  const diff = requiredSkill - playerSkill;
+  if (diff <= -10) return '#666666';
+  if (diff <= -5)  return '#44aa44';
+  if (diff <= -2)  return '#cccc44';
+  if (diff <= 0)   return '#cc8844';
+  if (diff <= 2)   return '#cc4444';
+  return '#661111';
+}
+
+function recipeSkillLabel(requiredSkill: number, playerSkill: number): string {
+  const diff = requiredSkill - playerSkill;
+  if (diff <= -10) return '(no skill-up)';
+  if (diff <= -5)  return '(small skill-up)';
+  if (diff <= -2)  return '(good skill-up)';
+  if (diff <= 0)   return '(max skill-up)';
+  if (diff <= 2)   return '(challenging)';
+  return `(locked — need Skill ${requiredSkill})`;
+}
+
+/**
+ * Returns the client-side crafting duration in milliseconds based on required skill level.
+ *
+ *  Skill 1     →  3 s
+ *  Skill 2–3   →  5 s
+ *  Skill 4–5   →  8 s
+ *  Skill 5+    → 12 s
+ */
+function getCraftDurationMs(requiredSkill: number): number {
+  if (requiredSkill <= 1) return 3_000;
+  if (requiredSkill <= 3) return 5_000;
+  if (requiredSkill <= 5) return 8_000;
+  return 12_000;
 }
 
 /** A unified item shape used internally so inventory and storage items can be handled together. */
@@ -110,6 +181,8 @@ interface CraftItem {
   source: 'inv' | 'storage';
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function CraftingPanel({
   recipes,
   inventoryItems,
@@ -117,6 +190,7 @@ export default function CraftingPanel({
   craftingSkill,
   lastCraftResult,
   onCraft,
+  onSalvage,
   onRequestRecipes,
   onClose,
 }: Props) {
@@ -126,22 +200,80 @@ export default function CraftingPanel({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusColor, setStatusColor] = useState('#cccccc');
 
+  // Timed crafting progress bar state
+  const [crafting, setCrafting] = useState(false);
+  const [craftProgress, setCraftProgress] = useState(0); // 0–100
+
+  // Craft All state
+  const [craftAllActive, setCraftAllActive] = useState(false);
+  const [craftAllCount, setCraftAllCount] = useState(0);
+  const craftAllRef = useRef(false); // mutable flag to cancel the loop
+  const craftAllCountRef = useRef(0);
+
+  // Auto-salvage option for Craft All
+  const [autoSalvageGrind, setAutoSalvageGrind] = useState(false);
+
+  // Pending item id to salvage after craft (used by auto-salvage grind mode)
+  const pendingSalvageRef = useRef<string | null>(null);
+
   // Refresh recipes when panel opens
   useEffect(() => {
     onRequestRecipes();
   }, [onRequestRecipes]);
 
-  // Show crafting result
+  // Show crafting result + handle Craft All loop
   useEffect(() => {
     if (!lastCraftResult) return;
+
     setStatusMsg(lastCraftResult.message);
     setStatusColor(outcomeColor(lastCraftResult.outcome));
 
-    // Clear selection after success/discovery
-    if (lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery') {
-      setSelectedComponentIds({});
-      setSelectedTaperId(null);
+    // Clear selection after success/discovery (single craft mode)
+    if (!craftAllRef.current) {
+      if (lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery') {
+        setSelectedComponentIds({});
+        setSelectedTaperId(null);
+      }
     }
+
+    // Auto-salvage grind: salvage the produced item immediately
+    if (
+      autoSalvageGrind &&
+      (lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery') &&
+      lastCraftResult.itemId
+    ) {
+      pendingSalvageRef.current = lastCraftResult.itemId;
+      onSalvage(lastCraftResult.itemId);
+    }
+
+    // If Craft All is running, continue or stop
+    if (craftAllRef.current) {
+      const didSucceed =
+        lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery';
+      const materialsFailed = lastCraftResult.outcome === 'NearMiss';
+
+      if (materialsFailed) {
+        // Stop — likely ran out of materials
+        craftAllRef.current = false;
+        setCraftAllActive(false);
+        setStatusMsg(`Craft All stopped: materials exhausted after ${craftAllCountRef.current} craft(s).`);
+        setStatusColor('#ffaa00');
+        return;
+      }
+
+      if (didSucceed) {
+        craftAllCountRef.current += 1;
+        setCraftAllCount(craftAllCountRef.current);
+      }
+
+      // Schedule next craft (brief pause for UX)
+      setTimeout(() => {
+        if (craftAllRef.current) {
+          triggerTimedCraft(true);
+        }
+      }, 400);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastCraftResult]);
 
   const selectedRecipe = recipes.find(r => r.recipeId === selectedRecipeId) ?? null;
@@ -186,6 +318,7 @@ export default function CraftingPanel({
 
   function canCraft(): boolean {
     if (!selectedRecipe) return false;
+    if (crafting || craftAllActive) return false;
     for (const ing of selectedRecipe.ingredients) {
       const chosen = (selectedComponentIds[ing.ingredientName] ?? []).length;
       if (chosen < ing.baseQuantity) return false;
@@ -193,26 +326,69 @@ export default function CraftingPanel({
     return true;
   }
 
-  function handleCraft() {
+  /**
+   * Animates the progress bar for the craft duration, then fires the actual craft command.
+   * If `isCraftAll` is true the function runs inside a Craft All loop.
+   */
+  const triggerTimedCraft = useCallback((isCraftAll = false) => {
     if (!selectedRecipe) return;
+
+    const duration = getCraftDurationMs(selectedRecipe.requiredCraftingSkill);
+    const tickMs = 80; // update progress bar every 80 ms
+    const totalTicks = duration / tickMs;
+    let tick = 0;
+
+    setCrafting(true);
+    setCraftProgress(0);
+
     const allComponentIds = Object.values(selectedComponentIds).flat();
-    onCraft(selectedRecipe.recipeId, allComponentIds, selectedTaperId);
-    setStatusMsg('Crafting...');
-    setStatusColor('#cccccc');
+
+    const interval = setInterval(() => {
+      tick++;
+      const pct = Math.min(100, Math.round((tick / totalTicks) * 100));
+      setCraftProgress(pct);
+
+      if (tick >= totalTicks) {
+        clearInterval(interval);
+        setCrafting(false);
+        setCraftProgress(0);
+
+        if (!isCraftAll || craftAllRef.current) {
+          onCraft(selectedRecipe.recipeId, allComponentIds, selectedTaperId);
+        }
+      }
+    }, tickMs);
+  }, [selectedRecipe, selectedComponentIds, selectedTaperId, onCraft]);
+
+  function handleCraft() {
+    if (!canCraft()) return;
+    setStatusMsg(null);
+    triggerTimedCraft(false);
+  }
+
+  function handleCraftAll() {
+    if (!canCraft()) return;
+    craftAllRef.current = true;
+    craftAllCountRef.current = 0;
+    setCraftAllActive(true);
+    setCraftAllCount(0);
+    setStatusMsg(null);
+    triggerTimedCraft(true);
+  }
+
+  function handleCancelCraftAll() {
+    craftAllRef.current = false;
+    setCraftAllActive(false);
+    setCrafting(false);
+    setCraftProgress(0);
+    setStatusMsg(`Craft All cancelled after ${craftAllCountRef.current} craft(s).`);
+    setStatusColor('#ffaa00');
   }
 
   /**
-   * Formats the availability string for an ingredient, e.g.:
-   *   "have 17 total (2 inv + 15 storage)"  — when both sources contribute
-   *   "have 3 (inventory)"                  — when only in inventory
-   *   "have 15 (storage)"                   — when only in storage
-   *   "have 0"                              — when not found anywhere
-   *
-   * Falls back to counting items in the passed arrays when the server hasn't
-   * yet returned cross-source counts in the recipe ingredient data.
+   * Formats the availability string for an ingredient.
    */
   function formatAvailability(ing: RecipeInfo['ingredients'][0], items: CraftItem[]): string {
-    // Prefer server-reported counts (populated by ViewRecipesCommandHandler)
     if (ing.invCount !== undefined || ing.storageCount !== undefined) {
       const inv = ing.invCount ?? 0;
       const storage = ing.storageCount ?? 0;
@@ -222,7 +398,6 @@ export default function CraftingPanel({
       if (storage > 0) return `have ${storage} (storage)`;
       return 'have 0';
     }
-    // Fallback: count items in the combined list
     const invCount = items.filter(i => i.source === 'inv').length;
     const storageCount = items.filter(i => i.source === 'storage').length;
     const total = invCount + storageCount;
@@ -232,14 +407,32 @@ export default function CraftingPanel({
     return 'have 0';
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  // Progress bar rendering helper
+  function renderProgressBar(pct: number, label: string): React.ReactNode {
+    const filled = Math.round(pct / 5); // 20 blocks total
+    const empty  = 20 - filled;
+    const bar    = '█'.repeat(filled) + '░'.repeat(empty);
+    return (
+      <div style={{ marginTop: '10px', fontSize: '12px', color: '#00cc33' }}>
+        {label}<br />
+        <span style={{ letterSpacing: '-1px' }}>{bar}</span>
+        <span style={{ marginLeft: '6px', color: '#888' }}>{pct}%</span>
+      </div>
+    );
+  }
+
   return (
     <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={panelStyle}>
+        {/* Header */}
         <div style={headerStyle}>
           <span>CRAFTING — Skill {craftingSkill}</span>
           <button type="button" style={closeBtnStyle} onClick={onClose}>close [x]</button>
         </div>
 
+        {/* Status bar */}
         {statusMsg && (
           <div style={{ padding: '6px 14px', fontSize: '12px', color: statusColor, borderBottom: '1px solid #1a3a1a', flexShrink: 0 }}>
             {statusMsg}
@@ -252,24 +445,36 @@ export default function CraftingPanel({
             {recipes.length === 0 && (
               <div style={{ padding: '12px', color: '#666' }}>No recipes available.</div>
             )}
-            {recipes.map(r => (
-              <div
-                key={r.recipeId}
-                onClick={() => { setSelectedRecipeId(r.recipeId); setSelectedComponentIds({}); setSelectedTaperId(null); setStatusMsg(null); }}
-                style={{
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #111',
-                  background: selectedRecipeId === r.recipeId ? '#001a00' : 'transparent',
-                  color: craftingSkill >= r.requiredCraftingSkill ? '#00ff41' : '#555',
-                }}
-              >
-                <div style={{ fontSize: '12px' }}>{r.name}</div>
-                <div style={{ fontSize: '11px', color: '#666' }}>
-                  → {r.resultItemName} · Skill {r.requiredCraftingSkill}
+            {recipes.map(r => {
+              const skillColor = recipeSkillColor(r.requiredCraftingSkill, craftingSkill);
+              const skillLabel = recipeSkillLabel(r.requiredCraftingSkill, craftingSkill);
+              return (
+                <div
+                  key={r.recipeId}
+                  onClick={() => {
+                    setSelectedRecipeId(r.recipeId);
+                    setSelectedComponentIds({});
+                    setSelectedTaperId(null);
+                    setStatusMsg(null);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid #111',
+                    background: selectedRecipeId === r.recipeId ? '#001a00' : 'transparent',
+                  }}
+                  title={skillLabel}
+                >
+                  <div style={{ fontSize: '12px', color: skillColor }}>{r.name}</div>
+                  <div style={{ fontSize: '11px', color: '#555' }}>
+                    → {r.resultItemName} · Skill {r.requiredCraftingSkill}
+                  </div>
+                  <div style={{ fontSize: '10px', color: skillColor, opacity: 0.8 }}>
+                    {skillLabel}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Recipe detail */}
@@ -280,9 +485,18 @@ export default function CraftingPanel({
               </div>
             ) : (
               <>
+                {/* Recipe header with skill color */}
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '14px', letterSpacing: '0.08em', marginBottom: '4px' }}>
+                  <div style={{
+                    fontSize: '14px',
+                    letterSpacing: '0.08em',
+                    marginBottom: '2px',
+                    color: recipeSkillColor(selectedRecipe.requiredCraftingSkill, craftingSkill),
+                  }}>
                     {selectedRecipe.name}
+                    <span style={{ fontSize: '11px', marginLeft: '8px', opacity: 0.75 }}>
+                      {recipeSkillLabel(selectedRecipe.requiredCraftingSkill, craftingSkill)}
+                    </span>
                   </div>
                   <div style={{ color: '#888', fontSize: '11px' }}>
                     Produces: {selectedRecipe.resultItemName} ({selectedRecipe.resultCategory})
@@ -296,8 +510,12 @@ export default function CraftingPanel({
                       Requires taper: {selectedRecipe.requiredTaperType}
                     </div>
                   )}
+                  <div style={{ color: '#666', fontSize: '11px', marginTop: '3px' }}>
+                    Craft time: {getCraftDurationMs(selectedRecipe.requiredCraftingSkill) / 1000}s
+                  </div>
                 </div>
 
+                {/* Ingredients */}
                 <div style={{ marginBottom: '12px' }}>
                   <div style={sectionLabel}>Ingredients</div>
                   {selectedRecipe.ingredients.map(ing => {
@@ -365,13 +583,79 @@ export default function CraftingPanel({
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  style={{ ...craftBtnStyle, opacity: canCraft() ? 1 : 0.4, cursor: canCraft() ? 'pointer' : 'not-allowed' }}
-                  onClick={canCraft() ? handleCraft : undefined}
-                >
-                  CRAFT
-                </button>
+                {/* Auto-salvage grind checkbox */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ fontSize: '11px', color: autoSalvageGrind ? '#ffaa44' : '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoSalvageGrind}
+                      onChange={e => setAutoSalvageGrind(e.target.checked)}
+                      style={{ accentColor: '#ffaa44' }}
+                    />
+                    Auto-salvage crafted items (skill grind mode)
+                    {autoSalvageGrind && <span style={{ color: '#888' }}> — craft + salvage loop</span>}
+                  </label>
+                </div>
+
+                {/* Progress bar during crafting */}
+                {crafting && renderProgressBar(
+                  craftProgress,
+                  craftAllActive
+                    ? `Crafting ${selectedRecipe.resultItemName}... ${craftAllCountRef.current + 1}`
+                    : `Crafting ${selectedRecipe.name}...`,
+                )}
+
+                {/* Craft All running progress */}
+                {craftAllActive && !crafting && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#44cc66' }}>
+                    Crafted {craftAllCount}× {selectedRecipe.resultItemName} — waiting for result...
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* CRAFT button */}
+                  <button
+                    type="button"
+                    style={{
+                      ...craftBtnStyle,
+                      opacity: canCraft() ? 1 : 0.4,
+                      cursor: canCraft() ? 'pointer' : 'not-allowed',
+                    }}
+                    onClick={handleCraft}
+                    disabled={!canCraft()}
+                  >
+                    CRAFT
+                  </button>
+
+                  {/* CRAFT ALL button */}
+                  {!craftAllActive && (
+                    <button
+                      type="button"
+                      style={{
+                        ...craftAllBtnStyle,
+                        opacity: canCraft() ? 1 : 0.4,
+                        cursor: canCraft() ? 'pointer' : 'not-allowed',
+                      }}
+                      onClick={handleCraftAll}
+                      disabled={!canCraft()}
+                      title="Craft repeatedly until materials run out"
+                    >
+                      CRAFT ALL
+                    </button>
+                  )}
+
+                  {/* CANCEL button while Craft All is running */}
+                  {craftAllActive && (
+                    <button
+                      type="button"
+                      style={cancelBtnStyle}
+                      onClick={handleCancelCraftAll}
+                    >
+                      CANCEL
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -380,3 +664,6 @@ export default function CraftingPanel({
     </div>
   );
 }
+
+// Re-export so callers can use the sound helper
+export { SoundEffects };
