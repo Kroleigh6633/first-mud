@@ -21,19 +21,19 @@ public class BuildingService
     // Material names match the canonical resource names used in HomesteadStorageItems.
     private static readonly Dictionary<BuildingType, (string Material, int Qty)[]> ConstructionCosts = new()
     {
-        [BuildingType.Forge]          = [("Wood", 20), ("Stone", 30), ("Iron Ore", 10)],
-        [BuildingType.Fletcher]       = [("Wood", 15), ("Stone", 10)],
-        [BuildingType.Tannery]        = [("Wood", 15), ("Leather", 10)],
-        [BuildingType.EnchantingTower]= [("Stone", 30), ("Wood", 10)],
-        [BuildingType.AlchemistHut]   = [("Wood", 10), ("Herbs", 15)],
-        [BuildingType.Stoneworker]    = [("Stone", 25), ("Wood", 10)],
-        [BuildingType.Woodworker]     = [("Wood", 25), ("Stone", 10)],
-        [BuildingType.MarketStall]    = [("Wood", 10), ("Stone", 5)],
-        [BuildingType.Farm]           = [("Wood", 5),  ("Stone", 5)],
-        [BuildingType.Mine]           = [("Stone", 20), ("Iron Ore", 15), ("Wood", 10)],
-        [BuildingType.Barracks]       = [("Stone", 25), ("Wood", 15)],
-        [BuildingType.Library]        = [("Wood", 20), ("Stone", 15)],
-        [BuildingType.Warehouse]      = [("Wood", 25), ("Stone", 15)],
+        [BuildingType.Forge]          = [("Wood", 10), ("Stone", 5), ("Iron Ore", 5)],
+        [BuildingType.Fletcher]       = [("Wood", 10), ("Sinew", 3)],
+        [BuildingType.Tannery]        = [("Wood", 8),  ("Leather", 5)],
+        [BuildingType.EnchantingTower]= [("Stone", 10), ("Dravenite Dust", 3), ("Wood", 5)],
+        [BuildingType.AlchemistHut]   = [("Wood", 8),  ("Herbs", 3)],
+        [BuildingType.Stoneworker]    = [("Stone", 10), ("Wood", 5)],
+        [BuildingType.Woodworker]     = [("Wood", 10)],
+        [BuildingType.MarketStall]    = [("Wood", 8)],
+        [BuildingType.Farm]           = [("Wood", 8),  ("Stone", 3)],
+        [BuildingType.Mine]           = [("Stone", 10), ("Wood", 5)],
+        [BuildingType.Barracks]       = [("Stone", 8),  ("Wood", 5)],
+        [BuildingType.Library]        = [("Wood", 10), ("Stone", 5)],
+        [BuildingType.Warehouse]      = [("Wood", 12), ("Stone", 5)],
         [BuildingType.Hut]            = [("Wood",  5), ("Stone",  3)],
     };
 

@@ -51,19 +51,19 @@ const WORKER_CAPACITY: Record<BuildingType, number> = {
 };
 
 const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[]> = {
-  Forge:          [{ material: 'Wood', qty: 20 }, { material: 'Stone', qty: 30 }, { material: 'Iron Ore', qty: 10 }],
-  Fletcher:       [{ material: 'Wood', qty: 15 }, { material: 'Stone', qty: 10 }],
-  Tannery:        [{ material: 'Wood', qty: 15 }, { material: 'Leather', qty: 10 }],
-  EnchantingTower:[{ material: 'Stone', qty: 30 }, { material: 'Wood', qty: 10 }],
-  AlchemistHut:   [{ material: 'Wood', qty: 10 }, { material: 'Herbs', qty: 15 }],
-  Stoneworker:    [{ material: 'Stone', qty: 25 }, { material: 'Wood', qty: 10 }],
-  Woodworker:     [{ material: 'Wood', qty: 25 }, { material: 'Stone', qty: 10 }],
-  MarketStall:    [{ material: 'Wood', qty: 10 }, { material: 'Stone', qty: 5 }],
-  Farm:           [{ material: 'Wood', qty: 5 },  { material: 'Stone', qty: 5 }],
-  Mine:           [{ material: 'Stone', qty: 20 }, { material: 'Iron Ore', qty: 15 }, { material: 'Wood', qty: 10 }],
-  Barracks:       [{ material: 'Stone', qty: 25 }, { material: 'Wood', qty: 15 }],
-  Library:        [{ material: 'Wood', qty: 20 }, { material: 'Stone', qty: 15 }],
-  Warehouse:      [{ material: 'Wood', qty: 25 }, { material: 'Stone', qty: 15 }],
+  Forge:          [{ material: 'Wood', qty: 10 }, { material: 'Stone', qty: 5 }, { material: 'Iron Ore', qty: 5 }],
+  Fletcher:       [{ material: 'Wood', qty: 10 }, { material: 'Sinew', qty: 3 }],
+  Tannery:        [{ material: 'Wood', qty: 8 },  { material: 'Leather', qty: 5 }],
+  EnchantingTower:[{ material: 'Stone', qty: 10 }, { material: 'Dravenite Dust', qty: 3 }, { material: 'Wood', qty: 5 }],
+  AlchemistHut:   [{ material: 'Wood', qty: 8 },  { material: 'Herbs', qty: 3 }],
+  Stoneworker:    [{ material: 'Stone', qty: 10 }, { material: 'Wood', qty: 5 }],
+  Woodworker:     [{ material: 'Wood', qty: 10 }],
+  MarketStall:    [{ material: 'Wood', qty: 8 }],
+  Farm:           [{ material: 'Wood', qty: 8 },  { material: 'Stone', qty: 3 }],
+  Mine:           [{ material: 'Stone', qty: 10 }, { material: 'Wood', qty: 5 }],
+  Barracks:       [{ material: 'Stone', qty: 8 },  { material: 'Wood', qty: 5 }],
+  Library:        [{ material: 'Wood', qty: 10 }, { material: 'Stone', qty: 5 }],
+  Warehouse:      [{ material: 'Wood', qty: 12 }, { material: 'Stone', qty: 5 }],
   Hut:            [{ material: 'Wood', qty: 5 },  { material: 'Stone', qty: 3 }],
 };
 
@@ -368,7 +368,7 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
           ) : (
             <div style={{ marginTop: '4px' }}>
               <div style={{ color: '#888888', marginBottom: '4px' }}>
-                No builder — assign a Crafter companion:
+                No builder — assign a Builder companion:
               </div>
               {availableCompanions.length === 0 ? (
                 <div style={{ color: '#555555', fontSize: '10px' }}>
@@ -419,16 +419,20 @@ interface PlaceBuildingSectionProps {
   storageItems: StorageItem[];
   inventoryItems: InventoryItem[];
   sendCommand: (command: string, payload?: unknown) => void;
+  /** When set, only this building type is offered and it is pre-selected. */
+  restrictTo?: BuildingType;
 }
 
 // Building types that can be placed multiple times (e.g. housing)
 const MULTI_PLACE_TYPES = new Set<BuildingType>(['Hut']);
 
-function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCommand }: PlaceBuildingSectionProps) {
+function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCommand, restrictTo }: PlaceBuildingSectionProps) {
   const placedTypes = new Set(buildings.map(b => b.type));
   // Multi-place types are always available; single-place types only if not yet placed
-  const availableTypes = ALL_BUILDING_TYPES.filter(t => MULTI_PLACE_TYPES.has(t) || !placedTypes.has(t));
-  const [selectedType, setSelectedType] = useState<BuildingType | ''>('');
+  const availableTypes = restrictTo
+    ? [restrictTo]
+    : ALL_BUILDING_TYPES.filter(t => MULTI_PLACE_TYPES.has(t) || !placedTypes.has(t));
+  const [selectedType, setSelectedType] = useState<BuildingType | ''>(restrictTo ?? '');
 
   if (availableTypes.length === 0) {
     return (
@@ -459,25 +463,30 @@ function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCom
     if (!selectedType) return;
     const pos = nextAvailablePosition(buildings);
     sendCommand('placebuilding', { buildingType: selectedType, gridX: pos.x, gridY: pos.y });
-    setSelectedType('');
+    // When restricted to a single type, keep it selected for quick repeat placing
+    if (!restrictTo) setSelectedType('');
   };
 
   return (
     <div style={{ fontSize: '11px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-        <select
-          value={selectedType}
-          onChange={e => setSelectedType(e.target.value as BuildingType | '')}
-          style={selectStyle}
-          aria-label="Select building type to place"
-        >
-          <option value="">-- Select building type --</option>
-          {availableTypes.map(t => (
-            <option key={t} value={t}>
-              {buildingIcon(t)} {t}
-            </option>
-          ))}
-        </select>
+        {restrictTo ? (
+          <span style={{ color: '#aaaaaa' }}>{buildingIcon(restrictTo)} {restrictTo}</span>
+        ) : (
+          <select
+            value={selectedType}
+            onChange={e => setSelectedType(e.target.value as BuildingType | '')}
+            style={selectStyle}
+            aria-label="Select building type to place"
+          >
+            <option value="">-- Select building type --</option>
+            {availableTypes.map(t => (
+              <option key={t} value={t}>
+                {buildingIcon(t)} {t}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={handlePlace}
@@ -908,6 +917,7 @@ function HousingTab({ buildings, availableCompanions, sendCommand, storageItems,
         storageItems={storageItems}
         inventoryItems={inventoryItems}
         sendCommand={sendCommand}
+        restrictTo="Hut"
       />
     </div>
   );
