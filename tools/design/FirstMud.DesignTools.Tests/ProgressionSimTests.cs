@@ -58,20 +58,17 @@ public class ProgressionSimTests
     public void High_hours_ceiling_balanced_seed42_pinned()
     {
         // Regression pin: captures CURRENT reality at hour 40, balanced, seed 42.
-        // Observed during initial calibration: reliable danger ≥ 8 at hour 40.
-        // If a future content tune lowers this below 6 we want to know immediately.
-        // If a tune RAISES it past 10 (capped), that's fine — the lower bound
-        // is what matters.
-        //
-        // Note: the user's Pass-13 playtest described danger 5 as a functional
-        // ceiling. This test currently FAILS that narrative in the sim (sim
-        // reaches d8+), which suggests the user's bottleneck is elsewhere —
-        // see the bottleneck-detection output (likely workmanship/materials).
+        // Post-Pass-tuned: reliable danger sits at d8 with the new
+        // progression-curves.json (compressed companion thresholds + halved
+        // workmanship divisor). Multi-seed sweep shows d8-d9 range.
+        // A drop below this line means a progression regression — investigate
+        // before merging. If a tune RAISES it past 10 (capped), that's fine —
+        // the lower bound is what matters.
         var r = RunBalanced(hours: 40, seed: 42);
 
         var finalDanger = r.HourByHour[^1].ReliableDangerTier;
-        Assert.True(finalDanger >= 6,
-            $"Expected reliable danger ≥ 6 at hour 40 (balanced, seed 42). Got d{finalDanger}. " +
+        Assert.True(finalDanger >= 8,
+            $"Expected reliable danger ≥ 8 at hour 40 (balanced, seed 42). Got d{finalDanger}. " +
             $"A drop below this line means a progression regression — investigate before merging.");
     }
 

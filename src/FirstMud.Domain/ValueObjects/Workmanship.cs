@@ -1,3 +1,5 @@
+using FirstMud.Domain.Configuration;
+
 namespace FirstMud.Domain.ValueObjects;
 
 public sealed record Workmanship
@@ -17,7 +19,7 @@ public sealed record Workmanship
     public static Workmanship Combine(Workmanship a, Workmanship b, int craftingSkill)
     {
         var baseValue = (a.Value + b.Value) / 2.0;
-        var skillBonus = craftingSkill / 20.0;
+        var skillBonus = craftingSkill / (double)ProgressionCurvesAccessor.SkillDivisor;
         var result = (int)Math.Round(baseValue + skillBonus);
         return Of(Math.Clamp(result, 1, 10));
     }

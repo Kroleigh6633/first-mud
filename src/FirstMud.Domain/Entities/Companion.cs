@@ -1,3 +1,4 @@
+using FirstMud.Domain.Configuration;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
 
@@ -38,14 +39,13 @@ public class Companion
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
     public void ClearDomainEvents() => _domainEvents.Clear();
 
-    private static readonly Dictionary<CompanionType, int[]> LayerThresholds = new()
-    {
-        [CompanionType.Wildfolk] = [0, 200, 500, 1000, 2000, 4000],
-        [CompanionType.HiredHero] = [0, 200, 600, 1200, 2500, 5000],
-        [CompanionType.CapturedMonster] = [0, 150, 400, 900, 1800, 3600],
-        [CompanionType.BoundShade] = [0, 300, 700, 1500, 3000, 6000],
-        [CompanionType.ArdweldConstruct] = [0, 500, 1500, 3000, 6000, 12000],
-    };
+    // Layer thresholds are sourced from content/progression-curves.json via
+    // ProgressionCurvesAccessor. When the file is absent (or in unit tests
+    // that never spin up a content root) the accessor returns the historical
+    // defaults [0,200,500,1000,2000,4000] for Wildfolk etc., preserving prior
+    // behaviour for any caller that does not exercise the loader.
+    private static IReadOnlyList<int> ThresholdsFor(CompanionType type)
+        => ProgressionCurvesAccessor.ThresholdsFor(type);
 
     private static readonly float DriftRatePerHour = 0.5f;
     private static readonly int MaxIgnoredWarnings = 3;
@@ -58,7 +58,7 @@ public class Companion
         get
         {
             if (CurrentLayer >= 6) return 0;
-            return LayerThresholds[Type][CurrentLayer];
+            return ThresholdsFor(Type)[CurrentLayer];
         }
     }
 
@@ -217,7 +217,7 @@ public class Companion
     {
         if (CurrentLayer >= 6) return;
 
-        var thresholds = LayerThresholds[Type];
+        var thresholds = ThresholdsFor(Type);
         var nextThreshold = thresholds[CurrentLayer];
 
         if (UsageCounter >= nextThreshold)

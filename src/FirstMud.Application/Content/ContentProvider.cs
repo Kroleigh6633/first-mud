@@ -71,6 +71,7 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<string, QuestDefinition> _questsById = new(StringComparer.Ordinal);
     private IReadOnlyList<QuestEdgeDefinition> _questEdges = Array.Empty<QuestEdgeDefinition>();
     private CombatCurvesDefinition _combatCurves = DefaultCombatCurves();
+    private ProgressionCurvesDefinition _progressionCurves = DefaultProgressionCurves();
     private IReadOnlyList<NpcDefinition> _npcs = Array.Empty<NpcDefinition>();
     private Dictionary<string, NpcDefinition> _npcsById = new(StringComparer.Ordinal);
     private IReadOnlyList<WorldEventDefinition> _events = Array.Empty<WorldEventDefinition>();
@@ -218,6 +219,8 @@ public sealed class ContentProvider : IContentProvider
 
     public CombatCurvesDefinition CombatCurves => _combatCurves;
 
+    public ProgressionCurvesDefinition ProgressionCurves => _progressionCurves;
+
     public IReadOnlyList<NpcDefinition> AllNpcs() => _npcs;
 
     public NpcDefinition? GetNpc(string id) =>
@@ -251,6 +254,10 @@ public sealed class ContentProvider : IContentProvider
         _factions = LoadFactions();
         _factionsById = _factions.ToDictionary(f => f.Id);
         _combatCurves = LoadCombatCurves();
+        _progressionCurves = LoadProgressionCurves();
+        FirstMud.Domain.Configuration.ProgressionCurvesAccessor.Publish(
+            _progressionCurves.Workmanship.SkillDivisor,
+            _progressionCurves.CompanionLayerThresholds);
 
         // NPCs load AFTER zones + factions so cross-ref validation
         // (homeZoneId / factionId) can run against the authored registries.
@@ -644,6 +651,81 @@ public sealed class ContentProvider : IContentProvider
             throw new InvalidDataException(
                 $"{path}: monsterScaling.{field} must be in [{min}, {max}] (got {value}).");
     }
+
+    // ─── Progression Curves ──────────────────────────────────────────────────
+
+    private static ProgressionCurvesDefinition DefaultProgressionCurves() =>
+        new(
+            new WorkmanshipCurve(SkillDivisor: FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultSkillDivisor),
+            FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCompanionLayerThresholds);
+
+    /// <summary>
+    /// Loads <c>content/progression-curves.json</c> if present. The file is
+    /// optional — if absent, the historical hardcoded constants are used so
+    /// existing test fixtures and partial-content roots keep working. Mirrors
+    /// the <c>combat-curves.json</c> pattern.
+    /// </summary>
+    private ProgressionCurvesDefinition LoadProgressionCurves()
+    {
+        var path = Path.Combine(_contentRoot, "progression-curves.json");
+        if (!File.Exists(path))
+            return DefaultProgressionCurves();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<ProgressionCurvesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        // Workmanship — required when file exists.
+        if (doc.Workmanship is null)
+            throw new InvalidDataException($"{path}: 'workmanship' block is required.");
+        var divisor = doc.Workmanship.SkillDivisor;
+        if (divisor < 1 || divisor > 100)
+            throw new InvalidDataException(
+                $"{path}: workmanship.skillDivisor must be in [1, 100] (got {divisor}).");
+
+        // Companion layer thresholds — required, all 5 enum values must be present.
+        if (doc.CompanionLayerThresholds is null || doc.CompanionLayerThresholds.Count == 0)
+            throw new InvalidDataException(
+                $"{path}: 'companionLayerThresholds' must contain an entry per CompanionType.");
+
+        var thresholds = new Dictionary<CompanionType, IReadOnlyList<int>>();
+        foreach (var (typeName, arr) in doc.CompanionLayerThresholds)
+        {
+            if (!Enum.TryParse<CompanionType>(typeName, ignoreCase: false, out var type))
+                throw new InvalidDataException(
+                    $"{path}: companionLayerThresholds key '{typeName}' is not a valid CompanionType.");
+            if (arr is null || arr.Count != 6)
+                throw new InvalidDataException(
+                    $"{path}: companionLayerThresholds[{typeName}] must have exactly 6 entries (got {arr?.Count ?? 0}).");
+            for (int i = 0; i < arr.Count; i++)
+            {
+                if (arr[i] < 0)
+                    throw new InvalidDataException(
+                        $"{path}: companionLayerThresholds[{typeName}][{i}] must be >= 0 (got {arr[i]}).");
+                if (i > 0 && arr[i] < arr[i - 1])
+                    throw new InvalidDataException(
+                        $"{path}: companionLayerThresholds[{typeName}] must be non-decreasing.");
+            }
+            thresholds[type] = arr;
+        }
+        foreach (var t in Enum.GetValues<CompanionType>())
+        {
+            if (!thresholds.ContainsKey(t))
+                throw new InvalidDataException(
+                    $"{path}: companionLayerThresholds is missing entry for CompanionType '{t}'.");
+        }
+
+        return new ProgressionCurvesDefinition(
+            new WorkmanshipCurve(divisor),
+            thresholds);
+    }
+
+    private sealed record ProgressionCurvesFile(
+        [property: JsonPropertyName("workmanship")] WorkmanshipRaw? Workmanship,
+        [property: JsonPropertyName("companionLayerThresholds")] Dictionary<string, List<int>>? CompanionLayerThresholds);
+
+    private sealed record WorkmanshipRaw(
+        [property: JsonPropertyName("skillDivisor")] int SkillDivisor);
 
     private sealed record CombatCurvesFile(
         [property: JsonPropertyName("monsterScaling")] MonsterScalingRaw? MonsterScaling);

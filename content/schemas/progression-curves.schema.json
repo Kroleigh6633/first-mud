@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProgressionCurves",
+  "description": "Player + companion progression scaling coefficients. Loaded by ContentProvider into IContentProvider.ProgressionCurves; consumed by Workmanship/CraftingService (skillDivisor) and Companion (layer thresholds). File is OPTIONAL — if absent, ContentProvider falls back to the historical hardcoded constants.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "_note": { "type": "string" },
+    "workmanship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skillDivisor"],
+      "properties": {
+        "skillDivisor": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Divisor applied to craftingSkill when computing the workmanship skill bonus. Lower = more skill contribution. Historical default: 20."
+        }
+      }
+    },
+    "companionLayerThresholds": {
+      "type": "object",
+      "description": "Map of CompanionType name → 6-element threshold array. Index i = UsageCounter required to unlock layer i+1. Index 0 is conventionally 0 (already at layer 1). All 5 CompanionType enum values must be present.",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 6,
+        "maxItems": 6,
+        "items": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

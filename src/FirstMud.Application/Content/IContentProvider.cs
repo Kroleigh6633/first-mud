@@ -162,6 +162,20 @@ public interface IContentProvider
     /// </summary>
     CombatCurvesDefinition CombatCurves { get; }
 
+    // ─── Progression Curves ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tunable progression scaling coefficients (workmanship skill divisor,
+    /// per-companion-type layer thresholds). Loaded from
+    /// <c>content/progression-curves.json</c>. The file is OPTIONAL — if it
+    /// is not present, the historical hardcoded constants are returned. When
+    /// loaded, the values are also published to
+    /// <c>FirstMud.Domain.Configuration.ProgressionCurvesAccessor</c> so
+    /// Domain types (<c>Companion</c>, <c>Workmanship</c>) can read them
+    /// without an upward project reference.
+    /// </summary>
+    ProgressionCurvesDefinition ProgressionCurves { get; }
+
     // ─── NPCs ────────────────────────────────────────────────────────────────
 
     /// <summary>All NPC definitions, in file order.</summary>

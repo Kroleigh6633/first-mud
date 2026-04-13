@@ -105,22 +105,24 @@ public sealed class ProgressionSimulator
         public int Layer = 1;
         public int Level = 1;
         public int Usage;
-        public static readonly Dictionary<CompanionType, int[]> Thresholds = new()
-        {
-            [CompanionType.Wildfolk]         = new[] { 0, 200, 500, 1000, 2000, 4000 },
-            [CompanionType.HiredHero]        = new[] { 0, 200, 600, 1200, 2500, 5000 },
-            [CompanionType.CapturedMonster]  = new[] { 0, 150, 400, 900, 1800, 3600 },
-            [CompanionType.BoundShade]       = new[] { 0, 300, 700, 1500, 3000, 6000 },
-            [CompanionType.ArdweldConstruct] = new[] { 0, 500, 1500, 3000, 6000, 12000 },
-        };
 
-        public int NextThreshold => Layer >= 6 ? 0 : Thresholds[Type][Layer];
+        /// <summary>
+        /// Per-type layer threshold table — sourced from
+        /// <c>content/progression-curves.json</c> via
+        /// <see cref="FirstMud.Domain.Configuration.ProgressionCurvesAccessor"/>
+        /// so the sim and live game share one source of truth.
+        /// </summary>
+        private static IReadOnlyList<int> ThresholdsFor(CompanionType t) =>
+            FirstMud.Domain.Configuration.ProgressionCurvesAccessor.ThresholdsFor(t);
+
+        public int NextThreshold => Layer >= 6 ? 0 : ThresholdsFor(Type)[Layer];
 
         public void AddUsage(int amt)
         {
             if (Layer >= 6) return;
             Usage += amt;
-            while (Layer < 6 && Usage >= Thresholds[Type][Layer])
+            var ts = ThresholdsFor(Type);
+            while (Layer < 6 && Usage >= ts[Layer])
             {
                 Layer++;
                 Level = Math.Max(Level, Layer * 2);
@@ -398,7 +400,8 @@ public sealed class ProgressionSimulator
 
         // workmanship = avg(in) + skill/20 (mirrors CraftingService formula w/o taper)
         int avgIn = 1; // materials stored at workmanship 1 in this model
-        int work = Math.Clamp(avgIn + state.CraftingSkill / 20, recipe.BaseWorkmanshipMin, Math.Max(recipe.BaseWorkmanshipMin, recipe.BaseWorkmanshipMax));
+        int divisor = _content.ProgressionCurves.Workmanship.SkillDivisor;
+        int work = Math.Clamp(avgIn + state.CraftingSkill / divisor, recipe.BaseWorkmanshipMin, Math.Max(recipe.BaseWorkmanshipMin, recipe.BaseWorkmanshipMax));
 
         // Auto-equip if better than current
         string? slot = recipe.ResultCategory switch

@@ -1,0 +1,14 @@
+{
+  "$schema": "./schemas/progression-curves.schema.json",
+  "_note": "Progression scaling coefficients. All companion thresholds compressed by ratio ~0.5x from Pass-1 baselines, preserving relative difficulty between types: Wildfolk (1.0x base), CapturedMonster (0.75x of Wildfolk), HiredHero (1.0-1.25x), BoundShade (1.5x), ArdweldConstruct (3x). Compression matches progression-sim Pass-1 recommendation for Wildfolk and is propagated proportionally so non-Wildfolk types accelerate at the same relative rate.",
+  "workmanship": {
+    "skillDivisor": 10
+  },
+  "companionLayerThresholds": {
+    "Wildfolk":         [0, 100, 300, 700, 1400, 2800],
+    "HiredHero":        [0, 100, 350, 850, 1750, 3500],
+    "CapturedMonster":  [0,  75, 225, 600, 1250, 2500],
+    "BoundShade":       [0, 150, 450, 1050, 2100, 4200],
+    "ArdweldConstruct": [0, 250, 900, 2100, 4200, 8400]
+  }
+}
