@@ -59,3 +59,9 @@ public record ViewCityCommand(Guid PlayerId) : IGameCommand;
 public record BuildStaffEverythingCommand(Guid PlayerId) : IGameCommand;
 /// <summary>Imbue all eligible items with available tapers, then auto-salvage fully imbued items.</summary>
 public record PracticeEnchantingCommand(Guid PlayerId) : IGameCommand;
+/// <summary>Start the auto-progression meta-mode (drives toward d10 ≥50% via sub-modes).</summary>
+public record AutoProgressionStartCommand(Guid PlayerId) : IGameCommand;
+/// <summary>Stop the auto-progression meta-mode.</summary>
+public record AutoProgressionStopCommand(Guid PlayerId) : IGameCommand;
+/// <summary>Query current auto-progression session status (active, binding constraint, reliability).</summary>
+public record AutoProgressionStatusCommand(Guid PlayerId) : IGameCommand;

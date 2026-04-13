@@ -113,6 +113,15 @@ export interface GameCommands {
   // Auto-farm
   autoFarm: (payload?: AutoFarmPayload) => void;
 
+  /**
+   * Auto-progression meta-mode — drives the party toward d10 ≥50% by
+   * dispatching to farm / craft / imbue / quest sub-modes per the binding
+   * constraint. UI (banner, keybind) comes in a later cycle; for now, this
+   * is the bare command surface. Sub-modes auto-craft and auto-imbue are
+   * still stubbed server-side — see docs/design/auto-craft-auto-imbue-gap.md.
+   */
+  autoProgression: (action: 'start' | 'stop' | 'status') => void;
+
   // Combat
   combatUse: (payload: CombatUsePayload) => void;
   combatFlee: (payload: { encounterId: string }) => void;
@@ -178,6 +187,7 @@ export function useGameCommands(sendCommand: SendCommandFn): GameCommands {
     buildStaffEverything: () => sendCommand('buildstaffeverything', null),
 
     autoFarm: (p) => sendCommand('autofarm', p ?? null),
+    autoProgression: (action) => sendCommand('autoprogression', { action }),
 
     combatUse: (p) => sendCommand('combat use', p),
     combatFlee: (p) => sendCommand('combat flee', p),

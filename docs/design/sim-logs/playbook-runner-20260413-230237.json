@@ -1,0 +1,20 @@
+{
+  "playbookId": "auto-progression-endgame",
+  "displayName": "Auto-progression endgame benchmark (scaffold)",
+  "seed": 42,
+  "rolls": 200,
+  "cells": [
+    {
+      "axis": {
+        "dangerLevel": 10
+      },
+      "winRate": 0,
+      "avgRounds": 2.155,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    }
+  ],
+  "divergences": []
+}

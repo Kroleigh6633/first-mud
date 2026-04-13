@@ -92,6 +92,7 @@ builder.Services.AddScoped<ITickHandler, HomesteadCompanionTickHandler>();
 builder.Services.AddScoped<ITickHandler, CompanionDriftTickHandler>();
 builder.Services.AddScoped<ITickHandler, BuildingConstructionTickHandler>();
 builder.Services.AddScoped<ITickHandler, ResourceRegenTickHandler>();
+builder.Services.AddScoped<ITickHandler, AutoProgressionTickHandler>();
 
 // Shared combat utilities and farming orchestrator
 builder.Services.AddSingleton<MonsterFactory>();
@@ -147,6 +148,9 @@ builder.Services.AddScoped<ICommandHandler<UnassignBuilderCommand>, UnassignBuil
 builder.Services.AddScoped<ICommandHandler<ViewCityCommand>, ViewCityCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<BuildStaffEverythingCommand>, BuildStaffEverythingCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<PracticeEnchantingCommand>, PracticeEnchantingCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<AutoProgressionStartCommand>, AutoProgressionStartCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<AutoProgressionStopCommand>, AutoProgressionStopCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<AutoProgressionStatusCommand>, AutoProgressionStatusCommandHandler>();
 
 // SignalR command parsing: one ICommandParser per command name, plus the
 // registry-based dispatcher. Add a new command = add one parser + one line here.
@@ -199,6 +203,7 @@ builder.Services.AddSingleton<ICommandParser, UnassignBuilderCommandParser>();
 builder.Services.AddSingleton<ICommandParser, ViewCityCommandParser>();
 builder.Services.AddSingleton<ICommandParser, BuildStaffEverythingCommandParser>();
 builder.Services.AddSingleton<ICommandParser, PracticeEnchantingCommandParser>();
+builder.Services.AddSingleton<ICommandParser, AutoProgressionCommandParser>();
 builder.Services.AddSingleton<GameServerCommandFactory>();
 
 var app = builder.Build();
