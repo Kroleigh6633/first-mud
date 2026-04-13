@@ -27,5 +27,6 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a37c57a5 | ready-to-merge | main | Disambiguate CityPanel overview labels (workers vs buildings vs slots) | - | src/FirstMud.Client/src/components/CityPanel.tsx | 2026-04-13 |
 
 <!-- agents add rows above this line -->
