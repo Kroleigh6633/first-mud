@@ -102,6 +102,7 @@ export interface GameMessage {
     | 'salvage-rare'
     | 'npc'
     | 'wyrd'
+    | 'warning'
     | 'error';
   text: string;
 }

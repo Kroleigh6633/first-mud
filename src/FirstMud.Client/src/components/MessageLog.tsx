@@ -25,6 +25,7 @@ const CATEGORY_COLORS: Record<GameMessage['category'], string> = {
   'salvage-rare':     '#4488cc',
   npc:                '#ffffff',
   wyrd:               '#cc88ff',
+  warning:            '#ffcc44',
   error:              '#ff0000',
 };
 

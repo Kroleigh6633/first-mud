@@ -207,6 +207,18 @@ export default function GameTerminal({
   const autoQuestIndexRef = useRef(autoQuestIndex);
   autoQuestIndexRef.current = autoQuestIndex;
 
+  // Wrap appendMessage so that Error events arriving during the 'interact'
+  // phase are flagged as an interact failure (missing items, kills, etc.).
+  // All other messages pass through unchanged.
+  const wrappedAppendMessage = useMemo(() => {
+    return (msg: GameMessage) => {
+      if (msg.category === 'error' && autoQuestPhaseRef.current === 'interact') {
+        autoQuestInteractFailedRef.current = true;
+      }
+      appendMessage(msg);
+    };
+  }, [appendMessage]);
+
   // When the player arrives at a new zone tile (or leaves one), narrate it
   // into the message log so the user knows what they're walking on.
   const lastZoneIdRef = useRef<number | null>(null);
@@ -591,6 +603,8 @@ export default function GameTerminal({
       }
       autoQuestPhaseRef.current = 'idle';
       acceptWaitTicksRef.current = 0;
+      autoQuestInteractFailedRef.current = false;
+      autoQuestSkippedIndicesRef.current = new Set();
       setAutoNavigating(false);
       return;
     }
@@ -615,16 +629,32 @@ export default function GameTerminal({
       console.log('[autoquest] No more quests — run complete');
       setAutoQuestActive(false);
       setAutoNavigating(false);
-      appendMessage({
-        timestamp: new Date().toISOString(),
-        category: 'quest',
-        text: 'All quests completed! Quest auto-run finished.',
-      });
+      // If every quest was skipped (none completed), tell the player why instead
+      // of falsely claiming "all quests completed".
+      const totalQuests = ordered.length;
+      const skippedCount = autoQuestSkippedIndicesRef.current.size;
+      if (skippedCount > 0 && skippedCount >= totalQuests) {
+        wrappedAppendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'quest',
+          text: 'Quest auto-run paused — remaining quests need items/kills. Farm more or complete them manually.',
+        });
+      } else {
+        wrappedAppendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'quest',
+          text: 'All quests completed! Quest auto-run finished.',
+        });
+      }
+      autoQuestSkippedIndicesRef.current = new Set();
       return;
     }
 
     setAutoQuestTitle(nextQuest.title);
     console.log(`[autoquest] Starting quest ${autoQuestIndexRef.current}: "${nextQuest.title}" isTaken=${nextQuest.isTaken}`);
+
+    // Reset the interact-failure flag before starting each quest
+    autoQuestInteractFailedRef.current = false;
 
     // Fire acceptquest to get (or refresh) the waypoint
     sendCommand('acceptquest', { questId: nextQuest.questId });
@@ -670,7 +700,7 @@ export default function GameTerminal({
           console.log(`[autoquest] Waypoint arrived for "${nextQuest.title}" → (${wp.targetX},${wp.targetY}), switching to navigate`);
           autoQuestPhaseRef.current = 'navigate';
           setAutoNavigating(true);
-          appendMessage({
+          wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'quest',
             text: `Waypoint received — navigating to ${wp.questTitle}...`,
@@ -688,7 +718,7 @@ export default function GameTerminal({
         // Timeout after ~15 s (50 ticks) — skip this quest
         if (acceptWaitTicksRef.current > 50) {
           console.warn(`[autoquest] Waypoint timeout for "${nextQuest.title}" — skipping`);
-          appendMessage({
+          wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'quest',
             text: `No waypoint for "${nextQuest.title}" — skipping.`,
@@ -719,9 +749,10 @@ export default function GameTerminal({
 
         if (distX <= 2 && distY <= 2) {
           console.log(`[autoquest navigate] Arrived at waypoint for "${nextQuest.title}" — interacting`);
+          autoQuestInteractFailedRef.current = false;
           autoQuestPhaseRef.current = 'interact';
           setAutoNavigating(false);
-          appendMessage({
+          wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'quest',
             text: `Arrived at ${wp.questTitle} — completing quest...`,
@@ -739,7 +770,7 @@ export default function GameTerminal({
             clearInterval(autoQuestIntervalRef.current);
             autoQuestIntervalRef.current = null;
           }
-          appendMessage({
+          wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'system',
             text: 'Auto-quest: path blocked. Run stopped.',
@@ -754,13 +785,28 @@ export default function GameTerminal({
 
       // ── Interact phase: wait one beat for server to process, then advance ─
       if (phase === 'interact') {
-        console.log(`[autoquest interact] Quest "${nextQuest.title}" processed — advancing to next`);
         autoQuestPhaseRef.current = 'idle';
         if (autoQuestIntervalRef.current !== null) {
           clearInterval(autoQuestIntervalRef.current);
           autoQuestIntervalRef.current = null;
         }
-        // Advance index — this re-fires the parent effect for the next quest
+
+        if (autoQuestInteractFailedRef.current) {
+          // Quest couldn't be completed (missing items, not enough kills, etc.)
+          // Log a yellow warning, record as skipped, and move on.
+          console.warn(`[autoquest interact] Quest "${nextQuest.title}" failed — skipping`);
+          autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+          wrappedAppendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'warning',
+            text: `Quest '${nextQuest.title}' needs items/kills you don't have — skipping to next quest.`,
+          });
+          autoQuestInteractFailedRef.current = false;
+        } else {
+          console.log(`[autoquest interact] Quest "${nextQuest.title}" completed — advancing to next`);
+        }
+
+        // Advance index regardless — this re-fires the parent effect for the next quest
         setAutoQuestIndex(prev => prev + 1);
       }
     }, 300);
@@ -773,7 +819,7 @@ export default function GameTerminal({
       }
     };
   // Re-run when active state changes or we advance to the next quest index
-  }, [autoQuestActive, autoQuestIndex, sendCommand, appendMessage]);
+  }, [autoQuestActive, autoQuestIndex, sendCommand, wrappedAppendMessage]);
 
   const handleAcceptQuest = (questId: string) => {
     sendCommand('acceptquest', { questId });
@@ -1168,7 +1214,7 @@ export default function GameTerminal({
       {showCharSheet && (
         <CharacterSheet player={worldState?.player ?? null} equipment={equipment} onClose={() => setShowCharSheet(false)} />
       )}
-      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} autoFarmStatus={autoFarmStatus} forceAutoCombat={autoQuestActive} />}
+      {combat && <CombatPanel combat={combat} sendCommand={sendCommand} autoFarmStatus={autoFarmStatus} forceAutoCombat={autoQuestActive} playSound={playSound} />}
       {showStorage && atHomestead && (
         <StoragePanel
           snapshot={storageView}

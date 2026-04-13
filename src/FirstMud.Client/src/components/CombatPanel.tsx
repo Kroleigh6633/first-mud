@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CombatUpdate, CombatantState, AutoFarmStatus } from '../types/game';
+import type { SoundName } from '../hooks/useAudio';
 
 interface Props {
   combat: CombatUpdate;
   sendCommand: (command: string, payload?: unknown) => void;
   autoFarmStatus?: AutoFarmStatus | null;
   forceAutoCombat?: boolean;
+  playSound?: (name: SoundName) => void;
 }
 
 function HpBar({ current, max, color }: { current: number; max: number; color: string }) {
@@ -102,7 +104,7 @@ function PartyRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: bo
 
 // Abilities are now sourced from the current actor's CombatantState.
 
-export default function CombatPanel({ combat, sendCommand, autoFarmStatus, forceAutoCombat }: Props) {
+export default function CombatPanel({ combat, sendCommand, autoFarmStatus, forceAutoCombat, playSound }: Props) {
   const isAutoFarm = autoFarmStatus?.active === true;
   const isOver = combat.state === 'Victory' || combat.state === 'Defeat' || combat.state === 'Fled';
   const playerSide = combat.combatants.filter(c => c.isPlayerSide);
@@ -128,6 +130,34 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
       setAutoCombat(true);
     }
   }, [forceAutoCombat]);
+
+  // Sound effects for auto-combat actions (lastActionText changes on every CombatUpdate).
+  // A ref prevents replaying the same text if the component re-renders for unrelated reasons.
+  const lastSoundedActionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!playSound || !combat?.lastActionText) return;
+    if (combat.lastActionText === lastSoundedActionRef.current) return;
+    lastSoundedActionRef.current = combat.lastActionText;
+
+    const text = combat.lastActionText.toLowerCase();
+    if (text.includes('critical')) playSound('crit');
+    else if (text.includes('miss') || text.includes('dodged') || text.includes('evaded')) playSound('miss');
+    else if (text.includes('dodge')) playSound('dodge');
+    else if (text.includes('heal') || text.includes('restore')) playSound('heal');
+    else if (text.includes('strikes') || text.includes('damage') || text.includes('hit')) playSound('strike');
+  }, [combat?.lastActionText, playSound]);
+
+  // Sound effects for terminal combat state transitions (Victory / Defeat / Fled).
+  const lastSoundedStateRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!playSound) return;
+    if (combat.state === lastSoundedStateRef.current) return;
+    lastSoundedStateRef.current = combat.state;
+
+    if (combat.state === 'Victory') playSound('questComplete');
+    else if (combat.state === 'Defeat') playSound('defeat');
+    else if (combat.state === 'Fled') playSound('portal');
+  }, [combat.state, playSound]);
 
   // Auto-combat: fire whenever combat state changes and it's the player's turn.
   // Watches the entire combat object so the effect re-triggers on every
