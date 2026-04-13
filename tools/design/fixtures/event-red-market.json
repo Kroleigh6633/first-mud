@@ -1,0 +1,49 @@
+{
+  "$schema": "world-event/v1",
+  "id": "red-market",
+  "title": "The Red Market",
+  "family": "economic",
+  "priority": 3,
+  "trigger": {
+    "type": "all",
+    "of": [
+      { "type": "gameTick", "minDaysSinceLast": 14 },
+      { "type": "repThreshold", "faction": "any", "minTier": "trusted", "withinDays": null }
+    ],
+    "comment": "14 quiet days AND player Trusted+ with at least one faction."
+  },
+  "duration": { "ticks": 6 },
+  "concurrencyKey": "economic",
+  "playerInterceptable": false,
+  "effects": {
+    "worldState": [
+      { "type": "setFlag", "key": "market.red", "value": true },
+      { "type": "shopPriceMultiplier", "scope": "zone:eastmile", "category": "grain", "factor": 1.4 },
+      { "type": "shopPriceMultiplier", "scope": "zone:eastmile", "category": "herbs", "factor": 1.6 },
+      { "type": "shopPriceMultiplier", "scope": "zone:gravenmarsh-causeway", "category": "toll", "factor": 1.0, "flatDelta": 2 }
+    ],
+    "npcDialogueFlags": [
+      { "type": "setNpcFlag", "npcId": "senna-orrick", "flag": "redmarket.line", "value": true },
+      { "type": "setNpcFlag", "npcId": "harken-vos",   "flag": "bounty.foodCart", "value": true },
+      { "type": "setNpcFlag", "npcId": "auld-maerwyn", "flag": "barterOnly",      "value": true }
+    ],
+    "zoneAmbient": [
+      { "type": "setAmbient", "zoneId": "thornwood-verge", "mood": "lax-patrols", "weatherOverride": null }
+    ],
+    "shopStock": [
+      { "type": "stockShift", "shopId": "bent-mare-common-room", "itemId": "stew", "stockDelta": 0, "priceDelta": 1 }
+    ],
+    "npcAvailability": []
+  },
+  "onResolve": [
+    { "type": "clearFlag", "key": "market.red" },
+    { "type": "clearShopPriceMultiplier", "scope": "zone:eastmile", "category": "grain" },
+    { "type": "clearShopPriceMultiplier", "scope": "zone:eastmile", "category": "herbs" },
+    { "type": "clearShopPriceMultiplier", "scope": "zone:gravenmarsh-causeway", "category": "toll" },
+    { "type": "setNpcFlag", "npcId": "senna-orrick", "flag": "redmarket.line", "value": false },
+    { "type": "setNpcFlag", "npcId": "harken-vos",   "flag": "bounty.foodCart", "value": false },
+    { "type": "setNpcFlag", "npcId": "auld-maerwyn", "flag": "barterOnly",      "value": false },
+    { "type": "clearAmbient", "zoneId": "thornwood-verge" }
+  ],
+  "exclusiveWith": []
+}

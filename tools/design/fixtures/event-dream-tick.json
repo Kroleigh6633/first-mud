@@ -1,0 +1,54 @@
+{
+  "$schema": "world-event/v1",
+  "id": "dream-installation-tick",
+  "title": "The Dream-Installation Tick",
+  "family": "faction-long-arc",
+  "priority": 2,
+  "trigger": {
+    "type": "cron",
+    "everyDays": 20,
+    "atDay": null,
+    "comment": "Unconditional 20-day cadence from world start. Ashen build-out runs whether the player is engaged or not (canon-deliberations Q2)."
+  },
+  "duration": { "ticks": 3 },
+  "concurrencyKey": "ashen-arc",
+  "playerInterceptable": true,
+  "rotationState": {
+    "type": "fixedCycle",
+    "key": "ashen.zoneCycleIndex",
+    "zones": [
+      "eastmile",
+      "thornwood-verge",
+      "gravenmarsh-causeway",
+      "marchkeep-outskirts",
+      "ironspire-environs",
+      "ashen-reach-periphery"
+    ]
+  },
+  "effects": {
+    "worldState": [
+      { "type": "setFlag", "key": "dreamNode.${rotationState.currentZone}", "value": true },
+      { "type": "addReputationDrift", "faction": "ashen", "perTickDelta": 1 }
+    ],
+    "npcDialogueFlags": [
+      { "type": "setNpcFlag", "npcId": "brother-velm",  "flag": "badDream",            "value": true,
+        "conditional": { "rotationState.currentZone": "eastmile" } },
+      { "type": "setNpcFlag", "npcId": "auld-maerwyn",  "flag": "sendsToInspectNode",  "value": true },
+      { "type": "setNpcFlag", "npcId": "rhianne-moss",  "flag": "feelsNode",           "value": true,
+        "conditional": { "questFlag": "rhianne.alive" } }
+    ],
+    "zoneAmbient": [
+      { "type": "setAmbient", "zoneId": "${rotationState.currentZone}", "mood": "wyrd-pressure", "weatherOverride": "fog-thick" }
+    ],
+    "shopStock": [],
+    "npcAvailability": []
+  },
+  "onResolve": [
+    { "type": "clearAmbient", "zoneId": "${rotationState.currentZone}" },
+    { "type": "setNpcFlag", "npcId": "brother-velm",  "flag": "badDream",           "value": false },
+    { "type": "setNpcFlag", "npcId": "auld-maerwyn",  "flag": "sendsToInspectNode", "value": false },
+    { "type": "setNpcFlag", "npcId": "rhianne-moss",  "flag": "feelsNode",          "value": false },
+    { "type": "advanceRotation", "key": "ashen.zoneCycleIndex" }
+  ],
+  "exclusiveWith": []
+}
