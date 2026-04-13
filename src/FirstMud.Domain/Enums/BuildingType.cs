@@ -15,4 +15,5 @@ public enum BuildingType
     Barracks         = 11,
     Library          = 12,
     Warehouse        = 13,
+    Hut              = 14,
 }

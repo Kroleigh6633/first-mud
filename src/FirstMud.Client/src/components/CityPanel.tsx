@@ -26,6 +26,7 @@ const BUILDING_DUTY: Record<BuildingType, HomesteadDuty> = {
   Barracks:       'Guard',
   Library:        'Salvager',
   Warehouse:      'Guard',
+  Hut:            'Guard',
 };
 
 const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[]> = {
@@ -42,12 +43,13 @@ const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[
   Barracks:       [{ material: 'Stone', qty: 25 }, { material: 'Wood', qty: 15 }],
   Library:        [{ material: 'Wood', qty: 20 }, { material: 'Stone', qty: 15 }],
   Warehouse:      [{ material: 'Wood', qty: 25 }, { material: 'Stone', qty: 15 }],
+  Hut:            [{ material: 'Wood', qty: 5 },  { material: 'Stone', qty: 3 }],
 };
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'Forge', 'Fletcher', 'Tannery', 'EnchantingTower', 'AlchemistHut',
   'Stoneworker', 'Woodworker', 'MarketStall', 'Farm', 'Mine',
-  'Barracks', 'Library', 'Warehouse',
+  'Barracks', 'Library', 'Warehouse', 'Hut',
 ];
 
 // Aptitude per companion type per duty (mirrors CompanionPanel)
@@ -100,6 +102,7 @@ function buildingIcon(type: BuildingType): string {
     case 'Barracks':        return '⚔';
     case 'Library':         return '📚';
     case 'Warehouse':       return '📦';
+    case 'Hut':             return '🏠';
   }
 }
 
@@ -118,6 +121,7 @@ function buildingColor(type: BuildingType): string {
     case 'Barracks':        return '#cc4444';
     case 'Library':         return '#44aacc';
     case 'Warehouse':       return '#aaaaaa';
+    case 'Hut':             return '#cc9966';
   }
 }
 

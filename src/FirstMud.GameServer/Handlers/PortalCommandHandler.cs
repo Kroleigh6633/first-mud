@@ -1,4 +1,5 @@
 using FirstMud.Application.Services;
+using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
 using FirstMud.Domain.ValueObjects;
 using FirstMud.GameServer.Commands;
@@ -50,10 +51,24 @@ public class PortalHomeCommandHandler(
         var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
         if (homestead is not null)
         {
+            bool wasEmpty = (await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct)).Count == 0;
             await buildingService.SeedStarterBuildingsAsync(homestead.Id, ct);
 
             // Push CityView so buildings appear on the map immediately on arrival
             var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
+
+            // On first-ever visit, show a housing status message
+            if (wasEmpty)
+            {
+                int companions = (await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct)).Count;
+                int housed = buildings.Count(b => b.Type == BuildingType.Hut) * 3;
+                int homeless = Math.Max(0, companions - housed);
+                string housingMsg = homeless > 0
+                    ? $"Your settlement has {buildings.Count} buildings and {buildings.Count(b => b.Type == BuildingType.Hut)} huts (housing {housed}). " +
+                      $"{homeless} companions are homeless — place more Huts from the City panel [G]."
+                    : $"Your settlement is ready: {buildings.Count} buildings with room for all {companions} companions.";
+                await notificationService.SendMessageAsync(cmd.PlayerId, "system", housingMsg, ct);
+            }
             var buildingDtos = new List<object>();
             foreach (var b in buildings)
             {

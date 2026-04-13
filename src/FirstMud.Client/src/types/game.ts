@@ -407,7 +407,8 @@ export type BuildingType =
   | 'Mine'
   | 'Barracks'
   | 'Library'
-  | 'Warehouse';
+  | 'Warehouse'
+  | 'Hut';
 
 export interface HomesteadBuilding {
   id: string;

@@ -33,6 +33,7 @@ public class BuildingService
         [BuildingType.Barracks]       = [("Stone", 25), ("Wood", 15)],
         [BuildingType.Library]        = [("Wood", 20), ("Stone", 15)],
         [BuildingType.Warehouse]      = [("Wood", 25), ("Stone", 15)],
+        [BuildingType.Hut]            = [("Wood",  5), ("Stone",  3)],
     };
 
     // Best HomesteadDuty for each building type — used for auto-assignment.
@@ -51,15 +52,33 @@ public class BuildingService
         [BuildingType.Barracks]       = HomesteadDuty.Guard,
         [BuildingType.Library]        = HomesteadDuty.Salvager,
         [BuildingType.Warehouse]      = HomesteadDuty.Guard,
+        [BuildingType.Hut]            = HomesteadDuty.Guard,
     };
 
     // Starter buildings placed (free, already constructed) on first homestead visit.
-    // Each tuple: (type, gridX, gridY)
-    private static readonly (BuildingType Type, int Gx, int Gy)[] StarterBuildings =
+    // Each tuple: (type, gridX, gridY, alreadyConstructed, constructionProgress)
+    private static readonly (BuildingType Type, int Gx, int Gy, bool Built, int Progress)[] StarterBuildings =
     [
-        (BuildingType.Forge,     0,  2),   // Workbench/Forge at south-centre
-        (BuildingType.Warehouse, -2, 0),   // Storage Shed to the west
-        (BuildingType.MarketStall, 2, 0),  // Market Stall to the east
+        // Core infrastructure — fully constructed
+        (BuildingType.Forge,       0,  2, true,  100),   // Forge at south-centre
+        (BuildingType.Warehouse,  -2,  0, true,  100),   // Warehouse to the west
+        (BuildingType.MarketStall, 2,  0, true,  100),   // Market Stall to the east
+        (BuildingType.Barracks,    0, -2, true,  100),   // Barracks to the north (guards)
+        (BuildingType.Farm,       -2, -2, true,  100),   // Farm to the northwest (food)
+        // Under construction at 50% — needs a builder to finish
+        (BuildingType.Tannery,     2,  2, false,  50),   // Tannery to the southeast
+        (BuildingType.Woodworker, -2,  2, false,  50),   // Woodworker to the southwest
+        (BuildingType.AlchemistHut,2, -2, false,  50),   // Alchemist to the northeast
+    ];
+
+    // Hut positions in a ring around the starter buildings for companion housing.
+    // Each is at radius 3 around the centre to avoid core building overlap.
+    private static readonly (int Gx, int Gy)[] HutRingPositions =
+    [
+        ( 3,  0), ( 3,  1), ( 3, -1),   // east arc
+        (-3,  0), (-3,  1), (-3, -1),   // west arc
+        ( 0,  3), ( 1,  3), (-1,  3),   // south arc
+        ( 0, -3), ( 1, -3), (-1, -3),   // north arc (extra)
     ];
 
     public BuildingService(
@@ -225,21 +244,39 @@ public class BuildingService
     }
 
     /// <summary>
-    /// Seeds the three free starter buildings for a new homestead.
-    /// Only places them if none exist yet.
+    /// Seeds a full starter village for a new homestead on first visit.
+    /// Places core infrastructure (5 complete + 3 under construction) plus
+    /// 10 Huts for initial companion housing.
+    /// Only runs if no buildings exist yet.
     /// </summary>
     public async Task SeedStarterBuildingsAsync(Guid homesteadId, CancellationToken ct = default)
     {
         var existing = await _buildings.GetByHomesteadIdAsync(homesteadId, ct);
         if (existing.Count > 0) return; // already seeded
 
-        foreach (var (type, gx, gy) in StarterBuildings)
+        // Place the core starter buildings (some constructed, some at 50%)
+        foreach (var (type, gx, gy, built, progress) in StarterBuildings)
         {
-            var building = HomesteadBuilding.Create(homesteadId, type, gx, gy, tier: 1, alreadyConstructed: true);
+            var building = HomesteadBuilding.Create(homesteadId, type, gx, gy, tier: 1, alreadyConstructed: built);
+            if (!built && progress > 0)
+                building.AdvanceConstruction(progress);
             await _buildings.AddAsync(building, ct);
         }
 
-        _logger.LogInformation("Seeded 3 starter buildings for homestead {HomesteadId}.", homesteadId);
+        // Seed 10 Huts (fully constructed) to house up to 30 companions initially.
+        // Players with larger rosters will see a prompt to build more via the City panel.
+        int hutCount = 0;
+        foreach (var (gx, gy) in HutRingPositions)
+        {
+            if (hutCount >= 10) break;
+            var hut = HomesteadBuilding.Create(homesteadId, BuildingType.Hut, gx, gy, tier: 1, alreadyConstructed: true);
+            await _buildings.AddAsync(hut, ct);
+            hutCount++;
+        }
+
+        _logger.LogInformation(
+            "Seeded {Total} starter buildings (8 core + {Huts} huts) for homestead {HomesteadId}.",
+            StarterBuildings.Length + hutCount, hutCount, homesteadId);
     }
 
     /// <summary>

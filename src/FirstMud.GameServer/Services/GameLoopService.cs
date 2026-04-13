@@ -179,6 +179,7 @@ public class GameLoopService : BackgroundService
                 if (player.Position.X != -100 || player.Position.Y != -100) continue;
 
                 var changed = false;
+                var hpBefore = player.CurrentHp;
 
                 if (player.CurrentHp < player.MaxHp)
                 {
@@ -194,6 +195,10 @@ public class GameLoopService : BackgroundService
                 }
 
                 if (!changed) continue;
+
+                _logger.LogInformation(
+                    "Homestead heal tick: player {Name} at ({X},{Y}), HP {Before} → {After}",
+                    player.Name, player.Position.X, player.Position.Y, hpBefore, player.CurrentHp);
 
                 await playerRepo.UpdateAsync(player, ct);
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Services;
 using FirstMud.Domain.Enums;
+using FirstMud.Domain.Interfaces;
 
 namespace FirstMud.GameServer.Hubs;
 
@@ -11,11 +12,13 @@ public class GameHub : Hub
 
     private readonly GameLoopService _gameLoop;
     private readonly WorldStateService _worldStateService;
+    private readonly IPlayerRepository _playerRepository;
 
-    public GameHub(GameLoopService gameLoop, WorldStateService worldStateService)
+    public GameHub(GameLoopService gameLoop, WorldStateService worldStateService, IPlayerRepository playerRepository)
     {
         _gameLoop = gameLoop;
         _worldStateService = worldStateService;
+        _playerRepository = playerRepository;
     }
 
     public override async Task OnConnectedAsync()
@@ -35,6 +38,10 @@ public class GameHub : Hub
         ConnectionPlayerMap[Context.ConnectionId] = playerId;
         await Groups.AddToGroupAsync(Context.ConnectionId, playerId.ToString());
         await Clients.Caller.SendAsync("Authenticated", playerId);
+
+        // Stamp LastSeenAt so the player stays within the 24-hour active-player
+        // window used by background ticks (homestead healing, weave regen, etc.).
+        await _playerRepository.TouchLastSeenAsync(playerId, Context.ConnectionAborted);
 
         // Push initial world-state snapshot so the status panel populates immediately
         try

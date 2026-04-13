@@ -48,4 +48,14 @@ internal sealed class PlayerRepository : IPlayerRepository
             .Where(p => EF.Property<DateTime>(p, "LastSeenAt") >= cutoff)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task TouchLastSeenAsync(Guid playerId, CancellationToken cancellationToken = default)
+    {
+        // Load only the entity we need (no Includes required — just the shadow property)
+        var player = await _context.Players.FindAsync([playerId], cancellationToken);
+        if (player is null) return;
+
+        _context.Entry(player).Property("LastSeenAt").CurrentValue = DateTime.UtcNow;
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }
