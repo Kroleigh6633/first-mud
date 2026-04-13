@@ -122,10 +122,12 @@ public class DepositCommandHandler(
         if (item is null || item.OwnerId != cmd.PlayerId)
             return new CommandResult(false, "Item not found in your inventory.");
 
-        // Count guard companions for storage capacity bonus
+        // Gather guard companions for bond-scaled storage capacity bonus
         var companions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-        var guardCount = companions.Count(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone);
-        var effectiveSlots = homestead.EffectiveStorageSlots(guardCount);
+        var guardBondLevels = companions
+            .Where(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone)
+            .Select(c => (c.CurrentLayer));
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardBondLevels);
 
         // Each row in storage = 1 slot (stack), regardless of quantity
         var storageEntries = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
@@ -247,10 +249,12 @@ public class OpenStorageCommandHandler(
         if (homestead is null)
             return new CommandResult(false, "Homestead not found.");
 
-        // Compute effective capacity including guard companion bonus
+        // Compute effective capacity including bond-scaled guard companion bonus
         var companions = await companionRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-        var guardCount = companions.Count(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone);
-        var effectiveSlots = homestead.EffectiveStorageSlots(guardCount);
+        var guardBondLevels = companions
+            .Where(c => c.AssignedDuty == HomesteadDuty.Guard && !c.IsPermanentlyGone)
+            .Select(c => (c.CurrentLayer));
+        var effectiveSlots = homestead.EffectiveStorageSlots(guardBondLevels);
 
         var storageEntries = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
         var itemIds = storageEntries.Select(s => s.ItemId).ToList();

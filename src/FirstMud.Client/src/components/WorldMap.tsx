@@ -326,142 +326,574 @@ function buildingBaseColors(type: BuildingType): { wall: string; roof: string; a
   }
 }
 
-/** Draw a homestead building on the isometric grid. */
+/**
+ * Draw a homestead building centered on its tile's screen position.
+ *
+ * sx, sy  — screen coords of the tile center (diamond midpoint).
+ * tileW, tileH — tile pixel dimensions (already DPR-scaled).
+ * Sizes are expressed in tile-relative units so buildings scale with the tile.
+ */
 function drawHomesteadBuilding(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
-  _tileW: number,
+  tileW: number,
   tileH: number,
   type: BuildingType,
   isConstructed: boolean,
   progress: number,
-  dpr: number,
+  waterFrame: number,
 ) {
   const colors = buildingBaseColors(type);
-  const baseY = sy - tileH / 2;
+  // "floor level" — top edge of the isometric tile face, used as the ground line
+  const floor = sy - tileH / 2;
 
   if (!isConstructed) {
-    // Draw construction scaffold (grey wireframe + progress indicator)
+    // ── Under construction: isometric wireframe scaffold ──────────────────
     ctx.save();
     ctx.globalAlpha = 0.55 + 0.35 * (progress / 100);
 
-    // Scaffolding outline
+    const hw = tileW * 0.44;   // half-width of scaffold footprint
+    const sh = tileH * 1.2;    // total scaffold height above floor
+
+    // Outer outline (dashed)
     ctx.strokeStyle = '#886644';
-    ctx.lineWidth = 1.5 * dpr;
-    ctx.setLineDash([4 * dpr, 3 * dpr]);
-    ctx.strokeRect(sx - 7 * dpr, baseY - 12 * dpr, 14 * dpr, 14 * dpr);
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(sx - hw, floor - sh, hw * 2, sh);
+
+    // Diagonal cross-beams
+    ctx.beginPath();
+    ctx.moveTo(sx - hw, floor - sh);
+    ctx.lineTo(sx + hw, floor);
+    ctx.moveTo(sx + hw, floor - sh);
+    ctx.lineTo(sx - hw, floor);
+    ctx.stroke();
     ctx.setLineDash([]);
 
-    // Progress fill
-    const fillH = (12 * dpr) * (progress / 100);
+    // Progress fill (tinted wall color)
+    const fillH = sh * (progress / 100);
     ctx.fillStyle = colors.wall + '88';
-    ctx.fillRect(sx - 7 * dpr, baseY - fillH, 14 * dpr, fillH);
+    ctx.fillRect(sx - hw, floor - fillH, hw * 2, fillH);
 
     // "%" label
-    ctx.font = `bold ${7 * dpr}px monospace`;
+    ctx.font = `bold ${tileH * 0.5}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffcc44';
-    ctx.fillText(`${progress}%`, sx, baseY - 6 * dpr);
+    ctx.fillText(`${progress}%`, sx, floor - sh * 0.5);
 
     ctx.restore();
     return;
   }
 
-  // ── Completed building ──
+  // ── Completed buildings ────────────────────────────────────────────────────
   ctx.save();
 
-  // Wall block
-  ctx.fillStyle = colors.wall;
-  ctx.fillRect(sx - 7 * dpr, baseY - 10 * dpr, 14 * dpr, 10 * dpr);
-
-  // Roof
-  ctx.beginPath();
-  ctx.moveTo(sx,              baseY - 10 * dpr);
-  ctx.lineTo(sx + 9 * dpr,   baseY - 3 * dpr);
-  ctx.lineTo(sx - 9 * dpr,   baseY - 3 * dpr);
-  ctx.closePath();
-  ctx.fillStyle = colors.roof;
-  ctx.fill();
-
-  // Building-specific accent details
   switch (type) {
+
+    // ── Forge: dark-red block + peaked roof + right-side chimney + smoke ──
     case 'Forge': {
-      // Chimney smoke puff
+      const hw  = tileW * 0.42;
+      const wh  = tileH * 1.4;   // wall height
+      const rh  = tileH * 0.6;   // roof peak extra height
+      const roofBase = floor - wh;
+
+      // Wall (left face — darker)
+      ctx.fillStyle = '#3d2016';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      // Wall (right face)
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+      // Wall top stripe (front face)
+      ctx.fillStyle = '#6a3a28';
+      ctx.fillRect(sx - hw, roofBase, hw * 2, tileH * 0.18);
+
+      // Peaked roof
       ctx.beginPath();
-      ctx.arc(sx + 4 * dpr, baseY - 16 * dpr, 3 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = '#666';
-      ctx.globalAlpha = 0.6;
+      ctx.moveTo(sx - hw, roofBase);
+      ctx.lineTo(sx,       roofBase - rh);
+      ctx.lineTo(sx + hw,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
       ctx.fill();
-      ctx.beginPath();
-      ctx.arc(sx + 5 * dpr, baseY - 20 * dpr, 2 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = '#555';
-      ctx.fill();
+
+      // Chimney (right side)
+      const chimneyX = sx + hw * 0.5;
+      const chimneyH = tileH * 0.9;
+      ctx.fillStyle = '#3a2010';
+      ctx.fillRect(chimneyX - tileW * 0.05, roofBase - chimneyH, tileW * 0.1, chimneyH);
+
+      // Animated orange smoke puffs
+      ctx.globalAlpha = 0.55 + 0.2 * Math.sin(waterFrame * 0.07);
+      const smokePhase = (waterFrame * 0.03) % 1;
+      for (let i = 0; i < 3; i++) {
+        const t   = ((smokePhase + i * 0.33) % 1);
+        const sr  = tileH * (0.12 + t * 0.18);
+        const sy2 = roofBase - chimneyH - tileH * 0.3 - t * tileH * 0.7;
+        const sx2 = chimneyX + Math.sin(t * Math.PI * 2) * tileW * 0.06;
+        ctx.beginPath();
+        ctx.arc(sx2, sy2, sr, 0, Math.PI * 2);
+        ctx.fillStyle = i === 0 ? '#ff8844' : '#886644';
+        ctx.fill();
+      }
       ctx.globalAlpha = 1;
-      // Chimney
-      ctx.fillStyle = '#4a3020';
-      ctx.fillRect(sx + 2 * dpr, baseY - 14 * dpr, 4 * dpr, 6 * dpr);
+
+      // Anvil silhouette in front
+      const ax = sx - hw * 0.3, ay = floor;
+      ctx.fillStyle = '#222';
+      ctx.fillRect(ax - tileW * 0.08, ay - tileH * 0.28, tileW * 0.16, tileH * 0.1);
+      ctx.fillRect(ax - tileW * 0.05, ay - tileH * 0.38, tileW * 0.1,  tileH * 0.1);
       break;
     }
+
+    // ── Warehouse: wide grey block + flat roof + crates ────────────────────
+    case 'Warehouse': {
+      const hw = tileW * 0.72;   // extra-wide (2x1 tiles)
+      const wh = tileH * 1.2;
+      const roofBase = floor - wh;
+
+      // Left (dark) face
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      // Right (lighter) face
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+      // Flat roof
+      ctx.fillStyle = '#555';
+      ctx.fillRect(sx - hw, roofBase - tileH * 0.15, hw * 2, tileH * 0.15);
+
+      // Crate outlines on right face
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1.2;
+      for (let ci = 0; ci < 2; ci++) {
+        const cx = sx + tileW * (0.08 + ci * 0.35);
+        const cy = floor - tileH * 0.3;
+        const cs = tileH * 0.35;
+        ctx.strokeRect(cx - cs / 2, cy - cs, cs, cs);
+        ctx.beginPath();
+        ctx.moveTo(cx - cs / 2, cy - cs * 0.5);
+        ctx.lineTo(cx + cs / 2, cy - cs * 0.5);
+        ctx.stroke();
+      }
+      // Door (big double-door)
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(sx - tileW * 0.12, floor - wh * 0.6, tileW * 0.24, wh * 0.6);
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx - tileW * 0.12, floor - wh * 0.6, tileW * 0.24, wh * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(sx, floor - wh * 0.6);
+      ctx.lineTo(sx, floor);
+      ctx.stroke();
+      break;
+    }
+
+    // ── MarketStall: open stall with triangular awning + counter ────────────
+    case 'MarketStall': {
+      const hw = tileW * 0.38;
+      const wh = tileH * 0.85;
+      const roofBase = floor - wh;
+
+      // Wooden posts at corners
+      ctx.fillStyle = '#7a5530';
+      for (const px2 of [sx - hw + tileW * 0.04, sx + hw - tileW * 0.04]) {
+        ctx.fillRect(px2 - tileW * 0.025, roofBase - tileH * 0.4, tileW * 0.05, wh + tileH * 0.4);
+      }
+
+      // Triangular canopy
+      ctx.beginPath();
+      ctx.moveTo(sx - hw - tileW * 0.05, roofBase);
+      ctx.lineTo(sx,                      roofBase - tileH * 0.55);
+      ctx.lineTo(sx + hw + tileW * 0.05,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+      // Canopy stripes
+      ctx.strokeStyle = colors.accent + 'aa';
+      ctx.lineWidth = 2;
+      for (let s = 0; s < 3; s++) {
+        const t = (s + 1) / 4;
+        const stripX = sx - hw + (hw * 2) * t;
+        ctx.beginPath();
+        ctx.moveTo(stripX, roofBase);
+        ctx.lineTo(sx + (stripX - sx) * 0.5, roofBase - tileH * 0.55 * 0.5);
+        ctx.stroke();
+      }
+
+      // Counter / table
+      ctx.fillStyle = '#6a4828';
+      ctx.fillRect(sx - hw * 0.8, floor - tileH * 0.45, hw * 1.6, tileH * 0.12);
+      ctx.fillRect(sx - hw * 0.8, floor - tileH * 0.45, tileW * 0.04, tileH * 0.45);
+      ctx.fillRect(sx + hw * 0.8 - tileW * 0.04, floor - tileH * 0.45, tileW * 0.04, tileH * 0.45);
+
+      // Goods on counter (colorful dots)
+      ctx.fillStyle = '#ff9944';
+      ctx.beginPath(); ctx.arc(sx - tileW * 0.14, floor - tileH * 0.38, tileH * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#44cc88';
+      ctx.beginPath(); ctx.arc(sx, floor - tileH * 0.38, tileH * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#cc6644';
+      ctx.beginPath(); ctx.arc(sx + tileW * 0.14, floor - tileH * 0.38, tileH * 0.08, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+
+    // ── Farm: green crop rows + fence perimeter ─────────────────────────────
     case 'Farm': {
-      // Crop rows around the building
-      ctx.fillStyle = colors.accent;
-      for (let r = 0; r < 3; r++) {
-        ctx.fillRect(sx - 12 * dpr + r * 4 * dpr, baseY + 1 * dpr, 2 * dpr, 4 * dpr);
+      const extent = tileW * 0.85;   // span most of 2×2 footprint
+
+      // Soil base
+      ctx.fillStyle = '#4a3018';
+      ctx.fillRect(sx - extent, floor - tileH * 0.22, extent * 2, tileH * 0.22);
+
+      // Crop rows (4 rows of green lines)
+      for (let r = 0; r < 4; r++) {
+        const rowX = sx - extent + extent * 2 * ((r + 0.5) / 4);
+        ctx.fillStyle = r % 2 === 0 ? colors.accent : '#5aaa28';
+        ctx.fillRect(rowX - tileW * 0.025, floor - tileH * 0.2, tileW * 0.05, tileH * 0.18);
+        // Small leaf bumps
+        for (let b = 0; b < 3; b++) {
+          const by2 = floor - tileH * (0.05 + b * 0.06);
+          ctx.beginPath();
+          ctx.arc(rowX + Math.sin(b * 1.8) * tileW * 0.02, by2, tileH * 0.05, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Fence perimeter
+      ctx.strokeStyle = '#7a5530';
+      ctx.lineWidth = 1.5;
+      // Top fence (horizontal)
+      ctx.beginPath();
+      ctx.moveTo(sx - extent, floor - tileH * 0.24);
+      ctx.lineTo(sx + extent, floor - tileH * 0.24);
+      ctx.stroke();
+      // Bottom fence
+      ctx.beginPath();
+      ctx.moveTo(sx - extent, floor + tileH * 0.04);
+      ctx.lineTo(sx + extent, floor + tileH * 0.04);
+      ctx.stroke();
+      // Fence posts
+      for (let p = 0; p <= 4; p++) {
+        const px2 = sx - extent + extent * 2 * (p / 4);
+        ctx.beginPath();
+        ctx.moveTo(px2, floor - tileH * 0.28);
+        ctx.lineTo(px2, floor + tileH * 0.08);
+        ctx.stroke();
+      }
+
+      // Small barn structure in center
+      ctx.fillStyle = '#7a4020';
+      ctx.fillRect(sx - tileW * 0.16, floor - tileH * 0.85, tileW * 0.32, tileH * 0.65);
+      ctx.beginPath();
+      ctx.moveTo(sx - tileW * 0.2, floor - tileH * 0.85);
+      ctx.lineTo(sx,               floor - tileH * 1.25);
+      ctx.lineTo(sx + tileW * 0.2, floor - tileH * 0.85);
+      ctx.closePath();
+      ctx.fillStyle = '#aa5030';
+      ctx.fill();
+      break;
+    }
+
+    // ── Mine: dark hillside arch + cart tracks + ore pile ──────────────────
+    case 'Mine': {
+      const hw = tileW * 0.40;
+      const wh = tileH * 1.1;
+      const roofBase = floor - wh;
+
+      // Hillside body (dark mound)
+      ctx.beginPath();
+      ctx.ellipse(sx, floor - wh * 0.5, hw * 1.1, wh * 0.7, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#2a2218';
+      ctx.fill();
+      // Hillside top contour
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 1.1, floor);
+      ctx.quadraticCurveTo(sx, roofBase - tileH * 0.1, sx + hw * 1.1, floor);
+      ctx.fillStyle = '#3a3020';
+      ctx.fill();
+
+      // Dark archway entrance
+      ctx.fillStyle = '#0a0808';
+      ctx.beginPath();
+      ctx.arc(sx, floor - tileH * 0.6, tileW * 0.18, Math.PI, 0);
+      ctx.rect(sx - tileW * 0.18, floor - tileH * 0.6, tileW * 0.36, tileH * 0.6);
+      ctx.fill();
+      // Arch frame (timber)
+      ctx.strokeStyle = '#5a3a1a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(sx, floor - tileH * 0.6, tileW * 0.18, Math.PI, 0);
+      ctx.stroke();
+      ctx.strokeRect(sx - tileW * 0.18, floor - tileH * 0.6, tileW * 0.36, tileH * 0.6);
+
+      // Cart tracks leading out (two parallel lines)
+      ctx.strokeStyle = '#6a5540';
+      ctx.lineWidth = 1.2;
+      for (const offset of [-tileW * 0.05, tileW * 0.05]) {
+        ctx.beginPath();
+        ctx.moveTo(sx + offset, floor - tileH * 0.02);
+        ctx.lineTo(sx + offset, floor + tileH * 0.22);
+        ctx.stroke();
+      }
+
+      // Small ore pile at entrance
+      ctx.fillStyle = '#555';
+      ctx.beginPath();
+      ctx.ellipse(sx + hw * 0.6, floor - tileH * 0.12, tileW * 0.1, tileH * 0.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#aaaacc';
+      for (let d = 0; d < 3; d++) {
+        ctx.beginPath();
+        ctx.arc(sx + hw * 0.6 + (d - 1) * tileW * 0.06, floor - tileH * 0.18, tileH * 0.06, 0, Math.PI * 2);
+        ctx.fill();
       }
       break;
     }
-    case 'EnchantingTower': {
-      // Taller tower
+
+    // ── Tannery: building + hide racks (vertical poles + rectangles) ────────
+    case 'Tannery': {
+      const hw = tileW * 0.38;
+      const wh = tileH * 1.2;
+      const roofBase = floor - wh;
+
+      // Main building
+      ctx.fillStyle = '#3d2a18';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
       ctx.fillStyle = colors.wall;
-      ctx.fillRect(sx - 5 * dpr, baseY - 20 * dpr, 10 * dpr, 12 * dpr);
-      // Glow at top
+      ctx.fillRect(sx, roofBase, hw, wh);
+      // Roof
       ctx.beginPath();
-      ctx.arc(sx, baseY - 21 * dpr, 4 * dpr, 0, Math.PI * 2);
+      ctx.moveTo(sx - hw, roofBase);
+      ctx.lineTo(sx,       roofBase - tileH * 0.5);
+      ctx.lineTo(sx + hw,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+
+      // Hide racks (3 vertical poles with brown hides)
+      for (let r = 0; r < 3; r++) {
+        const rx = sx - hw * 1.5 + r * hw;
+        const ry = floor - tileH * 0.2;
+        // Pole
+        ctx.fillStyle = '#5a3a18';
+        ctx.fillRect(rx - 1.5, ry - tileH * 1.0, 3, tileH * 1.0);
+        // Hide (brown rectangle)
+        ctx.fillStyle = colors.accent;
+        ctx.globalAlpha = 0.75;
+        ctx.fillRect(rx - tileW * 0.065, ry - tileH * 0.9, tileW * 0.13, tileH * 0.55);
+        ctx.globalAlpha = 1;
+        // Stitch lines on hide
+        ctx.strokeStyle = '#7a4a28';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(rx - tileW * 0.065, ry - tileH * 0.9, tileW * 0.13, tileH * 0.55);
+      }
+      break;
+    }
+
+    // ── Barracks: stone building + flag on top ───────────────────────────────
+    case 'Barracks': {
+      const hw = tileW * 0.46;
+      const wh = tileH * 1.5;
+      const roofBase = floor - wh;
+
+      // Stone wall texture (left face)
+      ctx.fillStyle = '#282020';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      // Right face
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+      // Stone texture — horizontal mortar lines
+      ctx.strokeStyle = '#1a1010';
+      ctx.lineWidth = 0.8;
+      for (let row = 0; row < 4; row++) {
+        const ly = roofBase + wh * ((row + 0.5) / 4);
+        ctx.beginPath();
+        ctx.moveTo(sx - hw, ly);
+        ctx.lineTo(sx + hw, ly);
+        ctx.stroke();
+      }
+      // Crenellations on flat top
+      ctx.fillStyle = colors.wall;
+      for (let c = 0; c < 5; c++) {
+        if (c % 2 === 0) {
+          const cx = sx - hw + (hw * 2) * (c / 4);
+          ctx.fillRect(cx, roofBase - tileH * 0.2, hw * 2 / 4 * 0.7, tileH * 0.2);
+        }
+      }
+      // Battlements top line
+      ctx.fillStyle = '#3a2818';
+      ctx.fillRect(sx - hw, roofBase, hw * 2, tileH * 0.1);
+
+      // Flagpole
+      const fpX = sx + hw * 0.6;
+      const fpY = roofBase - tileH * 0.8;
+      ctx.fillStyle = '#6a5030';
+      ctx.fillRect(fpX - 1.5, fpY, 3, tileH * 0.8);
+      // Flag (triangle, animated flap)
+      const flap = Math.sin(waterFrame * 0.09) * tileW * 0.04;
+      ctx.beginPath();
+      ctx.moveTo(fpX, fpY);
+      ctx.lineTo(fpX + tileW * 0.22 + flap, fpY + tileH * 0.12);
+      ctx.lineTo(fpX, fpY + tileH * 0.24);
+      ctx.closePath();
+      ctx.fillStyle = colors.accent;
+      ctx.fill();
+
+      // Windows
+      ctx.fillStyle = '#0a0606';
+      for (let w2 = 0; w2 < 2; w2++) {
+        const wx2 = sx - hw * 0.6 + w2 * hw * 1.1;
+        ctx.fillRect(wx2 - tileW * 0.04, floor - tileH * 0.8, tileW * 0.08, tileH * 0.2);
+      }
+      break;
+    }
+
+    // ── EnchantingTower: tall narrow tower + purple glow ────────────────────
+    case 'EnchantingTower': {
+      const hw = tileW * 0.22;
+      const wh = tileH * 2.2;   // much taller than others
+      const roofBase = floor - wh;
+
+      // Narrow tower body
+      ctx.fillStyle = '#1a1638';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+      // Stone band rings
+      ctx.strokeStyle = '#3a2870';
+      ctx.lineWidth = 1.5;
+      for (let ring = 0; ring < 4; ring++) {
+        const ry = roofBase + wh * (ring / 4);
+        ctx.beginPath();
+        ctx.moveTo(sx - hw, ry);
+        ctx.lineTo(sx + hw, ry);
+        ctx.stroke();
+      }
+      // Conical peaked roof
+      ctx.beginPath();
+      ctx.moveTo(sx - hw * 1.3, roofBase);
+      ctx.lineTo(sx,             roofBase - tileH * 0.9);
+      ctx.lineTo(sx + hw * 1.3,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+
+      // Glowing orb at top
+      const glowPulse = 0.7 + 0.3 * Math.sin(waterFrame * 0.11);
+      ctx.beginPath();
+      ctx.arc(sx, roofBase - tileH * 0.9, tileH * 0.22 * glowPulse, 0, Math.PI * 2);
       ctx.fillStyle = colors.accent;
       ctx.shadowColor = colors.accent;
-      ctx.shadowBlur = 6 * dpr;
-      ctx.globalAlpha = 0.8;
+      ctx.shadowBlur = 12;
+      ctx.globalAlpha = 0.9;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
-      break;
-    }
-    case 'MarketStall': {
-      // Open awning
-      ctx.fillStyle = colors.accent;
-      ctx.fillRect(sx - 10 * dpr, baseY - 14 * dpr, 20 * dpr, 3 * dpr);
-      break;
-    }
-    case 'Mine': {
-      // Dark entrance arch
-      ctx.fillStyle = '#111';
-      ctx.beginPath();
-      ctx.ellipse(sx, baseY - 3 * dpr, 4 * dpr, 5 * dpr, 0, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-    case 'Barracks': {
-      // Flag
-      ctx.fillStyle = colors.accent;
-      ctx.fillRect(sx + 6 * dpr, baseY - 18 * dpr, 1.5 * dpr, 8 * dpr);
-      ctx.beginPath();
-      ctx.moveTo(sx + 7.5 * dpr, baseY - 18 * dpr);
-      ctx.lineTo(sx + 13 * dpr,  baseY - 15 * dpr);
-      ctx.lineTo(sx + 7.5 * dpr, baseY - 12 * dpr);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    }
-    default: break;
-  }
 
-  // Accent dot on door
-  ctx.fillStyle = colors.accent;
-  ctx.beginPath();
-  ctx.arc(sx, baseY - 2 * dpr, 1.5 * dpr, 0, Math.PI * 2);
-  ctx.fill();
+      // Rune windows (glowing slits)
+      ctx.fillStyle = colors.accent;
+      ctx.globalAlpha = 0.5 + 0.3 * glowPulse;
+      ctx.fillRect(sx - hw * 0.2, roofBase + wh * 0.2, hw * 0.4, tileH * 0.18);
+      ctx.fillRect(sx - hw * 0.2, roofBase + wh * 0.5, hw * 0.4, tileH * 0.18);
+      ctx.globalAlpha = 1;
+      break;
+    }
+
+    // ── AlchemistHut: teal-accent hut + cauldron silhouette ────────────────
+    case 'AlchemistHut': {
+      const hw = tileW * 0.35;
+      const wh = tileH * 1.1;
+      const roofBase = floor - wh;
+
+      ctx.fillStyle = '#152028';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+      // Pitched roof
+      ctx.beginPath();
+      ctx.moveTo(sx - hw, roofBase);
+      ctx.lineTo(sx,       roofBase - tileH * 0.55);
+      ctx.lineTo(sx + hw,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+
+      // Glowing window
+      const gp = 0.6 + 0.4 * Math.sin(waterFrame * 0.08);
+      ctx.fillStyle = colors.accent;
+      ctx.globalAlpha = gp * 0.7;
+      ctx.fillRect(sx - hw * 0.25, roofBase + wh * 0.25, hw * 0.5, tileH * 0.22);
+      ctx.globalAlpha = 1;
+
+      // Cauldron in front
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(sx, floor - tileH * 0.22, tileH * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = colors.accent + '99';
+      ctx.beginPath();
+      ctx.arc(sx, floor - tileH * 0.28, tileH * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+
+    // ── Woodworker: warm-brown building + lumber pile ────────────────────────
+    case 'Woodworker': {
+      const hw = tileW * 0.38;
+      const wh = tileH * 1.15;
+      const roofBase = floor - wh;
+
+      ctx.fillStyle = '#3a2010';
+      ctx.fillRect(sx - hw, roofBase, hw, wh);
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx, roofBase, hw, wh);
+      ctx.beginPath();
+      ctx.moveTo(sx - hw, roofBase);
+      ctx.lineTo(sx,       roofBase - tileH * 0.5);
+      ctx.lineTo(sx + hw,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+
+      // Lumber pile (stacked log rectangles)
+      ctx.fillStyle = '#6a4020';
+      for (let l = 0; l < 3; l++) {
+        ctx.fillRect(sx + hw * 0.5, floor - tileH * (0.12 + l * 0.2), tileW * 0.25, tileH * 0.16);
+        ctx.strokeStyle = '#3a2010';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(sx + hw * 0.5, floor - tileH * (0.12 + l * 0.2), tileW * 0.25, tileH * 0.16);
+      }
+
+      // Saw blade icon on wall
+      ctx.strokeStyle = colors.accent;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(sx - hw * 0.4, roofBase + wh * 0.5, tileH * 0.15, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+
+    // ── Generic fallback: simple house ──────────────────────────────────────
+    default: {
+      const hw = tileW * 0.36;
+      const wh = tileH * 1.1;
+      const roofBase = floor - wh;
+
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx - hw, roofBase, hw * 2, wh);
+      ctx.beginPath();
+      ctx.moveTo(sx - hw, roofBase);
+      ctx.lineTo(sx,       roofBase - tileH * 0.5);
+      ctx.lineTo(sx + hw,  roofBase);
+      ctx.closePath();
+      ctx.fillStyle = colors.roof;
+      ctx.fill();
+      // Door
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(sx - tileW * 0.06, floor - tileH * 0.5, tileW * 0.12, tileH * 0.5);
+      break;
+    }
+  }
 
   ctx.restore();
 }
@@ -705,6 +1137,13 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
     const waterFrame = waterFrameRef.current;
     const waterShift = (Math.sin(waterFrame * 0.04) * 0.1);
 
+    // Buildings collected during terrain pass, drawn in a second pass (after terrain, before player)
+    interface DeferredBuilding {
+      sx: number; sy: number; sortKey: number;
+      building: HomesteadBuilding; fogAlpha: number;
+    }
+    const deferredBuildings: DeferredBuilding[] = [];
+
     // ── Draw terrain + zone tiles ──────────────────────────────────────────────
     for (const entry of entries) {
       const { gx, gy, sx, sy } = entry;
@@ -813,20 +1252,28 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
         ctx.shadowBlur = 0;
       }
 
-      // ── Homestead buildings ────────────────────────────────────────────────
+      // ── Collect homestead buildings for a deferred second pass ──────────────
       const homesteadBuilding = buildingMap.get(key);
       if (homesteadBuilding && !centerTile) {
-        // Only draw on the "anchor" tile (top-left of 2×2 footprint = gridX+homesteadCx, gridY+homesteadCy)
         const anchorX = homesteadCx + homesteadBuilding.gridX;
         const anchorY = homesteadCy + homesteadBuilding.gridY;
         if (gx === anchorX && gy === anchorY) {
-          drawHomesteadBuilding(
-            ctx, sx, sy, tileW, tileH,
-            homesteadBuilding.type,
-            homesteadBuilding.isConstructed,
-            homesteadBuilding.constructionProgress,
-            dpr,
-          );
+          // Compute center screen position for a 2×2 footprint:
+          // anchor is top-left corner tile; center is midpoint of the 4 tiles.
+          // For a 2×2 block the visual center between (ax,ay),(ax+1,ay),(ax,ay+1),(ax+1,ay+1)
+          // in isometric is the average of their screen centers.
+          const [s00x, s00y] = gridToScreen(anchorX,     anchorY,     vpCx, vpCy);
+          const [s10x, s10y] = gridToScreen(anchorX + 1, anchorY,     vpCx, vpCy);
+          const [s01x, s01y] = gridToScreen(anchorX,     anchorY + 1, vpCx, vpCy);
+          const [s11x, s11y] = gridToScreen(anchorX + 1, anchorY + 1, vpCx, vpCy);
+          const bldSx = (s00x + s10x + s01x + s11x) / 4 + camOffX;
+          const bldSy = (s00y + s10y + s01y + s11y) / 4 + camOffY;
+          deferredBuildings.push({
+            sx: bldSx, sy: bldSy,
+            sortKey: anchorX + anchorY,
+            building: homesteadBuilding,
+            fogAlpha,
+          });
         }
       }
 
@@ -912,29 +1359,46 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
         }
       }
 
-      // ── Player ─────────────────────────────────────────────────────────────
-      if (gx === playerX && gy === playerY) {
-        const headColor = '#ffffff';
-        const bodyColor = blinkRef.current ? '#ffcc33' : '#e6b820';
+    }  // end terrain loop
 
-        const bx = sx;
-        const by = sy - tileH / 2;
-        ctx.beginPath();
-        ctx.moveTo(bx, by - 2 * dpr);
-        ctx.lineTo(bx + 5 * dpr, by + 10 * dpr);
-        ctx.lineTo(bx - 5 * dpr, by + 10 * dpr);
-        ctx.closePath();
-        ctx.fillStyle = bodyColor;
-        ctx.shadowColor = '#ffcc33';
-        ctx.shadowBlur = 6 * dpr;
-        ctx.fill();
-        ctx.shadowBlur = 0;
+    // ── Homestead buildings pass (after terrain, before player) ───────────────
+    deferredBuildings.sort((a, b) => a.sortKey - b.sortKey);
+    for (const db of deferredBuildings) {
+      ctx.save();
+      ctx.globalAlpha = db.fogAlpha;
+      drawHomesteadBuilding(
+        ctx, db.sx, db.sy, tileW, tileH,
+        db.building.type,
+        db.building.isConstructed,
+        db.building.constructionProgress,
+        waterFrame,
+      );
+      ctx.restore();
+    }
 
-        ctx.beginPath();
-        ctx.arc(bx, by - 5 * dpr, 4 * dpr, 0, Math.PI * 2);
-        ctx.fillStyle = headColor;
-        ctx.fill();
-      }
+    // ── Player (drawn above all buildings) ────────────────────────────────────
+    {
+      const [psx2, psy2] = gridToScreen(playerX, playerY, vpCx, vpCy);
+      const bx = psx2 + camOffX;
+      const by = psy2 - tileH / 2;
+      const headColor = '#ffffff';
+      const bodyColor = blinkRef.current ? '#ffcc33' : '#e6b820';
+
+      ctx.beginPath();
+      ctx.moveTo(bx, by - 2 * dpr);
+      ctx.lineTo(bx + 5 * dpr, by + 10 * dpr);
+      ctx.lineTo(bx - 5 * dpr, by + 10 * dpr);
+      ctx.closePath();
+      ctx.fillStyle = bodyColor;
+      ctx.shadowColor = '#ffcc33';
+      ctx.shadowBlur = 6 * dpr;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.arc(bx, by - 5 * dpr, 4 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = headColor;
+      ctx.fill();
     }
 
     // ── Minimap ────────────────────────────────────────────────────────────────

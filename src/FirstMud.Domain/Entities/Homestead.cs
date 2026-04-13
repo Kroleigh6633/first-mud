@@ -63,9 +63,35 @@ public class Homestead
     public void RemoveFromSalvageQueue(Guid itemId) => SalvageQueue.Remove(itemId);
 
     /// <summary>
-    /// Computes effective storage capacity factoring in companion guards.
-    /// +20% per guard companion (50 base → 60 with 1 guard, etc.).
+    /// Flat slot bonus per guard based on bond level (layer).
     /// </summary>
-    public int EffectiveStorageSlots(int guardCount) =>
-        (int)(StorageSlots * (1.0 + guardCount * 0.2));
+    private static int BondStorageBonus(int bondLevel) => bondLevel switch
+    {
+        1 => 5,
+        2 => 10,
+        3 => 20,
+        4 => 40,
+        5 => 70,
+        6 => 100,
+        _ => 5
+    };
+
+    /// <summary>
+    /// Computes effective storage capacity factoring in companion guards.
+    /// Bonus scales with each guard's bond level (CurrentLayer).
+    /// Diminishing returns: guards 4-5 provide 50% bonus; beyond 5 guards is ignored.
+    /// </summary>
+    public int EffectiveStorageSlots(IEnumerable<int> guardBondLevels)
+    {
+        var sortedGuards = guardBondLevels.OrderByDescending(b => b).ToList();
+        int bonus = 0;
+        for (int i = 0; i < sortedGuards.Count; i++)
+        {
+            if (i >= 5) break; // cap at 5 effective guards
+            int guardBonus = BondStorageBonus(sortedGuards[i]);
+            if (i >= 3) guardBonus /= 2; // 50% for guards 4 and 5
+            bonus += guardBonus;
+        }
+        return StorageSlots + bonus;
+    }
 }
