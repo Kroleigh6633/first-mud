@@ -29,7 +29,6 @@ public class StartCombatCommandHandler(
         var zone = zones.FirstOrDefault(z => z.Id == cmd.ZoneId);
         var dangerLevel = zone?.DangerLevel ?? (int)(cmd.ZoneId.GetHashCode() & 0x7FFFFFFF) % 3 + 1;
         var biome = CombatHelpers.GetBiome(zone);
-        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
 
         // Load all equipped items into a slot → Item dictionary
         var equippedItems = new Dictionary<Domain.Enums.EquipmentSlot, Domain.Entities.Item>();
@@ -48,10 +47,13 @@ public class StartCombatCommandHandler(
                 activeCompanions.Add(comp);
         }
 
+        int partySize = 1 + activeCompanions.Count;
+        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome, partySize);
+
         var encounter = await combatService.StartEncounterAsync(
             cmd.PlayerId, cmd.ZoneId, player, activeCompanions, monsters, equippedItems, ct, dangerLevel);
 
-        await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, encounter, ct);
+        await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, encounter, ct, dangerLevel);
 
         var dto = CombatHelpers.BuildCombatUpdateDto(encounter, dangerLevel: dangerLevel);
 
@@ -85,7 +87,8 @@ public class UseCombatAbilityCommandHandler(
         if (!success || updated is null)
             return new CommandResult(false, message);
 
-        await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, updated, ct);
+        var encounterDangerLevel = combatService.GetEncounterDangerLevel(cmd.EncounterId);
+        await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, updated, ct, encounterDangerLevel);
 
         if (updated.State == EncounterState.Victory)
         {

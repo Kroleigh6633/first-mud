@@ -649,7 +649,16 @@ public class FarmingOrchestrator(
                 var freshPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
                 if (freshPlayer is null) break;
 
-                var monsters = MonsterFactory.BuildMonsterPack(dangerLevel, freshPlayer.Level, biome);
+                var farmActiveCompanions = new List<Companion>();
+                foreach (var compId in freshPlayer.ActiveCompanionIds)
+                {
+                    var comp = await companionRepo.GetByIdAsync(compId, farmCt);
+                    if (comp != null && !comp.IsPermanentlyGone)
+                        farmActiveCompanions.Add(comp);
+                }
+
+                int partySize = 1 + farmActiveCompanions.Count;
+                var monsters = MonsterFactory.BuildMonsterPack(dangerLevel, freshPlayer.Level, biome, partySize);
 
                 var avgMonsterLevel = monsters.Count > 0
                     ? (int)Math.Round(monsters.Average(m => (double)m.Level))
@@ -709,14 +718,6 @@ public class FarmingOrchestrator(
                 // --- FIGHT ---
                 autoFarmService.SetState(playerId, "fighting");
                 await BroadcastStatusAsync(playerId, session, "fighting", biome, dangerLevel, farmCt);
-
-                var farmActiveCompanions = new List<Companion>();
-                foreach (var compId in freshPlayer.ActiveCompanionIds)
-                {
-                    var comp = await companionRepo.GetByIdAsync(compId, farmCt);
-                    if (comp != null && !comp.IsPermanentlyGone)
-                        farmActiveCompanions.Add(comp);
-                }
 
                 var encounter = await combatSvc.StartEncounterAsync(
                     playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, farmActiveCompanions, monsters, ct: farmCt, dangerLevel: dangerLevel);

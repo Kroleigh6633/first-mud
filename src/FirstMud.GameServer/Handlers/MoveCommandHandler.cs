@@ -129,8 +129,6 @@ public class MoveCommandHandler(
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
 
-        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome);
-
         var activeCompanions = new List<Companion>();
         foreach (var compId in player.ActiveCompanionIds)
         {
@@ -138,6 +136,9 @@ public class MoveCommandHandler(
             if (comp != null && !comp.IsPermanentlyGone)
                 activeCompanions.Add(comp);
         }
+
+        int partySize = 1 + activeCompanions.Count;
+        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome, partySize);
 
         // Aggro check: high-level players in low-level zones don't get bothered
         var avgMonsterLevel = monsters.Count > 0
@@ -177,7 +178,7 @@ public class MoveCommandHandler(
             narration,
             ct);
 
-        await combatHelpers.ProcessEnemyTurnsAsync(playerId, encounter, ct);
+        await combatHelpers.ProcessEnemyTurnsAsync(playerId, encounter, ct, dangerLevel);
 
         var dto = CombatHelpers.BuildCombatUpdateDto(encounter, dangerLevel: dangerLevel);
         await hubContext.Clients

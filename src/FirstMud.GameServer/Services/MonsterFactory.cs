@@ -260,7 +260,7 @@ public static class MonsterFactory
     // Public API
     // -------------------------------------------------------------------------
 
-    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains")
+    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains", int partySize = 1)
     {
         var biomePools = biome switch
         {
@@ -281,15 +281,23 @@ public static class MonsterFactory
             _    => 3,
         };
 
-        // Danger-scaled pack size — higher danger means more enemies
+        // Pack size scales with party size + danger:
+        // danger 1-2:  party + 0  (fair fight)
+        // danger 3-5:  party + 1  (slightly outnumbered)
+        // danger 6-8:  party + 2  (outnumbered)
+        // danger 9-10: party + 3  (heavily outnumbered)
+        int maxEnemies = partySize + (dangerLevel / 3);
+
         int packSize = dangerLevel switch
         {
-            <= 2 => 1,
-            <= 4 => Random.Shared.Next(1, 3),  // 1-2
-            <= 6 => Random.Shared.Next(2, 4),  // 2-3
-            <= 8 => Random.Shared.Next(2, 5),  // 2-4
-            _    => Random.Shared.Next(3, 5),  // 3-4 at danger 9-10
+            <= 2 => Math.Min(maxEnemies, Random.Shared.Next(1, 3)),
+            <= 4 => Math.Min(maxEnemies, Random.Shared.Next(2, 4)),
+            <= 6 => Math.Min(maxEnemies, Random.Shared.Next(3, maxEnemies + 1)),
+            <= 8 => Math.Min(maxEnemies, Random.Shared.Next(4, maxEnemies + 1)),
+            _    => maxEnemies, // danger 9-10: maximum enemies
         };
+
+        packSize = Math.Max(1, packSize);
 
         var pool = biomePools[tierIndex];
         var pack = new List<MonsterTemplate>();

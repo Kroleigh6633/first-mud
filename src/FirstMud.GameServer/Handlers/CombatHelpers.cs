@@ -49,7 +49,7 @@ public class CombatHelpers(
     /// Enemies attack randomly. Companions use smart AI: heal low-HP allies first,
     /// then buff once per encounter, then use their strongest attack.
     /// </summary>
-    public async Task ProcessEnemyTurnsAsync(Guid playerId, Encounter encounter, CancellationToken ct)
+    public async Task ProcessEnemyTurnsAsync(Guid playerId, Encounter encounter, CancellationToken ct, int dangerLevel = 0)
     {
         var buffUsed = _companionBuffUsed.GetOrAdd(encounter.Id, _ => []);
 
@@ -141,23 +141,43 @@ public class CombatHelpers(
             // ---- ENEMY TURN ----
             var enemyAbilities = actor.Abilities.Where(a => a.Category == AbilityCategory.Attack).ToList();
             if (enemyAbilities.Count == 0) break;
-            var enemyAbility = enemyAbilities[Random.Shared.Next(enemyAbilities.Count)];
 
-            var targets = encounter.Combatants
-                .Where(c => c.IsPlayerSide && !c.IsDefeated)
-                .ToList();
-            if (targets.Count == 0) break;
-            var target = targets[Random.Shared.Next(targets.Count)];
+            // Multi-attack at high danger: danger 7-8 = 2 attacks, danger 9-10 = 3 attacks
+            int actionsPerTurn = dangerLevel switch
+            {
+                >= 9 => 3,
+                >= 7 => 2,
+                _    => 1,
+            };
 
-            var (eSuccess, eNarration, _) = await combatService.ExecuteActionAsync(
-                encounter.Id, actor.Id, enemyAbility.Name, target.Id, ct);
-            if (!eSuccess) break;
+            // Narrate multi-attack opener
+            if (actionsPerTurn == 3)
+                await notificationService.SendMessageAsync(playerId, "combat", $"{actor.Name} unleashes a triple assault!", ct);
+            else if (actionsPerTurn == 2)
+                await notificationService.SendMessageAsync(playerId, "combat", $"{actor.Name} strikes twice!", ct);
 
-            var eNarrText = !string.IsNullOrEmpty(eNarration)
-                ? eNarration
-                : $"{actor.Name} uses {enemyAbility.Name} on {target.Name}.";
+            for (int action = 0; action < actionsPerTurn; action++)
+            {
+                if (encounter.State != EncounterState.InProgress) break;
 
-            await notificationService.SendMessageAsync(playerId, "combat", eNarrText, ct);
+                var enemyAbility = enemyAbilities[Random.Shared.Next(enemyAbilities.Count)];
+
+                var targets = encounter.Combatants
+                    .Where(c => c.IsPlayerSide && !c.IsDefeated)
+                    .ToList();
+                if (targets.Count == 0) break;
+                var target = targets[Random.Shared.Next(targets.Count)];
+
+                var (eSuccess, eNarration, _) = await combatService.ExecuteActionAsync(
+                    encounter.Id, actor.Id, enemyAbility.Name, target.Id, ct);
+                if (!eSuccess) break;
+
+                var eNarrText = !string.IsNullOrEmpty(eNarration)
+                    ? eNarration
+                    : $"{actor.Name} uses {enemyAbility.Name} on {target.Name}.";
+
+                await notificationService.SendMessageAsync(playerId, "combat", eNarrText, ct);
+            }
         }
 
         // Clean up buff tracking when encounter ends
@@ -792,8 +812,8 @@ public class CombatHelpers(
     // Monster pack builder — forwarding wrapper → MonsterFactory
     // -------------------------------------------------------------------------
 
-    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains")
-        => MonsterFactory.BuildMonsterPack(dangerLevel, playerLevel, biome);
+    public static List<MonsterTemplate> BuildMonsterPack(int dangerLevel, int playerLevel = 1, string biome = "plains", int partySize = 1)
+        => MonsterFactory.BuildMonsterPack(dangerLevel, playerLevel, biome, partySize);
 
     // -------------------------------------------------------------------------
     // DTO builder
