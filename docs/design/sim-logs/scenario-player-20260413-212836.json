@@ -1,0 +1,115 @@
+{
+  "QuestId": "chain5-wrong-tide",
+  "Title": "The Wrong Tide",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "At Kelpholm\u0027s Rider post, Postmaster Dann lays out the commission: \u0027Tide\u0027s three hours off, every third day. Find out why. Pilgrims say omen. I say something big is moving down there.\u0027",
+      "AvailableChoices": [
+        "accept: Accept the commission.",
+        "refuse: Refuse \u2014 not my arc."
+      ],
+      "ChosenChoiceId": "accept",
+      "ChosenChoiceText": "Accept the commission.",
+      "Deltas": [
+        "flag\u002B wrongtide.accepted"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "survey",
+      "Description": "Three obvious reads: ask the pilgrims, survey the tide mechanically, or force the issue and draw something up from the deep.",
+      "AvailableChoices": [
+        "talk-pilgrims: Seek out the bogmen pilgrims.",
+        "survey-tide: Measure the tide yourself.",
+        "spook-fairgean: Light a fire-signal at the shore. Force a surfacing."
+      ],
+      "ChosenChoiceId": "survey-tide",
+      "ChosenChoiceText": "Measure the tide yourself.",
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "tide-read",
+      "Description": "The off-cycle is mechanically regular: volume displacement suggests a large sub-surface reroute. Something is being built, not thrashed.",
+      "AvailableChoices": [
+        "measured-read: Record the measurements cleanly.",
+        "hand-wave: Eyeball it. Good enough."
+      ],
+      "ChosenChoiceId": "measured-read",
+      "ChosenChoiceText": "Record the measurements cleanly.",
+      "Deltas": [
+        "flag\u002B tide.measured"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "choose-approach",
+      "Description": "Time to close. Three routes remain.",
+      "AvailableChoices": [
+        "dive: Dive. Find the source.",
+        "commune-fairgean: Signal for a Fairgean parley \u2014 respectfully.",
+        "leave-and-report: Report what you have. Do not close."
+      ],
+      "ChosenChoiceId": "commune-fairgean",
+      "ChosenChoiceText": "Signal for a Fairgean parley \u2014 respectfully.",
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "diplomatic",
+      "Description": "The Fairgean speaker surfaces unhurried. \u0027We are building. You are an interruption. Speak.\u0027 Your measurements matter here.",
+      "AvailableChoices": [
+        "negotiate: Propose a shared maintenance window. Tide predictability for peace."
+      ],
+      "ChosenChoiceId": "negotiate",
+      "ChosenChoiceText": "Propose a shared maintenance window. Tide predictability for peace.",
+      "Deltas": [
+        "rep\u002B rider-compact \u002B200",
+        "rep\u002B fairgean \u002B200",
+        "rep\u002B bogmen \u002B100",
+        "flag\u002B tide.restored",
+        "flag\u002B below-song.translator.unlocked"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-diplomatic",
+      "Description": "You walk away with a Fairgean translator\u0027s mark pressed into your palm. The tide keeps its new rhythm, but predictably now. A door has opened you did not know existed.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "success-diplomatic"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "below-song.translator.unlocked",
+      "drowned-coast.visited",
+      "tide.measured",
+      "tide.restored",
+      "wrongtide.accepted"
+    ],
+    "inventory": {},
+    "reputation": {
+      "bogmen": 100,
+      "fairgean": 200,
+      "rider-compact": 200
+    }
+  },
+  "FinalOutcome": "success-diplomatic",
+  "Errors": []
+}

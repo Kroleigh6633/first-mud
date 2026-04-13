@@ -1,0 +1,172 @@
+{
+  "id": "chain5-wrong-tide",
+  "title": "The Wrong Tide",
+  "_designNote": "Drowned Coast chain 5. 7 beats, 6 terminals. Two 'good' terminals (redirected vs diplomatic) reward different investigation routes. allowUnderflow=false — this chain has no removeItem effects, so strict mode is fine.",
+  "allowUnderflow": false,
+  "startState": {
+    "flags": ["drowned-coast.visited"],
+    "inventory": [],
+    "reputation": { "rider-compact": 0, "fairgean": 0, "bogmen": 0 }
+  },
+  "root": "intro",
+  "beats": [
+    {
+      "id": "intro",
+      "description": "At Kelpholm's Rider post, Postmaster Dann lays out the commission: 'Tide's three hours off, every third day. Find out why. Pilgrims say omen. I say something big is moving down there.'",
+      "choices": [
+        { "id": "accept",
+          "text": "Accept the commission.",
+          "next": "survey",
+          "effects": [ { "type": "setFlag", "key": "wrongtide.accepted" } ] },
+        { "id": "refuse",
+          "text": "Refuse — not my arc.",
+          "next": "end-refused",
+          "effects": [ { "type": "addReputation", "key": "rider-compact", "amount": -50 } ] }
+      ]
+    },
+    {
+      "id": "survey",
+      "description": "Three obvious reads: ask the pilgrims, survey the tide mechanically, or force the issue and draw something up from the deep.",
+      "requires": { "flags": ["wrongtide.accepted"] },
+      "choices": [
+        { "id": "talk-pilgrims", "text": "Seek out the bogmen pilgrims.", "next": "pilgrim-read" },
+        { "id": "survey-tide", "text": "Measure the tide yourself.", "next": "tide-read" },
+        { "id": "spook-fairgean",
+          "text": "Light a fire-signal at the shore. Force a surfacing.",
+          "next": "provoke",
+          "requires": { "flags": ["drowned-coast.visited"] } }
+      ]
+    },
+    {
+      "id": "pilgrim-read",
+      "description": "The pilgrims speak of a 'below-song' — a rhythmic low-frequency sound from the deep. They beg the player not to dive. 'It is maintenance,' the eldest says. 'Not malice. Not yet.'",
+      "choices": [
+        { "id": "promise-no-dive",
+          "text": "Promise not to dive.",
+          "next": "choose-approach",
+          "effects": [
+            { "type": "setFlag", "key": "pilgrim.trusted" },
+            { "type": "addReputation", "key": "bogmen", "amount": 25 }
+          ] },
+        { "id": "ignore-warning",
+          "text": "Nod and move on. Make no promise.",
+          "next": "choose-approach" }
+      ]
+    },
+    {
+      "id": "tide-read",
+      "description": "The off-cycle is mechanically regular: volume displacement suggests a large sub-surface reroute. Something is being built, not thrashed.",
+      "choices": [
+        { "id": "measured-read",
+          "text": "Record the measurements cleanly.",
+          "next": "choose-approach",
+          "effects": [ { "type": "setFlag", "key": "tide.measured" } ] },
+        { "id": "hand-wave",
+          "text": "Eyeball it. Good enough.",
+          "next": "choose-approach" }
+      ]
+    },
+    {
+      "id": "choose-approach",
+      "description": "Time to close. Three routes remain.",
+      "choices": [
+        { "id": "dive",
+          "text": "Dive. Find the source.",
+          "next": "confront-creature" },
+        { "id": "commune-fairgean",
+          "text": "Signal for a Fairgean parley — respectfully.",
+          "next": "diplomatic",
+          "requires": { "flags": ["tide.measured"] } },
+        { "id": "leave-and-report",
+          "text": "Report what you have. Do not close.",
+          "next": "end-reported-no-close",
+          "effects": [ { "type": "addReputation", "key": "rider-compact", "amount": 50 } ] }
+      ]
+    },
+    {
+      "id": "provoke",
+      "description": "The fire-signal burns green. Three minutes. Six. Then the surface breaks and a Fairgean speaker rises — hostile.",
+      "choices": [
+        { "id": "hold-nerve",
+          "text": "Hold your ground. Speak first.",
+          "next": "diplomatic-hostile",
+          "effects": [ { "type": "addReputation", "key": "fairgean", "amount": -100 } ] },
+        { "id": "flee",
+          "text": "Run.",
+          "next": "end-scared-off",
+          "effects": [ { "type": "addReputation", "key": "bogmen", "amount": -50 } ] }
+      ]
+    },
+    {
+      "id": "confront-creature",
+      "description": "Thirty feet down, a Tide-Eater — a Fairgean maintenance-beast — is rerouting a deep current as nest construction. It notices you.",
+      "choices": [
+        { "id": "kill-beast",
+          "text": "Kill it. Fast and loud.",
+          "next": "end-killed-beast",
+          "effects": [
+            { "type": "addReputation", "key": "rider-compact", "amount": 250 },
+            { "type": "addReputation", "key": "fairgean", "amount": -300 },
+            { "type": "addReputation", "key": "bogmen", "amount": 50 },
+            { "type": "setFlag", "key": "tide.restored" }
+          ] },
+        { "id": "spare-and-redirect",
+          "text": "Redirect the current. Spare the beast.",
+          "next": "end-redirected",
+          "requires": { "flags": ["tide.measured"] },
+          "effects": [
+            { "type": "addReputation", "key": "rider-compact", "amount": 250 },
+            { "type": "addReputation", "key": "fairgean", "amount": 100 },
+            { "type": "addReputation", "key": "bogmen", "amount": 100 },
+            { "type": "setFlag", "key": "tide.restored" }
+          ] }
+      ]
+    },
+    {
+      "id": "diplomatic",
+      "description": "The Fairgean speaker surfaces unhurried. 'We are building. You are an interruption. Speak.' Your measurements matter here.",
+      "choices": [
+        { "id": "negotiate",
+          "text": "Propose a shared maintenance window. Tide predictability for peace.",
+          "next": "end-diplomatic",
+          "effects": [
+            { "type": "addReputation", "key": "rider-compact", "amount": 200 },
+            { "type": "addReputation", "key": "fairgean", "amount": 200 },
+            { "type": "addReputation", "key": "bogmen", "amount": 100 },
+            { "type": "setFlag", "key": "tide.restored" },
+            { "type": "setFlag", "key": "below-song.translator.unlocked" }
+          ] }
+      ]
+    },
+    {
+      "id": "diplomatic-hostile",
+      "description": "The speaker is braced for ambush. Your next move decides the shape of the conversation.",
+      "choices": [
+        { "id": "stand-down",
+          "text": "Lower your hands. Speak calmly.",
+          "next": "diplomatic" },
+        { "id": "attack",
+          "text": "Strike first.",
+          "next": "confront-creature" }
+      ]
+    },
+    { "id": "end-refused",
+      "description": "Dann shrugs. 'Another rider, then.' The commission sits on the board for anyone else. Chain closed without progress.",
+      "terminal": true, "outcome": "refused" },
+    { "id": "end-reported-no-close",
+      "description": "You hand in a partial report. Dann pays half — the work counts. The commission stays open for next arc.",
+      "terminal": true, "outcome": "partial-incomplete" },
+    { "id": "end-scared-off",
+      "description": "You run. The shore behind you goes green, then dark. The pilgrims do not meet your eye on the way home.",
+      "terminal": true, "outcome": "failure-withdrew" },
+    { "id": "end-killed-beast",
+      "description": "The Tide-Eater dies loud. Tide is restored. A current you never saw goes slack, and something far down makes a noise that is not a song.",
+      "terminal": true, "outcome": "success-violent" },
+    { "id": "end-redirected",
+      "description": "You route the beast around the shore. It works, eyes on you the whole time. Tide restored. The pilgrims weep with relief.",
+      "terminal": true, "outcome": "success-clean" },
+    { "id": "end-diplomatic",
+      "description": "You walk away with a Fairgean translator's mark pressed into your palm. The tide keeps its new rhythm, but predictably now. A door has opened you did not know existed.",
+      "terminal": true, "outcome": "success-diplomatic" }
+  ]
+}

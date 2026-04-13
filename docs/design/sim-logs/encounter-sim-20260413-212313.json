@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "timber-wolf"
+  ],
+  "party": "3:Fire,3:Water",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Fire",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 3,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 1.014,
+    "AvgPlayerHpPct": 0.9993924050632911,
+    "MinPlayerHpPct": 0.930379746835443,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 0,
+    "DmgP75": 0,
+    "DmgMax": 11,
+    "MvpName": "Wildfolk-Fire-L3",
+    "Difficulty": "trivial"
+  }
+}

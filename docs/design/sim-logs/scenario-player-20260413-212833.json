@@ -1,0 +1,46 @@
+{
+  "QuestId": "chain5-wrong-tide",
+  "Title": "The Wrong Tide",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "At Kelpholm\u0027s Rider post, Postmaster Dann lays out the commission: \u0027Tide\u0027s three hours off, every third day. Find out why. Pilgrims say omen. I say something big is moving down there.\u0027",
+      "AvailableChoices": [
+        "accept: Accept the commission.",
+        "refuse: Refuse \u2014 not my arc."
+      ],
+      "ChosenChoiceId": "refuse",
+      "ChosenChoiceText": "Refuse \u2014 not my arc.",
+      "Deltas": [
+        "rep\u002B rider-compact -50"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-refused",
+      "Description": "Dann shrugs. \u0027Another rider, then.\u0027 The commission sits on the board for anyone else. Chain closed without progress.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "refused"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "drowned-coast.visited"
+    ],
+    "inventory": {},
+    "reputation": {
+      "bogmen": 0,
+      "fairgean": 0,
+      "rider-compact": -50
+    }
+  },
+  "FinalOutcome": "refused",
+  "Errors": []
+}

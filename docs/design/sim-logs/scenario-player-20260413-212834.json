@@ -1,0 +1,78 @@
+{
+  "QuestId": "chain5-wrong-tide",
+  "Title": "The Wrong Tide",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "At Kelpholm\u0027s Rider post, Postmaster Dann lays out the commission: \u0027Tide\u0027s three hours off, every third day. Find out why. Pilgrims say omen. I say something big is moving down there.\u0027",
+      "AvailableChoices": [
+        "accept: Accept the commission.",
+        "refuse: Refuse \u2014 not my arc."
+      ],
+      "ChosenChoiceId": "accept",
+      "ChosenChoiceText": "Accept the commission.",
+      "Deltas": [
+        "flag\u002B wrongtide.accepted"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "survey",
+      "Description": "Three obvious reads: ask the pilgrims, survey the tide mechanically, or force the issue and draw something up from the deep.",
+      "AvailableChoices": [
+        "talk-pilgrims: Seek out the bogmen pilgrims.",
+        "survey-tide: Measure the tide yourself.",
+        "spook-fairgean: Light a fire-signal at the shore. Force a surfacing."
+      ],
+      "ChosenChoiceId": "spook-fairgean",
+      "ChosenChoiceText": "Light a fire-signal at the shore. Force a surfacing.",
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "provoke",
+      "Description": "The fire-signal burns green. Three minutes. Six. Then the surface breaks and a Fairgean speaker rises \u2014 hostile.",
+      "AvailableChoices": [
+        "hold-nerve: Hold your ground. Speak first.",
+        "flee: Run."
+      ],
+      "ChosenChoiceId": "flee",
+      "ChosenChoiceText": "Run.",
+      "Deltas": [
+        "rep\u002B bogmen -50"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-scared-off",
+      "Description": "You run. The shore behind you goes green, then dark. The pilgrims do not meet your eye on the way home.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "failure-withdrew"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "drowned-coast.visited",
+      "wrongtide.accepted"
+    ],
+    "inventory": {},
+    "reputation": {
+      "bogmen": -50,
+      "fairgean": 0,
+      "rider-compact": 0
+    }
+  },
+  "FinalOutcome": "failure-withdrew",
+  "Errors": []
+}

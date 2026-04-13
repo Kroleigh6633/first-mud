@@ -1,0 +1,144 @@
+{
+  "QuestId": "sealed-letter",
+  "Title": "The Sealed Letter",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "On the Gravenmarsh Causeway, Kesh of Reed-End presses a sealed letter and a silver signet into the player\u0027s hand. \u0027Drest. Eyes only. Not Varn. Especially not Varn.\u0027",
+      "AvailableChoices": [
+        "accept: Take the letter and swear by the signet.",
+        "decline: Refuse. \u0027Find another Rider.\u0027"
+      ],
+      "ChosenChoiceId": "accept",
+      "ChosenChoiceText": "Take the letter and swear by the signet.",
+      "Deltas": [
+        "flag\u002B sealed.accepted",
+        "item\u002B sealed-letter x1",
+        "item\u002B silver-signet x1",
+        "rep\u002B gravenguard \u002B150"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "gate-arrival",
+      "Description": "At Gravenhold\u0027s outer gate, Lieutenant Varn intercepts. \u0027The Commander\u0027s schedule is tight. I\u0027ll take that.\u0027 His hand is already out.",
+      "AvailableChoices": [
+        "hand-over: Hand the letter to Varn.",
+        "refuse-varn: Refuse. Push past."
+      ],
+      "ChosenChoiceId": "refuse-varn",
+      "ChosenChoiceText": "Refuse. Push past.",
+      "Deltas": [
+        "flag\u002B varn.antagonized"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "past-varn",
+      "Description": "Varn does not forget. To reach Drest unaccompanied, the player must pick a method.",
+      "AvailableChoices": [
+        "bribe-scribe: Bribe the night-scribe (gold cost).",
+        "servants-stair: Take the servants\u0027 stair (Thornwood-sympathetic scullery mage).",
+        "rider-privilege: Invoke the Rider\u0027s once-per-arc commission privilege."
+      ],
+      "ChosenChoiceId": "bribe-scribe",
+      "ChosenChoiceText": "Bribe the night-scribe (gold cost).",
+      "Deltas": [
+        "item- gold x25 (underflow\u21920)",
+        "flag\u002B scribe.bribed"
+      ],
+      "RequirementWarnings": [
+        "WARN at beat \u0027past-varn\u0027 choice \u0027bribe-scribe\u0027: removeItem \u0027gold\u0027 x25 exceeds stock (0 available) (clamped to 0)"
+      ],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "drest-reads",
+      "Description": "In Drest\u0027s private chamber the seal cracks. Drest reads. He goes very still. \u0027Orla saw a glyph. On a skeleton that should not have had bones.\u0027 He needs Brother Velm of Eastmile \u2014 fast.",
+      "AvailableChoices": [
+        "accept-velm: Accept the ride to Eastmile."
+      ],
+      "ChosenChoiceId": "accept-velm",
+      "ChosenChoiceText": "Accept the ride to Eastmile.",
+      "Deltas": [
+        "item- sealed-letter x1",
+        "rep\u002B gravenguard \u002B250",
+        "flag\u002B velm.tasked"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "ride-to-velm",
+      "Description": "East road. Varn (if flagged) has already dispatched two assumed-deniable footmen to a forest choke-point. Velm is at the chapel; which of him survives depends on the player.",
+      "AvailableChoices": [
+        "fight-through-fast: Ride fast, fight the ambush, reach Velm inside three days.",
+        "detour-safe-slow: Detour via the Holt (safe but slow \u2014 five\u002B days).",
+        "fail-ambush: Take the ambush badly. Velm not retrieved."
+      ],
+      "ChosenChoiceId": "fight-through-fast",
+      "ChosenChoiceText": "Ride fast, fight the ambush, reach Velm inside three days.",
+      "Deltas": [
+        "flag\u002B velm.retrieved.clean"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "translation-clean",
+      "Description": "Velm reads the glyph at Gravenhold. He breaks down. \u0027This is a naming. A *funerary* naming. Something in that expedition was already dead, and someone had already un-killed it.\u0027 Drest promotes the player\u0027s access.",
+      "AvailableChoices": [
+        "accept-promotion: Accept the Gravenguard promotion."
+      ],
+      "ChosenChoiceId": "accept-promotion",
+      "ChosenChoiceText": "Accept the Gravenguard promotion.",
+      "Deltas": [
+        "rep\u002B gravenguard \u002B500",
+        "flag\u002B ardweld.remnant.unlocked"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-good",
+      "Description": "The Ardweld Remnant precursor is live. Drest trusts the player with the Lost Expedition\u0027s real worth. Player reputation with Gravenguard pushed toward Trusted.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "success"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "ardweld.remnant.unlocked",
+      "scribe.bribed",
+      "sealed.accepted",
+      "varn.antagonized",
+      "velm.retrieved.clean",
+      "velm.tasked"
+    ],
+    "inventory": {
+      "gold": 0,
+      "sealed-letter": 0,
+      "silver-signet": 1
+    },
+    "reputation": {
+      "caervorn": 0,
+      "gravenguard": 1000,
+      "thornwood": 0
+    }
+  },
+  "FinalOutcome": "success",
+  "Errors": []
+}
