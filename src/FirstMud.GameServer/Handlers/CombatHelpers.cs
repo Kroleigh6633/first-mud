@@ -354,6 +354,20 @@ public class CombatHelpers(
 
         var ownedItems = await itemRepository.GetByOwnerAsync(playerId, ct);
 
+        // If inventory is full, portal home to deposit and come back before rolling loot.
+        // This fires regardless of whether the player is in auto-farm, quest auto-run, or
+        // manual play — the session parameter is null outside of auto-farm, which is fine.
+        if (ownedItems.Count >= player.MaxInventorySlots)
+        {
+            var returnPos = player.Position;
+            await inventoryDepositService.AutoDepositAndReturnAsync(playerId, returnPos, session: null, ct);
+
+            // Refresh player and item count after deposit
+            player = await playerRepository.GetByIdAsync(playerId, ct);
+            if (player is null) return;
+            ownedItems = await itemRepository.GetByOwnerAsync(playerId, ct);
+        }
+
         var result = await lootService.RollLootDropAsync(
             dangerLevel,
             playerId,
