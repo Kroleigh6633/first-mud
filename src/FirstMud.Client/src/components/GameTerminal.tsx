@@ -105,6 +105,68 @@ function stepToward(
   return null; // stuck
 }
 
+/**
+ * Danger-aware variant of stepToward used by quest auto-run.
+ * Returns { deltaX, deltaY } for a safe step, null if blocked by impassable
+ * terrain, or 'danger' if every viable step toward the target would enter a
+ * tile whose dangerEstimate exceeds safeCap.
+ */
+function stepTowardSafe(
+  playerX: number,
+  playerY: number,
+  targetX: number,
+  targetY: number,
+  safeCap: number,
+): { deltaX: number; deltaY: number } | null | 'danger' {
+  const dx = Math.sign(targetX - playerX);
+  const dy = Math.sign(targetY - playerY);
+
+  // Candidates in preference order: diagonal first, then cardinal
+  const candidates: Array<[number, number]> = [];
+  if (dx !== 0 && dy !== 0) candidates.push([dx, dy]);
+  if (dx !== 0) candidates.push([dx, 0]);
+  if (dy !== 0) candidates.push([0, dy]);
+
+  let anyPassable = false;
+  for (const [cdx, cdy] of candidates) {
+    const biome = getBiome(playerX + cdx, playerY + cdy);
+    if (biome.type === 'water' || biome.type === 'snowMountain') continue;
+    anyPassable = true;
+    if (biome.dangerEstimate <= safeCap) {
+      return { deltaX: cdx, deltaY: cdy };
+    }
+  }
+
+  // No passable tile at all
+  if (!anyPassable) return null;
+
+  // Passable tiles exist but all exceed safeCap
+  return 'danger';
+}
+
+/**
+ * Sample 6 evenly-spaced points along the straight line from
+ * (fromX, fromY) → (toX, toY) and return the maximum dangerEstimate seen.
+ * Used to pre-screen whether a quest path is safe enough to attempt.
+ */
+function samplePathDanger(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  samples = 6,
+): number {
+  let maxDanger = 0;
+  for (let i = 1; i <= samples; i++) {
+    const t = i / samples;
+    const x = Math.round(fromX + (toX - fromX) * t);
+    const y = Math.round(fromY + (toY - fromY) * t);
+    const d = getBiome(x, y).dangerEstimate;
+    if (d > maxDanger) maxDanger = d;
+  }
+  return maxDanger;
+}
+
 export default function GameTerminal({
   connectionState,
   sendCommand,
@@ -485,7 +547,10 @@ export default function GameTerminal({
             });
             break;
           }
-          // Sort same as QuestLog: taken first, then by rep reward desc
+          // Sort: taken quests first, then by rep reward desc.
+          // Per-quest path danger is pre-checked live when the waypoint arrives
+          // (in the accept→navigate transition), so no upfront sort by danger is
+          // possible here — waypoint coords are not known until accepted.
           const ordered = [...quests].sort((a, b) => {
             if (a.isTaken && !b.isTaken) return -1;
             if (!a.isTaken && b.isTaken) return 1;
@@ -644,7 +709,9 @@ export default function GameTerminal({
       autoQuestIntervalRef.current = null;
     }
 
-    // Determine the ordered quest list and target quest
+    // Determine the ordered quest list and target quest.
+    // Sort: taken quests first, then by rep reward desc.
+    // Per-quest path danger is checked live when the waypoint arrives.
     const quests = availableQuestsRef.current;
     const ordered = [...quests].sort((a, b) => {
       if (a.isTaken && !b.isTaken) return -1;
@@ -713,7 +780,46 @@ export default function GameTerminal({
       prevCombatRef.current = combatRef.current;
 
       if (combatRef.current !== null) {
-        // In combat — wait for it to finish before navigating
+        // ── Auto-flee if the fight is unwinnable ──────────────────────
+        // Check if player HP is critically low vs total enemy HP remaining,
+        // or if the encounter danger level far exceeds player level.
+        const combat = combatRef.current;
+        const combatPlayer = combat.combatants.find(c => c.isPlayerSide && !c.isDefeated);
+        const enemies = combat.combatants.filter(c => !c.isPlayerSide && !c.isDefeated);
+        const playerLevel = player.level ?? 1;
+
+        // Flee conditions:
+        //   1) Encounter dangerLevel (if present) exceeds player level + 3
+        //   2) Player HP is below 25% of max AND total enemy HP > player HP
+        const dangerTooHigh = combat.dangerLevel != null && combat.dangerLevel > playerLevel + 3;
+        const playerHpLow =
+          combatPlayer != null &&
+          combatPlayer.currentHp / combatPlayer.maxHp < 0.25 &&
+          enemies.reduce((sum, e) => sum + e.currentHp, 0) > combatPlayer.currentHp;
+
+        if (dangerTooHigh || playerHpLow) {
+          console.warn(`[autoquest combat] Unwinnable fight detected (dangerTooHigh=${dangerTooHigh}, playerHpLow=${playerHpLow}) — fleeing`);
+          sendCommand('flee', null);
+          autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+          wrappedAppendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'warning',
+            text: `Quest '${nextQuest.title}': unwinnable fight — fleeing and skipping quest.`,
+          });
+          // Will advance to next quest once combat clears (post-combat pause)
+          autoQuestPhaseRef.current = 'idle';
+          if (autoQuestIntervalRef.current !== null) {
+            clearInterval(autoQuestIntervalRef.current);
+            autoQuestIntervalRef.current = null;
+          }
+          // Small delay then advance to next quest
+          setTimeout(() => {
+            setAutoQuestIndex(prev => prev + 1);
+          }, 2500);
+          return;
+        }
+
+        // Winnable or uncertain — wait for combat to finish before navigating
         return;
       }
       if (Date.now() < combatEndResumeAtRef.current) {
@@ -727,6 +833,28 @@ export default function GameTerminal({
 
         if (wp && wp.questId === nextQuest.questId) {
           console.log(`[autoquest] Waypoint arrived for "${nextQuest.title}" → (${wp.targetX},${wp.targetY}), switching to navigate`);
+
+          // ── Pre-check: sample path danger before committing to navigate ──
+          const playerLevelNow = player.level ?? 1;
+          const hardCap = playerLevelNow + 4;
+          const pathMaxDanger = samplePathDanger(player.x, player.y, wp.targetX, wp.targetY, 6);
+          if (pathMaxDanger > hardCap) {
+            console.warn(`[autoquest] Path to "${nextQuest.title}" has max danger ${pathMaxDanger} (hard cap ${hardCap}) — skipping quest`);
+            wrappedAppendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'warning',
+              text: `Quest '${nextQuest.title}' is in a danger ${pathMaxDanger} zone — too dangerous (safe limit: ${hardCap}). Skipping.`,
+            });
+            autoQuestPhaseRef.current = 'idle';
+            autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+            if (autoQuestIntervalRef.current !== null) {
+              clearInterval(autoQuestIntervalRef.current);
+              autoQuestIntervalRef.current = null;
+            }
+            setAutoQuestIndex(prev => prev + 1);
+            return;
+          }
+
           autoQuestPhaseRef.current = 'navigate';
           setAutoNavigating(true);
           wrappedAppendMessage({
@@ -762,7 +890,7 @@ export default function GameTerminal({
         return;
       }
 
-      // ── Navigate phase: step toward waypoint ────────────────────────
+      // ── Navigate phase: step toward waypoint (danger-aware) ────────
       if (phase === 'navigate') {
         if (!wp || wp.questId !== nextQuest.questId) {
           console.warn('[autoquest navigate] Waypoint lost — returning to accept phase');
@@ -770,6 +898,13 @@ export default function GameTerminal({
           acceptWaitTicksRef.current = 0;
           sendCommand('acceptquest', { questId: nextQuest.questId });
           return;
+        }
+
+        // ── Homestead check: must portal back before navigating ────────
+        if (player.x === -100 && player.y === -100) {
+          console.log('[autoquest navigate] Player is at homestead — sending portalback before navigating');
+          sendCommand('portalback', null);
+          return; // next tick will see the new position and start navigating
         }
 
         const distX = Math.abs(wp.targetX - player.x);
@@ -790,20 +925,44 @@ export default function GameTerminal({
           return;
         }
 
-        const step = stepToward(player.x, player.y, wp.targetX, wp.targetY, getBiome);
-        if (!step) {
-          console.warn('[autoquest navigate] Path blocked — stopping');
+        const safeStepCap = (player.level ?? 1) + 2;
+        const step = stepTowardSafe(player.x, player.y, wp.targetX, wp.targetY, safeStepCap);
+
+        if (step === null) {
+          // Impassable terrain — fully blocked
+          console.warn('[autoquest navigate] Path completely blocked (impassable terrain) — skipping quest');
           setAutoNavigating(false);
-          setAutoQuestActive(false);
+          autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+          wrappedAppendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: `Auto-quest: path to '${nextQuest.title}' is blocked by impassable terrain. Skipping to next quest.`,
+          });
+          autoQuestPhaseRef.current = 'idle';
           if (autoQuestIntervalRef.current !== null) {
             clearInterval(autoQuestIntervalRef.current);
             autoQuestIntervalRef.current = null;
           }
+          setAutoQuestIndex(prev => prev + 1);
+          return;
+        }
+
+        if (step === 'danger') {
+          // All adjacent steps toward target exceed safeCap — skip quest
+          console.warn(`[autoquest navigate] Next step into danger zone (safe cap: ${safeStepCap}) — skipping quest`);
+          setAutoNavigating(false);
+          autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
           wrappedAppendMessage({
             timestamp: new Date().toISOString(),
-            category: 'system',
-            text: 'Auto-quest: path blocked. Run stopped.',
+            category: 'warning',
+            text: `Quest route blocked by danger terrain (safe limit: ${safeStepCap}). Skipping '${nextQuest.title}' to next quest.`,
           });
+          autoQuestPhaseRef.current = 'idle';
+          if (autoQuestIntervalRef.current !== null) {
+            clearInterval(autoQuestIntervalRef.current);
+            autoQuestIntervalRef.current = null;
+          }
+          setAutoQuestIndex(prev => prev + 1);
           return;
         }
 
