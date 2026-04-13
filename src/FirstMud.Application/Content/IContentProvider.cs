@@ -127,6 +127,16 @@ public interface IContentProvider
     /// <summary>Lookup a faction by its enum id. Returns null if no definition exists.</summary>
     FactionDefinition? GetFaction(FactionId id);
 
+    // ─── Combat Curves ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tunable combat scaling coefficients (monster danger-level multipliers,
+    /// boss bonuses). Loaded from <c>content/combat-curves.json</c>. Consumed
+    /// by both the live game's <c>MonsterFactory</c> and the design-time
+    /// <c>encounter-sim</c> tool — one source of truth.
+    /// </summary>
+    CombatCurvesDefinition CombatCurves { get; }
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>

@@ -46,7 +46,7 @@ dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario f
 | `scenario-player` | full     | `--fixture <path>` `--choose id,id,id`             |
 | `dialogue-lint`   | full     | `--fixture <path>`                                 |
 | `faction-state`   | scaffold | `--at <marker>`                                    |
-| `encounter-sim`   | full     | `--monster <id>` (repeatable) `--party <L:elem,...>` `--rolls <N>` `--player-level <L>` `--player-element <E>` `--seed <S>` |
+| `encounter-sim`   | full     | `--monster <id>` (repeatable) `--party <L:elem,...>` `--rolls <N>` `--player-level <L>` `--player-element <E>` `--seed <S>` `--danger-level <0..10>` |
 | `economy-sim`     | scaffold | `--hours <N>` `--scenario <name>`                  |
 
 ## Input formats
@@ -147,11 +147,47 @@ The simulator categorises encounters by aggregate win rate across all rolls:
 Use `--rolls` to tighten confidence on the band — 1000 is usually enough,
 2000+ for borderline tunes.
 
-**Known caveat**: `encounter-sim` uses raw `monsters.json` stats. The live
-game's `MonsterFactory` applies danger-level scaling (HP ×1.4–5×, power
-×1.3–4×, boss bonuses) on top of these base stats. Tune encounters by
-`--player-level` / party layer to explore design space, but remember a t3 boss
-in live combat at danger 10 will be ~2× the raw stats you see here.
+### Danger-level scaling (`--danger-level N`)
+
+Pass `--danger-level N` (0–10) to apply the same multipliers `MonsterFactory`
+uses at runtime, so sim results match what the live game spawns at that
+danger. Without the flag, the tool runs against raw `monsters.json` stats and
+prints a stderr warning automatically:
+
+```
+Warning: running unscaled monster stats. Live game scales HP+power by zone
+danger. Use --danger-level N to match live.
+```
+
+The applied danger level is recorded in both the JSON sim-log
+(`dangerLevel`, `scaled`) and the markdown daily journal so reviewers can
+tell at a glance whether a row was scaled.
+
+The scaling math is shared with `MonsterFactory.ScaleMonster` via the
+`MonsterScaling.Apply` helper in `FirstMud.Application`, with coefficients
+authored in [`content/combat-curves.json`](../../content/combat-curves.json):
+
+| coefficient        | default | what it does                                 |
+|--------------------|---------|----------------------------------------------|
+| `hpPerDanger`      | `0.4`   | HP = base × (1 + danger × 0.4) → 5× at d10   |
+| `powerPerDanger`   | `0.3`   | Ability BasePower × (1 + danger × 0.3)       |
+| `speedPerDanger`   | `1.0`   | Speed += danger × 1                          |
+| `bossHpMultiplier` | `2.0`   | Boss HP doubled on top of normal scaling     |
+| `bossSpeedBonus`   | `5`     | Boss speed +5 on top of normal scaling       |
+
+Tweak the JSON to retune; both the live game and `encounter-sim` pick up the
+new curves on next load. (Variance, per-monster-level overrides, pack-size
+selection, and the boss-flag itself stay in `MonsterFactory` — only clean
+numeric coefficients live in the JSON.)
+
+A typical scaled-vs-unscaled compare at danger 5 against a t3 monster
+(level-6 solo Fire player vs `frost-giant`, seed 42, 500 rolls) shows the
+flag is doing real work:
+
+```
+unscaled: Wins 99.8%   Avg rounds 4.2   Damage taken med 65   Difficulty trivial
+danger=5: Wins  0.4%   Avg rounds 4.6   Damage taken med 171  Difficulty punishing
+```
 
 ## Isolation
 

@@ -67,6 +67,7 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<(WorldId, int), ZoneDefinition> _zonesByWorldNumber = new();
     private IReadOnlyList<FactionDefinition> _factions = Array.Empty<FactionDefinition>();
     private Dictionary<FactionId, FactionDefinition> _factionsById = new();
+    private CombatCurvesDefinition _combatCurves = DefaultCombatCurves();
 
     private static readonly HashSet<string> ValidBiomeNames = new(StringComparer.Ordinal)
     {
@@ -192,6 +193,8 @@ public sealed class ContentProvider : IContentProvider
     public FactionDefinition? GetFaction(FactionId id) =>
         _factionsById.TryGetValue(id, out var def) ? def : null;
 
+    public CombatCurvesDefinition CombatCurves => _combatCurves;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -213,6 +216,7 @@ public sealed class ContentProvider : IContentProvider
         // waypointZoneIds) can run against the authored zones registry.
         _factions = LoadFactions();
         _factionsById = _factions.ToDictionary(f => f.Id);
+        _combatCurves = LoadCombatCurves();
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
@@ -532,6 +536,71 @@ public sealed class ContentProvider : IContentProvider
             return null;
         }
     }
+
+    // ─── Combat Curves ───────────────────────────────────────────────────────
+
+    private static CombatCurvesDefinition DefaultCombatCurves() =>
+        new(new MonsterScalingCurve(
+            HpPerDanger:      0.4,
+            PowerPerDanger:   0.3,
+            SpeedPerDanger:   1.0,
+            BossHpMultiplier: 2.0,
+            BossSpeedBonus:   5));
+
+    /// <summary>
+    /// Loads <c>content/combat-curves.json</c> if present. The file is
+    /// optional — if absent, the historical hardcoded constants are used so
+    /// existing test fixtures and partial-content roots keep working. When
+    /// the file IS present, every field is required and must fall in a
+    /// sensible range (validated against <c>combat-curves.schema.json</c>).
+    /// </summary>
+    private CombatCurvesDefinition LoadCombatCurves()
+    {
+        var path = Path.Combine(_contentRoot, "combat-curves.json");
+        if (!File.Exists(path))
+            return DefaultCombatCurves();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<CombatCurvesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.MonsterScaling is null)
+            throw new InvalidDataException($"{path}: 'monsterScaling' block is required.");
+
+        var ms = doc.MonsterScaling;
+
+        ValidateRange(path, "hpPerDanger",      ms.HpPerDanger,      min: 0, max: 5);
+        ValidateRange(path, "powerPerDanger",   ms.PowerPerDanger,   min: 0, max: 5);
+        ValidateRange(path, "speedPerDanger",   ms.SpeedPerDanger,   min: 0, max: 10);
+        ValidateRange(path, "bossHpMultiplier", ms.BossHpMultiplier, min: 1, max: 10);
+        if (ms.BossSpeedBonus < 0 || ms.BossSpeedBonus > 50)
+            throw new InvalidDataException(
+                $"{path}: monsterScaling.bossSpeedBonus must be in [0, 50] (got {ms.BossSpeedBonus}).");
+
+        return new CombatCurvesDefinition(new MonsterScalingCurve(
+            HpPerDanger:      ms.HpPerDanger,
+            PowerPerDanger:   ms.PowerPerDanger,
+            SpeedPerDanger:   ms.SpeedPerDanger,
+            BossHpMultiplier: ms.BossHpMultiplier,
+            BossSpeedBonus:   ms.BossSpeedBonus));
+    }
+
+    private static void ValidateRange(string path, string field, double value, double min, double max)
+    {
+        if (value < min || value > max)
+            throw new InvalidDataException(
+                $"{path}: monsterScaling.{field} must be in [{min}, {max}] (got {value}).");
+    }
+
+    private sealed record CombatCurvesFile(
+        [property: JsonPropertyName("monsterScaling")] MonsterScalingRaw? MonsterScaling);
+
+    private sealed record MonsterScalingRaw(
+        [property: JsonPropertyName("hpPerDanger")]      double HpPerDanger,
+        [property: JsonPropertyName("powerPerDanger")]   double PowerPerDanger,
+        [property: JsonPropertyName("speedPerDanger")]   double SpeedPerDanger,
+        [property: JsonPropertyName("bossHpMultiplier")] double BossHpMultiplier,
+        [property: JsonPropertyName("bossSpeedBonus")]   int    BossSpeedBonus);
 
     private sealed record FactionsFile(
         [property: JsonPropertyName("factions")] List<FactionRaw>? Factions);

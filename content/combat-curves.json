@@ -1,0 +1,10 @@
+{
+  "$schema": "./schemas/combat-curves.schema.json",
+  "monsterScaling": {
+    "hpPerDanger": 0.4,
+    "powerPerDanger": 0.3,
+    "speedPerDanger": 1.0,
+    "bossHpMultiplier": 2.0,
+    "bossSpeedBonus": 5
+  }
+}

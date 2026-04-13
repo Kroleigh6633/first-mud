@@ -43,6 +43,49 @@ public class EncounterSimTests
     }
 
     [Fact]
+    public void Scaling_at_danger_zero_is_bit_identical_noop()
+    {
+        // Regression fence: encounter-sim with --danger-level 0 (omitted) MUST
+        // hand CombatSimulationService bit-identical templates so existing
+        // sim-log baselines remain reproducible.
+        var template = TemplateFor("timber-wolf");
+        var curve = MonsterScaling.DefaultCurve;
+
+        var scaled = MonsterScaling.Apply(template, dangerLevel: 0, curve, isBoss: false);
+
+        Assert.Same(template, scaled);
+        Assert.Equal(template.Hp,    scaled.Hp);
+        Assert.Equal(template.Speed, scaled.Speed);
+        Assert.Equal(template.Level, scaled.Level);
+        Assert.Equal(template.Abilities.Count, scaled.Abilities.Count);
+        for (int i = 0; i < template.Abilities.Count; i++)
+            Assert.Equal(template.Abilities[i].BasePower, scaled.Abilities[i].BasePower);
+    }
+
+    [Fact]
+    public void Scaled_run_at_danger_5_strictly_lowers_win_rate_vs_unscaled()
+    {
+        // Same seed/monster/party — only the danger-level scaling differs.
+        // At danger 5 HP becomes 3x and ability power 2.5x, so a fight that
+        // sits in a contested win-rate band unscaled MUST shed measurable
+        // win rate when scaled. We pick a t3 monster vs a low-level solo
+        // player so neither end pegs at 100%/0% (which would mask the delta).
+        var baseTemplate = TemplateFor("frost-giant");
+        var curve = MonsterScaling.DefaultCurve;
+        var scaledTemplate = MonsterScaling.Apply(baseTemplate, dangerLevel: 5, curve, isBoss: false);
+
+        var party = Array.Empty<CombatSimulationService.PartyMember>();
+
+        var unscaled = RunBatch(seed: 99, rolls: 400, playerLevel: 6, MagicElement.Fire, party,
+            new[] { baseTemplate });
+        var scaled   = RunBatch(seed: 99, rolls: 400, playerLevel: 6, MagicElement.Fire, party,
+            new[] { scaledTemplate });
+
+        Assert.True(scaled.WinRate < unscaled.WinRate,
+            $"Expected danger-5 scaling to strictly lower win rate. Unscaled={unscaled.WinRate:P1} Scaled={scaled.WinRate:P1}.");
+    }
+
+    [Fact]
     public void Same_seed_produces_identical_outcome_distribution()
     {
         var monsters = new[] { TemplateFor("timber-wolf"), TemplateFor("wild-boar") };

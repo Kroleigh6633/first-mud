@@ -1286,4 +1286,57 @@ public class ContentProviderTests
             dir.Delete(recursive: true);
         }
     }
+
+    // ─── Combat Curves ────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_combat_curves_file_loads_with_expected_coefficients()
+    {
+        // content/combat-curves.json must keep the historical constants so
+        // the live game's MonsterFactory and the encounter-sim agree.
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var ms = provider.CombatCurves.MonsterScaling;
+        ms.HpPerDanger.Should().Be(0.4);
+        ms.PowerPerDanger.Should().Be(0.3);
+        ms.SpeedPerDanger.Should().Be(1.0);
+        ms.BossHpMultiplier.Should().Be(2.0);
+        ms.BossSpeedBonus.Should().Be(5);
+    }
+
+    [Fact]
+    public void Out_of_range_combat_curve_coefficient_is_rejected()
+    {
+        // Author error guard: hpPerDanger of 99 would 100x monster HP at
+        // danger 1 — that's almost certainly a typo, not intent.
+        var realRoot = ContentRootResolver.Resolve();
+        var dir = Directory.CreateTempSubdirectory("fm-content-curves-test-");
+        try
+        {
+            // Mirror every required content file from the real root, then
+            // overwrite combat-curves.json with the bogus payload.
+            foreach (var file in Directory.EnumerateFiles(realRoot, "*.json"))
+                File.Copy(file, Path.Combine(dir.FullName, Path.GetFileName(file)));
+
+            File.WriteAllText(Path.Combine(dir.FullName, "combat-curves.json"), """
+            {
+              "monsterScaling": {
+                "hpPerDanger": 99,
+                "powerPerDanger": 0.3,
+                "speedPerDanger": 1.0,
+                "bossHpMultiplier": 2.0,
+                "bossSpeedBonus": 5
+              }
+            }
+            """);
+
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*hpPerDanger*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
 }
