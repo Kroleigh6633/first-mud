@@ -89,12 +89,13 @@ public static class EncounterSimCommand
         var masterSeed = seed ?? Random.Shared.Next();
         var results = new List<CombatSimulationService.SimulationResult>(rolls);
 
+        var partyCurve = content.CombatCurves.PartyScaling;
         for (int i = 0; i < rolls; i++)
         {
             var rng = new Random(unchecked(masterSeed * 1_000_003 + i));
-            var service = new CombatSimulationService(rng);
+            var service = new CombatSimulationService(rng, partyCurve);
             var encounter = service.BuildEncounter(playerElem, playerLvl, party, monsters);
-            results.Add(service.Run(encounter));
+            results.Add(service.Run(encounter, dangerLevel: dangerLvl));
         }
 
         var summary = Summarize(results);

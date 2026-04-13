@@ -1881,16 +1881,22 @@ public class ContentProviderTests
     [Fact]
     public void Real_combat_curves_file_loads_with_expected_coefficients()
     {
-        // content/combat-curves.json must keep the historical constants so
-        // the live game's MonsterFactory and the encounter-sim agree.
+        // content/combat-curves.json pins the post-TPK-fix scaling values.
+        // Live game's MonsterFactory + encounter-sim must agree on these.
+        // Halving hpPerDanger + powerPerDanger + softening boss/speed came
+        // from the 2026-04-13 three-TPK play session; do not revert without
+        // a matching party-scaling review.
         var provider = new ContentProvider(ContentRootResolver.Resolve());
 
         var ms = provider.CombatCurves.MonsterScaling;
-        ms.HpPerDanger.Should().Be(0.4);
-        ms.PowerPerDanger.Should().Be(0.3);
-        ms.SpeedPerDanger.Should().Be(1.0);
-        ms.BossHpMultiplier.Should().Be(2.0);
-        ms.BossSpeedBonus.Should().Be(5);
+        ms.HpPerDanger.Should().Be(0.20);
+        ms.PowerPerDanger.Should().Be(0.15);
+        ms.SpeedPerDanger.Should().Be(0.7);
+        ms.BossHpMultiplier.Should().Be(1.6);
+        ms.BossSpeedBonus.Should().Be(4);
+
+        var ps = provider.CombatCurves.PartyScaling;
+        ps.ScalingPerTier.Should().Be(0.12);
     }
 
     [Fact]

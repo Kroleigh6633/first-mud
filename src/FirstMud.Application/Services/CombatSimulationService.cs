@@ -1,3 +1,4 @@
+using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Services;
@@ -22,10 +23,21 @@ namespace FirstMud.Application.Services;
 public sealed class CombatSimulationService
 {
     private readonly Random _rng;
+    private readonly PartyScalingCurve _partyScaling;
 
     public CombatSimulationService(Random rng)
+        : this(rng, new PartyScalingCurve(0.0)) { }
+
+    /// <summary>
+    /// Overload used by the encounter-sim tool and progression-sim so the
+    /// sim applies the same party-scaling buff the live game does. Pass
+    /// <see cref="PartyScalingCurve"/> with ScalingPerTier=0 for legacy /
+    /// baseline sims that want the pre-fix numbers.
+    /// </summary>
+    public CombatSimulationService(Random rng, PartyScalingCurve partyScaling)
     {
         _rng = rng ?? throw new ArgumentNullException(nameof(rng));
+        _partyScaling = partyScaling ?? throw new ArgumentNullException(nameof(partyScaling));
     }
 
     // ─── Party composition ──────────────────────────────────────────────────
@@ -78,6 +90,11 @@ public sealed class CombatSimulationService
         int levelScaledBoltBase    = 30 + (playerLevel * 3);
         int levelScaledRestoreBase = 30 + (playerLevel * 2);
 
+        // Party scaling: symmetric buff vs monster danger curve.
+        var avgLayer = PartyScaling.AvgCompanionLayer(companions.Select(c => c.Layer).ToList());
+        var partyFactor = PartyScaling.Factor(_partyScaling, playerLevel, avgLayer);
+        combatMaxHp = (int)(combatMaxHp * partyFactor);
+
         var strikeAbility = new CombatAbility(
             "Strike",
             levelScaledStrikeBase + statStrikeBonus,
@@ -86,14 +103,14 @@ public sealed class CombatSimulationService
             AbilityTargetType.SingleEnemy,
             AbilityCategory.Attack);
 
-        var playerAbilities = new List<CombatAbility>
+        var playerAbilities = PartyScaling.ScaleAbilities(new List<CombatAbility>
         {
             strikeAbility,
             new("Weave Bolt", levelScaledBoltBase + statSpellBonus, 10, playerElement,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
             new("Restore", levelScaledRestoreBase, 5, MagicElement.Aether,
                 AbilityTargetType.Self, AbilityCategory.Heal),
-        };
+        }, partyFactor);
 
         var playerCombatant = Combatant.Create(
             "Player",
@@ -115,6 +132,9 @@ public sealed class CombatSimulationService
             var companionHp    = 50 + c.Level * 10 + c.Layer * 5;
             var companionSpeed = 6 + c.Level;
 
+            companionHp = (int)(companionHp * partyFactor);
+            var scaledAbilities = PartyScaling.ScaleAbilities(abilities, partyFactor);
+
             playerSide.Add(Combatant.Create(
                 $"{c.Type}-{c.Element}-L{c.Layer}",
                 CombatantType.Companion,
@@ -124,7 +144,7 @@ public sealed class CombatSimulationService
                 c.Element,
                 isPlayerSide: true,
                 c.Level,
-                abilities,
+                scaledAbilities,
                 agility: c.Level + 5));
         }
 
@@ -148,8 +168,14 @@ public sealed class CombatSimulationService
     /// <summary>
     /// Runs a single encounter to completion (victory/defeat) or returns Timeout
     /// after <paramref name="maxRounds"/>. Deterministic per the injected RNG.
+    ///
+    /// <paramref name="dangerLevel"/> mirrors the live game's multi-attack rule
+    /// (<see cref="FirstMud.GameServer.Handlers.CombatHelpers.ProcessEnemyTurnsAsync"/>):
+    /// danger 7-8 gives enemies 2 actions/turn, danger 9-10 gives 3. Required
+    /// or the sim drastically under-estimates mid/high-danger difficulty vs.
+    /// what the live game actually spawns.
     /// </summary>
-    public SimulationResult Run(Encounter encounter, int maxRounds = 60)
+    public SimulationResult Run(Encounter encounter, int maxRounds = 60, int dangerLevel = 0)
     {
         var playerStart = encounter.Combatants.First(c => c.CombatantType == CombatantType.Player);
         int playerMaxHp = playerStart.MaxHp;
@@ -216,9 +242,22 @@ public sealed class CombatSimulationService
                 continue;
             }
 
-            ResolveAction(encounter, actor, chosen, targetId, damageByCompanion);
+            // Multi-attack: mirror CombatHelpers.ProcessEnemyTurnsAsync's
+            // dangerLevel switch so the sim matches the live game.
+            int actionsPerTurn = actor.CombatantType == CombatantType.Monster
+                ? dangerLevel switch { >= 9 => 3, >= 7 => 2, _ => 1 }
+                : 1;
 
-            encounter.CheckEndState();
+            for (int a = 0; a < actionsPerTurn; a++)
+            {
+                if (encounter.State != EncounterState.InProgress) break;
+                // Re-pick target each sub-action so a dead target isn't hit twice.
+                if (actor.CombatantType == CombatantType.Monster)
+                    targetId = encounter.Combatants.FirstOrDefault(c => c.IsPlayerSide && !c.IsDefeated)?.Id;
+                ResolveAction(encounter, actor, chosen, targetId, damageByCompanion);
+                encounter.CheckEndState();
+            }
+
             if (encounter.State == EncounterState.InProgress)
                 encounter.AdvanceTurn();
         }

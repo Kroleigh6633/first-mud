@@ -600,12 +600,14 @@ public sealed class ContentProvider : IContentProvider
     // ─── Combat Curves ───────────────────────────────────────────────────────
 
     private static CombatCurvesDefinition DefaultCombatCurves() =>
-        new(new MonsterScalingCurve(
-            HpPerDanger:      0.4,
-            PowerPerDanger:   0.3,
-            SpeedPerDanger:   1.0,
-            BossHpMultiplier: 2.0,
-            BossSpeedBonus:   5));
+        new(
+            new MonsterScalingCurve(
+                HpPerDanger:      0.20,
+                PowerPerDanger:   0.15,
+                SpeedPerDanger:   0.7,
+                BossHpMultiplier: 1.6,
+                BossSpeedBonus:   4),
+            new PartyScalingCurve(ScalingPerTier: 0.12));
 
     /// <summary>
     /// Loads <c>content/combat-curves.json</c> if present. The file is
@@ -637,12 +639,24 @@ public sealed class ContentProvider : IContentProvider
             throw new InvalidDataException(
                 $"{path}: monsterScaling.bossSpeedBonus must be in [0, 50] (got {ms.BossSpeedBonus}).");
 
-        return new CombatCurvesDefinition(new MonsterScalingCurve(
-            HpPerDanger:      ms.HpPerDanger,
-            PowerPerDanger:   ms.PowerPerDanger,
-            SpeedPerDanger:   ms.SpeedPerDanger,
-            BossHpMultiplier: ms.BossHpMultiplier,
-            BossSpeedBonus:   ms.BossSpeedBonus));
+        // Party scaling block is optional. Default to 0.12 so legacy files
+        // without the block still get the symmetric party buff that pairs
+        // with post-TPK-fix monster scaling.
+        double partyScalingPerTier = 0.12;
+        if (doc.PartyScaling is not null)
+        {
+            ValidateRange(path, "scalingPerTier", doc.PartyScaling.ScalingPerTier, min: 0, max: 1);
+            partyScalingPerTier = doc.PartyScaling.ScalingPerTier;
+        }
+
+        return new CombatCurvesDefinition(
+            new MonsterScalingCurve(
+                HpPerDanger:      ms.HpPerDanger,
+                PowerPerDanger:   ms.PowerPerDanger,
+                SpeedPerDanger:   ms.SpeedPerDanger,
+                BossHpMultiplier: ms.BossHpMultiplier,
+                BossSpeedBonus:   ms.BossSpeedBonus),
+            new PartyScalingCurve(partyScalingPerTier));
     }
 
     private static void ValidateRange(string path, string field, double value, double min, double max)
@@ -728,7 +742,11 @@ public sealed class ContentProvider : IContentProvider
         [property: JsonPropertyName("skillDivisor")] int SkillDivisor);
 
     private sealed record CombatCurvesFile(
-        [property: JsonPropertyName("monsterScaling")] MonsterScalingRaw? MonsterScaling);
+        [property: JsonPropertyName("monsterScaling")] MonsterScalingRaw? MonsterScaling,
+        [property: JsonPropertyName("partyScaling")]   PartyScalingRaw?   PartyScaling);
+
+    private sealed record PartyScalingRaw(
+        [property: JsonPropertyName("scalingPerTier")] double ScalingPerTier);
 
     private sealed record MonsterScalingRaw(
         [property: JsonPropertyName("hpPerDanger")]      double HpPerDanger,

@@ -28,11 +28,11 @@ public static class MonsterScaling
     /// speed). Returned by <see cref="DefaultCurve"/>.
     /// </summary>
     public static readonly MonsterScalingCurve DefaultCurve = new(
-        HpPerDanger:      0.4,
-        PowerPerDanger:   0.3,
-        SpeedPerDanger:   1.0,
-        BossHpMultiplier: 2.0,
-        BossSpeedBonus:   5);
+        HpPerDanger:      0.20,
+        PowerPerDanger:   0.15,
+        SpeedPerDanger:   0.7,
+        BossHpMultiplier: 1.6,
+        BossSpeedBonus:   4);
 
     /// <summary>
     /// Applies the danger-level scaling curve to <paramref name="template"/>.

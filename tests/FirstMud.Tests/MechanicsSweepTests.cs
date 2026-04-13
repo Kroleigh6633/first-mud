@@ -281,11 +281,13 @@ public class MechanicsSweepTests
     [Fact]
     public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf4_MaxPack()
     {
-        // Small-party cap (partySize ≤ 4): maxEnemies = partySize + 1 = 5.
-        // Introduced to stop alpha-strike TPKs on small parties with underleveled companions.
+        // Merged cap (min of soft cap and small-party cap):
+        //   softCap       = partySize + danger/4 = 4 + 2 = 6
+        //   smallPartyCap = partySize + 1        = 5
+        //   maxEnemies    = min(6, 5)            = 5
         var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 4);
 
-        int maxEnemies = 4 + 1; // 5 — small-party cap
+        int maxEnemies = 5; // small-party cap dominates
         pack.Count.Should().Be(maxEnemies,
             $"party of 4 at danger 10 should produce exactly {maxEnemies} enemies (small-party cap)");
     }
@@ -293,12 +295,12 @@ public class MechanicsSweepTests
     [Fact]
     public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf5_UsesLegacyScaling()
     {
-        // partySize ≥ 5: legacy scaling — maxEnemies = partySize + dangerLevel/3 = 5 + 3 = 8.
+        // partySize ≥ 5: soft-cap dominates — maxEnemies = partySize + dangerLevel/4 = 5 + 2 = 7.
         var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 5);
 
-        int maxEnemies = 5 + (10 / 3); // 8
+        int maxEnemies = 5 + (10 / 4); // 7
         pack.Count.Should().Be(maxEnemies,
-            $"party of 5 at danger 10 should produce exactly {maxEnemies} enemies (legacy cap)");
+            $"party of 5 at danger 10 should produce exactly {maxEnemies} enemies (soft cap)");
     }
 
     [Fact]

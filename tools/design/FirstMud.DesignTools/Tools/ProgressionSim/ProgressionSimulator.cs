@@ -311,9 +311,9 @@ public sealed class ProgressionSimulator
             .Select(c => new CombatSimulationService.PartyMember(c.Type, c.Element, c.Layer, c.Level))
             .ToList();
 
-        var svc = new CombatSimulationService(new Random(_rng.Next()));
+        var svc = new CombatSimulationService(new Random(_rng.Next()), _content.CombatCurves.PartyScaling);
         var enc = svc.BuildEncounter(_archetype, state.PlayerLevel, party, new[] { template });
-        var res = svc.Run(enc);
+        var res = svc.Run(enc, dangerLevel: zone.DangerLevel);
 
         // Award usage to active companions
         foreach (var c in state.Companions.Take(3))
@@ -588,9 +588,9 @@ public sealed class ProgressionSimulator
                 var party = state.Companions.Take(3)
                     .Select(c => new CombatSimulationService.PartyMember(c.Type, c.Element, c.Layer, c.Level))
                     .ToList();
-                var svc = new CombatSimulationService(new Random(unchecked(_seed * 7919 + d * 31 + i)));
+                var svc = new CombatSimulationService(new Random(unchecked(_seed * 7919 + d * 31 + i)), _content.CombatCurves.PartyScaling);
                 var enc = svc.BuildEncounter(_archetype, state.PlayerLevel, party, pack);
-                var res = svc.Run(enc);
+                var res = svc.Run(enc, dangerLevel: d);
                 if (res.Outcome == CombatSimulationService.Outcome.Victory) wins++;
             }
             if ((double)wins / rolls >= 0.60) highest = d;
