@@ -28,4 +28,6 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 
+| worktree-agent-ab7bca92 | ready-to-merge | main | Fix StatusPanel Bar RangeError: clamp filled to [0,width] + fix XP bar using cumulative XP vs next-level threshold | - | src/FirstMud.Client/src/components/StatusPanel.tsx | 2026-04-13 |
+
 <!-- agents add rows above this line -->
