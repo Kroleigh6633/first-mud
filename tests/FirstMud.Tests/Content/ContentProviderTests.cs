@@ -893,6 +893,12 @@ public class ContentProviderTests
         File.Copy(Path.Combine(realRoot, "quests.json"), Path.Combine(dir, "quests.json"));
     }
 
+    internal static void WriteValidNpcs(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "npcs.json"), Path.Combine(dir, "npcs.json"));
+    }
+
     /// <summary>
     /// Seed a temp content dir with all upstream-required content files so a
     /// negative test targeting a specific file can reach that file's validator.
@@ -908,6 +914,7 @@ public class ContentProviderTests
         if (!excludedSet.Contains("zones")) WriteValidZones(dir);
         if (!excludedSet.Contains("factions")) WriteValidFactions(dir);
         if (!excludedSet.Contains("quests")) WriteValidQuests(dir);
+        if (!excludedSet.Contains("npcs")) WriteValidNpcs(dir);
     }
 
     // ─── Zone definitions ─────────────────────────────────────────────────
@@ -1599,6 +1606,200 @@ public class ContentProviderTests
             var act = () => new ContentProvider(dir.FullName);
             act.Should().Throw<InvalidDataException>()
                .WithMessage("*hpPerDanger*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    // ─── NPCs ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_npcs_file_loads_and_round_trips_canonical_entries()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var all = provider.AllNpcs();
+        all.Should().NotBeEmpty();
+        all.Select(n => n.Id).Should().OnlyHaveUniqueItems();
+
+        var maerwyn = provider.GetNpc("auld-maerwyn");
+        maerwyn.Should().NotBeNull();
+        maerwyn!.DisplayName.Should().Be("Auld Maerwyn");
+        maerwyn.FactionId.Should().Be(FirstMud.Domain.Enums.FactionId.ThornwoodCovens);
+        maerwyn.HomeZoneId.Should().Be("aeldran-2-thornwood");
+        maerwyn.Role.Should().Be(NpcRole.Questgiver);
+        maerwyn.VoiceTells.Should().HaveCountGreaterOrEqualTo(3);
+        maerwyn.VoiceTells.Should().HaveCountLessOrEqualTo(5);
+
+        // Unaffiliated NPCs retain a null factionId.
+        var senna = provider.GetNpc("senna-orrick");
+        senna.Should().NotBeNull();
+        senna!.FactionId.Should().BeNull();
+
+        provider.GetNpc("no-such-npc").Should().BeNull();
+        provider.GetNpc("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Npc_missing_id_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "", "displayName": "Nameless", "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*npc missing id*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_unknown_factionId_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "ghost", "displayName": "Ghost", "factionId": "NotAFaction",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*invalid factionId 'NotAFaction'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_unknown_homeZoneId_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "ghost", "displayName": "Ghost",
+                  "homeZoneId": "no-such-zone",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*homeZoneId 'no-such-zone' is not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_unknown_role_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "ghost", "displayName": "Ghost",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "wizard", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*invalid role 'wizard'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_duplicate_id_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "twin", "displayName": "Twin A",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] },
+                { "id": "twin", "displayName": "Twin B",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "y",
+                  "voiceTells": ["d","e","f"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*duplicate npc id 'twin'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_too_few_voiceTells_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "thin", "displayName": "Thin",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["only-one"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*between 3 and 5 voiceTells*");
         }
         finally
         {
