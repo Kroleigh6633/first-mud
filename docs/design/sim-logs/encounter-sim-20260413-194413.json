@@ -1,0 +1,30 @@
+{
+  "monsters": [
+    "frost-giant",
+    "dragon-whelp"
+  ],
+  "party": "3:Fire,2:Water",
+  "rolls": 1000,
+  "playerLevel": 4,
+  "playerElement": "Fire",
+  "seed": 1234,
+  "seedFixed": true,
+  "summary": {
+    "Rolls": 1000,
+    "Wins": 1000,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 2.296,
+    "AvgPlayerHpPct": 0.7537586206896546,
+    "MinPlayerHpPct": 0.2206896551724138,
+    "DmgMin": 0,
+    "DmgP25": 21,
+    "DmgMedian": 28,
+    "DmgP75": 56,
+    "DmgMax": 113,
+    "MvpName": "Wildfolk-Fire-L3",
+    "Difficulty": "trivial"
+  }
+}

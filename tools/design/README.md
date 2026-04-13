@@ -35,7 +35,7 @@ dotnet run --project FirstMud.DesignTools -- scenario-player
 dotnet run --project FirstMud.DesignTools -- scenario-player --choose accept,hunt-poach,honest
 dotnet run --project FirstMud.DesignTools -- dialogue-lint
 dotnet run --project FirstMud.DesignTools -- faction-state --at Q3.after-harken
-dotnet run --project FirstMud.DesignTools -- encounter-sim --monster wolf --party sera,varn --rolls 1000
+dotnet run --project FirstMud.DesignTools -- encounter-sim --monster timber-wolf --party 2:Fire,3:Water --rolls 1000 --player-level 5 --player-element Fire --seed 42
 dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario farming
 ```
 
@@ -46,7 +46,7 @@ dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario f
 | `scenario-player` | full     | `--fixture <path>` `--choose id,id,id`             |
 | `dialogue-lint`   | full     | `--fixture <path>`                                 |
 | `faction-state`   | scaffold | `--at <marker>`                                    |
-| `encounter-sim`   | scaffold | `--monster <id>` `--party <csv>` `--rolls <N>`     |
+| `encounter-sim`   | full     | `--monster <id>` (repeatable) `--party <L:elem,...>` `--rolls <N>` `--player-level <L>` `--player-element <E>` `--seed <S>` |
 | `economy-sim`     | scaffold | `--hours <N>` `--scenario <name>`                  |
 
 ## Input formats
@@ -103,6 +103,55 @@ Every run writes:
 3. Run `dialogue-lint --fixture <path>` to catch orphans, unreachable gates.
 4. Read the generated markdown in `docs/design/sim-logs/` — that's the daily design journal.
 5. When the spec stabilises, promote it into the game-content pipeline.
+
+## encounter-sim
+
+Deterministic per-round combat simulator. Reuses the live game's damage, hit,
+dodge, crit, and element formulas via a parallel `CombatSimulationService` in
+`FirstMud.Application` that takes an injected `Random` for reproducibility.
+
+```bash
+# one monster, party of two, 1000 rolls, seeded (reproducible)
+dotnet run --project FirstMud.DesignTools -- encounter-sim \
+    --monster timber-wolf --party 2:Fire,3:Water \
+    --rolls 1000 --player-level 5 --player-element Fire --seed 42
+
+# multi-monster pack (repeat --monster)
+dotnet run --project FirstMud.DesignTools -- encounter-sim \
+    --monster frost-giant --monster dragon-whelp --monster thornwood-guardian \
+    --party 5:Fire,5:Water,5:Earth \
+    --rolls 2000 --player-level 12 --player-element Air --seed 7
+```
+
+**Party format**: `layer:element,...` — each entry spawns a Wildfolk companion
+at that bond layer with that element affinity. Omit `--party` for a solo run.
+
+**Outputs** (per run):
+- stdout pretty summary (win/loss, avg rounds, HP% left, damage-taken
+  percentiles, MVP companion, difficulty band)
+- `docs/design/sim-logs/encounter-sim-<ts>.json` — full structured summary
+- Markdown append to `docs/design/sim-logs/<today>.md` — one-line per run
+
+### Difficulty bands (by win-rate)
+
+The simulator categorises encounters by aggregate win rate across all rolls:
+
+| band        | win rate    | designer intent                                  |
+|-------------|-------------|--------------------------------------------------|
+| `trivial`   | `> 95%`     | chore content; xp grind only                     |
+| `easy`      | `85–95%`    | intro/zone-1 content; low tension                |
+| `balanced`  | `60–85%`    | sweet spot; resource-drain without frequent TPK  |
+| `hard`      | `30–60%`    | gear-check; expect consumables + retries         |
+| `punishing` | `< 30%`     | boss / faction-event / progression wall          |
+
+Use `--rolls` to tighten confidence on the band — 1000 is usually enough,
+2000+ for borderline tunes.
+
+**Known caveat**: `encounter-sim` uses raw `monsters.json` stats. The live
+game's `MonsterFactory` applies danger-level scaling (HP ×1.4–5×, power
+×1.3–4×, boss bonuses) on top of these base stats. Tune encounters by
+`--player-level` / party layer to explore design space, but remember a t3 boss
+in live combat at danger 10 will be ~2× the raw stats you see here.
 
 ## Isolation
 

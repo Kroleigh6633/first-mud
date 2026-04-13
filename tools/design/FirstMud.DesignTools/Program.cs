@@ -55,7 +55,7 @@ public static class Program
         Console.WriteLine("  scenario-player   Step through a quest-chain spec.     [FULL]");
         Console.WriteLine("  dialogue-lint     Validate a dialogue tree.            [FULL]");
         Console.WriteLine("  faction-state     Render factions at a marker.         [scaffold]");
-        Console.WriteLine("  encounter-sim     Simulate combat rolls.               [scaffold]");
+        Console.WriteLine("  encounter-sim     Simulate combat rolls.               [FULL]");
         Console.WriteLine("  economy-sim       Simulate N hours of play.            [scaffold]");
         Console.WriteLine();
         Console.WriteLine("Each tool writes JSON + markdown under docs/design/sim-logs/.");
