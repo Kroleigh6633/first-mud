@@ -1254,6 +1254,16 @@ public class FarmingOrchestrator(
 
                     if (lootResult.Dropped)
                     {
+                        // Diagnostic trace — fires on every auto-farm loot drop
+                        if (lootResult.Item is not null)
+                        {
+                            var hasSlot = lootResult.Item.Slot != Domain.Enums.EquipmentSlot.None
+                                       && lootPlayer?.GetEquipped(lootResult.Item.Slot) is null;
+                            logger.LogInformation(
+                                "Loot: {Name} Slot={Slot} PlayerHasSlot={HasSlot} AutoSalvaged={AutoSalvaged}",
+                                lootResult.Item.Name, lootResult.Item.Slot, hasSlot, lootResult.AutoSalvaged);
+                        }
+
                         if (lootResult.AutoSalvaged)
                         {
                             autoFarmService.RecordAutoSalvage(playerId);

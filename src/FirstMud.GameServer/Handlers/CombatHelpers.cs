@@ -371,6 +371,21 @@ public class CombatHelpers(
         }
 
         var item = result.Item!;
+
+        // Diagnostic trace — fires on every loot drop so we can track equip decisions
+        var hasSlot = item.Slot != Domain.Enums.EquipmentSlot.None && player.GetEquipped(item.Slot) is null;
+        logger.LogInformation(
+            "Loot: {Name} Slot={Slot} PlayerHasSlot={HasSlot} AutoSalvaged={AutoSalvaged}",
+            item.Name, item.Slot, hasSlot, result.AutoSalvaged);
+
+        // If the item was auto-salvaged, send the message and stop — don't equip or broadcast LootDropped
+        if (result.AutoSalvaged)
+        {
+            var salvageCategory = GetSalvageCategory(item.Workmanship.Value);
+            await notificationService.SendMessageAsync(playerId, salvageCategory, result.Message, ct);
+            return;
+        }
+
         var lootCategory = GetLootCategory(item);
         await notificationService.SendMessageAsync(playerId, lootCategory, result.Message, ct);
 
