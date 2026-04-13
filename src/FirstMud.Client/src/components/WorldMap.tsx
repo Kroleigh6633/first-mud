@@ -741,6 +741,14 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       const biome = getBiome(gx, gy);
       const path  = !centerTile && !haloTile && isPathTile(gx, gy);
 
+      // Within 10 tiles of the homestead centre (-100, -100) treat terrain as
+      // a cleared grassland so buildings are visible and trees don't clutter the area.
+      const distToHomestead = Math.sqrt((gx - homesteadCx) ** 2 + (gy - homesteadCy) ** 2);
+      const inHomesteadClearing = distToHomestead <= 10;
+      const effectiveBiomeType = inHomesteadClearing && !centerTile && !haloTile
+        ? 'grassland'
+        : biome.type;
+
       if (centerTile) {
         const colors = zoneSaturatedColor(centerTile);
         const glow   = zoneGlowColor(centerTile);
@@ -748,20 +756,20 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       } else if (haloTile) {
         const colors = path
           ? getBiomeColors('path', gx, gy)
-          : getBiomeColors(biome.type, gx, gy);
+          : getBiomeColors(effectiveBiomeType, gx, gy);
         const glow   = zoneGlowColor(haloTile) + '66';
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top, glow);
       } else if (path) {
         const colors = getBiomeColors('path', gx, gy);
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top);
-      } else if (biome.type === 'water') {
+      } else if (effectiveBiomeType === 'water') {
         const blueBase = 0x22 + Math.round(waterShift * 16);
         const greenVal = Math.round(0x66 + waterShift * 20);
         const col = `rgb(${blueBase},${greenVal},${0xaa})`;
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, col);
         drawWaterWaves(ctx, sx, sy, tileW, tileH, waterFrame);
       } else {
-        const colors = getBiomeColors(biome.type, gx, gy);
+        const colors = getBiomeColors(effectiveBiomeType, gx, gy);
         drawIsoDiamond(ctx, sx, sy, tileW, tileH, colors.top);
       }
 
@@ -779,7 +787,10 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       }
 
       // ── Terrain decals ─────────────────────────────────────────────────────
-      if (!centerTile && !path) {
+      // Suppress decals inside the homestead clearing (grassland tiles are shown instead)
+      // and on any tile occupied by a homestead building.
+      const hasBuildingHere = buildingMap.has(key);
+      if (!centerTile && !path && !inHomesteadClearing && !hasBuildingHere) {
         if (biome.type === 'denseForest')  drawTreeDecal(ctx, sx, sy, true);
         if (biome.type === 'lightForest')  drawTreeDecal(ctx, sx, sy, false);
         if (biome.type === 'mountain')     drawMountainDecal(ctx, sx, sy, false);

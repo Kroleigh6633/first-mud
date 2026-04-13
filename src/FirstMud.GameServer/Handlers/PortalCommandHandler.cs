@@ -11,6 +11,8 @@ namespace FirstMud.GameServer.Handlers;
 public class PortalHomeCommandHandler(
     IPlayerRepository playerRepository,
     IHomesteadRepository homesteadRepository,
+    IHomesteadBuildingRepository buildingRepository,
+    ICompanionRepository companionRepository,
     BuildingService buildingService,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<PortalHomeCommand>
@@ -49,6 +51,46 @@ public class PortalHomeCommandHandler(
         if (homestead is not null)
         {
             await buildingService.SeedStarterBuildingsAsync(homestead.Id, ct);
+
+            // Push CityView so buildings appear on the map immediately on arrival
+            var buildings = await buildingRepository.GetByHomesteadIdAsync(homestead.Id, ct);
+            var buildingDtos = new List<object>();
+            foreach (var b in buildings)
+            {
+                string? assignedName = null;
+                if (b.AssignedCompanionId.HasValue)
+                {
+                    var companion = await companionRepository.GetByIdAsync(b.AssignedCompanionId.Value, ct);
+                    assignedName = companion?.Name;
+                }
+
+                buildingDtos.Add(new
+                {
+                    id                    = b.Id,
+                    homesteadId           = b.HomesteadId,
+                    type                  = b.Type.ToString(),
+                    tier                  = b.Tier,
+                    gridX                 = b.GridX,
+                    gridY                 = b.GridY,
+                    isConstructed         = b.IsConstructed,
+                    constructionProgress  = b.ConstructionProgress,
+                    assignedCompanionId   = b.AssignedCompanionId,
+                    assignedCompanionName = assignedName,
+                });
+            }
+
+            var cityViewPayload = new
+            {
+                homesteadId      = homestead.Id,
+                homesteadName    = homestead.Name,
+                buildingCount    = buildings.Count,
+                constructedCount = buildings.Count(b => b.IsConstructed),
+                buildings        = buildingDtos,
+            };
+
+            await hubContext.Clients
+                .Group(cmd.PlayerId.ToString())
+                .SendAsync("CityView", cityViewPayload, ct);
         }
 
         await hubContext.Clients
