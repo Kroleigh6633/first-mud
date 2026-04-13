@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "tide-lurker"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 5,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 3.294,
+    "AvgPlayerHpPct": 0.6547183098591552,
+    "MinPlayerHpPct": 0.09154929577464789,
+    "DmgMin": 0,
+    "DmgP25": 29,
+    "DmgMedian": 49,
+    "DmgP75": 66,
+    "DmgMax": 129,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

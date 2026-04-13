@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "reef-shark"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 5,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 496,
+    "Losses": 4,
+    "Timeouts": 0,
+    "WinRate": 0.992,
+    "LossRate": 0.008,
+    "AvgRounds": 3.198,
+    "AvgPlayerHpPct": 0.6146353930031806,
+    "MinPlayerHpPct": 0.04225352112676056,
+    "DmgMin": 0,
+    "DmgP25": 33,
+    "DmgMedian": 56,
+    "DmgP75": 74,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

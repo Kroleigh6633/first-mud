@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "phoenix-hatchling"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 0,
+  "scaled": false,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 2.214,
+    "AvgPlayerHpPct": 0.8604788732394358,
+    "MinPlayerHpPct": 0.45774647887323944,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 23,
+    "DmgP75": 27,
+    "DmgMax": 77,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "giant-crab"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 5,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 2.504,
+    "AvgPlayerHpPct": 0.883267605633802,
+    "MinPlayerHpPct": 0.4225352112676056,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 18,
+    "DmgP75": 21,
+    "DmgMax": 82,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

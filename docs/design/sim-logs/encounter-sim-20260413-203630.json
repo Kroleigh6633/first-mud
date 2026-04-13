@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "pack-alpha-wolf"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 1,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 2.406,
+    "AvgPlayerHpPct": 0.8446338028169013,
+    "MinPlayerHpPct": 0.4295774647887324,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 24,
+    "DmgP75": 28,
+    "DmgMax": 81,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

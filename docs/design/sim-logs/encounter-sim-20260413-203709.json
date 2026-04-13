@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "deep-horror"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 0,
+  "scaled": false,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 2.41,
+    "AvgPlayerHpPct": 0.8392676056338024,
+    "MinPlayerHpPct": 0.24647887323943662,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 25,
+    "DmgP75": 29,
+    "DmgMax": 107,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "drowned-revenant"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 5,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 121,
+    "Losses": 379,
+    "Timeouts": 0,
+    "WinRate": 0.242,
+    "LossRate": 0.758,
+    "AvgRounds": 4.524,
+    "AvgPlayerHpPct": 0.25771155860784534,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 0,
+    "DmgP25": 142,
+    "DmgMedian": 142,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "punishing"
+  }
+}

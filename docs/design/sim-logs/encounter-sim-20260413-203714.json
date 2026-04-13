@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "dust-viper"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 8,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 494,
+    "Losses": 6,
+    "Timeouts": 0,
+    "WinRate": 0.988,
+    "LossRate": 0.012,
+    "AvgRounds": 3.186,
+    "AvgPlayerHpPct": 0.6699264412385233,
+    "MinPlayerHpPct": 0.056338028169014086,
+    "DmgMin": 0,
+    "DmgP25": 28,
+    "DmgMedian": 47,
+    "DmgP75": 64,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

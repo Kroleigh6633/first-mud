@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "ash-golem"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 8,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 58,
+    "Losses": 442,
+    "Timeouts": 0,
+    "WinRate": 0.116,
+    "LossRate": 0.884,
+    "AvgRounds": 4.994,
+    "AvgPlayerHpPct": 0.19111219038368144,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 37,
+    "DmgP25": 142,
+    "DmgMedian": 142,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "punishing"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "mounted-raider"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 2,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 483,
+    "Losses": 17,
+    "Timeouts": 0,
+    "WinRate": 0.966,
+    "LossRate": 0.034,
+    "AvgRounds": 4.016,
+    "AvgPlayerHpPct": 0.5149593211442566,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 0,
+    "DmgP25": 53,
+    "DmgMedian": 68,
+    "DmgP75": 91,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}
