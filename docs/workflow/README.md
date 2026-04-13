@@ -22,6 +22,8 @@ This folder holds the process rules for multi-agent work on first-mud. It exists
    scripts/agent/ledger-lint.ps1 -ExpectEmpty   # post-merge sanity check
    ```
    Result: one commit, incoming row gone, no `chore(ledger)` follow-up.
+
+   **Expect a conflict on `docs/workflow/active-branches.md`** — this is normal. The incoming branch self-added a row; HEAD has its own rows; auto-merge can't resolve. Resolution: delete the incoming branch's row from both sides of the conflict, keep HEAD's other rows, `git add`, then `git commit`. Still one commit; rule #3 holds. If the merge has zero other file conflicts, the Edit+add+commit flow above collapses the conflict resolution and the row removal into the same commit.
 4. **Client-side fixes verify HMR.** Before reporting a fix to `src/FirstMud.Client/**`, run `scripts/agent/check-hmr.ps1 <changed-file>`. Note: the dev container mounts main's working tree by default — if your change is in a worktree, either (a) merge first then verify, or (b) run `scripts/agent/deploy-worktree.ps1 <worktree> <file>` to copy the file into main's mount (dirties main's tree; `git restore` after if still iterating), or (c) rebind the Docker mount to your worktree. Report which you did.
 5. **Supersession protocol.** If branch B is a strict superset of branch A's changes:
    - B's commit message includes a `Supersedes: <branch A>` trailer
@@ -29,7 +31,16 @@ This folder holds the process rules for multi-agent work on first-mud. It exists
    - A's ledger row flips to `status: superseded by <branch B>`
    - The merge agent deletes both rows when B lands (A is implicitly dropped)
 6. **Pre-flight check.** Before starting, scan the ledger for rows touching the files you plan to edit. If you find overlap, either coordinate (supersede) or pick a narrower scope.
-7. **Ledger is the source of truth.** Briefings must quote ledger state, not override it. An orchestrator writing a merge briefing must run `scripts/agent/ledger-lint.ps1` first and only list branches currently marked `ready-to-merge`. If a briefing names an agent whose row is not in the ledger, that agent's first action is to add the row; if a briefing lists a merge target whose ledger status is not `ready-to-merge`, the merge agent must stop and reconcile (not silently proceed).
+7. **Ledger is the source of truth — evaluated against HEAD at merge-agent start.** Briefings must quote ledger state, not override it. The merge agent evaluates the incoming branch's row **as it appears in HEAD's ledger** (i.e. the base branch it is merging into) at the moment the agent starts — not as the row appears on the incoming branch's tip. This resolves the otherwise-circular requirement that a branch mark itself `ready-to-merge`: it can, and typically does, but that self-edit only becomes authoritative once merged.
+
+   Rules:
+   - If HEAD's ledger has the row with status `ready-to-merge`, proceed.
+   - If HEAD's ledger has the row with status `in-progress` (or any other non-ready state), stop and reconcile — the author hasn't flipped it yet, or a prior merge agent left it mid-flight.
+   - If HEAD's ledger has **no row** for the incoming branch (common: the branch never pushed its own ledger edit to HEAD before landing), the briefing is authoritative. The merge agent may proceed on the briefing alone, and the post-merge state will simply have no row to delete for that branch.
+
+   Example: orchestrator spawns agent-X, which edits `foo.cs` and updates its own ledger row on its branch to `ready-to-merge`, then commits. A merge agent is spawned. From the merge agent's perspective on the base branch, the ledger row still shows `in-progress` (or is absent), because agent-X's ledger edit lives on agent-X's branch, not on base. The merge agent treats the briefing as authoritative (row absent) or reconciles (row present and not-ready). After `git merge`, agent-X's `ready-to-merge` edit is what conflicts — the merge agent deletes that row entirely per rule #3.
+
+   An orchestrator writing a merge briefing must run `scripts/agent/ledger-lint.ps1` against base first; it may list branches whose HEAD-ledger row is `in-progress` only if the briefing explicitly states the branch has self-flipped on its tip, in which case the merge agent proceeds on the briefing and deletes the row on merge.
 
 ## Scripts
 

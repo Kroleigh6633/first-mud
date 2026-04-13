@@ -27,5 +27,6 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a9e85204 | ready-to-merge | main | fix worktree-health Split-Path loop + clarify README merge rules #3/#7 | - | scripts/agent/worktree-health.ps1, docs/workflow/README.md | 2026-04-13 |
 
 <!-- agents add rows above this line -->

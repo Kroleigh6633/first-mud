@@ -91,9 +91,14 @@ if (Test-Path $worktreeRoot) {
     $p = $myCwd
     while ($p) {
         $lockedPaths += $p
-        $parent = Split-Path $p -Parent
-        if (-not $parent -or $parent -eq $p) { break }
-        $p = $parent.ToLower().TrimEnd('\', '/')
+        # Guard: Split-Path throws on drive-root-ish inputs like "c:" (which TrimEnd
+        # produces from "c:\"). Catch, null, or fixed-point all mean "stop walking up".
+        $parent = $null
+        try { $parent = Split-Path $p -Parent -ErrorAction Stop } catch { break }
+        if ([string]::IsNullOrEmpty($parent) -or $parent -eq $p) { break }
+        $next = $parent.ToLower().TrimEnd('\', '/')
+        if ([string]::IsNullOrEmpty($next) -or $next -eq $p) { break }
+        $p = $next
     }
 
     $onDisk = Get-ChildItem $worktreeRoot -Directory -ErrorAction SilentlyContinue
@@ -101,7 +106,7 @@ if (Test-Path $worktreeRoot) {
         $norm = $d.FullName.ToLower().TrimEnd('\', '/')
         if ($gitPathsNorm -notcontains $norm) {
             if ($lockedPaths -contains $norm) {
-                Write-Host "-- LOCKED-CWD (expected): $($d.FullName) (agent's own cwd, OS-locked — cannot be removed while running)"
+                Write-Host "-- LOCKED-CWD (expected): $($d.FullName) (agent's own cwd, OS-locked -- cannot be removed while running)"
             }
             else {
                 Write-Host "-- ORPHAN (stale): $($d.FullName) (on disk, not in git worktree list)"
