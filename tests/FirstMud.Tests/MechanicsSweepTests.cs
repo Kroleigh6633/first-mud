@@ -281,12 +281,24 @@ public class MechanicsSweepTests
     [Fact]
     public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf4_MaxPack()
     {
-        // partySize=4, danger=10: maxEnemies = 4 + 10/3 = 4 + 3 = 7
+        // Small-party cap (partySize ≤ 4): maxEnemies = partySize + 1 = 5.
+        // Introduced to stop alpha-strike TPKs on small parties with underleveled companions.
         var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 4);
 
-        int maxEnemies = 4 + (10 / 3); // 7
+        int maxEnemies = 4 + 1; // 5 — small-party cap
         pack.Count.Should().Be(maxEnemies,
-            $"party of 4 at danger 10 should produce exactly {maxEnemies} enemies");
+            $"party of 4 at danger 10 should produce exactly {maxEnemies} enemies (small-party cap)");
+    }
+
+    [Fact]
+    public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf5_UsesLegacyScaling()
+    {
+        // partySize ≥ 5: legacy scaling — maxEnemies = partySize + dangerLevel/3 = 5 + 3 = 8.
+        var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 5);
+
+        int maxEnemies = 5 + (10 / 3); // 8
+        pack.Count.Should().Be(maxEnemies,
+            $"party of 5 at danger 10 should produce exactly {maxEnemies} enemies (legacy cap)");
     }
 
     [Fact]
