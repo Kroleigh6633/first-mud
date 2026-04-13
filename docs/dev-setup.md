@@ -13,7 +13,13 @@ containers.
    - `MSSQL_SA_PASSWORD=YourLocal_SA_Pwd#1`
    - `NEO4J_PASSWORD=YourLocal_Neo4j_Pwd#1`
 
-2. Create `docker/.env` (gitignored) with:
+2. Create `docker/.env` (gitignored) by copying the tracked template:
+
+   ```bash
+   cp docker/.env.template docker/.env
+   ```
+
+   Then edit to taste, or keep the defaults:
 
    ```dotenv
    MSSQL_SA_PASSWORD=YourLocal_SA_Pwd#1
@@ -21,6 +27,9 @@ containers.
    ```
 
    `docker compose -f docker/docker-compose.yml up` picks these up automatically.
+   Whatever values you choose here **must match** the passwords in
+   `src/FirstMud.GameServer/appsettings.Development.json` (step 3) — the
+   gameserver container connects with those credentials.
 
 3. For running the GameServer **outside** Docker (e.g. in an IDE), copy the
    template and fill in the same values:
