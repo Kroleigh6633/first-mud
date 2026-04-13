@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "highway-bandit"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 0,
+  "scaled": false,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 1.182,
+    "AvgPlayerHpPct": 0.9913943661971832,
+    "MinPlayerHpPct": 0.8028169014084507,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 0,
+    "DmgP75": 0,
+    "DmgMax": 28,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

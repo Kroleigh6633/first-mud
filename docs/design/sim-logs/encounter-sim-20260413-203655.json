@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "treant"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 3,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 493,
+    "Losses": 7,
+    "Timeouts": 0,
+    "WinRate": 0.986,
+    "LossRate": 0.014,
+    "AvgRounds": 4.492,
+    "AvgPlayerHpPct": 0.5429391766420022,
+    "MinPlayerHpPct": 0.02112676056338028,
+    "DmgMin": 0,
+    "DmgP25": 36,
+    "DmgMedian": 64,
+    "DmgP75": 91,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

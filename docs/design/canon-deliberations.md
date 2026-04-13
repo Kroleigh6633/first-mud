@@ -256,3 +256,92 @@ user direction.
 | Q6 | Sub-region reputation | No — use per-NPC opinion + flags | Yes |
 | Q7 | Event vs. chain rep ownership | (Deferred — chain owns rep, strawman) | — |
 
+## Pass #4 / #5 additions
+
+Three new canon-ambiguous questions surfaced while reconciling the Pass #3
+encounter-balance sweep, the `content/npcs.json` gap, and the Sealed Letter
+`--allow-underflow` non-result.
+
+### Q4 — "Catalogue" as a spoken marker of Gravenguard allegiance
+
+In Pass #1 voice samples, Commander Drest uses **"catalogue"** as an idiolect
+tic. In Pass #5 drafting of Lieutenant Varn (batch 3), Varn is shown
+*borrowing* that tic — the way an understudy borrows a lead's gesture. This
+was a writing choice, not a canon fact.
+
+> Is the word "catalogue" an institutional marker inside the Gravenguard
+> (i.e. anyone who has served under Drest for 3+ years picks it up), or is
+> it private to Drest alone?
+
+**Ruling (conservative): Private to Drest alone. Varn's borrowing of it is
+a *tell* — the speaker is copying a superior they have not earned.**
+
+Rationale: making it an institutional tic trivializes the tell; keeping it
+private makes Varn's mimicry load-bearing for the Sealed Letter chain (an
+observant player notices the borrowed vocabulary and flags Varn early).
+
+**Implications:** Any future Gravenguard NPC voice may not use "catalogue"
+unless they are explicitly Drest-adjacent and drafted as imitating him.
+
+### Q5 — `content/npcs.json` canonical identity keys
+
+Named NPCs appear in quest fixtures (`kesh`, `varn`, `velm`) as *text*, not
+as ids. When `content/npcs.json` lands, each NPC needs a stable
+canonical id for fixture wiring.
+
+> What is the canonical naming convention for NPC ids?
+
+**Ruling (conservative): `hyphen-lowercase` full use-name, matching the
+monsters/zones convention.** Examples: `kesh-of-reed-end`, `lieutenant-varn`,
+`brother-velm`, `solan-drest`, `harken-vos`.
+
+- Titles (Lieutenant, Brother, Commander) are **part of the id** when the
+  character is *canonically* known by title more than first name.
+- Use-names only — no surnames unless canon names them.
+- Ambiguous collisions (two NPCs named "Varn") resolved by zone suffix:
+  `varn-gravenhold` vs `varn-thornwood`.
+
+**Implication:** The Pass #5 voice-batch-3 file uses these ids. Any
+content-migration pass should consume those as-is.
+
+### Q6 — Brother Velm's Thornwood listening habit
+
+Batch 3 drafts Brother Velm (Gravenhold Chapel archivist) as treating a
+Thornwood-leaning player with *more attention, fewer words*, and asks the
+player what the Coven would read an Ardweld glyph as.
+
+> Does the Chapel archive formally or informally consult the Thornwood
+> Coven on Ardweld translations?
+
+**Ruling (conservative): Informally, and exactly one archivist at a time
+— whoever currently holds the position.** Brother Velm is that person now.
+His predecessor consulted with Auld Maerwyn's mother (lore silent on
+whether Maerwyn continues the relationship).
+
+**Implication:** Rhianne Moss is **not** privy to this channel. If the
+player tells Rhianne about it, that's new information, with
+consequences. Flag for a future quest beat.
+
+### Q7 — Tool-gap etiquette when a flag is missing
+
+The Pass #5 runner found that `scenario-player --allow-underflow` is
+silently accepted (the CLI arg-parser discards unknown flags) rather than
+erroring. On the `quest-sealed-letter.json` fixture the `bribe-scribe`
+branch (which needs 25 gold the player doesn't carry) is therefore
+**unreachable in the sim**, and the playthrough silently picks a different
+path.
+
+> Should a design agent proceed with a sim run that silently ignored an
+> unknown CLI flag, or block on a tool-gap sim-log?
+
+**Ruling (conservative): Block. Record the run as a gap, not a result.**
+This cycle records it as a gap in `docs/design/sim-logs/sealed-letter-
+allowunderflow-attempt-20260413.txt` and does *not* promote the default-
+path outcome to the sim-reports catalogue. A future cycle re-runs once
+the flag is wired.
+
+**Implication:** A standing "missing-flag detection" heuristic — a design
+agent running any tool command should first `dotnet run -- <tool> --help`
+or grep the command source for the flag before assuming a result is
+meaningful.
+

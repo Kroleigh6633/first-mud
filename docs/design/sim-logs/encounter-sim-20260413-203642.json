@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "rogue-knight"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 2,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 3.196,
+    "AvgPlayerHpPct": 0.7015492957746489,
+    "MinPlayerHpPct": 0.09859154929577464,
+    "DmgMin": 0,
+    "DmgP25": 28,
+    "DmgMedian": 35,
+    "DmgP75": 62,
+    "DmgMax": 128,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

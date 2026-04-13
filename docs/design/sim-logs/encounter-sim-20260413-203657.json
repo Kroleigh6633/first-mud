@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "elder-stag"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 3,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 328,
+    "Losses": 172,
+    "Timeouts": 0,
+    "WinRate": 0.656,
+    "LossRate": 0.344,
+    "AvgRounds": 4.332,
+    "AvgPlayerHpPct": 0.3546461697011337,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 0,
+    "DmgP25": 84,
+    "DmgMedian": 121,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "balanced"
+  }
+}

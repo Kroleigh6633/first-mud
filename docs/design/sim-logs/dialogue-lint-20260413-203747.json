@@ -1,0 +1,17 @@
+{
+  "NpcId": "harken-vos",
+  "NodeCount": 17,
+  "ReachableCount": 9,
+  "Errors": [],
+  "Warnings": [
+    "Orphan node \u0027check-in\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027check-in-continue\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027turn-in\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027turn-in-varn\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027turn-in-complaint\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027turn-in-close\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027greet-low-rep\u0027 \u2014 not reachable from any root.",
+    "Orphan node \u0027low-rep-claim\u0027 \u2014 not reachable from any root.",
+    "Node \u0027greet\u0027 option \u0027You\u0027ve seen a lot of claims, clerk. Anything strange lately?\u0027 gated by gravenguard\u003E=1000 but best reachable rep here is 0. Ensure an off-tree path grants this reputation."
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "NpcId": "harken",
+  "NodeCount": 6,
+  "ReachableCount": 6,
+  "Errors": [],
+  "Warnings": [
+    "Node \u0027greet\u0027 option \u0027I\u0027m a friend of the wood.\u0027 gated by wytchwood\u003E=25 but best reachable rep here is 0. Ensure an off-tree path grants this reputation."
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "QuestId": "sealed-letter",
+  "Title": "The Sealed Letter",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "On the Gravenmarsh Causeway, Kesh of Reed-End presses a sealed letter and a silver signet into the player\u0027s hand. \u0027Drest. Eyes only. Not Varn. Especially not Varn.\u0027",
+      "AvailableChoices": [
+        "accept: Take the letter and swear by the signet.",
+        "decline: Refuse. \u0027Find another Rider.\u0027"
+      ],
+      "ChosenChoiceId": "accept",
+      "ChosenChoiceText": "Take the letter and swear by the signet.",
+      "Deltas": [
+        "flag\u002B sealed.accepted",
+        "item\u002B sealed-letter x1",
+        "item\u002B silver-signet x1",
+        "rep\u002B gravenguard \u002B150"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "gate-arrival",
+      "Description": "At Gravenhold\u0027s outer gate, Lieutenant Varn intercepts. \u0027The Commander\u0027s schedule is tight. I\u0027ll take that.\u0027 His hand is already out.",
+      "AvailableChoices": [
+        "hand-over: Hand the letter to Varn.",
+        "refuse-varn: Refuse. Push past."
+      ],
+      "ChosenChoiceId": "hand-over",
+      "ChosenChoiceText": "Hand the letter to Varn.",
+      "Deltas": [
+        "item- sealed-letter x1",
+        "flag\u002B varn.intercepted"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "beat-2a-summons",
+      "Description": "A day later: Kesh is found face-down in the bog. \u0027Exposure,\u0027 the bogmen say. Drest summons the player. Calm. Asks what was in the letter the player never delivered.",
+      "AvailableChoices": [
+        "confess: Confess. Varn took it. You didn\u0027t know.",
+        "lie-caught: Lie. Drest catches it (his intent-read assumed)."
+      ],
+      "ChosenChoiceId": "confess",
+      "ChosenChoiceText": "Confess. Varn took it. You didn\u0027t know.",
+      "Deltas": [
+        "rep\u002B gravenguard \u002B100",
+        "flag\u002B varn.flagged"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-confess",
+      "Description": "Drest nods once. \u0027You will be of use.\u0027 Varn is now a marked problem. Chain ends with Varn-treachery seed planted.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "partial-success-varn-seeded"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "sealed.accepted",
+      "varn.flagged",
+      "varn.intercepted"
+    ],
+    "inventory": {
+      "sealed-letter": 0,
+      "silver-signet": 1
+    },
+    "reputation": {
+      "caervorn": 0,
+      "gravenguard": 350,
+      "thornwood": 0
+    }
+  },
+  "FinalOutcome": "partial-success-varn-seeded",
+  "Errors": []
+}

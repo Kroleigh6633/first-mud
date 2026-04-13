@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "sand-wurm"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 8,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 75,
+    "Losses": 425,
+    "Timeouts": 0,
+    "WinRate": 0.15,
+    "LossRate": 0.85,
+    "AvgRounds": 4.8,
+    "AvgPlayerHpPct": 0.17943661971830988,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 44,
+    "DmgP25": 142,
+    "DmgMedian": 142,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "punishing"
+  }
+}

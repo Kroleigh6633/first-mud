@@ -64,6 +64,8 @@ Canon is `lore/*.md` and is read-only from here.
 ### Pass #2 open questions for next cycle
 1. Dialogue-tree v1 schema needs `requiresReputationMax` (or general
    predicate syntax) before NPC low-rep variants can be fixture-linted.
+   **RESOLVED in Pass #5** — `requiresReputationMax` is wired through
+   `DialogueLinter` and accepted on fixture nodes.
 2. Commission token as arc-scoped state: where does that live in world-state?
 3. Season / day-count calendar: what is the canonical year length?
    `world-events.md` assumes ~365 days with day 200 as first frost; canon
@@ -114,3 +116,45 @@ Canon is `lore/*.md` and is read-only from here.
    schema-tool parity gap. Real warnings (8 orphans) only surface when
    re-entry nodes are explicitly listed in `roots[]` — until the lint
    tool grows multi-root inference from `requires*` fields.
+## Pass #5 additions
+
+| Title | Status | Canon Files Touched (read-only) | Outstanding Questions |
+|---|---|---|---|
+| `sim-reports/encounter-balance-pass3.md` | ready | combat, world-aeldran | Verify with a 3-companion party (not solo lvl-5); repeat against gravenmarsh/swamp pool. |
+| `encounter-stat-tweaks-proposal.md` | draft | combat, world-aeldran | Needs curve-designer review before content edits. |
+| `tapers-content-proposal.md` | ready | magic-system, economy-and-crafting | 7th "Sealed" taper for Compact? Qualities inline vs split file? |
+| `npc-voices-batch3.md` | draft | factions, reputation | Q4-Q6 in canon-deliberations pending user ruling. |
+| `canon-deliberations.md` (Q4–Q7 added) | draft | — | Four new rulings awaiting user overrule. |
+
+### Pass #5 run log (2026-04-13, agent-a31a7ab9)
+
+- Re-ran encounter-balance Pass #3 for real against `--danger-level`.
+  Report `sim-reports/encounter-balance-pass3.md` supersedes the Pass #4
+  provisional.
+- Drafted `encounter-stat-tweaks-proposal.md` — concrete monster-level
+  tweaks for portmere + starting-road (missing `balanced`), and the
+  ashen-reach tier-2+ cliff.
+- Verified `dialogue-lint` accepts `requiresReputationMax`. Fixed the
+  Harken Vos fixture `roots` to surface all 17 nodes; lint returns
+  clean (only intended high-rep warning).
+- Verified `scenario-player --allow-underflow` is **not wired**
+  (worktree predates that merge). Sealed-letter bribe-scribe branch
+  remains unreachable; recorded as gap.
+- Drafted `content/tapers.json` shape — 6-entry migration, inline
+  qualities, no existing recipe edits needed.
+- Drafted voice samples for Kesh, Varn, Brother Velm (batch 3); all
+  three were referenced in `quest-sealed-letter.json` without a voice.
+- Added canon Q4 (catalogue-as-tell), Q5 (npc-id convention),
+  Q6 (Chapel↔Thornwood channel), Q7 (tool-gap etiquette) with
+  conservative rulings.
+
+### Pass #5 open questions for next cycle
+1. Missing `--allow-underflow` in `scenario-player` blocks the
+   bribe-scribe exploration on Sealed Letter. Wire it or document that
+   the `removeItem` op soft-fails on underflow.
+2. `content/npcs.json` still not in tree. Voice batches 1+2+3 are all
+   drafted and waiting for the catalogue to land so they can be
+   cross-linked.
+3. Solo-lvl-5 Aether baseline for encounter-sim may over-estimate zone
+   difficulty. Re-run pass #3 with a canonical 3-companion party once
+   such a party is specced.

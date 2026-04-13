@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "thornwood-guardian"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 3,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 358,
+    "Losses": 142,
+    "Timeouts": 0,
+    "WinRate": 0.716,
+    "LossRate": 0.284,
+    "AvgRounds": 5.254,
+    "AvgPlayerHpPct": 0.3640333621842789,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 0,
+    "DmgP25": 75,
+    "DmgMedian": 109,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "balanced"
+  }
+}

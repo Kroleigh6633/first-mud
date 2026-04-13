@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "wandering-ogre"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 1,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 499,
+    "Losses": 1,
+    "Timeouts": 0,
+    "WinRate": 0.998,
+    "LossRate": 0.002,
+    "AvgRounds": 3.458,
+    "AvgPlayerHpPct": 0.6957012616782856,
+    "MinPlayerHpPct": 0.176056338028169,
+    "DmgMin": 0,
+    "DmgP25": 27,
+    "DmgMedian": 46,
+    "DmgP75": 58,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

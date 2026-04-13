@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "ember-drake"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 8,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 0,
+    "Losses": 500,
+    "Timeouts": 0,
+    "WinRate": 0,
+    "LossRate": 1,
+    "AvgRounds": 3.28,
+    "AvgPlayerHpPct": 0,
+    "MinPlayerHpPct": 0,
+    "DmgMin": 142,
+    "DmgP25": 142,
+    "DmgMedian": 142,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "punishing"
+  }
+}
