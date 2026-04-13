@@ -73,6 +73,28 @@ public interface IContentProvider
     /// <summary>All monsters in a given biome + tier (0-3).</summary>
     IReadOnlyList<MonsterDefinition> MonstersByBiomeAndTier(string biome, int tier);
 
+    // ─── Loot Tables ─────────────────────────────────────────────────────────
+
+    /// <summary>Complete loot-table data block.</summary>
+    LootTablesDefinition LootTables { get; }
+
+    /// <summary>Drop pool lookup by id, or null if unknown.</summary>
+    DropPoolDefinition? GetDropPool(string id);
+
+    /// <summary>All drop pools, in file order.</summary>
+    IReadOnlyList<DropPoolDefinition> AllDropPools();
+
+    /// <summary>
+    /// Returns the monster-drop mapping for <paramref name="monsterId"/>, or
+    /// null if none. Current first-mud loot is biome-keyed — this will return
+    /// null until monster ids stabilise, but the contract exists so callers
+    /// can migrate in-place.
+    /// </summary>
+    MonsterDropDefinition? GetMonsterDrop(string monsterId);
+
+    /// <summary>Tier/workmanship curve row, or null if tier out of range.</summary>
+    TierCurveDefinition? GetTierCurve(int tier);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>
