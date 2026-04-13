@@ -1,7 +1,7 @@
 {
   "$schema": "dialogue-tree/v1",
   "npcId": "harken-vos",
-  "roots": ["greet"],
+  "roots": ["greet", "greet-low-rep", "check-in", "turn-in"],
   "startingReputation": { "gravenguard": 0 },
   "nodes": [
     {

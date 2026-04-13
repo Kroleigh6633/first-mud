@@ -1,0 +1,66 @@
+{
+  "$schema": "world-event/v1",
+  "id": "seed-conversion-thenna",
+  "title": "The Seed-Conversion Attempt — Thenna Orys",
+  "family": "faction-long-arc",
+  "priority": 2,
+  "trigger": {
+    "type": "all",
+    "of": [
+      { "type": "questCompletion", "questId": "compact-introduction", "beatId": "any", "anyBranch": true, "delayDays": 30 },
+      { "type": "repThreshold", "faction": "compact", "minTier": "known", "withinDays": 60 }
+    ],
+    "comment": "30 days after first Compact contact AND player still touched-in with Compact. Canon-deliberations Q3 conservative ruling: target is adolescent, not child."
+  },
+  "duration": { "ticks": 5 },
+  "concurrencyKey": "ashen-arc",
+  "playerInterceptable": true,
+  "interceptionWindow": {
+    "openingHint": {
+      "npcId": "auld-maerwyn",
+      "lineId": "thinking-girl",
+      "deliveredOnTickOffset": 0
+    },
+    "successConditions": [
+      { "type": "playerVisitsZone", "zoneId": "compact-house", "withinTicks": 5 },
+      { "type": "dialogueCompleted", "npcId": "thenna-orys", "treeId": "thenna-intercept", "endingId": "rescue" }
+    ],
+    "onSuccess": [
+      { "type": "setFlag", "key": "thenna.intercepted", "value": true },
+      { "type": "setFlag", "key": "thenna.protected.thornwood", "value": true },
+      { "type": "addReputation", "faction": "thornwood", "amount": 150 },
+      { "type": "addReputation", "faction": "compact",   "amount": 50 },
+      { "type": "addReputation", "faction": "ashen",     "amount": -200 },
+      { "type": "spawn", "npcId": "thenna-orys", "zoneId": "thornwood-verge", "lifetimeTicks": null, "voiceProfile": "wary-recovering" }
+    ],
+    "onFailure": [
+      { "type": "setFlag", "key": "thenna.converted", "value": true },
+      { "type": "addReputation", "faction": "ashen", "amount": 100 },
+      { "type": "spawn", "npcId": "thenna-orys", "zoneId": "ashen-reach-periphery", "lifetimeTicks": null, "voiceProfile": "ashen-agent" },
+      { "type": "setNpcFlag", "npcId": "halven-orys", "flag": "grief.thenna", "value": true }
+    ]
+  },
+  "effects": {
+    "worldState": [
+      { "type": "setFlag", "key": "seedConversion.thenna.active", "value": true }
+    ],
+    "npcDialogueFlags": [
+      { "type": "setNpcFlag", "npcId": "halven-orys",  "flag": "unusuallyGenerous",  "value": true },
+      { "type": "setNpcFlag", "npcId": "auld-maerwyn", "flag": "thinking-girl-line", "value": true }
+    ],
+    "zoneAmbient": [],
+    "shopStock": [],
+    "npcAvailability": [
+      { "type": "spawn", "npcId": "thenna-orys", "zoneId": "compact-house", "lifetimeTicks": 5, "voiceProfile": "dream-fragmented" }
+    ]
+  },
+  "onResolve": [
+    { "type": "clearFlag", "key": "seedConversion.thenna.active" },
+    { "type": "setNpcFlag", "npcId": "halven-orys",  "flag": "unusuallyGenerous",  "value": false },
+    { "type": "setNpcFlag", "npcId": "auld-maerwyn", "flag": "thinking-girl-line", "value": false },
+    { "type": "despawn", "npcId": "thenna-orys", "zoneId": "compact-house",
+      "guardFlag": "thenna.intercepted | thenna.converted",
+      "comment": "If neither outcome flag set, the despawn IS the failure trigger — fall through to interceptionWindow.onFailure." }
+  ],
+  "exclusiveWith": []
+}

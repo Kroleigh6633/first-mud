@@ -1,0 +1,158 @@
+{
+  "$schema": "quest-chain/v1",
+  "id": "chain4-thinking-girl",
+  "title": "The Thinking Girl",
+  "description": "Auld Maerwyn pulls the player into the 5-day Seed-Conversion event window targeting Thenna Orys. Hooks into world-event 'seed-conversion-thenna' (see fixtures/event-seed-conversion.json). Soft-fails to end-too-late if the world-event window closes before Beat 4 resolves — modeled here via the seedConversion.thenna.active flag, which the world-event scheduler clears on cleanup.",
+  "startState": {
+    "player": "trusted-rider",
+    "flags": ["seedConversion.thenna.active"],
+    "inventory": [],
+    "reputation": { "compact": 200, "thornwood": 200, "ashen": 0, "caervorn": 0, "gravenguard": 100 }
+  },
+  "root": "intro-maerwyn",
+  "beats": [
+    {
+      "id": "intro-maerwyn",
+      "description": "Auld Maerwyn at the Verge edge: 'There's a girl thinking in the Compact house. Thinking at the wrong frequency. Go listen.'",
+      "choices": [
+        {
+          "id": "engage",
+          "text": "Take the hint. Ride for the Compact house.",
+          "next": "compact-house",
+          "effects": [
+            { "type": "setFlag", "key": "chain4.engaged", "amount": 0 }
+          ]
+        },
+        {
+          "id": "refuse",
+          "text": "Decline. 'Not my line.'",
+          "next": "end-uninvolved"
+        }
+      ]
+    },
+    {
+      "id": "compact-house",
+      "description": "The Compact house in Eastmile. Halven Orys is in the courtyard. Two ways in.",
+      "requires": { "flags": ["seedConversion.thenna.active", "chain4.engaged"] },
+      "choices": [
+        {
+          "id": "ask-halven",
+          "text": "Ask Halven for an introduction (social).",
+          "next": "listen",
+          "effects": [
+            { "type": "setFlag", "key": "thenna.met", "amount": 0 }
+          ]
+        },
+        {
+          "id": "side-door",
+          "text": "Slip in the side door (covert, -25 Compact).",
+          "next": "listen",
+          "effects": [
+            { "type": "setFlag", "key": "thenna.met", "amount": 0 },
+            { "type": "setFlag", "key": "chain4.covert", "amount": 0 },
+            { "type": "addReputation", "key": "compact", "amount": -25 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "listen",
+      "description": "Thenna Orys, 17, sits by the window. She speaks in dream-fragments — names a handler ('Calix'), describes a route, calls it 'remembering.'",
+      "requires": { "flags": ["seedConversion.thenna.active", "thenna.met"] },
+      "choices": [
+        {
+          "id": "extract-good-intel",
+          "text": "Listen carefully. Extract two of three facts.",
+          "next": "choice",
+          "effects": [
+            { "type": "setFlag", "key": "chain4.intelGood", "amount": 0 }
+          ]
+        },
+        {
+          "id": "rush",
+          "text": "Cut the conversation short.",
+          "next": "choice"
+        }
+      ]
+    },
+    {
+      "id": "choice",
+      "description": "Thenna's route is real. She walks it tonight unless someone stops her. Three options.",
+      "requires": { "flags": ["seedConversion.thenna.active", "thenna.met"] },
+      "choices": [
+        {
+          "id": "walk-out-verge",
+          "text": "Walk her to the Verge for Thornwood placement (requires good intel).",
+          "next": "end-rescue",
+          "effects": [
+            { "type": "setFlag", "key": "thenna.protected.thornwood", "amount": 0 },
+            { "type": "addReputation", "key": "thornwood", "amount": 150 },
+            { "type": "addReputation", "key": "compact", "amount": 50 },
+            { "type": "addReputation", "key": "ashen", "amount": -200 }
+          ]
+        },
+        {
+          "id": "ambush-calix",
+          "text": "Ambush Calix on the route (combat — Aether-aligned rare encounter).",
+          "next": "end-handler-broken",
+          "effects": [
+            { "type": "setFlag", "key": "thenna.contact.severed", "amount": 0 },
+            { "type": "addItem", "key": "ashen-passphrase-token", "amount": 1 },
+            { "type": "addReputation", "key": "caervorn", "amount": 100 },
+            { "type": "addReputation", "key": "gravenguard", "amount": 200 },
+            { "type": "addReputation", "key": "ashen", "amount": -100 }
+          ]
+        },
+        {
+          "id": "tell-halven",
+          "text": "Tell Halven the truth (requires good intel).",
+          "next": "end-compact-shielded",
+          "effects": [
+            { "type": "setFlag", "key": "thenna.compact.south", "amount": 0 },
+            { "type": "addReputation", "key": "compact", "amount": 200 },
+            { "type": "addReputation", "key": "thornwood", "amount": -100 }
+          ]
+        },
+        {
+          "id": "stall",
+          "text": "Hesitate. (If the window closes here, the chain soft-fails.)",
+          "next": "end-too-late",
+          "effects": [
+            { "type": "setFlag", "key": "thenna.converted", "amount": 0 },
+            { "type": "addReputation", "key": "ashen", "amount": 100 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "end-rescue",
+      "description": "The Singing Brook accepts her. Maerwyn nods. 'Good. Tea.' Permanent +100 Thornwood floor.",
+      "terminal": true,
+      "outcome": "success-rescue"
+    },
+    {
+      "id": "end-handler-broken",
+      "description": "Calix bleeds into the road. Thenna is rattled but home. Drest hears about it. Maerwyn: 'Good. Tea? — but the dark leaf today.'",
+      "terminal": true,
+      "outcome": "success-handler-broken"
+    },
+    {
+      "id": "end-compact-shielded",
+      "description": "Halven sends Thenna south under escort. Compact closes ranks. Maerwyn is bitter; the Reach is bemused.",
+      "terminal": true,
+      "outcome": "success-compact-shielded"
+    },
+    {
+      "id": "end-too-late",
+      "description": "The window closes. Thenna walks her route. Three ticks later Halven appears in mourning at the Bent Mare. Maerwyn does not appear.",
+      "terminal": true,
+      "outcome": "soft-fail-too-late"
+    },
+    {
+      "id": "end-uninvolved",
+      "description": "Player declined. The world-event runs to its failure terminal off-screen. Halven is generous-and-empty for one tick.",
+      "terminal": true,
+      "outcome": "soft-fail-uninvolved"
+    }
+  ]
+}
