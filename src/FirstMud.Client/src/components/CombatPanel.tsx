@@ -132,7 +132,7 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
   // Auto-combat: fire whenever combat state changes and it's the player's turn.
   // Watches the entire combat object so the effect re-triggers on every
   // CombatUpdate — including after enemy turns that land back on the player
-  // with the same currentActorId. The 300ms timeout + cleanup prevents
+  // with the same currentActorId. The 800ms timeout + cleanup prevents
   // double-firing if the component re-renders mid-delay.
   useEffect(() => {
     if (!autoCombat || !isPlayerTurn || isOver) return;
@@ -166,7 +166,7 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
         abilityName: chosenAbility.name,
         targetId: chosenTargetId,
       });
-    }, 300);
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [autoCombat, isPlayerTurn, isOver, combat]);

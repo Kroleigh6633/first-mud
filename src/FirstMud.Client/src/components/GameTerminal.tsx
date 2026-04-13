@@ -161,6 +161,11 @@ export default function GameTerminal({
   const autoQuestPhaseRef = useRef<'idle' | 'accept' | 'navigate' | 'interact'>('idle');
   // How many ticks we have been in 'accept' phase waiting for a waypoint
   const acceptWaitTicksRef = useRef(0);
+  // Set to true when an Error message arrives while in the 'interact' phase —
+  // tells the runner the quest failed (e.g. missing item) rather than completed.
+  const autoQuestInteractFailedRef = useRef(false);
+  // Set of quest indices that were skipped this run (incomplete, not failed permanently)
+  const autoQuestSkippedIndicesRef = useRef<Set<number>>(new Set());
 
   // Use refs for values that the key handler reads but should NOT
   // cause the effect to re-fire when they change. This prevents the
@@ -176,6 +181,12 @@ export default function GameTerminal({
   atHomesteadRef.current = atHomestead;
   const autoFarmRef = useRef(autoFarmStatus);
   autoFarmRef.current = autoFarmStatus;
+  const combatRef = useRef(combat);
+  // Track the previous combat value so we can detect the moment combat ends
+  const prevCombatRef = useRef(combat);
+  // Timestamp (ms) after which post-combat pause is over
+  const combatEndResumeAtRef = useRef<number>(0);
+  combatRef.current = combat;
   const currentTileRef = useRef(currentTile);
   currentTileRef.current = currentTile;
   const questWaypointRef = useRef(questWaypoint);
@@ -631,6 +642,23 @@ export default function GameTerminal({
 
       if (!player) {
         console.log('[autoquest tick] No player state yet — waiting');
+        return;
+      }
+
+      // ── Pause during combat and briefly after ──────────────────────
+      // Detect the moment combat ends: prev was non-null, now null
+      if (prevCombatRef.current !== null && combatRef.current === null) {
+        // Combat just ended — give the player 2 s to see the outcome screen
+        combatEndResumeAtRef.current = Date.now() + 2000;
+      }
+      prevCombatRef.current = combatRef.current;
+
+      if (combatRef.current !== null) {
+        // In combat — wait for it to finish before navigating
+        return;
+      }
+      if (Date.now() < combatEndResumeAtRef.current) {
+        // Short post-combat pause so the victory/defeat screen is visible
         return;
       }
 

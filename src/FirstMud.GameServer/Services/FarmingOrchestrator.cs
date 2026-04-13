@@ -1018,7 +1018,7 @@ public class FarmingOrchestrator(
                                 encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
                                 var healDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText);
                                 await hubContext.Clients.Group(playerId.ToString()).SendAsync("CombatUpdate", healDto, farmCt);
-                                await Task.Delay(500, farmCt);
+                                await Task.Delay(800, farmCt);
                                 continue;
                             }
                         }
@@ -1066,7 +1066,7 @@ public class FarmingOrchestrator(
                     await hubContext.Clients
                         .Group(playerId.ToString())
                         .SendAsync("CombatUpdate", actionDto, farmCt);
-                    await Task.Delay(500, farmCt);
+                    await Task.Delay(800, farmCt);
                 }
 
                 // Broadcast final encounter state
