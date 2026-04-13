@@ -5,6 +5,7 @@ using FirstMud.DesignTools.Tools.EncounterSim;
 using FirstMud.DesignTools.Tools.ProgressionSim;
 using FirstMud.DesignTools.Tools.FactionState;
 using FirstMud.DesignTools.Tools.ScenarioPlayer;
+using FirstMud.DesignTools.Tools.PlaybookRunner;
 
 namespace FirstMud.DesignTools;
 
@@ -31,6 +32,7 @@ public static class Program
                 "encounter-sim"   => EncounterSimCommand.Run(rest),
                 "economy-sim"     => EconomySimCommand.Run(rest),
                 "progression-sim" => ProgressionSimCommand.Run(rest),
+                "playbook-runner" => PlaybookRunnerCommand.Run(rest),
                 _                 => Unknown(command),
             };
         }
@@ -60,6 +62,7 @@ public static class Program
         Console.WriteLine("  encounter-sim     Simulate combat rolls.               [FULL]");
         Console.WriteLine("  economy-sim       Simulate N hours of play.            [scaffold]");
         Console.WriteLine("  progression-sim   Full progression curve sim.          [FULL]");
+        Console.WriteLine("  playbook-runner   Run a balance playbook.              [FULL]");
         Console.WriteLine();
         Console.WriteLine("Each tool writes JSON + markdown under docs/design/sim-logs/.");
     }

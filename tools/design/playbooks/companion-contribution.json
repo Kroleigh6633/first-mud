@@ -1,0 +1,39 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "companion-contribution",
+  "displayName": "Companion contribution",
+  "description": "Player (no gear/imbue proxy) + N companions at layer L. When do extra party slots keep a player alive that gear/level alone can't?",
+  "holdouts": {
+    "playerLevel": 5,
+    "playerElement": "Aether"
+  },
+  "axes": [
+    { "name": "companionCount", "values": [0, 1, 2, 3] },
+    { "name": "companionLayer", "values": [1, 3, 5] },
+    { "name": "dangerLevel",    "values": [3, 6, 9] }
+  ],
+  "rolls": 100,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 3, "expected": "balanced" },
+      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 6, "expected": "hard" },
+      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 9, "expected": "punishing" },
+
+      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 3, "expected": "easy" },
+      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 6, "expected": "balanced" },
+      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 9, "expected": "hard" },
+
+      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 3, "expected": "trivial" },
+      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 6, "expected": "easy" },
+      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 9, "expected": "balanced" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

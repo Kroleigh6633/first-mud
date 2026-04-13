@@ -17,11 +17,47 @@ tools/design/
       FactionState/                # scaffold + README
       EncounterSim/                # scaffold + README
       EconomySim/                  # scaffold + README
+      PlaybookRunner/              # FULL — balance harness
   FirstMud.DesignTools.Tests/
+  playbooks/                       # canonical balance scenarios (JSON)
+  schemas/                         # playbook.schema.json
   fixtures/
     quest-sample.json
     dialogue-sample.json
 ```
+
+## playbook-runner — balance harness
+
+The harness the creative agent runs every cycle. Replaces one-off rebalance
+agents with a library of canonical playbooks. Each playbook fixes some
+variables (holdouts) and sweeps others (axes), running `CombatSimulationService`
+for every cell in the grid and classifying each into a viability band. Cells
+whose actual band differs from the playbook's expected band are flagged as
+DIVERGENT — those are the cells the agent investigates.
+
+```bash
+dotnet run --project FirstMud.DesignTools -- playbook-runner --playbook full-party
+dotnet run --project FirstMud.DesignTools -- playbook-runner --playbook gear-only --seed 99
+dotnet run --project FirstMud.DesignTools -- playbook-runner --playbook full-party \
+    --compare-to ../../docs/design/sim-logs/playbook-runner-20260413-120000.json
+```
+
+Seed playbooks under `tools/design/playbooks/`:
+
+| id                        | expected curve (one-liner) |
+|---------------------------|----------------------------|
+| `nude-character`          | Viable at low danger only; falls off fast above danger 3. |
+| `gear-only`               | Tier ≈ danger keeps fights balanced; +2 eff. levels / tier. |
+| `imbue-only`              | Imbues add ~1–2 effective tiers on top of a tier-3 gear baseline. |
+| `companion-contribution`  | Extra party slots rescue HP budgets that gear alone can't. |
+| `full-party`              | Regression baseline: mid-game loadout vs dangerLevel 0–10. |
+
+Exit codes: `0`=all on-band, `1`=arg error, `2`=load error, `3`=one or more cells diverged.
+
+> **Proxy note.** Gear and imbue systems don't yet exist in
+> `CombatSimulationService`, so `gearTier` and `imbueLevel` axes are implemented
+> as player-level boosts (+2 / tier, +1 / imbue). Swap to real stats once the
+> gear/imbue systems land; the playbooks themselves won't change.
 
 ## Build & run
 
@@ -37,6 +73,7 @@ dotnet run --project FirstMud.DesignTools -- dialogue-lint
 dotnet run --project FirstMud.DesignTools -- faction-state --at Q3.after-harken
 dotnet run --project FirstMud.DesignTools -- encounter-sim --monster timber-wolf --party 2:Fire,3:Water --rolls 1000 --player-level 5 --player-element Fire --seed 42
 dotnet run --project FirstMud.DesignTools -- economy-sim --hours 48 --scenario farming
+dotnet run --project FirstMud.DesignTools -- playbook-runner --playbook full-party
 ```
 
 ## Commands
