@@ -86,6 +86,7 @@ export interface GameStateResult {
   lastSmeltResult: SmeltCompleteEvent | null;
   questWaypoint: QuestWaypoint | null;
   questProgress: QuestProgressMap;
+  completedQuestIds: string[];
   cityView: CityViewSnapshot | null;
 }
 
@@ -113,6 +114,7 @@ export function useGameState(): GameStateResult {
   const [lastSmeltResult, setLastSmeltResult] = useState<SmeltCompleteEvent | null>(null);
   const [questWaypoint, setQuestWaypoint] = useState<QuestWaypoint | null>(null);
   const [questProgress, setQuestProgress] = useState<QuestProgressMap>({});
+  const [completedQuestIds, setCompletedQuestIds] = useState<string[]>([]);
   const [cityView, setCityView] = useState<CityViewSnapshot | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
@@ -264,6 +266,9 @@ export function useGameState(): GameStateResult {
             delete next[result.questId!];
             return next;
           });
+          // Track completed quest ids so the auto-quest runner can evaluate
+          // `requires.priorQuests` preconditions on the next selection pass.
+          setCompletedQuestIds(prev => prev.includes(result.questId!) ? prev : [...prev, result.questId!]);
         }
       });
 
@@ -609,6 +614,7 @@ export function useGameState(): GameStateResult {
     lastSmeltResult,
     questWaypoint,
     questProgress,
+    completedQuestIds,
     cityView,
   };
 }

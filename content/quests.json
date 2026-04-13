@@ -23,7 +23,8 @@
       "reputationReward": 300,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": false,
-      "startingZoneId": "aeldran-1-caervorn-highlands"
+      "startingZoneId": "aeldran-1-caervorn-highlands",
+      "requires": { "priorQuests": ["RIDER_001"] }
     },
     {
       "questId": "RIDER_002b",
@@ -35,7 +36,8 @@
       "reputationReward": 300,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": false,
-      "startingZoneId": "aeldran-2-thornwood"
+      "startingZoneId": "aeldran-2-thornwood",
+      "requires": { "priorQuests": ["RIDER_001"] }
     },
     {
       "questId": "THORN_001",
@@ -59,7 +61,8 @@
       "reputationReward": 400,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": false,
-      "startingZoneId": "aeldran-2-thornwood"
+      "startingZoneId": "aeldran-2-thornwood",
+      "requires": { "priorQuests": ["THORN_001"] }
     },
     {
       "questId": "THORN_003",
@@ -71,7 +74,8 @@
       "reputationReward": 600,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": false,
-      "startingZoneId": "aeldran-2-thornwood"
+      "startingZoneId": "aeldran-2-thornwood",
+      "requires": { "priorQuests": ["THORN_002"] }
     },
     {
       "questId": "THORN_004",
@@ -83,7 +87,8 @@
       "reputationReward": 800,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": true,
-      "startingZoneId": "aeldran-2-thornwood"
+      "startingZoneId": "aeldran-2-thornwood",
+      "requires": { "priorQuests": ["THORN_003"] }
     },
     {
       "questId": "GRAVE_001",
@@ -107,7 +112,8 @@
       "reputationReward": 600,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": false,
-      "startingZoneId": "aeldran-8-gravenhold"
+      "startingZoneId": "aeldran-8-gravenhold",
+      "requires": { "priorQuests": ["GRAVE_001"] }
     },
     {
       "questId": "GRAVE_003",
@@ -119,7 +125,8 @@
       "reputationReward": 900,
       "possibleOutcomes": ["revealed", "buried"],
       "isWyrdQuest": true,
-      "startingZoneId": "aeldran-8-gravenhold"
+      "startingZoneId": "aeldran-8-gravenhold",
+      "requires": { "priorQuests": ["GRAVE_002"] }
     },
     {
       "questId": "FAIR_001",
@@ -143,7 +150,8 @@
       "reputationReward": 450,
       "possibleOutcomes": ["completed"],
       "isWyrdQuest": false,
-      "startingZoneId": "aeldran-5-drowned-coast"
+      "startingZoneId": "aeldran-5-drowned-coast",
+      "requires": { "priorQuests": ["FAIR_001"] }
     },
     {
       "questId": "ASHEN_001",

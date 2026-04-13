@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | creative-pass-7 | ready-to-merge | content-layer-pilot | Creative pass #7: playbook balance sweep + combat-curves tune + playbook spec rewrites | - | content/combat-curves.json, tools/design/playbooks, docs/design, tests/FirstMud.Tests | 2026-04-13 |
+| worktree-agent-a9a66dad | ready-to-merge | 0feeca2 | Quest preconditions: requires schema, server-side accept block, client eligibility filter | - | content/quests.json, content/schemas/quests.schema.json, src/FirstMud.Application, src/FirstMud.GameServer, src/FirstMud.Infrastructure, src/FirstMud.Domain, src/FirstMud.Client, tests | 2026-04-13 |
 <!-- agents add rows above this line -->

@@ -46,6 +46,7 @@ interface Props {
   lastSmeltResult?: SmeltCompleteEvent | null;
   questWaypoint?: QuestWaypoint | null;
   questProgress?: QuestProgressMap;
+  completedQuestIds?: string[];
   cityView?: CityViewSnapshot | null;
 }
 
@@ -68,6 +69,55 @@ function findTileAt(tiles: ZoneTile[], x: number, y: number): ZoneTile | null {
     }
   }
   return best;
+}
+
+/**
+ * Auto-quest precondition gate. Returns true when the player satisfies every
+ * sub-requirement authored in `content/quests.json → quests[].requires`.
+ *
+ * Runs client-side in the `selecting` phase so the auto-quest runner never
+ * accepts a quest it cannot finish. The server enforces the same gate in
+ * AcceptQuestCommandHandler as a safety net — this filter exists so the
+ * runner can SKIP rather than attempt-and-fail.
+ *
+ * A missing/empty `requires` block means the quest has no preconditions and
+ * is always eligible (backward-compatible for every pre-existing quest and
+ * every DM-generated procgen quest, which never carries `requires`).
+ *
+ * Note on reputation: the client only carries `factionTiers` (tier strings),
+ * not raw reputation points, so numeric reputation gates are deferred to the
+ * server. The runner treats rep-gated quests as eligible here; if the server
+ * rejects accept, the per-quest skip path handles the no-op cleanly.
+ *
+ * Flags: there is no player-side flag registry yet. Flag requirements are
+ * treated as satisfied until one lands, matching the server behavior.
+ */
+function isQuestEligible(
+  q: QuestNode,
+  inv: InventorySnapshot | null,
+  completedQuestIds: string[],
+): boolean {
+  const req = q.requires;
+  if (!req) return true;
+
+  if (req.items && req.items.length > 0) {
+    const items = inv?.items ?? [];
+    for (const need of req.items) {
+      const held = items
+        .filter(i => i.name.toLowerCase() === need.name.toLowerCase())
+        .reduce((sum, i) => sum + (i.isStackable ? (i.quantity ?? 1) : 1), 0);
+      if (held < need.quantity) return false;
+    }
+  }
+
+  if (req.priorQuests && req.priorQuests.length > 0) {
+    const completed = new Set(completedQuestIds);
+    for (const prior of req.priorQuests) {
+      if (!completed.has(prior)) return false;
+    }
+  }
+
+  return true;
 }
 
 // Simple step-toward-waypoint helper used by auto-navigate
@@ -191,6 +241,7 @@ export default function GameTerminal({
   lastSmeltResult = null,
   questWaypoint = null,
   questProgress = {},
+  completedQuestIds = [],
   cityView = null,
 }: Props) {
   const commands = useGameCommands(sendCommand);
@@ -332,6 +383,10 @@ export default function GameTerminal({
   questProgressRef.current = questProgress;
   const availableQuestsRef = useRef(availableQuests);
   availableQuestsRef.current = availableQuests;
+  const completedQuestIdsRef = useRef(completedQuestIds);
+  completedQuestIdsRef.current = completedQuestIds;
+  const inventoryRef = useRef(inventory);
+  inventoryRef.current = inventory;
   const autoQuestActiveRef = useRef(autoQuestActive);
   autoQuestActiveRef.current = autoQuestActive;
   const autoQuestIndexRef = useRef(autoQuestIndex);
@@ -812,7 +867,14 @@ export default function GameTerminal({
     // Sort: taken quests first, then by rep reward desc.
     // Per-quest path danger is checked live when the waypoint arrives.
     const quests = availableQuestsRef.current;
-    const ordered = [...quests].sort((a, b) => {
+    // Precondition filter (selecting phase): drop quests whose `requires`
+    // block cannot be satisfied by current player state. A quest already
+    // accepted (isTaken) is kept regardless — the server already blessed
+    // it and backing out mid-chain is worse than attempting completion.
+    const eligible = quests.filter(
+      q => q.isTaken || isQuestEligible(q, inventoryRef.current, completedQuestIdsRef.current),
+    );
+    const ordered = [...eligible].sort((a, b) => {
       if (a.isTaken && !b.isTaken) return -1;
       if (!a.isTaken && b.isTaken) return 1;
       return b.reputationReward - a.reputationReward;
@@ -828,7 +890,14 @@ export default function GameTerminal({
       // terrain, danger cap, missing prereqs, interact failure, etc.), we
       // do NOT silently transition to farm. The user needs to see that
       // their auto-quest loop is stuck so they can intervene.
-      const allSkipped = totalQuests > 0 && skippedCount >= totalQuests;
+      //
+      // Also treated as "no actionable": there WERE quests on the board but
+      // every single one failed the precondition gate (filtered out above).
+      // Without this, an all-ineligible pass would silently drop into auto-
+      // farm forever, which is indistinguishable from "the world has no
+      // quests today" and hides the real problem.
+      const allFilteredByPreconditions = quests.length > 0 && ordered.length === 0;
+      const allSkipped = (totalQuests > 0 && skippedCount >= totalQuests) || allFilteredByPreconditions;
       autoQuestSkippedIndicesRef.current = new Set();
 
       if (allSkipped) {

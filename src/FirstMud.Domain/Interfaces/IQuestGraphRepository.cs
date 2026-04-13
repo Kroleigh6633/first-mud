@@ -17,6 +17,13 @@ public interface IQuestGraphRepository
     /// to the quest — regardless of the takenByAi flag.
     /// </summary>
     Task<bool> IsQuestInProgressAsync(Guid playerId, string questId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns true when the player has a COMPLETED relationship to the quest.
+    /// Used by the precondition gate to validate <c>requires.priorQuests</c>
+    /// before allowing quest acceptance.
+    /// </summary>
+    Task<bool> HasCompletedQuestAsync(Guid playerId, string questId, CancellationToken cancellationToken = default);
 }
 
 public record QuestNode(

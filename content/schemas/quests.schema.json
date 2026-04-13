@@ -31,6 +31,29 @@
           "isWyrdQuest": { "type": "boolean" },
           "startingZoneId": { "type": ["string", "null"] },
           "prerequisites": { "type": "array", "items": { "type": "string" } },
+          "requires": {
+            "type": "object",
+            "description": "Precondition gate: player must satisfy ALL listed items, flags, reputation, and priorQuests before the quest can be accepted or completed.",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "quantity": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              },
+              "flags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+              "reputation": {
+                "type": "object",
+                "additionalProperties": { "type": "integer" }
+              },
+              "priorQuests": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          },
           "rewards": {
             "type": "array",
             "items": {

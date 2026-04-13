@@ -1916,6 +1916,64 @@ public sealed class ContentProvider : IContentProvider
                 }
             }
 
+            // Requires block: optional. Shape-validated here; priorQuests
+            // cross-ref validated in the second pass (after all ids are known).
+            QuestRequirementsDefinition? requires = null;
+            if (raw.Requires is not null)
+            {
+                var reqItems = new List<QuestRequiredItem>();
+                if (raw.Requires.Items is not null)
+                {
+                    foreach (var it in raw.Requires.Items)
+                    {
+                        if (string.IsNullOrWhiteSpace(it.Name))
+                            throw new InvalidDataException(
+                                $"{path}: quest '{raw.QuestId}' requires.items has an entry with empty name.");
+                        if (it.Quantity < 1)
+                            throw new InvalidDataException(
+                                $"{path}: quest '{raw.QuestId}' requires.items '{it.Name}' quantity must be >= 1.");
+                        reqItems.Add(new QuestRequiredItem(it.Name, it.Quantity));
+                    }
+                }
+
+                var reqFlags = new List<string>();
+                if (raw.Requires.Flags is not null)
+                {
+                    foreach (var f in raw.Requires.Flags)
+                    {
+                        if (string.IsNullOrWhiteSpace(f))
+                            throw new InvalidDataException(
+                                $"{path}: quest '{raw.QuestId}' requires.flags contains an empty entry.");
+                        reqFlags.Add(f);
+                    }
+                }
+
+                var reqRep = new Dictionary<string, int>(StringComparer.Ordinal);
+                if (raw.Requires.Reputation is not null)
+                {
+                    var repFactionSet = _factions.Count > 0
+                        ? new HashSet<string>(_factions.Select(f => f.Id.ToString()), StringComparer.Ordinal)
+                        : ValidFactionIdNames;
+                    foreach (var (fid, pts) in raw.Requires.Reputation)
+                    {
+                        if (string.IsNullOrWhiteSpace(fid) || !repFactionSet.Contains(fid))
+                            throw new InvalidDataException(
+                                $"{path}: quest '{raw.QuestId}' requires.reputation has unknown factionId '{fid}'.");
+                        reqRep[fid] = pts;
+                    }
+                }
+
+                var reqPrior = raw.Requires.PriorQuests is null
+                    ? new List<string>()
+                    : raw.Requires.PriorQuests.ToList();
+
+                requires = new QuestRequirementsDefinition(
+                    Items: reqItems,
+                    Flags: reqFlags,
+                    Reputation: reqRep,
+                    PriorQuests: reqPrior);
+            }
+
             defs.Add(new QuestDefinition(
                 QuestId: raw.QuestId,
                 Title: raw.Title,
@@ -1932,7 +1990,8 @@ public sealed class ContentProvider : IContentProvider
                     : raw.Prerequisites.ToList(),
                 Rewards: rewards,
                 Nodes: nodes,
-                InternalEdges: internalEdges));
+                InternalEdges: internalEdges,
+                Requires: requires));
         }
 
         // Second pass: prerequisites must reference declared quest ids.
@@ -1943,6 +2002,17 @@ public sealed class ContentProvider : IContentProvider
                 if (!seenIds.Contains(p))
                     throw new InvalidDataException(
                         $"{path}: quest '{q.QuestId}' lists unknown prerequisite questId '{p}'.");
+            }
+
+            // requires.priorQuests[] must resolve to declared quest ids too.
+            if (q.Requires is not null)
+            {
+                foreach (var priorId in q.Requires.PriorQuests)
+                {
+                    if (!seenIds.Contains(priorId))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{q.QuestId}' requires.priorQuests references unknown questId '{priorId}'.");
+                }
             }
         }
 
@@ -2018,6 +2088,21 @@ public sealed class ContentProvider : IContentProvider
         public List<RawQuestReward>? Rewards { get; set; }
         public List<RawQuestNode>? Nodes { get; set; }
         public List<RawQuestInternalEdge>? InternalEdges { get; set; }
+        public RawQuestRequires? Requires { get; set; }
+    }
+
+    private sealed class RawQuestRequires
+    {
+        public List<RawQuestRequiredItem>? Items { get; set; }
+        public List<string>? Flags { get; set; }
+        public Dictionary<string, int>? Reputation { get; set; }
+        public List<string>? PriorQuests { get; set; }
+    }
+
+    private sealed class RawQuestRequiredItem
+    {
+        public string Name { get; set; } = "";
+        public int Quantity { get; set; } = 1;
     }
 
     private sealed class RawQuestReward

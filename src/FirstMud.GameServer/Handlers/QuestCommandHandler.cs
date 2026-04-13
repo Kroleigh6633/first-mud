@@ -16,6 +16,7 @@ public class AcceptQuestCommandHandler(
     IPlayerRepository playerRepository,
     IQuestGraphRepository questGraphRepository,
     IContentProvider content,
+    IItemRepository itemRepository,
     IHubContext<GameHub> hubContext) : ICommandHandler<AcceptQuestCommand>
 {
     // Faction waypoints are now authored in content/factions.json; the old
@@ -85,6 +86,56 @@ public class AcceptQuestCommandHandler(
         var isAvailable = await questGraphRepository.IsQuestAvailableAsync(cmd.PlayerId, cmd.QuestId, ct);
         if (!isAvailable)
             return new CommandResult(false, "Quest is not available for this player.");
+
+        // ── Precondition gate ────────────────────────────────────────────
+        // Authored quests carry an optional `requires` block in content/quests.json.
+        // Quests without a matching ContentProvider entry (e.g. DM-generated
+        // procedural quests) skip this check — they have no authored
+        // preconditions to enforce. When the gate fires, we block acceptance
+        // so the failure surfaces at accept-time, not completion-time.
+        var def = content.GetQuest(cmd.QuestId);
+        if (def?.Requires is not null)
+        {
+            var title = def.Title;
+            var items = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+            foreach (var need in def.Requires.Items)
+            {
+                var held = items
+                    .Where(i => string.Equals(i.Name, need.Name, StringComparison.OrdinalIgnoreCase))
+                    .Sum(i => i.IsStackable ? i.Quantity : 1);
+                if (held < need.Quantity)
+                    return new CommandResult(false,
+                        $"Cannot accept '{title}' — missing required items/prereqs.");
+            }
+
+            foreach (var priorId in def.Requires.PriorQuests)
+            {
+                var completed = await questGraphRepository.HasCompletedQuestAsync(cmd.PlayerId, priorId, ct);
+                if (!completed)
+                    return new CommandResult(false,
+                        $"Cannot accept '{title}' — missing required items/prereqs.");
+            }
+
+            if (def.Requires.Reputation.Count > 0)
+            {
+                foreach (var (factionName, pts) in def.Requires.Reputation)
+                {
+                    if (!Enum.TryParse<FactionId>(factionName, out var fid))
+                        return new CommandResult(false,
+                            $"Cannot accept '{title}' — missing required items/prereqs.");
+                    var rep = player.Reputations.FirstOrDefault(r => r.FactionId == fid);
+                    var score = rep?.Score.Points ?? 0;
+                    if (score < pts)
+                        return new CommandResult(false,
+                            $"Cannot accept '{title}' — missing required items/prereqs.");
+                }
+            }
+            // Flags: no player-side flag store exists today. They are authored
+            // for future use; until the flag registry lands, we treat any
+            // non-empty flag requirement as automatically satisfied to avoid
+            // accidentally blocking content. The client filter can still read
+            // them once the registry exists.
+        }
 
         await questGraphRepository.MarkQuestInProgressAsync(cmd.PlayerId, cmd.QuestId, takenByAi: false, ct: ct);
 
@@ -209,23 +260,39 @@ public class CompleteQuestCommandHandler(
 
 public class GetAvailableQuestsCommandHandler(
     WorldStateService worldStateService,
+    IContentProvider content,
     GameNotificationService notificationService) : ICommandHandler<GetAvailableQuestsCommand>
 {
     public async Task<CommandResult> HandleAsync(GetAvailableQuestsCommand cmd, CancellationToken ct)
     {
         var quests = await worldStateService.GetAvailableQuestsAsync(cmd.PlayerId, ct);
 
-        var questPayload = quests.Select(q => new
+        var questPayload = quests.Select(q =>
         {
-            q.QuestId,
-            q.Title,
-            q.Description,
-            FactionId = (int)q.FactionId,
-            RequiredTier = (int)q.RequiredTier,
-            q.ReputationReward,
-            q.PossibleOutcomes,
-            q.IsWyrdQuest,
-            q.IsTaken,
+            // Cross-reference authored content for the optional `requires` gate.
+            // DM-procgen quests have no ContentProvider entry → requires = null.
+            var def = content.GetQuest(q.QuestId);
+            object? requires = def?.Requires is null ? null : new
+            {
+                items = def.Requires.Items.Select(i => new { name = i.Name, quantity = i.Quantity }).ToArray(),
+                flags = def.Requires.Flags.ToArray(),
+                reputation = def.Requires.Reputation,
+                priorQuests = def.Requires.PriorQuests.ToArray(),
+            };
+
+            return new
+            {
+                q.QuestId,
+                q.Title,
+                q.Description,
+                FactionId = (int)q.FactionId,
+                RequiredTier = (int)q.RequiredTier,
+                q.ReputationReward,
+                q.PossibleOutcomes,
+                q.IsWyrdQuest,
+                q.IsTaken,
+                requires,
+            };
         }).ToList();
 
         await notificationService.SendEventAsync(cmd.PlayerId, "AvailableQuests", questPayload, ct);
