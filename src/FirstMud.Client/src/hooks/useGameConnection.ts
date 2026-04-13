@@ -519,7 +519,7 @@ export function useGameConnection(): GameConnectionResult {
         text: `${payload.name} has advanced to Layer ${payload.newLayer}! New abilities unlocked.`,
       });
       // Refresh companion roster so the UI reflects the updated layer
-      sendCommand('listcompanions');
+      sendCommand('viewcompanions');
     });
 
     connection.onreconnecting(() => {
