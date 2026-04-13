@@ -2,7 +2,7 @@
   "$schema": "../schemas/playbook.schema.json",
   "id": "companion-contribution",
   "displayName": "Companion contribution",
-  "description": "Player (no gear/imbue proxy) + N companions at layer L. When do extra party slots keep a player alive that gear/level alone can't?",
+  "description": "Player (no gear/imbue proxy) + N companions at layer L. When do extra party slots keep a player alive that gear/level alone can't? DESIGN INTENT (creative pass #7): 0 companions at any layer is the solo-bare-character line (tracked by `nude-character` for pl coverage); 3 companions at any layer with pl=5 clears solo-monster content cleanly because party-scaling + extra bodies stacks multiplicatively vs a 1v1 target. This playbook documents the floor: even 3 companions at layer 1 should carry pl=5 through d9 vs a single scaled frost-giant. FUTURE WORK: pair with a `pack-viability` playbook to stress the same loadouts against 3-5 monster packs.",
   "holdouts": {
     "playerLevel": 5,
     "playerElement": "Aether"
@@ -16,17 +16,17 @@
   "seed": 42,
   "expectedViability": {
     "cells": [
-      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 3, "expected": "balanced" },
-      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 6, "expected": "hard" },
+      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "companionCount": 0, "companionLayer": 1, "dangerLevel": 6, "expected": "punishing" },
       { "companionCount": 0, "companionLayer": 1, "dangerLevel": 9, "expected": "punishing" },
 
-      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 3, "expected": "easy" },
-      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 6, "expected": "balanced" },
+      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "companionCount": 3, "companionLayer": 1, "dangerLevel": 6, "expected": "trivial" },
       { "companionCount": 3, "companionLayer": 1, "dangerLevel": 9, "expected": "hard" },
 
       { "companionCount": 3, "companionLayer": 5, "dangerLevel": 3, "expected": "trivial" },
-      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 6, "expected": "easy" },
-      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 9, "expected": "balanced" }
+      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 6, "expected": "trivial" },
+      { "companionCount": 3, "companionLayer": 5, "dangerLevel": 9, "expected": "trivial" }
     ]
   },
   "toleranceBands": {

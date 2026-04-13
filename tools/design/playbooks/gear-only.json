@@ -2,7 +2,7 @@
   "$schema": "../schemas/playbook.schema.json",
   "id": "gear-only",
   "displayName": "Gear-only viability",
-  "description": "Player + tier-N gear (proxy: +2 effective levels per tier), no companions, no imbues. When does gear alone carry? Expectation: tier ≈ danger keeps it balanced.",
+  "description": "Player + tier-N gear (proxy: +2 effective levels per tier), no companions, no imbues. When does gear alone carry? DESIGN INTENT (creative pass #7): baseline pl=5 + gt=N is a player who has invested in kit but not companions or imbues. Post-rebalance the tuned expectation is: gear 1-2 steps past danger keeps the fight trivial/easy; gear == danger-3 produces balanced; gear more than 4 behind danger goes hard/punishing. Sim runs 1v1 vs a representative monster (timber-wolf / dire-bear / frost-giant by danger bucket). Because there's no pack, mid-gear hangs on further than a real pack fight would allow — this playbook is not a pack stress-test (see `pack-viability` when it lands).",
   "holdouts": {
     "playerLevel": 5,
     "playerElement": "Aether"
@@ -15,35 +15,35 @@
   "seed": 42,
   "expectedViability": {
     "cells": [
-      { "gearTier": 1, "dangerLevel": 1, "expected": "easy" },
-      { "gearTier": 1, "dangerLevel": 3, "expected": "balanced" },
-      { "gearTier": 1, "dangerLevel": 5, "expected": "hard" },
-      { "gearTier": 1, "dangerLevel": 7, "expected": "punishing" },
+      { "gearTier": 1, "dangerLevel": 1, "expected": "trivial" },
+      { "gearTier": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "gearTier": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "gearTier": 1, "dangerLevel": 7, "expected": "hard" },
       { "gearTier": 1, "dangerLevel": 9, "expected": "punishing" },
 
       { "gearTier": 2, "dangerLevel": 1, "expected": "trivial" },
-      { "gearTier": 2, "dangerLevel": 3, "expected": "easy" },
-      { "gearTier": 2, "dangerLevel": 5, "expected": "balanced" },
-      { "gearTier": 2, "dangerLevel": 7, "expected": "hard" },
-      { "gearTier": 2, "dangerLevel": 9, "expected": "punishing" },
+      { "gearTier": 2, "dangerLevel": 3, "expected": "trivial" },
+      { "gearTier": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "gearTier": 2, "dangerLevel": 7, "expected": "balanced" },
+      { "gearTier": 2, "dangerLevel": 9, "expected": "hard" },
 
       { "gearTier": 3, "dangerLevel": 1, "expected": "trivial" },
-      { "gearTier": 3, "dangerLevel": 3, "expected": "easy" },
-      { "gearTier": 3, "dangerLevel": 5, "expected": "balanced" },
-      { "gearTier": 3, "dangerLevel": 7, "expected": "balanced" },
-      { "gearTier": 3, "dangerLevel": 9, "expected": "hard" },
+      { "gearTier": 3, "dangerLevel": 3, "expected": "trivial" },
+      { "gearTier": 3, "dangerLevel": 5, "expected": "trivial" },
+      { "gearTier": 3, "dangerLevel": 7, "expected": "easy" },
+      { "gearTier": 3, "dangerLevel": 9, "expected": "balanced" },
 
       { "gearTier": 4, "dangerLevel": 1, "expected": "trivial" },
       { "gearTier": 4, "dangerLevel": 3, "expected": "trivial" },
-      { "gearTier": 4, "dangerLevel": 5, "expected": "easy" },
-      { "gearTier": 4, "dangerLevel": 7, "expected": "balanced" },
-      { "gearTier": 4, "dangerLevel": 9, "expected": "balanced" },
+      { "gearTier": 4, "dangerLevel": 5, "expected": "trivial" },
+      { "gearTier": 4, "dangerLevel": 7, "expected": "trivial" },
+      { "gearTier": 4, "dangerLevel": 9, "expected": "trivial" },
 
       { "gearTier": 5, "dangerLevel": 1, "expected": "trivial" },
       { "gearTier": 5, "dangerLevel": 3, "expected": "trivial" },
       { "gearTier": 5, "dangerLevel": 5, "expected": "trivial" },
-      { "gearTier": 5, "dangerLevel": 7, "expected": "easy" },
-      { "gearTier": 5, "dangerLevel": 9, "expected": "balanced" }
+      { "gearTier": 5, "dangerLevel": 7, "expected": "trivial" },
+      { "gearTier": 5, "dangerLevel": 9, "expected": "trivial" }
     ]
   },
   "toleranceBands": {

@@ -1881,22 +1881,24 @@ public class ContentProviderTests
     [Fact]
     public void Real_combat_curves_file_loads_with_expected_coefficients()
     {
-        // content/combat-curves.json pins the post-TPK-fix scaling values.
+        // content/combat-curves.json pins the current scaling values.
         // Live game's MonsterFactory + encounter-sim must agree on these.
-        // Halving hpPerDanger + powerPerDanger + softening boss/speed came
-        // from the 2026-04-13 three-TPK play session; do not revert without
-        // a matching party-scaling review.
+        // Pass #7 (2026-04-13, creative pass playbook sweep) re-tuned from
+        // the initial TPK-fix (hp 0.2 / power 0.15 / party 0.12) which
+        // over-corrected once gear/imbue proxies were stacked in playbook
+        // cells. hp/power restored partway, party-scaling cut hard. See
+        // docs/design/sim-reports/playbook-pass-1.md.
         var provider = new ContentProvider(ContentRootResolver.Resolve());
 
         var ms = provider.CombatCurves.MonsterScaling;
-        ms.HpPerDanger.Should().Be(0.20);
-        ms.PowerPerDanger.Should().Be(0.15);
+        ms.HpPerDanger.Should().Be(0.40);
+        ms.PowerPerDanger.Should().Be(0.28);
         ms.SpeedPerDanger.Should().Be(0.7);
         ms.BossHpMultiplier.Should().Be(1.6);
         ms.BossSpeedBonus.Should().Be(4);
 
         var ps = provider.CombatCurves.PartyScaling;
-        ps.ScalingPerTier.Should().Be(0.12);
+        ps.ScalingPerTier.Should().Be(0.03);
     }
 
     [Fact]

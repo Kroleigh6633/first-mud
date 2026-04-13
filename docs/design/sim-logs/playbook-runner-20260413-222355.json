@@ -1,0 +1,259 @@
+{
+  "playbookId": "imbue-only",
+  "displayName": "Imbue-only contribution",
+  "seed": 42,
+  "rolls": 200,
+  "cells": [
+    {
+      "axis": {
+        "imbueLevel": 0,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.455,
+      "avgHpPct": 0.9213902439024395,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 0,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.29,
+      "avgHpPct": 0.8299024390243906,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 0,
+        "dangerLevel": 7
+      },
+      "winRate": 0.975,
+      "avgRounds": 5.145,
+      "avgHpPct": 0.6139587242026268,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 0,
+        "dangerLevel": 9
+      },
+      "winRate": 0.8,
+      "avgRounds": 5.98,
+      "avgHpPct": 0.42246951219512197,
+      "actual": "balanced",
+      "expected": "balanced",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 1,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.35,
+      "avgHpPct": 0.9359069767441859,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 1,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.085,
+      "avgHpPct": 0.8810232558139538,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 1,
+        "dangerLevel": 7
+      },
+      "winRate": 0.985,
+      "avgRounds": 5.005,
+      "avgHpPct": 0.6526974383189706,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 1,
+        "dangerLevel": 9
+      },
+      "winRate": 0.865,
+      "avgRounds": 5.9,
+      "avgHpPct": 0.5491329479768786,
+      "actual": "easy",
+      "expected": "easy",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 2,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.24,
+      "avgHpPct": 0.9500663716814151,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 2,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.04,
+      "avgHpPct": 0.9034513274336281,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 2,
+        "dangerLevel": 7
+      },
+      "winRate": 1,
+      "avgRounds": 4.725,
+      "avgHpPct": 0.7575221238938054,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 2,
+        "dangerLevel": 9
+      },
+      "winRate": 0.94,
+      "avgRounds": 5.545,
+      "avgHpPct": 0.6399453963472042,
+      "actual": "easy",
+      "expected": "trivial",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "imbueLevel": 3,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.19,
+      "avgHpPct": 0.9692584745762711,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 3,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 2.81,
+      "avgHpPct": 0.938665254237288,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 3,
+        "dangerLevel": 7
+      },
+      "winRate": 1,
+      "avgRounds": 4.515,
+      "avgHpPct": 0.828686440677966,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 3,
+        "dangerLevel": 9
+      },
+      "winRate": 0.985,
+      "avgRounds": 5.385,
+      "avgHpPct": 0.7037985029682526,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 4,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.125,
+      "avgHpPct": 0.9716801619433199,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 4,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 2.725,
+      "avgHpPct": 0.9472874493927128,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 4,
+        "dangerLevel": 7
+      },
+      "winRate": 1,
+      "avgRounds": 4.3,
+      "avgHpPct": 0.8638663967611339,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "imbueLevel": 4,
+        "dangerLevel": 9
+      },
+      "winRate": 0.98,
+      "avgRounds": 5.14,
+      "avgHpPct": 0.7379781872263079,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    }
+  ],
+  "divergences": [
+    {
+      "axis": {
+        "imbueLevel": 2,
+        "dangerLevel": 9
+      },
+      "expected": "trivial",
+      "actual": "easy",
+      "winRate": 0.94
+    }
+  ]
+}

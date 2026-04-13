@@ -1,0 +1,170 @@
+===== full-party =====
+=== playbook-runner: full-party — Full-party regression baseline ===
+Canonical mid-game loadout: playerLevel 8 + gearTier 3 proxy + imbueLevel 2 proxy + 3 companions at layer 3. Single axis: dangerLevel. DESIGN INTENT (creative pass #7): a player who has earned the mid-game stack IS supposed to dominate the overworld monster curve; 'hard' is reserved for end-game bosses and for content that exceeds the player's zone band (neither of which this sim represents — single monster cell, no boss flag). Post-rebalance + pass-7 tunes, the full stack sweeps d0-d10 in 1-3 rounds. Treat this playbook as a regression detector ('mid-game stack suddenly can't clear a mid-danger mob') rather than a balance target ('mid-game stack should struggle at mid-danger').
+rolls/cell=200  seed=42  axes=[dangerLevel:11]
+
+dangerLevel | winRate | rounds | actual    | expected  | !
+0          |  100.0% |    1.0 | trivial   | trivial   | 
+1          |  100.0% |    1.0 | trivial   | trivial   | 
+2          |  100.0% |    1.0 | trivial   | trivial   | 
+3          |  100.0% |    1.0 | trivial   | trivial   | 
+4          |  100.0% |    1.0 | trivial   | trivial   | 
+5          |  100.0% |    1.0 | trivial   | trivial   | 
+6          |  100.0% |    1.9 | trivial   | trivial   | 
+7          |  100.0% |    2.0 | trivial   | trivial   | 
+8          |  100.0% |    2.1 | trivial   | trivial   | 
+9          |  100.0% |    2.1 | trivial   | trivial   | 
+10         |  100.0% |    2.4 | trivial   | trivial   | 
+
+
+  ok  All cells on-band.
+
+===== nude-character =====
+=== playbook-runner: nude-character — Nude character viability ===
+Player only (no companions, no imbues, no gear proxy). Where does a bare character alone stop working? DESIGN INTENT (creative pass #7): at d=0 a timber-wolf is unscaled (hp 28) so any player >=1 should trivialise it in <3 rounds. A bare character 1v1 vs a single monster is a FAVORABLE matchup regardless of danger because the monster is alone and has no ally piling on. Where this playbook earns its keep is in the 'character outgrows gear-danger gap' cliff: pl-5 hits balance at d~4, hard at d~6, punishing at d~8. Higher-level bare characters keep clearing because 1v1 scaled-monster vs pl-12 strike-base favours the caster. This is acceptable: overworld threat comes from PACKS, not solo mobs (see `full-party` + future `pack` playbook).
+rolls/cell=200  seed=42  axes=[playerLevel:5, dangerLevel:5]
+
+playerLevel | dangerLevel | winRate | rounds | actual    | expected  | !
+1          | 0          |  100.0% |    2.0 | trivial   | trivial   | 
+1          | 2          |  100.0% |    3.0 | trivial   | trivial   | 
+1          | 4          |    0.5% |    3.5 | punishing | punishing | 
+1          | 6          |    0.0% |    2.7 | punishing | punishing | 
+1          | 8          |    0.0% |    2.3 | punishing | punishing | 
+3          | 0          |  100.0% |    1.3 | trivial   | trivial   | 
+3          | 2          |  100.0% |    2.2 | trivial   | trivial   | 
+3          | 4          |   36.0% |    4.7 | hard      | hard      | 
+3          | 6          |    0.0% |    3.7 | punishing | punishing | 
+3          | 8          |    0.0% |    3.2 | punishing | punishing | 
+5          | 0          |  100.0% |    1.1 | trivial   | trivial   | 
+5          | 2          |  100.0% |    1.9 | trivial   | trivial   | 
+5          | 4          |   92.0% |    4.5 | easy      | easy      | 
+5          | 6          |    7.5% |    4.8 | punishing | punishing | 
+5          | 8          |    0.0% |    4.1 | punishing | punishing | 
+8          | 0          |  100.0% |    1.1 | trivial   | trivial   | 
+8          | 2          |  100.0% |    1.3 | trivial   | trivial   | 
+8          | 4          |   99.5% |    3.5 | trivial   | trivial   | 
+8          | 6          |   73.5% |    5.6 | balanced  | balanced  | 
+8          | 8          |   36.5% |    5.6 | hard      | hard      | 
+12         | 0          |  100.0% |    1.1 | trivial   | trivial   | 
+12         | 2          |  100.0% |    1.1 | trivial   | trivial   | 
+12         | 4          |  100.0% |    2.8 | trivial   | trivial   | 
+12         | 6          |  100.0% |    4.5 | trivial   | trivial   | 
+12         | 8          |   97.5% |    5.5 | trivial   | trivial   | 
+
+
+  ok  All cells on-band.
+
+===== gear-only =====
+=== playbook-runner: gear-only — Gear-only viability ===
+Player + tier-N gear (proxy: +2 effective levels per tier), no companions, no imbues. When does gear alone carry? DESIGN INTENT (creative pass #7): baseline pl=5 + gt=N is a player who has invested in kit but not companions or imbues. Post-rebalance the tuned expectation is: gear 1-2 steps past danger keeps the fight trivial/easy; gear == danger-3 produces balanced; gear more than 4 behind danger goes hard/punishing. Sim runs 1v1 vs a representative monster (timber-wolf / dire-bear / frost-giant by danger bucket). Because there's no pack, mid-gear hangs on further than a real pack fight would allow — this playbook is not a pack stress-test (see `pack-viability` when it lands).
+rolls/cell=200  seed=42  axes=[gearTier:5, dangerLevel:5]
+
+gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
+1          | 1          |  100.0% |    1.1 | trivial   | trivial   | 
+1          | 3          |  100.0% |    3.2 | trivial   | trivial   | 
+1          | 5          |   91.5% |    4.3 | easy      | trivial   | DIVERGE
+1          | 7          |   38.0% |    5.5 | hard      | hard      | 
+1          | 9          |    9.0% |    4.9 | punishing | punishing | 
+2          | 1          |  100.0% |    1.1 | trivial   | trivial   | 
+2          | 3          |  100.0% |    2.9 | trivial   | trivial   | 
+2          | 5          |  100.0% |    3.8 | trivial   | trivial   | 
+2          | 7          |   78.0% |    5.6 | balanced  | balanced  | 
+2          | 9          |   43.0% |    5.7 | hard      | hard      | 
+3          | 1          |  100.0% |    1.1 | trivial   | trivial   | 
+3          | 3          |  100.0% |    2.5 | trivial   | trivial   | 
+3          | 5          |  100.0% |    3.3 | trivial   | trivial   | 
+3          | 7          |   98.5% |    5.2 | trivial   | easy      | DIVERGE
+3          | 9          |   77.5% |    6.0 | balanced  | balanced  | 
+4          | 1          |  100.0% |    1.1 | trivial   | trivial   | 
+4          | 3          |  100.0% |    2.2 | trivial   | trivial   | 
+4          | 5          |  100.0% |    2.9 | trivial   | trivial   | 
+4          | 7          |  100.0% |    4.6 | trivial   | trivial   | 
+4          | 9          |   98.0% |    5.7 | trivial   | trivial   | 
+5          | 1          |  100.0% |    1.1 | trivial   | trivial   | 
+5          | 3          |  100.0% |    2.1 | trivial   | trivial   | 
+5          | 5          |  100.0% |    2.7 | trivial   | trivial   | 
+5          | 7          |  100.0% |    4.4 | trivial   | trivial   | 
+5          | 9          |   99.5% |    5.2 | trivial   | trivial   | 
+
+
+  warn  2 cell(s) diverged from expectation:
+  warn    {gearTier=1, dangerLevel=5}  expected=trivial  actual=easy  winRate=91.5%
+  warn    {gearTier=3, dangerLevel=7}  expected=easy  actual=trivial  winRate=98.5%
+
+===== imbue-only =====
+=== playbook-runner: imbue-only — Imbue-only contribution ===
+Baseline gear tier 3, no companions, varying imbue level (proxy: +1 effective level per imbue). DESIGN INTENT (creative pass #7): with gearTier=3 baseline (effective pl ~11), the overworld danger curve is already cleared by gear alone; imbues are a marginal buff against the top end. This playbook should flag REGRESSIONS (imbue 0 at d9 suddenly falling off a cliff) rather than prescribe a steep viability curve. In its current form most cells are trivial because the proxy stack (pl 5 + gt 3 = pl 11) already exceeds danger; a more informative variant will pull gearTier baseline down once 'balanced expectation' can be expressed in proxy-free form.
+rolls/cell=200  seed=42  axes=[imbueLevel:5, dangerLevel:4]
+
+imbueLevel | dangerLevel | winRate | rounds | actual    | expected  | !
+0          | 3          |  100.0% |    2.5 | trivial   | trivial   | 
+0          | 5          |  100.0% |    3.3 | trivial   | trivial   | 
+0          | 7          |   93.5% |    5.1 | easy      | trivial   | DIVERGE
+0          | 9          |   84.5% |    6.0 | balanced  | balanced  | 
+1          | 3          |  100.0% |    2.4 | trivial   | trivial   | 
+1          | 5          |  100.0% |    3.1 | trivial   | trivial   | 
+1          | 7          |   99.0% |    4.9 | trivial   | trivial   | 
+1          | 9          |   88.5% |    5.9 | easy      | easy      | 
+2          | 3          |  100.0% |    2.3 | trivial   | trivial   | 
+2          | 5          |  100.0% |    2.9 | trivial   | trivial   | 
+2          | 7          |  100.0% |    4.7 | trivial   | trivial   | 
+2          | 9          |   95.5% |    5.6 | trivial   | trivial   | 
+3          | 3          |  100.0% |    2.2 | trivial   | trivial   | 
+3          | 5          |  100.0% |    2.8 | trivial   | trivial   | 
+3          | 7          |  100.0% |    4.6 | trivial   | trivial   | 
+3          | 9          |   99.0% |    5.4 | trivial   | trivial   | 
+4          | 3          |  100.0% |    2.1 | trivial   | trivial   | 
+4          | 5          |  100.0% |    2.7 | trivial   | trivial   | 
+4          | 7          |  100.0% |    4.4 | trivial   | trivial   | 
+4          | 9          |  100.0% |    5.1 | trivial   | trivial   | 
+
+
+  warn  1 cell(s) diverged from expectation:
+  warn    {imbueLevel=0, dangerLevel=7}  expected=trivial  actual=easy  winRate=93.5%
+
+===== companion-contribution =====
+=== playbook-runner: companion-contribution — Companion contribution ===
+Player (no gear/imbue proxy) + N companions at layer L. When do extra party slots keep a player alive that gear/level alone can't? DESIGN INTENT (creative pass #7): 0 companions at any layer is the solo-bare-character line (tracked by `nude-character` for pl coverage); 3 companions at any layer with pl=5 clears solo-monster content cleanly because party-scaling + extra bodies stacks multiplicatively vs a 1v1 target. This playbook documents the floor: even 3 companions at layer 1 should carry pl=5 through d9 vs a single scaled frost-giant. FUTURE WORK: pair with a `pack-viability` playbook to stress the same loadouts against 3-5 monster packs.
+rolls/cell=100  seed=42  axes=[companionCount:4, companionLayer:3, dangerLevel:3]
+
+companionCount | companionLayer | dangerLevel | winRate | rounds | actual    | expected  | !
+0          | 1          | 3          |  100.0% |    4.0 | trivial   | trivial   | 
+0          | 1          | 6          |    8.0% |    4.5 | punishing | punishing | 
+0          | 1          | 9          |    0.0% |    3.9 | punishing | punishing | 
+0          | 3          | 3          |   98.0% |    4.1 | trivial   | (none)    | 
+0          | 3          | 6          |    4.0% |    4.7 | punishing | (none)    | 
+0          | 3          | 9          |    0.0% |    3.7 | punishing | (none)    | 
+0          | 5          | 3          |   99.0% |    4.0 | trivial   | (none)    | 
+0          | 5          | 6          |    7.0% |    4.8 | punishing | (none)    | 
+0          | 5          | 9          |    0.0% |    4.0 | punishing | (none)    | 
+1          | 1          | 3          |  100.0% |    2.9 | trivial   | (none)    | 
+1          | 1          | 6          |   44.0% |    5.8 | hard      | (none)    | 
+1          | 1          | 9          |    1.0% |    5.5 | punishing | (none)    | 
+1          | 3          | 3          |  100.0% |    2.1 | trivial   | (none)    | 
+1          | 3          | 6          |  100.0% |    3.8 | trivial   | (none)    | 
+1          | 3          | 9          |   81.0% |    5.6 | balanced  | (none)    | 
+1          | 5          | 3          |  100.0% |    2.2 | trivial   | (none)    | 
+1          | 5          | 6          |  100.0% |    4.0 | trivial   | (none)    | 
+1          | 5          | 9          |   91.0% |    5.8 | easy      | (none)    | 
+2          | 1          | 3          |  100.0% |    2.2 | trivial   | (none)    | 
+2          | 1          | 6          |   75.0% |    5.6 | balanced  | (none)    | 
+2          | 1          | 9          |   11.0% |    6.5 | punishing | (none)    | 
+2          | 3          | 3          |  100.0% |    1.2 | trivial   | (none)    | 
+2          | 3          | 6          |  100.0% |    3.0 | trivial   | (none)    | 
+2          | 3          | 9          |   99.0% |    4.2 | trivial   | (none)    | 
+2          | 5          | 3          |  100.0% |    2.0 | trivial   | (none)    | 
+2          | 5          | 6          |  100.0% |    3.3 | trivial   | (none)    | 
+2          | 5          | 9          |  100.0% |    4.3 | trivial   | (none)    | 
+3          | 1          | 3          |  100.0% |    1.9 | trivial   | trivial   | 
+3          | 1          | 6          |  100.0% |    4.2 | trivial   | trivial   | 
+3          | 1          | 9          |   41.0% |    7.0 | hard      | hard      | 
+3          | 3          | 3          |  100.0% |    1.0 | trivial   | (none)    | 
+3          | 3          | 6          |  100.0% |    2.1 | trivial   | (none)    | 
+3          | 3          | 9          |  100.0% |    2.8 | trivial   | (none)    | 
+3          | 5          | 3          |  100.0% |    2.0 | trivial   | trivial   | 
+3          | 5          | 6          |  100.0% |    2.6 | trivial   | trivial   | 
+3          | 5          | 9          |  100.0% |    3.5 | trivial   | trivial   | 
+
+
+  ok  All cells on-band.
+

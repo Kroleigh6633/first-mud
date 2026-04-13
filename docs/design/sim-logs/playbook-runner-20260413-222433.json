@@ -1,0 +1,309 @@
+{
+  "playbookId": "nude-character",
+  "displayName": "Nude character viability",
+  "seed": 42,
+  "rolls": 200,
+  "cells": [
+    {
+      "axis": {
+        "playerLevel": 1,
+        "dangerLevel": 0
+      },
+      "winRate": 1,
+      "avgRounds": 2.02,
+      "avgHpPct": 0.9102499999999997,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 1,
+        "dangerLevel": 2
+      },
+      "winRate": 1,
+      "avgRounds": 2.885,
+      "avgHpPct": 0.7579000000000007,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 1,
+        "dangerLevel": 4
+      },
+      "winRate": 0,
+      "avgRounds": 3.65,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 1,
+        "dangerLevel": 6
+      },
+      "winRate": 0,
+      "avgRounds": 2.81,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 1,
+        "dangerLevel": 8
+      },
+      "winRate": 0,
+      "avgRounds": 2.375,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "dangerLevel": 0
+      },
+      "winRate": 1,
+      "avgRounds": 1.255,
+      "avgHpPct": 0.9827685950413227,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "dangerLevel": 2
+      },
+      "winRate": 1,
+      "avgRounds": 2.18,
+      "avgHpPct": 0.8828099173553716,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "dangerLevel": 4
+      },
+      "winRate": 0.375,
+      "avgRounds": 4.62,
+      "avgHpPct": 0.2469421487603305,
+      "actual": "hard",
+      "expected": "hard",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "dangerLevel": 6
+      },
+      "winRate": 0,
+      "avgRounds": 3.6,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "dangerLevel": 8
+      },
+      "winRate": 0,
+      "avgRounds": 3.085,
+      "avgHpPct": 0,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "dangerLevel": 0
+      },
+      "winRate": 1,
+      "avgRounds": 1.1,
+      "avgHpPct": 0.9954225352112676,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "dangerLevel": 2
+      },
+      "winRate": 1,
+      "avgRounds": 1.98,
+      "avgHpPct": 0.9404577464788727,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "dangerLevel": 4
+      },
+      "winRate": 0.91,
+      "avgRounds": 4.62,
+      "avgHpPct": 0.4423076923076923,
+      "actual": "easy",
+      "expected": "easy",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "dangerLevel": 6
+      },
+      "winRate": 0.13,
+      "avgRounds": 4.87,
+      "avgHpPct": 0.2174972914409534,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "dangerLevel": 8
+      },
+      "winRate": 0.015,
+      "avgRounds": 4.27,
+      "avgHpPct": 0.13380281690140847,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "dangerLevel": 0
+      },
+      "winRate": 1,
+      "avgRounds": 1.09,
+      "avgHpPct": 0.9982080924855492,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "dangerLevel": 2
+      },
+      "winRate": 1,
+      "avgRounds": 1.35,
+      "avgHpPct": 0.9873410404624274,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "dangerLevel": 4
+      },
+      "winRate": 1,
+      "avgRounds": 3.57,
+      "avgHpPct": 0.7343930635838152,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "dangerLevel": 6
+      },
+      "winRate": 0.775,
+      "avgRounds": 5.63,
+      "avgHpPct": 0.4074212194667164,
+      "actual": "balanced",
+      "expected": "balanced",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "dangerLevel": 8
+      },
+      "winRate": 0.4,
+      "avgRounds": 5.755,
+      "avgHpPct": 0.3186416184971098,
+      "actual": "hard",
+      "expected": "hard",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 12,
+        "dangerLevel": 0
+      },
+      "winRate": 1,
+      "avgRounds": 1.06,
+      "avgHpPct": 0.999720930232558,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 12,
+        "dangerLevel": 2
+      },
+      "winRate": 1,
+      "avgRounds": 1.08,
+      "avgHpPct": 0.998139534883721,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 12,
+        "dangerLevel": 4
+      },
+      "winRate": 1,
+      "avgRounds": 2.78,
+      "avgHpPct": 0.9143255813953486,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 12,
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 4.54,
+      "avgHpPct": 0.7300465116279071,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 12,
+        "dangerLevel": 8
+      },
+      "winRate": 0.965,
+      "avgRounds": 5.445,
+      "avgHpPct": 0.6127003253404024,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    }
+  ],
+  "divergences": []
+}

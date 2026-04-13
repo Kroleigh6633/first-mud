@@ -1,0 +1,130 @@
+{
+  "playbookId": "full-party",
+  "displayName": "Full-party regression baseline",
+  "seed": 42,
+  "rolls": 200,
+  "cells": [
+    {
+      "axis": {
+        "dangerLevel": 0
+      },
+      "winRate": 1,
+      "avgRounds": 1,
+      "avgHpPct": 1,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 1
+      },
+      "winRate": 1,
+      "avgRounds": 1,
+      "avgHpPct": 1,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 2
+      },
+      "winRate": 1,
+      "avgRounds": 1,
+      "avgHpPct": 1,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 1.015,
+      "avgHpPct": 0.9992996108949416,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 4
+      },
+      "winRate": 1,
+      "avgRounds": 1.04,
+      "avgHpPct": 0.9986575875486381,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 1.04,
+      "avgHpPct": 1,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 6
+      },
+      "winRate": 1,
+      "avgRounds": 1.88,
+      "avgHpPct": 0.9647665369649805,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 7
+      },
+      "winRate": 1,
+      "avgRounds": 2.025,
+      "avgHpPct": 0.9626653696498052,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 8
+      },
+      "winRate": 1,
+      "avgRounds": 2.07,
+      "avgHpPct": 0.9507003891050582,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 9
+      },
+      "winRate": 1,
+      "avgRounds": 2.16,
+      "avgHpPct": 0.9540272373540852,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "dangerLevel": 10
+      },
+      "winRate": 1,
+      "avgRounds": 2.34,
+      "avgHpPct": 0.9306031128404669,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    }
+  ],
+  "divergences": []
+}

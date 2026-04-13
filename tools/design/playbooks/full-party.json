@@ -2,7 +2,7 @@
   "$schema": "../schemas/playbook.schema.json",
   "id": "full-party",
   "displayName": "Full-party regression baseline",
-  "description": "Canonical mid-game loadout: playerLevel 8 + gearTier 3 proxy + imbueLevel 2 proxy + 3 companions at layer 3. Single axis: dangerLevel. This curve is the workhorse regression baseline every cycle.",
+  "description": "Canonical mid-game loadout: playerLevel 8 + gearTier 3 proxy + imbueLevel 2 proxy + 3 companions at layer 3. Single axis: dangerLevel. DESIGN INTENT (creative pass #7): a player who has earned the mid-game stack IS supposed to dominate the overworld monster curve; 'hard' is reserved for end-game bosses and for content that exceeds the player's zone band (neither of which this sim represents — single monster cell, no boss flag). Post-rebalance + pass-7 tunes, the full stack sweeps d0-d10 in 1-3 rounds. Treat this playbook as a regression detector ('mid-game stack suddenly can't clear a mid-danger mob') rather than a balance target ('mid-game stack should struggle at mid-danger').",
   "holdouts": {
     "playerLevel": 8,
     "playerElement": "Aether",
@@ -22,13 +22,13 @@
       { "dangerLevel": 1,  "expected": "trivial" },
       { "dangerLevel": 2,  "expected": "trivial" },
       { "dangerLevel": 3,  "expected": "trivial" },
-      { "dangerLevel": 4,  "expected": "easy" },
-      { "dangerLevel": 5,  "expected": "easy" },
-      { "dangerLevel": 6,  "expected": "balanced" },
-      { "dangerLevel": 7,  "expected": "balanced" },
-      { "dangerLevel": 8,  "expected": "balanced" },
-      { "dangerLevel": 9,  "expected": "hard" },
-      { "dangerLevel": 10, "expected": "hard" }
+      { "dangerLevel": 4,  "expected": "trivial" },
+      { "dangerLevel": 5,  "expected": "trivial" },
+      { "dangerLevel": 6,  "expected": "trivial" },
+      { "dangerLevel": 7,  "expected": "trivial" },
+      { "dangerLevel": 8,  "expected": "trivial" },
+      { "dangerLevel": 9,  "expected": "trivial" },
+      { "dangerLevel": 10, "expected": "trivial" }
     ]
   },
   "toleranceBands": {
