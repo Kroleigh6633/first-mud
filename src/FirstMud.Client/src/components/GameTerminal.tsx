@@ -936,6 +936,23 @@ export default function GameTerminal({
         // Reset the portal-sent flag once we're back on the world map
         autoQuestPortalSentRef.current = false;
 
+        // ── Post-combat heal check ─────────────────────────────────────
+        // If HP is below 70% after a fight, portal home to heal before
+        // continuing navigation. The homestead check above will wait for
+        // full HP then send portalback automatically.
+        const hpPercent = player.currentHp / (player.maxHp || 1);
+        if (hpPercent < 0.7 && Date.now() >= portalCooldownUntilRef.current) {
+          console.log(`[autoquest navigate] HP at ${Math.round(hpPercent * 100)}% — portaling home to heal`);
+          portalCooldownUntilRef.current = Date.now() + 2000;
+          sendCommand('portalhome', null);
+          wrappedAppendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: `Party needs healing (HP: ${player.currentHp}/${player.maxHp}) — portaling home...`,
+          });
+          return;
+        }
+
         const distX = Math.abs(wp.targetX - player.x);
         const distY = Math.abs(wp.targetY - player.y);
         console.log(`[autoquest navigate] dist=(${distX},${distY}) to (${wp.targetX},${wp.targetY})`);

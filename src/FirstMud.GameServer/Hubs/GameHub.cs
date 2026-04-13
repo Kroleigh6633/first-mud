@@ -58,6 +58,16 @@ public class GameHub : Hub
         _gameLoop.EnqueueCommand(new GetAvailableQuestsCommand(playerId));
         _gameLoop.EnqueueCommand(new EnterZoneCommand(playerId, 0, Guid.Empty));
         _gameLoop.EnqueueCommand(new OpenInventoryCommand(playerId));
+
+        // If the player is already at homestead when they connect, send CityView so buildings render immediately
+        var connectingPlayer = await _playerRepository.GetByIdAsync(playerId, Context.ConnectionAborted);
+        if (connectingPlayer is not null
+            && connectingPlayer.Position.X == -100
+            && connectingPlayer.Position.Y == -100)
+        {
+            _gameLoop.EnqueueCommand(new ViewCityCommand(playerId));
+            await Clients.Caller.SendAsync("AtHomestead", cancellationToken: Context.ConnectionAborted);
+        }
     }
 
     public async Task SendCommand(string command, object? payload)
