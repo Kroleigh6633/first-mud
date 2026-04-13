@@ -165,6 +165,24 @@ public class MoveCommandHandler(
             return;
         }
 
+        // Survivability gate: if total enemy HP exceeds 5× party HP, the fight is
+        // unwinnable at this stage — skip the encounter entirely.
+        int totalEnemyHp = monsters.Sum(m => m.Hp);
+        totalEnemyHp = (int)(totalEnemyHp * (1.0 + dangerLevel * 0.4));
+        // Use player HP as the party HP baseline; companions don't expose a CurrentHp
+        // field, so scale by party size as a rough proxy.
+        int partyHp = player.CurrentHp * partySize;
+
+        if (totalEnemyHp > partyHp * 5)
+        {
+            await notificationService.SendMessageAsync(
+                playerId,
+                "system",
+                $"Your party senses overwhelming danger and avoids the encounter. (Danger {dangerLevel})",
+                ct);
+            return;
+        }
+
         var encounter = await combatService.StartEncounterAsync(
             playerId, Guid.NewGuid(), player, activeCompanions, monsters, ct: ct, dangerLevel: dangerLevel);
 

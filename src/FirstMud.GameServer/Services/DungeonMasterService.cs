@@ -317,7 +317,9 @@ public class DungeonMasterService : BackgroundService
 
             var questId    = $"DM_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{_rng.Next(1000)}";
             var factionId  = PickFactionId();
-            var difficulty = _rng.Next(1, 6); // 1-5
+            // Difficulty 1-5 maps to zones with danger ≤ 7; cap at 5 to stay clear of
+            // danger 8-10 areas that would kill auto-running low-level players.
+            var difficulty = _rng.Next(1, 6); // 1-5, never targets danger 9-10 zones
             var repReward  = 50 + difficulty * 90; // 140 – 500
 
             var (title, description, outcomes) = BuildQuestContent(difficulty);
@@ -383,7 +385,7 @@ public class DungeonMasterService : BackgroundService
 
         var adjective = Pick(QuestAdjectives);
         var noun      = Pick(QuestNouns);
-        var zone      = Pick(ZoneNames);
+        var zone      = Pick(SafeQuestZoneNames); // never waypoint toward danger 8-10 zones
         var monster   = Pick(MonsterNames);
         var item      = Pick(DialogueItems);
         var npcName   = BuildNpcName();
@@ -582,6 +584,17 @@ public class DungeonMasterService : BackgroundService
         "the Maw Borderlands", "Coldmere", "Ironspire Ridge", "the Rootweave",
         "the Tidegate", "the Pale City", "the Sundering Scar", "Ashcross",
         "Veldann", "the Golvari Marches", "the Wyrd-Paths crossing", "the Deeps threshold",
+    ];
+
+    // Safe zone names for procedural quest targets — excludes danger 8-10 zones
+    // (the Maw Borderlands, the Golvari Marches, the Wyrd-Paths crossing, the Deeps threshold)
+    // so auto-run quests never waypoint players into certain-death territory.
+    private static readonly string[] SafeQuestZoneNames =
+    [
+        "the Caervorn Highlands", "the Thornwood", "Portmere", "the Gravenmarsh",
+        "the Drowned Coast", "the Ashen Reach", "the Starting Road", "Gravenhold",
+        "Coldmere", "Ironspire Ridge", "the Rootweave",
+        "the Tidegate", "the Pale City", "the Sundering Scar", "Ashcross", "Veldann",
     ];
 
     // --- Region names ---

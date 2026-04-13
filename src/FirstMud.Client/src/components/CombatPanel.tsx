@@ -173,6 +173,15 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
       return;
     }
 
+    // During quest auto-run (forceAutoCombat), flee immediately from danger 9-10 encounters
+    // — the server should have blocked these, but this is the client-side safety net.
+    if (forceAutoCombat && combat.dangerLevel != null && combat.dangerLevel >= 9) {
+      const timer = setTimeout(() => {
+        sendCommand('combat flee', { encounterId: combat.encounterId });
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+
     const abilities = currentActor?.abilities ?? [];
     const hpPct = currentActor
       ? currentActor.currentHp / Math.max(currentActor.maxHp, 1)
