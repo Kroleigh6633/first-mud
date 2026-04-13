@@ -24,7 +24,6 @@ public class CraftCommandHandler(
     IRecipeRepository recipeRepository,
     IItemRepository itemRepository,
     IHomesteadRepository homesteadRepository,
-    GameNotificationService notificationService,
     IHubContext<GameHub> hubContext,
     ILogger<CraftCommandHandler> logger) : ICommandHandler<CraftCommand>
 {
@@ -62,9 +61,11 @@ public class CraftCommandHandler(
         var result = await craftingService.AttemptCraftAsync(
             cmd.PlayerId, cmd.RecipeId, componentIds, cmd.TaperId, ct);
 
-        // Consume components on success or component-loss outcomes
+        // Consume components on success, unexpected-result, and component-loss outcomes.
+        // UnexpectedResult now produces an item (like Success) so components must be consumed.
         bool consumeComponents = result.Outcome is CraftingOutcome.Success
             or CraftingOutcome.Discovery
+            or CraftingOutcome.UnexpectedResult
             or CraftingOutcome.ComponentLoss;
 
         if (consumeComponents)
@@ -112,27 +113,38 @@ public class CraftCommandHandler(
             }
         }
 
-        // Notify the player of the outcome
-        await notificationService.SendMessageAsync(cmd.PlayerId, "system", result.Message, ct);
+        // Choose the message category based on outcome so the client styles it correctly.
+        // UnexpectedResult → "loot" (yellow bonus), Discovery → "loot-rare" (blue),
+        // ComponentLoss → "warning", NearMiss → "warning", Success → "system".
+        // Only one message is sent per craft result — via CraftingComplete — so there is no
+        // separate SendMessageAsync call here (that was the source of duplicate messages).
+        string messageCategory = result.Outcome switch
+        {
+            CraftingOutcome.Success          => "system",
+            CraftingOutcome.UnexpectedResult => "loot",
+            CraftingOutcome.Discovery        => "loot-rare",
+            CraftingOutcome.ComponentLoss    => "warning",
+            _                                => "warning",   // NearMiss
+        };
 
-        // If an item was produced, notify the client so the inventory updates
+        // Broadcast the single CraftingComplete event — this is the only message sent.
+        await hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("CraftingComplete", new
+            {
+                Outcome = result.Outcome.ToString(),
+                ItemId = result.ProducedItem?.Id,
+                ItemName = result.ProducedItem?.Name,
+                Workmanship = result.ProducedItem?.Workmanship.Value ?? 0,
+                Category = result.ProducedItem?.Category.ToString(),
+                Slot = result.ProducedItem?.Slot.ToString(),
+                IsDiscovery = result.IsFirstDiscovery,
+                Message = result.Message,
+                MessageCategory = messageCategory,
+            }, ct);
+
         if (result.ProducedItem is not null)
         {
-            // Item was already persisted by CraftingService; broadcast to client
-            await hubContext.Clients
-                .Group(cmd.PlayerId.ToString())
-                .SendAsync("CraftingComplete", new
-                {
-                    Outcome = result.Outcome.ToString(),
-                    ItemId = result.ProducedItem.Id,
-                    ItemName = result.ProducedItem.Name,
-                    Workmanship = result.ProducedItem.Workmanship.Value,
-                    Category = result.ProducedItem.Category.ToString(),
-                    Slot = result.ProducedItem.Slot.ToString(),
-                    IsDiscovery = result.IsFirstDiscovery,
-                    Message = result.Message,
-                }, ct);
-
             logger.LogInformation(
                 "Player {PlayerId} crafted {ItemName} (W{Work}) via recipe {RecipeId} — {Outcome}",
                 cmd.PlayerId, result.ProducedItem.Name, result.ProducedItem.Workmanship.Value,
@@ -140,27 +152,20 @@ public class CraftCommandHandler(
         }
         else
         {
-            // No item produced — still tell the client the outcome so the UI resets
-            await hubContext.Clients
-                .Group(cmd.PlayerId.ToString())
-                .SendAsync("CraftingComplete", new
-                {
-                    Outcome = result.Outcome.ToString(),
-                    ItemId = (Guid?)null,
-                    ItemName = (string?)null,
-                    Workmanship = 0,
-                    Category = (string?)null,
-                    Slot = (string?)null,
-                    IsDiscovery = false,
-                    Message = result.Message,
-                }, ct);
-
             logger.LogInformation(
                 "Player {PlayerId} craft attempt for recipe {RecipeId} — {Outcome}: {Message}",
                 cmd.PlayerId, cmd.RecipeId, result.Outcome, result.Message);
         }
 
-        return new CommandResult(result.Outcome == CraftingOutcome.Success || result.Outcome == CraftingOutcome.Discovery,
+        // UnexpectedResult, ComponentLoss, and Discovery are not errors — return Success = true
+        // so GameLoopService does not broadcast an additional "error" message on top.
+        bool commandSucceeded = result.Outcome is CraftingOutcome.Success
+            or CraftingOutcome.Discovery
+            or CraftingOutcome.UnexpectedResult
+            or CraftingOutcome.ComponentLoss;
+
+        return new CommandResult(
+            commandSucceeded,
             result.Message,
             result.ProducedItem is not null ? new { result.ProducedItem.Id, result.ProducedItem.Name } : null);
     }

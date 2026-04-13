@@ -220,17 +220,24 @@ export default function CraftingPanel({
     setStatusMsg(lastCraftResult.message);
     setStatusColor(outcomeColor(lastCraftResult.outcome));
 
-    // Clear selection after success/discovery (single craft mode)
+    // Clear taper selection after any outcome that consumed the taper (single craft mode)
     if (!craftAllRef.current) {
-      if (lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery') {
+      if (
+        lastCraftResult.outcome === 'Success' ||
+        lastCraftResult.outcome === 'Discovery' ||
+        lastCraftResult.outcome === 'UnexpectedResult'
+      ) {
         setSelectedTaperId(null);
       }
     }
 
-    // Auto-salvage grind: salvage the produced item immediately
+    // Auto-salvage grind: salvage the produced item immediately for any outcome that
+    // produced an item (Success, Discovery, UnexpectedResult all produce items).
     if (
       autoSalvageGrind &&
-      (lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery') &&
+      (lastCraftResult.outcome === 'Success' ||
+       lastCraftResult.outcome === 'Discovery' ||
+       lastCraftResult.outcome === 'UnexpectedResult') &&
       lastCraftResult.itemId
     ) {
       pendingSalvageRef.current = lastCraftResult.itemId;
@@ -239,8 +246,11 @@ export default function CraftingPanel({
 
     // If Craft All is running, continue or stop
     if (craftAllRef.current) {
+      // UnexpectedResult produces an item — count it as a success and keep going
       const didSucceed =
-        lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery';
+        lastCraftResult.outcome === 'Success' ||
+        lastCraftResult.outcome === 'Discovery' ||
+        lastCraftResult.outcome === 'UnexpectedResult';
       const materialsFailed = lastCraftResult.outcome === 'NearMiss';
 
       if (materialsFailed) {

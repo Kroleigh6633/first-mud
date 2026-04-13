@@ -118,7 +118,54 @@ public class CraftingService
             return new CraftingResult(CraftingOutcome.ComponentLoss, null, "The crafting attempt failed and some components were lost.", false, null);
 
         if (outcome == CraftingOutcome.UnexpectedResult)
-            return new CraftingResult(CraftingOutcome.UnexpectedResult, null, "Something unexpected happened during crafting.", false, null);
+        {
+            // Unexpected outcome: produce the recipe's result item anyway, but with a
+            // modified name and a loot-style message so it reads as a bonus, not a failure.
+            var unexpectedWorkmanship = CalculateWorkmanship(componentItems, player.CraftingSkill, taperItem);
+            var unexpectedItem = Item.Create(
+                $"{recipe.ResultItemName} (Unusual)",
+                $"Crafted unexpectedly from recipe: {recipe.Name}",
+                recipe.ResultCategory,
+                unexpectedWorkmanship,
+                recipe.RequiredWorld);
+
+            if (taperItem?.AppliedTaper is TaperType uTaperType &&
+                taperItem.TaperQuality is TaperQuality uTaperQuality &&
+                taperItem.MagicalElement is MagicElement uElement &&
+                taperItem.MagicalPolarity is MagicPolarity uPolarity)
+            {
+                unexpectedItem.ApplyTaperImbue(uTaperType, uTaperQuality, uElement, uPolarity);
+            }
+
+            var unexpectedInventoryItems = await _items.GetByOwnerAsync(playerId, ct);
+            if (player.CanCarryMore(unexpectedInventoryItems.Count))
+            {
+                unexpectedItem.SetOwner(playerId);
+                await _items.AddAsync(unexpectedItem, ct);
+            }
+            else
+            {
+                var unexpectedHomestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+                if (unexpectedHomestead is not null)
+                {
+                    await _items.AddAsync(unexpectedItem, ct);
+                    var storageEntry = HomesteadStorageItem.Create(unexpectedHomestead.Id, unexpectedItem.Id);
+                    await _homesteads.AddStorageItemAsync(storageEntry, ct);
+                }
+                else
+                {
+                    unexpectedItem.SetOwner(playerId);
+                    await _items.AddAsync(unexpectedItem, ct);
+                }
+            }
+
+            return new CraftingResult(
+                CraftingOutcome.UnexpectedResult,
+                unexpectedItem,
+                $"Something unexpected happened — you crafted {unexpectedItem.Name} instead!",
+                false,
+                null);
+        }
 
         // 6. On success / discovery: calculate final Workmanship
         var workmanship = CalculateWorkmanship(componentItems, player.CraftingSkill, taperItem);
