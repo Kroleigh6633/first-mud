@@ -30,4 +30,5 @@ Columns:
 | worktree-agent-a28b3adf | in-progress | content-layer-pilot | Auto-quest completion flow playbook + flow evaluator + AutoQuestSimulationService + ASHEN_001 startingZoneId tune | - | tools/design, content/quests.json, docs/design/sim-reports | 2026-04-13 |
 | worktree-agent-a9a66dad | in-progress | content-layer-pilot | Auto-quest precondition checks | - | src/FirstMud.GameServer | 2026-04-13 |
 | worktree-agent-a32711f5 | in-progress | content-layer-pilot | Auto-progression MVP | - | src/FirstMud.GameServer, src/FirstMud.Client | 2026-04-13 |
+| worktree-agent-a27840da | ready-to-merge | content-layer-pilot | Herb tiering system (3 tiers, greenhouse cultivation, recipe migration, playbook) | - | content/, src/FirstMud.Application, src/FirstMud.GameServer, src/FirstMud.Client, tools/design, tests/ | 2026-04-13 |
 <!-- agents add rows above this line -->

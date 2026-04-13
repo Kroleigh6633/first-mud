@@ -16,6 +16,7 @@ public class HomesteadCompanionService
 {
     private readonly ICompanionRepository _companions;
     private readonly IHomesteadRepository _homesteads;
+    private readonly IHomesteadBuildingRepository _buildings;
     private readonly IItemRepository _items;
     private readonly IGameEventPublisher _events;
     private readonly ILogger<HomesteadCompanionService> _logger;
@@ -27,15 +28,38 @@ public class HomesteadCompanionService
         ResourceType.Metal, ResourceType.Sand
     ];
 
+    // Tier-1 herbs a Harvester may gather in lieu of the generic "Herbs" resource.
+    // Sage is weighted heaviest (design: most-common tier-1).
+    private static readonly string[] Tier1HerbPool =
+    [
+        "Sage", "Sage", "Sage", "Mint", "Mint", "Thornroot", "Lavender"
+    ];
+
+    // Tier-3 seed → herb mapping. A Greenhouse harvester consumes one seed and
+    // produces the mapped tier-3 herb over a multi-tick cultivation window.
+    private static readonly Dictionary<string, string> SeedToTier3Herb = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Moonbloom Seed"]       = "Moonbloom",
+        ["Starflower Seed"]      = "Starflower",
+        ["Wyrd Blossom Seed"]    = "Wyrd Blossom",
+        ["Dragon's Breath Seed"] = "Dragon's Breath",
+    };
+
+    // Greenhouse cultivation: ticks required per tier-3 herb unit. Reduced by
+    // companion layer so higher-layer companions cultivate faster.
+    private const int GreenhouseBaseTicksPerHerb = 6;
+
     public HomesteadCompanionService(
         ICompanionRepository companions,
         IHomesteadRepository homesteads,
+        IHomesteadBuildingRepository buildings,
         IItemRepository items,
         IGameEventPublisher events,
         ILogger<HomesteadCompanionService> logger)
     {
         _companions = companions;
         _homesteads = homesteads;
+        _buildings = buildings;
         _items = items;
         _events = events;
         _logger = logger;
@@ -103,12 +127,25 @@ public class HomesteadCompanionService
 
     private async Task<string?> ProcessHarvesterAsync(Companion companion, Homestead homestead, CancellationToken ct)
     {
+        // If the companion is assigned to a Greenhouse, route to cultivation instead of generic gather.
+        var greenhouseBuilding = await FindCompanionGreenhouseAsync(companion, homestead, ct);
+        if (greenhouseBuilding is not null)
+        {
+            var cultivationMsg = await ProcessGreenhouseAsync(companion, homestead, greenhouseBuilding, ct);
+            if (cultivationMsg is not null)
+                return cultivationMsg;
+            // No seed available — fall through to normal harvest so the tick is not wasted.
+        }
+
         var aptitude = companion.GetAptitude(HomesteadDuty.Harvester);
         var yield = (int)(1 * aptitude * (companion.Level / 5.0 + 1));
 
         // Pick a random resource type weighted toward Aeldran defaults
         var resourceType = AeldranResources[Random.Shared.Next(AeldranResources.Length)];
-        var resourceName = resourceType.ToString(); // "Wood", "Stone", etc.
+        // Tier-1 herbs replace the generic "Herbs" resource name.
+        var resourceName = resourceType == ResourceType.Herbs
+            ? Tier1HerbPool[Random.Shared.Next(Tier1HerbPool.Length)]
+            : resourceType.ToString();
 
         // Check storage capacity (guards increase effective slots)
         var guardBondLevels = await GetGuardBondLevelsAsync(homestead.PlayerId, ct);
@@ -153,6 +190,121 @@ public class HomesteadCompanionService
             new StorageChangedEvent(homestead.Id), ct);
 
         return $"Your companion {companion.Name} harvested {resourceName} x{yield} (stored in homestead).";
+    }
+
+    // ─── Greenhouse cultivation ─────────────────────────────────────────────
+    //
+    // Greenhouse buildings have duty=Harvester (per content/buildings.json) so
+    // companions assigned to them are processed by ProcessHarvesterAsync. We
+    // detect the Greenhouse assignment up-front and divert to cultivation:
+    // consume one tier-3 seed from homestead storage, increment a per-tick
+    // progress counter on the building, and once progress reaches the
+    // layer-scaled threshold, yield one tier-3 herb.
+    //
+    // For simplicity the progress counter lives in the AssignedCompanion layer
+    // concept: growth per tick scales with aptitude * layer, so higher-layer
+    // companions finish a cultivation cycle in fewer ticks. We approximate
+    // this without persisting extra state by rolling against a probability
+    // each tick.
+
+    private async Task<HomesteadBuilding?> FindCompanionGreenhouseAsync(
+        Companion companion, Homestead homestead, CancellationToken ct)
+    {
+        var buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        return buildings.FirstOrDefault(b =>
+            b.Type == BuildingType.Greenhouse
+            && b.IsConstructed
+            && b.HasCompanion(companion.Id));
+    }
+
+    private async Task<string?> ProcessGreenhouseAsync(
+        Companion companion, Homestead homestead, HomesteadBuilding greenhouse, CancellationToken ct)
+    {
+        // Find any tier-3 seed in homestead storage.
+        var storageItems = await _homesteads.GetStorageItemsAsync(homestead.Id, ct);
+        Item? seedItem = null;
+        string? seedName = null;
+        foreach (var entry in storageItems)
+        {
+            var candidate = await _items.GetByIdAsync(entry.ItemId, ct);
+            if (candidate is null) continue;
+            if (SeedToTier3Herb.ContainsKey(candidate.Name) && candidate.Quantity > 0)
+            {
+                seedItem = candidate;
+                seedName = candidate.Name;
+                break;
+            }
+        }
+
+        if (seedItem is null || seedName is null)
+            return null; // No seeds — let caller fall back to generic harvest.
+
+        var tier3Name = SeedToTier3Herb[seedName];
+
+        // Cultivation chance per tick. Base = 1/6. +1/6 per companion layer,
+        // capped at 4/6. Aptitude rounds to +1/6 chance per full star above 1.
+        var aptitude = companion.GetAptitude(HomesteadDuty.Harvester);
+        var layerBonus = Math.Max(0, companion.CurrentLayer);
+        var aptitudeBonus = Math.Max(0, aptitude - 1);
+        var successIn6 = Math.Min(5, 1 + layerBonus + aptitudeBonus);
+
+        var roll = Random.Shared.Next(GreenhouseBaseTicksPerHerb);
+        if (roll >= successIn6)
+        {
+            // Cultivation in progress but not ripe this tick.
+            return $"Your companion {companion.Name} tends a {seedName} in the Greenhouse (cultivating...).";
+        }
+
+        // Consume one seed unit.
+        if (seedItem.Quantity > 1)
+        {
+            seedItem.AddQuantity(-1);
+            await _items.UpdateAsync(seedItem, ct);
+        }
+        else
+        {
+            // Remove the storage entry + item when the last seed is consumed.
+            await _homesteads.RemoveStorageItemAsync(homestead.Id, seedItem.Id, ct);
+            await _items.DeleteAsync(seedItem.Id, ct);
+        }
+
+        // Deposit tier-3 herb into homestead storage (stack if possible).
+        var existingEntry = await _homesteads.GetStorageItemByNameAsync(homestead.Id, tier3Name, ct);
+        if (existingEntry is not null)
+        {
+            var existing = await _items.GetByIdAsync(existingEntry.ItemId, ct);
+            if (existing is not null)
+            {
+                existing.AddQuantity(1);
+                await _items.UpdateAsync(existing, ct);
+            }
+        }
+        else
+        {
+            var guardBondLevels = await GetGuardBondLevelsAsync(homestead.PlayerId, ct);
+            var effectiveSlots = homestead.EffectiveStorageSlots(guardBondLevels);
+            var currentItems = await _homesteads.GetStorageItemsAsync(homestead.Id, ct);
+            if (currentItems.Count >= effectiveSlots)
+            {
+                _logger.LogDebug("Greenhouse cultivation succeeded but storage is full; tier-3 herb dropped for player {PlayerId}.", homestead.PlayerId);
+                await _events.PublishAsync(homestead.PlayerId, new StorageChangedEvent(homestead.Id), ct);
+                return $"Your companion {companion.Name} cultivated {tier3Name} but homestead storage was full — it spoiled.";
+            }
+
+            var newHerb = Item.Create(
+                tier3Name,
+                $"A tier-3 herb cultivated in the Greenhouse by {companion.Name}.",
+                ItemCategory.Reagent,
+                Workmanship.Of(4),
+                WorldId.Aeldran);
+            newHerb.SetOwner(null);
+            await _items.AddAsync(newHerb, ct);
+            var storageEntry = HomesteadStorageItem.Create(homestead.Id, newHerb.Id);
+            await _homesteads.AddStorageItemAsync(storageEntry, ct);
+        }
+
+        await _events.PublishAsync(homestead.PlayerId, new StorageChangedEvent(homestead.Id), ct);
+        return $"Your companion {companion.Name} cultivated {tier3Name} x1 in the Greenhouse (consumed 1 {seedName}).";
     }
 
     private async Task<string?> ProcessSalvagerAsync(Companion companion, Homestead homestead, CancellationToken ct)

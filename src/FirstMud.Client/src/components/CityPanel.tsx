@@ -58,7 +58,7 @@ const CONSTRUCTION_COST: Record<BuildingType, { material: string; qty: number }[
   Fletcher:       [{ material: 'Wood', qty: 10 }, { material: 'Sinew', qty: 3 }],
   Tannery:        [{ material: 'Wood', qty: 8 },  { material: 'Leather', qty: 5 }],
   EnchantingTower:[{ material: 'Stone', qty: 10 }, { material: 'Dravenite Dust', qty: 3 }, { material: 'Wood', qty: 5 }],
-  AlchemistHut:   [{ material: 'Wood', qty: 8 },  { material: 'Herbs', qty: 3 }],
+  AlchemistHut:   [{ material: 'Wood', qty: 8 },  { material: 'Sage', qty: 3 }],
   Stoneworker:    [{ material: 'Stone', qty: 10 }, { material: 'Wood', qty: 5 }],
   Woodworker:     [{ material: 'Wood', qty: 10 }],
   MarketStall:    [{ material: 'Wood', qty: 8 }],

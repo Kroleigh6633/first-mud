@@ -681,7 +681,7 @@ public class ContentProviderTests
         masters.Should().NotBeNull();
         masters!.RequiredCraftingSkill.Should().Be(100);
         masters.ResultCategory.Should().Be(ItemCategory.Consumable);
-        masters.Ingredients.Should().HaveCount(3);
+        masters.Ingredients.Should().HaveCount(4);
 
         // Every recipe the old tuple array held must now come from JSON.
         provider.AllRecipes().Should().HaveCountGreaterOrEqualTo(57);

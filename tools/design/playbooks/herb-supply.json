@@ -1,0 +1,29 @@
+{
+  "id": "herb-supply",
+  "displayName": "Herb supply by biome",
+  "description": "ECONOMY playbook. Measures tier-1, tier-2, and tier-3 herb acquisition rate per biome per playerHour. Tier-1 (Sage, Mint, Thornroot, Lavender) should drop abundantly everywhere. Tier-2 (Fire Moss / Sea Kelp / Nightshade / Sand Thistle / Bogweed) should appear meaningfully in their designated biome but be near-zero elsewhere. Tier-3 (Moonbloom / Starflower / Wyrd Blossom / Dragon's Breath) is scarce — 0/hr baseline because acquisition requires Greenhouse cultivation from rare seeds, not direct drops. Seeds (Moonbloom Seed from Thornwood forest, Starflower Seed from water/Fairgean, Wyrd Blossom Seed from wyrd sources, Dragon's Breath Seed from volcanic/mountain boss drops) should be scarce but non-zero in their biomes. This playbook is a design reference + regression target; the current PlaybookRunner does not execute economy kind, but herb-supply cells are validated by the HerbSupplyPlaybookTests unit test.",
+  "kind": "economy",
+  "holdouts": {
+    "playerLevel": 5
+  },
+  "axes": [
+    { "name": "biome",       "values": [1, 2, 3, 4, 5, 6, 7] },
+    { "name": "playerHours", "values": [1] }
+  ],
+  "rolls": 200,
+  "seed": 42,
+  "expectedViability": { "cells": [] },
+  "toleranceBands": {},
+  "expectedDistribution": {
+    "cells": [
+      { "biome": 1, "playerHours": 1, "expected": { "tier1PerHour": [15, 40], "tier2PerHour": [3, 10], "tier3PerHour": [0, 0],    "seedsPerHour": [0, 2] }, "biomeName": "mountain", "tier2Herb": "Fire Moss",    "seedDrop": "Dragon's Breath Seed" },
+      { "biome": 2, "playerHours": 1, "expected": { "tier1PerHour": [15, 40], "tier2PerHour": [3, 10], "tier3PerHour": [0, 0],    "seedsPerHour": [0, 2] }, "biomeName": "forest",   "tier2Herb": "Nightshade",   "seedDrop": "Moonbloom Seed" },
+      { "biome": 3, "playerHours": 1, "expected": { "tier1PerHour": [15, 40], "tier2PerHour": [0, 2],  "tier3PerHour": [0, 0],    "seedsPerHour": [0, 0] }, "biomeName": "plains",   "tier2Herb": "(none)",       "seedDrop": "(none)" },
+      { "biome": 4, "playerHours": 1, "expected": { "tier1PerHour": [15, 40], "tier2PerHour": [3, 10], "tier3PerHour": [0, 0],    "seedsPerHour": [0, 0] }, "biomeName": "swamp",    "tier2Herb": "Bogweed",      "seedDrop": "(none)" },
+      { "biome": 5, "playerHours": 1, "expected": { "tier1PerHour": [10, 30], "tier2PerHour": [3, 10], "tier3PerHour": [0, 0],    "seedsPerHour": [0, 2] }, "biomeName": "water",    "tier2Herb": "Sea Kelp",     "seedDrop": "Starflower Seed" },
+      { "biome": 6, "playerHours": 1, "expected": { "tier1PerHour": [10, 30], "tier2PerHour": [3, 10], "tier3PerHour": [0, 0],    "seedsPerHour": [0, 2] }, "biomeName": "desert",   "tier2Herb": "Sand Thistle", "seedDrop": "Dragon's Breath Seed" },
+      { "biome": 7, "playerHours": 1, "expected": { "tier1PerHour": [5, 20],  "tier2PerHour": [0, 2],  "tier3PerHour": [0, 0],    "seedsPerHour": [0, 2] }, "biomeName": "wyrd",     "tier2Herb": "(none)",       "seedDrop": "Wyrd Blossom Seed" },
+      { "biome": 0, "playerHours": 1, "expected": { "tier1PerHour": [0, 0],   "tier2PerHour": [0, 0],  "tier3PerHour": [1, 10],   "seedsPerHour": [0, 0] }, "biomeName": "greenhouse", "tier2Herb": "(cultivated)", "seedDrop": "(consumed)" }
+    ]
+  }
+}
