@@ -14,7 +14,7 @@ on branch `worktree-agent-{{AGENT_ID}}`.
 
 ### Pre-flight (do this first)
 
-1. Read `docs/workflow/active-branches.md`.
+1. **Consult the ledger first — it is the source of truth.** Read `docs/workflow/active-branches.md`. Anything in your briefing that contradicts the ledger loses; reconcile before proceeding. If your branch is not in the ledger, your first action is to add it (step 3 below). If you are a merge agent and a target branch is not `ready-to-merge` in the ledger, stop and reconcile rather than merging anyway.
 2. Scan for rows that touch the files you plan to edit. If any row overlaps and is newer, either:
    - Rebase onto that branch and supersede it (see supersession protocol in `docs/workflow/README.md`), or
    - Narrow your scope so there is no overlap, or
@@ -29,8 +29,27 @@ on branch `worktree-agent-{{AGENT_ID}}`.
 
 - **Commit before returning.** The branch is your commit authorization. Use a descriptive message; if you superseded another branch, include `Supersedes: <branch>` as a trailer.
 - **Update your ledger row** to `status: ready-to-merge` (or `blocked: <reason>` / `superseded by <branch>`). Bump the `updated` date.
-- **Client-side changes:** run `scripts/agent/check-hmr.ps1 <primary-file>` and paste its output in your report. If HMR cannot verify from the worktree (Docker mounts main), say so explicitly; do not claim verified.
+- **Client-side changes (HMR constraint).** Docker mounts `src/FirstMud.Client/` from **main**, not from worktrees. That means an edit in your worktree is **not visible to the browser until merge**. Options, in order of preference:
+  1. Do the edit, commit, return, and let the merge agent's merge-to-main be the HMR trigger. Verification happens post-merge. This is normal and fine.
+  2. If you need to visually verify before merge, run `scripts/agent/deploy-worktree.ps1 <worktree-path> <file>` to copy the file into main's mount. This dirties main's working tree — you must `git restore` it in main before the next merge if you are still iterating. Then run `scripts/agent/check-hmr.ps1 <file>`.
+  3. Rebind the Docker mount to your worktree via compose override (heavy; usually unnecessary).
+
+  In your report, state which option you used and paste the `check-hmr.ps1` output if applicable. Do not claim "visually verified" if you only ran option 1.
 - **Build/test:** `dotnet build FirstMud.slnx` must stay at 0 errors / 0 warnings. `dotnet test FirstMud.slnx` must not lose tests.
+
+### Merging-agent checklist (only if you are a merge agent)
+
+Use this procedure to land a `ready-to-merge` branch in a **single commit** without a `chore(ledger)` follow-up (the workflow forbids `--amend`):
+
+1. Run `scripts/agent/ledger-lint.ps1`. Confirm the target branch is listed and its status is `ready-to-merge`. If not, stop and reconcile.
+2. Flip its row to `status: merging` and commit that on the base branch.
+3. `git merge --no-commit --no-ff <branch>` — this stages the merge without committing. The incoming branch will re-add its own ledger row at this point.
+4. Use `Edit` on `docs/workflow/active-branches.md` to delete the re-added row.
+5. `git add docs/workflow/active-branches.md`
+6. `git commit -m "merge <branch>"` — single commit, row gone, tree clean.
+7. `scripts/agent/ledger-lint.ps1 -ExpectEmpty` — post-merge verification. Fails loudly if the row survived.
+
+If step 7 fails, something went wrong with step 4; fix in a follow-up commit and investigate why the row wasn't caught in the merge.
 
 ### Report (under 200 words)
 

@@ -28,5 +28,6 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | worktree-agent-a8f77995 | ready-to-merge | 9c5e5b9 | Migrate progression scaling (workmanship divisor + companion layer thresholds) into content/progression-curves.json + apply Pass-1 tunes + bump enchanting drop weights | - | content/progression-curves.json, content/schemas/progression-curves.schema.json, content/loot-tables.json, src/FirstMud.Domain/Configuration/, src/FirstMud.Domain/Entities/Companion.cs, src/FirstMud.Domain/ValueObjects/Workmanship.cs, src/FirstMud.Application/Content/, src/FirstMud.Application/Services/CraftingService.cs, tools/design/FirstMud.DesignTools/Tools/ProgressionSim/ProgressionSimulator.cs, tests/, docs/design/sim-reports/progression-pass-tuned.md | 2026-04-13 |
+| worktree-agent-a1fc25ed | ready-to-merge | 098a82d | Polish 4 workflow rough edges: single-commit merge procedure with ledger cleanup, worktree-health cwd tagging, ledger-is-source-of-truth rule, HMR deploy-worktree helper | - | docs/workflow/agent-briefing-template.md, docs/workflow/README.md, docs/workflow/active-branches.md, scripts/agent/ledger-lint.ps1, scripts/agent/worktree-health.ps1, scripts/agent/deploy-worktree.ps1, scripts/agent/README.md | 2026-04-13 |
 
 <!-- agents add rows above this line -->
