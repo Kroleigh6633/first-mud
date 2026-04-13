@@ -281,30 +281,35 @@ public static class MonsterFactory
             _    => 3,
         };
 
+        // Danger-scaled pack size — higher danger means more enemies
+        int packSize = dangerLevel switch
+        {
+            <= 2 => 1,
+            <= 4 => Random.Shared.Next(1, 3),  // 1-2
+            <= 6 => Random.Shared.Next(2, 4),  // 2-3
+            <= 8 => Random.Shared.Next(2, 5),  // 2-4
+            _    => Random.Shared.Next(3, 5),  // 3-4 at danger 9-10
+        };
+
         var pool = biomePools[tierIndex];
         var pack = new List<MonsterTemplate>();
 
+        // First monster is the primary (boss at danger 10)
         var primary = pool[Random.Shared.Next(pool.Length)];
-        pack.Add(ScaleMonster(primary, dangerLevel, playerLevel));
+        pack.Add(ScaleMonster(primary, dangerLevel, playerLevel, isBoss: dangerLevel >= 10));
 
-        if (dangerLevel >= 3 && Random.Shared.Next(2) == 0)
+        // Fill remaining pack slots with monsters from the tier below
+        while (pack.Count < packSize)
         {
             var weakPool = biomePools[Math.Max(0, tierIndex - 1)];
             var extra = weakPool[Random.Shared.Next(weakPool.Length)];
-            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel));
-        }
-
-        if (dangerLevel >= 7 && pack.Count == 1)
-        {
-            var midPool = biomePools[Math.Max(0, tierIndex - 1)];
-            var extra = midPool[Random.Shared.Next(midPool.Length)];
-            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel));
+            pack.Add(ScaleMonster(extra, dangerLevel, playerLevel, isBoss: false));
         }
 
         return pack;
     }
 
-    private static MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel)
+    private static MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel, bool isBoss = false)
     {
         var variance = Random.Shared.Next(-1, 2); // -1, 0, or 1
         var monsterLevel = Math.Max(1, dangerLevel + variance);
@@ -312,6 +317,32 @@ public static class MonsterFactory
         if (playerLevel > dangerLevel * 2)
             monsterLevel = Math.Max(monsterLevel, playerLevel - 2);
 
-        return template with { Level = monsterLevel };
+        // HP scales aggressively with danger: danger 10 = 5x base HP
+        double hpMultiplier = 1.0 + dangerLevel * 0.4;
+        int scaledHp = (int)(template.Hp * hpMultiplier);
+
+        // Speed scales with danger so high-danger monsters act first more often
+        int scaledSpeed = template.Speed + dangerLevel;
+
+        // Ability damage scales with danger: danger 10 = 4x base power
+        double powerMultiplier = 1.0 + dangerLevel * 0.3;
+        var scaledAbilities = template.Abilities
+            .Select(a => a with { BasePower = (int)(a.BasePower * powerMultiplier) })
+            .ToArray();
+
+        // Boss at danger 10: double HP and +5 speed on top of normal scaling
+        if (isBoss)
+        {
+            scaledHp   *= 2;
+            scaledSpeed += 5;
+        }
+
+        return template with
+        {
+            Level     = monsterLevel,
+            Hp        = scaledHp,
+            Speed     = scaledSpeed,
+            Abilities = scaledAbilities,
+        };
     }
 }

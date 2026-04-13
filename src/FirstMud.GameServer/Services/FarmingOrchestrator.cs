@@ -27,7 +27,8 @@ public class FarmingOrchestrator(
     IHubContext<GameHub> hubContext,
     AutoFarmService autoFarmService,
     IServiceScopeFactory scopeFactory,
-    ILogger<FarmingOrchestrator> logger)
+    ILogger<FarmingOrchestrator> logger,
+    InventoryDepositService inventoryDepositService)
 {
     // -------------------------------------------------------------------------
     // Clockwise spiral step generator

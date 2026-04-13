@@ -46,6 +46,7 @@ builder.Services.AddScoped<StartupSeeder>();
 // Shared combat utilities and farming orchestrator
 builder.Services.AddScoped<CombatHelpers>();
 builder.Services.AddScoped<FarmingOrchestrator>();
+builder.Services.AddSingleton<InventoryDepositService>();
 
 // Quest objective interaction
 builder.Services.AddSingleton<QuestProgressTracker>();
