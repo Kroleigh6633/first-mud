@@ -47,6 +47,7 @@ const SECTIONS: Section[] = [
       { keys: ['B'], description: 'open companion panel — manage your party of 3' },
       { keys: ['R'], description: 'open crafting panel — view recipes and craft items' },
       { keys: ['?', 'H'], description: 'open / close this help menu' },
+      { keys: ['M'], description: 'mute / unmute audio (music + SFX)' },
       { keys: ['Esc'], description: 'close any open panel / cancel auto-farm' },
     ],
   },

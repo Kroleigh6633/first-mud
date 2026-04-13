@@ -17,6 +17,7 @@ export type KeyAction =
   | { type: 'crafting' }
   | { type: 'navigate' }
   | { type: 'autoquest' }
+  | { type: 'mute' }
   | null;
 
 export function useKeyboard(): KeyAction {
@@ -106,6 +107,10 @@ export function useKeyboard(): KeyAction {
         case 'l':
         case 'L':
           next = { type: 'autoquest' };
+          break;
+        case 'm':
+        case 'M':
+          next = { type: 'mute' };
           break;
         case 'Escape':
           next = { type: 'escape' };

@@ -17,6 +17,7 @@ import CraftingPanel from './CraftingPanel';
 import AutoFarmPicker from './AutoFarmPicker';
 import type { AutoFarmSettings } from './AutoFarmPicker';
 import { useKeyboard } from '../hooks/useKeyboard';
+import { useAudio } from '../hooks/useAudio';
 
 interface Props {
   connectionState: ConnectionState;
@@ -125,6 +126,16 @@ export default function GameTerminal({
   questProgress = {},
 }: Props) {
   const keyAction = useKeyboard();
+
+  // Derive biome type from player position for audio
+  const currentBiomeType = useMemo(() => {
+    if (!worldState?.player) return 'grassland';
+    return getBiome(worldState.player.x, worldState.player.y).type;
+  }, [worldState?.player]);
+
+  const { playSound, setMusicVolume, setSfxVolume, musicVolume, sfxVolume, isMuted, toggleMute } =
+    useAudio(currentBiomeType, combat !== null, atHomestead);
+
   const [showQuestLog, setShowQuestLog] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
@@ -456,6 +467,9 @@ export default function GameTerminal({
         setShowCrafting(false);
         setShowAutoFarmPicker(false);
         break;
+      case 'mute':
+        toggleMute();
+        break;
       case 'pass':
         appendMessage({
           timestamp: new Date().toISOString(),
@@ -466,7 +480,73 @@ export default function GameTerminal({
     }
   // Only re-run when keyAction or the stable callbacks change — NOT when
   // atHomestead / autoFarmStatus / currentTile change (read via refs).
-  }, [keyAction, sendCommand, fetchAvailableQuests, appendMessage]);
+  }, [keyAction, sendCommand, fetchAvailableQuests, appendMessage, toggleMute]);
+
+  // ── Audio SFX triggers from incoming messages ─────────────────────────────
+  const lastMessageCountRef = useRef(0);
+  useEffect(() => {
+    const newMessages = messages.slice(lastMessageCountRef.current);
+    lastMessageCountRef.current = messages.length;
+    if (newMessages.length === 0) return;
+
+    for (const msg of newMessages) {
+      const t = msg.text.toLowerCase();
+
+      // Combat events
+      if (msg.category === 'system' || msg.category === 'combat' || msg.category === 'loot') {
+        if (/critical/i.test(msg.text)) {
+          playSound('crit');
+        } else if (/\bmiss\b|dodged|evaded/i.test(t)) {
+          playSound('miss');
+        } else if (/\bdodge\b/i.test(t)) {
+          playSound('dodge');
+        } else if (/you strike|you hit|strikes for|hits for/i.test(t)) {
+          playSound('strike');
+        } else if (/healed|restores/i.test(t)) {
+          playSound('heal');
+        }
+      }
+
+      // Level up
+      if (/level \d+|leveled up|reached level/i.test(msg.text)) {
+        playSound('levelUp');
+      }
+
+      // Quest
+      if (msg.category === 'quest' && /complete|complet/i.test(t)) {
+        playSound('questComplete');
+      }
+
+      // Loot
+      if (msg.category === 'loot') {
+        if (/rare|legendary|epic|masterwork/i.test(t)) {
+          playSound('rareLoot');
+        } else {
+          playSound('loot');
+        }
+      }
+
+      // Portal
+      if (/portal stirs|portal/i.test(t) && msg.category === 'wyrd') {
+        playSound('portal');
+      }
+
+      // Defeat
+      if (msg.category === 'system' && /defeated|you have been defeated/i.test(t)) {
+        playSound('defeat');
+      }
+
+      // Capture
+      if (msg.category === 'system' && /captured/i.test(t)) {
+        playSound('capture');
+      }
+
+      // Harvest
+      if (msg.category === 'loot' && /harvest/i.test(t)) {
+        playSound('harvest');
+      }
+    }
+  }, [messages, playSound]);
 
   const handleAutoFarmStart = (settings: AutoFarmSettings) => {
     setShowAutoFarmPicker(false);
@@ -829,6 +909,64 @@ export default function GameTerminal({
         }}
       >
         press [?] for help
+      </div>
+
+      {/* Audio controls — bottom-right, below help hint */}
+      <div style={{
+        position: 'absolute',
+        bottom: '204px',
+        right: '10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        pointerEvents: 'auto',
+      }}>
+        {/* Mute toggle */}
+        <button
+          type="button"
+          onClick={toggleMute}
+          title="Toggle mute [M]"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: isMuted ? '#ff6644' : '#444444',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            cursor: 'pointer',
+            padding: 0,
+            letterSpacing: '0.05em',
+            textAlign: 'left',
+          }}
+        >
+          {isMuted ? '♪ [M] muted' : '♪ [M] sound on'}
+        </button>
+        {/* Volume sliders */}
+        {!isMuted && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <label style={{ color: '#444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ minWidth: '28px' }}>♫</span>
+              <input
+                type="range" min={0} max={1} step={0.05}
+                value={musicVolume}
+                onChange={e => setMusicVolume(parseFloat(e.target.value))}
+                style={{ width: '70px', accentColor: '#00ff41', cursor: 'pointer' }}
+                title="Music volume"
+              />
+            </label>
+            <label style={{ color: '#444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ minWidth: '28px' }}>⚡</span>
+              <input
+                type="range" min={0} max={1} step={0.05}
+                value={sfxVolume}
+                onChange={e => setSfxVolume(parseFloat(e.target.value))}
+                style={{ width: '70px', accentColor: '#00ff41', cursor: 'pointer' }}
+                title="SFX volume"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Homestead indicator */}
