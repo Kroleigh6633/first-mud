@@ -94,22 +94,19 @@ type CityTab = 'OVERVIEW' | 'PRODUCTION' | 'HOUSING';
 
 /**
  * Returns the next available grid position not occupied by any existing building.
- * Searches outward from (0,0) in a spiral pattern.
+ * Fills row-major: (0,0),(1,0),...,(ROW_WIDTH-1,0),(0,1),(1,1),... so buildings
+ * read as tidy rows/columns rather than a radial spiral.
+ *
+ * Pure / deterministic for a given set of occupied tiles.
  */
+const ROW_WIDTH = 7; // buildings per row before wrapping to next row
 function nextAvailablePosition(buildings: HomesteadBuilding[]): { x: number; y: number } {
   const occupied = new Set(buildings.map(b => `${b.gridX},${b.gridY}`));
-  const candidates: [number, number][] = [];
-  for (let r = 0; r <= 6; r++) {
-    for (let x = -r; x <= r; x++) {
-      for (let y = -r; y <= r; y++) {
-        if (Math.abs(x) === r || Math.abs(y) === r) {
-          candidates.push([x, y]);
-        }
-      }
+  // Scan up to a generous ceiling: enough slots for >200 buildings
+  for (let y = 0; y < 32; y++) {
+    for (let x = 0; x < ROW_WIDTH; x++) {
+      if (!occupied.has(`${x},${y}`)) return { x, y };
     }
-  }
-  for (const [x, y] of candidates) {
-    if (!occupied.has(`${x},${y}`)) return { x, y };
   }
   return { x: 0, y: 0 };
 }

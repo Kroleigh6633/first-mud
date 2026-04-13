@@ -345,6 +345,8 @@ function drawHomesteadBuilding(
   isConstructed: boolean,
   progress: number,
   waterFrame: number,
+  residentCount: number = 0,
+  residentCapacity: number = 0,
 ) {
   const colors = buildingBaseColors(type);
   // "floor level" — top edge of the isometric tile face, used as the ground line
@@ -396,9 +398,9 @@ function drawHomesteadBuilding(
 
     // ── Forge: dark-red block + peaked roof + right-side chimney + smoke ──
     case 'Forge': {
-      const hw  = tileW * 0.42;
-      const wh  = tileH * 1.4;   // wall height
-      const rh  = tileH * 0.6;   // roof peak extra height
+      const hw  = tileW * 0.30;  // shrunk from 0.42 so sprite fits 1-tile footprint
+      const wh  = tileH * 1.1;   // wall height (was 1.4)
+      const rh  = tileH * 0.5;   // roof peak extra height (was 0.6)
       const roofBase = floor - wh;
 
       // Wall (left face — darker)
@@ -451,8 +453,8 @@ function drawHomesteadBuilding(
 
     // ── Warehouse: wide grey block + flat roof + crates ────────────────────
     case 'Warehouse': {
-      const hw = tileW * 0.72;   // extra-wide (2x1 tiles)
-      const wh = tileH * 1.2;
+      const hw = tileW * 0.36;   // shrunk from 0.72 to fit 1-tile footprint
+      const wh = tileH * 1.1;    // (was 1.2)
       const roofBase = floor - wh;
 
       // Left (dark) face
@@ -469,9 +471,9 @@ function drawHomesteadBuilding(
       ctx.strokeStyle = '#666';
       ctx.lineWidth = 1.2;
       for (let ci = 0; ci < 2; ci++) {
-        const cx = sx + tileW * (0.08 + ci * 0.35);
+        const cx = sx + tileW * (0.06 + ci * 0.18);
         const cy = floor - tileH * 0.3;
-        const cs = tileH * 0.35;
+        const cs = tileH * 0.22;
         ctx.strokeRect(cx - cs / 2, cy - cs, cs, cs);
         ctx.beginPath();
         ctx.moveTo(cx - cs / 2, cy - cs * 0.5);
@@ -493,7 +495,7 @@ function drawHomesteadBuilding(
 
     // ── MarketStall: open stall with triangular awning + counter ────────────
     case 'MarketStall': {
-      const hw = tileW * 0.38;
+      const hw = tileW * 0.30;   // shrunk from 0.38 to fit 1-tile footprint
       const wh = tileH * 0.85;
       const roofBase = floor - wh;
 
@@ -598,8 +600,8 @@ function drawHomesteadBuilding(
 
     // ── Mine: dark hillside arch + cart tracks + ore pile ──────────────────
     case 'Mine': {
-      const hw = tileW * 0.40;
-      const wh = tileH * 1.1;
+      const hw = tileW * 0.32;   // shrunk from 0.40 to fit 1-tile footprint
+      const wh = tileH * 1.0;    // (was 1.1)
       const roofBase = floor - wh;
 
       // Hillside body (dark mound)
@@ -654,8 +656,8 @@ function drawHomesteadBuilding(
 
     // ── Tannery: building + hide racks (vertical poles + rectangles) ────────
     case 'Tannery': {
-      const hw = tileW * 0.38;
-      const wh = tileH * 1.2;
+      const hw = tileW * 0.28;   // shrunk from 0.38 to fit 1-tile footprint
+      const wh = tileH * 1.05;   // (was 1.2)
       const roofBase = floor - wh;
 
       // Main building
@@ -672,30 +674,30 @@ function drawHomesteadBuilding(
       ctx.fillStyle = colors.roof;
       ctx.fill();
 
-      // Hide racks (3 vertical poles with brown hides)
-      for (let r = 0; r < 3; r++) {
-        const rx = sx - hw * 1.5 + r * hw;
+      // Hide racks (2 vertical poles with brown hides) — tucked beside the building
+      for (let r = 0; r < 2; r++) {
+        const rx = sx + hw + tileW * 0.04 + r * tileW * 0.08;
         const ry = floor - tileH * 0.2;
         // Pole
         ctx.fillStyle = '#5a3a18';
-        ctx.fillRect(rx - 1.5, ry - tileH * 1.0, 3, tileH * 1.0);
+        ctx.fillRect(rx - 1.5, ry - tileH * 0.7, 3, tileH * 0.7);
         // Hide (brown rectangle)
         ctx.fillStyle = colors.accent;
         ctx.globalAlpha = 0.75;
-        ctx.fillRect(rx - tileW * 0.065, ry - tileH * 0.9, tileW * 0.13, tileH * 0.55);
+        ctx.fillRect(rx - tileW * 0.035, ry - tileH * 0.6, tileW * 0.07, tileH * 0.38);
         ctx.globalAlpha = 1;
         // Stitch lines on hide
         ctx.strokeStyle = '#7a4a28';
         ctx.lineWidth = 0.8;
-        ctx.strokeRect(rx - tileW * 0.065, ry - tileH * 0.9, tileW * 0.13, tileH * 0.55);
+        ctx.strokeRect(rx - tileW * 0.035, ry - tileH * 0.6, tileW * 0.07, tileH * 0.38);
       }
       break;
     }
 
     // ── Barracks: stone building + flag on top ───────────────────────────────
     case 'Barracks': {
-      const hw = tileW * 0.46;
-      const wh = tileH * 1.5;
+      const hw = tileW * 0.32;   // shrunk from 0.46 to fit 1-tile footprint
+      const wh = tileH * 1.25;   // (was 1.5)
       const roofBase = floor - wh;
 
       // Stone wall texture (left face)
@@ -732,10 +734,10 @@ function drawHomesteadBuilding(
       ctx.fillStyle = '#6a5030';
       ctx.fillRect(fpX - 1.5, fpY, 3, tileH * 0.8);
       // Flag (triangle, animated flap)
-      const flap = Math.sin(waterFrame * 0.09) * tileW * 0.04;
+      const flap = Math.sin(waterFrame * 0.09) * tileW * 0.03;
       ctx.beginPath();
       ctx.moveTo(fpX, fpY);
-      ctx.lineTo(fpX + tileW * 0.22 + flap, fpY + tileH * 0.12);
+      ctx.lineTo(fpX + tileW * 0.14 + flap, fpY + tileH * 0.12);
       ctx.lineTo(fpX, fpY + tileH * 0.24);
       ctx.closePath();
       ctx.fillStyle = colors.accent;
@@ -752,8 +754,8 @@ function drawHomesteadBuilding(
 
     // ── EnchantingTower: tall narrow tower + purple glow ────────────────────
     case 'EnchantingTower': {
-      const hw = tileW * 0.22;
-      const wh = tileH * 2.2;   // much taller than others
+      const hw = tileW * 0.20;   // narrow tower — already thin, minor shrink
+      const wh = tileH * 1.8;    // slightly reduced from 2.2 so it doesn't dwarf neighbours
       const roofBase = floor - wh;
 
       // Narrow tower body
@@ -803,8 +805,8 @@ function drawHomesteadBuilding(
 
     // ── AlchemistHut: teal-accent hut + cauldron silhouette ────────────────
     case 'AlchemistHut': {
-      const hw = tileW * 0.35;
-      const wh = tileH * 1.1;
+      const hw = tileW * 0.30;   // shrunk from 0.35 to fit 1-tile footprint
+      const wh = tileH * 1.0;    // (was 1.1)
       const roofBase = floor - wh;
 
       ctx.fillStyle = '#152028';
@@ -841,8 +843,8 @@ function drawHomesteadBuilding(
 
     // ── Woodworker: warm-brown building + lumber pile ────────────────────────
     case 'Woodworker': {
-      const hw = tileW * 0.38;
-      const wh = tileH * 1.15;
+      const hw = tileW * 0.26;   // shrunk from 0.38 to fit 1-tile footprint with lumber pile beside
+      const wh = tileH * 1.05;   // (was 1.15)
       const roofBase = floor - wh;
 
       ctx.fillStyle = '#3a2010';
@@ -970,13 +972,46 @@ function drawHomesteadBuilding(
       ctx.arc(sx, roofBase + wh * 0.28, tileW * 0.03, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
+
+      // Capacity badge pill above roof apex: N/M occupancy indicator.
+      // Colors: grey default, red when empty, green when full.
+      if (residentCapacity > 0) {
+        const label = `${residentCount}/${residentCapacity}`;
+        const badgeFont = Math.max(9, Math.round(tileH * 0.28));
+        ctx.font = `bold ${badgeFont}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const textW = ctx.measureText(label).width;
+        const padX = 4;
+        const padY = 2;
+        const bw = textW + padX * 2;
+        const bh = badgeFont + padY * 2;
+        const bx = sx - bw / 2;
+        // Anchor just above the trapezoidal hut's roof apex (roofBase - rh).
+        const by = (roofBase - rh) - bh - 2;
+        let bgFill = 'rgba(20,20,20,0.85)';
+        if (residentCount >= residentCapacity) bgFill = 'rgba(40,140,60,0.92)';
+        else if (residentCount === 0) bgFill = 'rgba(150,60,60,0.9)';
+        const rad = bh / 2;
+        ctx.fillStyle = bgFill;
+        ctx.beginPath();
+        ctx.moveTo(bx + rad, by);
+        ctx.lineTo(bx + bw - rad, by);
+        ctx.arc(bx + bw - rad, by + rad, rad, -Math.PI / 2, Math.PI / 2);
+        ctx.lineTo(bx + rad, by + bh);
+        ctx.arc(bx + rad, by + rad, rad, Math.PI / 2, -Math.PI / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, sx, by + bh / 2);
+      }
       break;
     }
 
     // ── Greenhouse: green-tinted geodesic dome ──────────────────────────────
     case 'Greenhouse': {
-      const radius = tileW * 0.38;
-      const domeTop = floor - tileH * 1.6;
+      const radius = tileW * 0.34;   // shrunk from 0.38 to fit 1-tile footprint
+      const domeTop = floor - tileH * 1.2;
       const cx = sx;
       const cy = floor;
 
@@ -986,7 +1021,7 @@ function drawHomesteadBuilding(
 
       // Dome body — semi-ellipse
       ctx.beginPath();
-      ctx.ellipse(cx, cy - tileH * 0.15, radius, tileH * 1.45, 0, Math.PI, 0);
+      ctx.ellipse(cx, cy - tileH * 0.15, radius, tileH * 1.05, 0, Math.PI, 0);
       ctx.fillStyle = 'rgba(68, 170, 102, 0.45)';
       ctx.fill();
       ctx.strokeStyle = '#44aa66';
@@ -998,7 +1033,7 @@ function drawHomesteadBuilding(
       ctx.lineWidth = 0.8;
       for (let i = -2; i <= 2; i++) {
         const xOff = (radius * 0.35) * i;
-        const ribH = tileH * 1.45 * Math.sqrt(1 - (xOff * xOff) / (radius * radius));
+        const ribH = tileH * 1.05 * Math.sqrt(1 - (xOff * xOff) / (radius * radius));
         ctx.beginPath();
         ctx.moveTo(cx + xOff, cy - tileH * 0.15);
         ctx.lineTo(cx + xOff, cy - tileH * 0.15 - ribH);
@@ -1007,9 +1042,9 @@ function drawHomesteadBuilding(
 
       // Geodesic rib lines — horizontal
       for (let i = 1; i <= 3; i++) {
-        const yOff = tileH * 1.45 * (i / 4);
+        const yOff = tileH * 1.05 * (i / 4);
         const ribY = cy - tileH * 0.15 - yOff;
-        const span = radius * Math.sqrt(1 - (yOff * yOff) / (tileH * 1.45 * tileH * 1.45));
+        const span = radius * Math.sqrt(1 - (yOff * yOff) / (tileH * 1.05 * tileH * 1.05));
         ctx.beginPath();
         ctx.moveTo(cx - span, ribY);
         ctx.lineTo(cx + span, ribY);
@@ -1030,8 +1065,8 @@ function drawHomesteadBuilding(
 
     // ── Generic fallback: simple house ──────────────────────────────────────
     default: {
-      const hw = tileW * 0.36;
-      const wh = tileH * 1.1;
+      const hw = tileW * 0.30;   // shrunk from 0.36 to fit 1-tile footprint
+      const wh = tileH * 1.0;    // (was 1.1)
       const roofBase = floor - wh;
 
       ctx.fillStyle = colors.wall;
@@ -1525,6 +1560,8 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
         db.building.isConstructed,
         db.building.constructionProgress,
         waterFrame,
+        db.building.residents?.length ?? 0,
+        db.building.residentCapacity ?? 0,
       );
       ctx.restore();
     }
