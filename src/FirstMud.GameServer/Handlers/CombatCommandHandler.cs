@@ -6,6 +6,7 @@ using FirstMud.Domain.Entities;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 
 namespace FirstMud.GameServer.Handlers;
 
@@ -65,6 +66,7 @@ public class StartCombatCommandHandler(
 public class UseCombatAbilityCommandHandler(
     CombatService combatService,
     CombatHelpers combatHelpers,
+    IPlayerRepository playerRepository,
     IHubContext<GameHub> hubContext) : ICommandHandler<UseCombatAbilityCommand>
 {
     public async Task<CommandResult> HandleAsync(UseCombatAbilityCommand cmd, CancellationToken ct)
@@ -92,6 +94,16 @@ public class UseCombatAbilityCommandHandler(
             await combatHelpers.TryRollLootAsync(cmd.PlayerId, updated.ZoneId, ct);
             await combatHelpers.TryCaptureCompanionAsync(cmd.PlayerId, updated, ct);
             await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
+
+            // Auto-rotate maxed companions every 5th manual combat victory
+            var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+            if (player is not null && player.AutoRotateMaxedCompanions)
+            {
+                var shouldRotate = player.RecordCombatVictory();
+                await playerRepository.UpdateAsync(player, ct);
+                if (shouldRotate)
+                    await combatHelpers.TryRotateMaxedCompanionsAsync(cmd.PlayerId, ct);
+            }
         }
         else if (updated.State == EncounterState.Defeat)
         {

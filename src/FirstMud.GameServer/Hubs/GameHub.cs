@@ -259,6 +259,8 @@ public class GameHub : Hub
                 playerId,
                 TryGetInt(payload, "amount") is int sa and > 0 ? sa : 1),
 
+            "toggleautorotate" => new ToggleCompanionAutoRotateCommand(playerId),
+
             _ => null
         };
     }

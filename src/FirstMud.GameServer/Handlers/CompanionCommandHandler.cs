@@ -254,6 +254,33 @@ public class QueueSalvageCommandHandler(
     }
 }
 
+// ─── auto-rotate toggle handler ───────────────────────────────────────────────
+
+public class ToggleCompanionAutoRotateCommandHandler(
+    IPlayerRepository playerRepository,
+    GameNotificationService notificationService) : ICommandHandler<ToggleCompanionAutoRotateCommand>
+{
+    public async Task<CommandResult> HandleAsync(ToggleCompanionAutoRotateCommand cmd, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        var newValue = player.ToggleAutoRotateMaxedCompanions();
+        await playerRepository.UpdateAsync(player, ct);
+
+        var state = newValue ? "enabled" : "disabled";
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system",
+            $"Companion auto-rotation is now {state}. " +
+            (newValue
+                ? "Maxed companions will be swapped to homestead duty every 5 victories."
+                : "You will manage your companion roster manually."),
+            ct);
+
+        return new CommandResult(true, $"Auto-rotate {state}.", new { AutoRotate = newValue });
+    }
+}
+
 // ─── shared helpers ───────────────────────────────────────────────────────────
 
 internal static class CompanionDtoHelpers

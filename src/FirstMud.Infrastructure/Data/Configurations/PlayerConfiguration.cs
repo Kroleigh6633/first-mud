@@ -50,6 +50,10 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
             .HasDefaultValue(0);
         builder.Property(p => p.AutoSalvageArmorThreshold)
             .HasDefaultValue(0);
+        builder.Property(p => p.AutoRotateMaxedCompanions)
+            .HasDefaultValue(true);
+        builder.Property(p => p.CombatVictoryCount)
+            .HasDefaultValue(0);
         builder.Property(p => p.CraftingSeed);
 
         builder.Property(p => p.CurrentHp);

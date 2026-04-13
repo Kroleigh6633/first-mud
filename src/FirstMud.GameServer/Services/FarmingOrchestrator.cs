@@ -338,6 +338,16 @@ public class FarmingOrchestrator(
         autoFarmService.RecordDeposit(playerId, deposited);
         session.ItemsDeposited += deposited;
 
+        // Check companion auto-rotation on every deposit cycle (safe: not mid-fight)
+        await using (var rotScope = scopeFactory.CreateAsyncScope())
+        {
+            var rotHelpers = rotScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+            var rotPlayerRepo = rotScope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var rotPlayer = await rotPlayerRepo.GetByIdAsync(playerId, ct);
+            if (rotPlayer is not null && rotPlayer.AutoRotateMaxedCompanions)
+                await rotHelpers.TryRotateMaxedCompanionsAsync(playerId, ct);
+        }
+
         await Task.Delay(2_000, ct);
 
         var returnPlayer = await playerRepo.GetByIdAsync(playerId, ct);

@@ -33,6 +33,10 @@ public class Player
     public int AutoSalvageWeaponThreshold { get; private set; }
     public int AutoSalvageArmorThreshold { get; private set; }
 
+    // Companion auto-rotation — default ON; rotate maxed companions to homestead every 5 victories
+    public bool AutoRotateMaxedCompanions { get; private set; } = true;
+    public int CombatVictoryCount { get; private set; }
+
     // Position
     public Position Position { get; private set; } = new(WorldId.Aeldran, 1, 0, 0);
 
@@ -305,6 +309,25 @@ public class Player
         Speed = spd;
         MaxHp = maxHp;
         CurrentHp = Math.Min(CurrentHp, maxHp);
+    }
+
+    /// <summary>
+    /// Toggles the auto-rotate maxed companions setting and returns the new value.
+    /// </summary>
+    public bool ToggleAutoRotateMaxedCompanions()
+    {
+        AutoRotateMaxedCompanions = !AutoRotateMaxedCompanions;
+        return AutoRotateMaxedCompanions;
+    }
+
+    /// <summary>
+    /// Increments the combat victory counter and returns whether a rotation check
+    /// should fire (every 5th victory).
+    /// </summary>
+    public bool RecordCombatVictory()
+    {
+        CombatVictoryCount++;
+        return CombatVictoryCount % 5 == 0;
     }
 
     public void GainSalvageSkillXp(int amount)

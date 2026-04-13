@@ -88,6 +88,7 @@ builder.Services.AddScoped<ICommandHandler<ViewRecipesCommand>, ViewRecipesComma
 builder.Services.AddScoped<ICommandHandler<UseConsumableCommand>, UseConsumableCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<InteractQuestCommand>, InteractQuestCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SmeltCommand>, SmeltCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ToggleCompanionAutoRotateCommand>, ToggleCompanionAutoRotateCommandHandler>();
 
 var app = builder.Build();
 

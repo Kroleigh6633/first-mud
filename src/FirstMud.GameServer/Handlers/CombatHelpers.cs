@@ -588,6 +588,105 @@ public class CombatHelpers(
     }
 
     // -------------------------------------------------------------------------
+    // Companion auto-rotation
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// After every 5th combat victory (or when called explicitly from an auto-farm
+    /// deposit cycle), checks whether any active companions are at Bond MAX (Layer 6)
+    /// while lower-bond companions sit idle.  Swaps them: maxed companion → best
+    /// homestead duty, lowest-bond idle companion → active party.
+    ///
+    /// No-ops when <see cref="Player.AutoRotateMaxedCompanions"/> is false or
+    /// there is nothing to swap.
+    /// </summary>
+    public async Task TryRotateMaxedCompanionsAsync(Guid playerId, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(playerId, ct);
+        if (player is null) return;
+        if (!player.AutoRotateMaxedCompanions) return;
+
+        var allCompanions = await companionRepository.GetByOwnerAsync(playerId, ct);
+
+        // Active companions that have hit the bond cap
+        var maxedActive = allCompanions
+            .Where(c => !c.IsPermanentlyGone && c.IsActive && c.CurrentLayer >= 6)
+            .ToList();
+
+        if (maxedActive.Count == 0) return;
+
+        // Idle companions (not active, not on any homestead duty) that can still grow
+        var growableInactive = allCompanions
+            .Where(c => !c.IsPermanentlyGone
+                     && !c.IsActive
+                     && (c.AssignedDuty is null || c.AssignedDuty == Domain.Enums.HomesteadDuty.None)
+                     && c.CurrentLayer < 6)
+            .OrderBy(c => c.CurrentLayer)   // lowest bond first — most benefit from XP
+            .ToList();
+
+        if (growableInactive.Count == 0) return;
+
+        var rotated = false;
+
+        foreach (var maxed in maxedActive)
+        {
+            if (growableInactive.Count == 0) break;
+
+            var replacement = growableInactive[0];
+            growableInactive.RemoveAt(0);
+
+            // Deactivate the maxed companion
+            player.RemoveActiveCompanion(maxed.Id);
+            maxed.SetActive(false);
+
+            // Assign maxed companion to its best homestead duty
+            var bestDuty = new[] { Domain.Enums.HomesteadDuty.Guard, Domain.Enums.HomesteadDuty.Harvester, Domain.Enums.HomesteadDuty.Salvager, Domain.Enums.HomesteadDuty.Crafter }
+                .OrderByDescending(d => maxed.GetAptitude(d))
+                .First();
+
+            maxed.AssignToHomestead(bestDuty);
+            await companionRepository.UpdateAsync(maxed, ct);
+
+            // Activate the replacement (may need to recall from homestead first)
+            if (replacement.AssignedDuty.HasValue && replacement.AssignedDuty != Domain.Enums.HomesteadDuty.None)
+                replacement.RecallFromHomestead();
+
+            player.TryAddActiveCompanion(replacement.Id);
+            replacement.SetActive(true);
+            await companionRepository.UpdateAsync(replacement, ct);
+
+            await notificationService.SendMessageAsync(playerId, "system",
+                $"{maxed.Name} (Bond MAX) has been rotated to {bestDuty} duty at your homestead. " +
+                $"{replacement.Name} (Bond {replacement.CurrentLayer}) joins your party to train.",
+                ct);
+
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("CompanionRotated", new
+                {
+                    RotatedOutId   = maxed.Id,
+                    RotatedOutName = maxed.Name,
+                    Duty           = bestDuty.ToString(),
+                    RotatedInId    = replacement.Id,
+                    RotatedInName  = replacement.Name,
+                    ReplacementLayer = replacement.CurrentLayer,
+                }, ct);
+
+            logger.LogInformation(
+                "Auto-rotated companion {MaxedName} (Layer {Layer}) → {Duty}; {RepName} (Layer {RepLayer}) → active for player {PlayerId}",
+                maxed.Name, maxed.CurrentLayer, bestDuty, replacement.Name, replacement.CurrentLayer, playerId);
+
+            rotated = true;
+        }
+
+        if (rotated)
+        {
+            await playerRepository.UpdateAsync(player, ct);
+            await CompanionDtoHelpers.BroadcastCompanionListAsync(playerId, companionRepository, hubContext, ct);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Biome detection — forwarding wrappers → BiomeService
     // Kept here so callers don't need to change import namespaces.
     // -------------------------------------------------------------------------
