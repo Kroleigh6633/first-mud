@@ -203,8 +203,15 @@ public sealed class CombatSimulationService
 
         var playerSide = new List<Combatant> { playerCombatant };
 
+        // Disambiguate companion names so parties with duplicate (Type,Element,Layer)
+        // don't collide downstream when we materialize the damage dictionary by name.
+        // Before this, two L5-Earth CapturedMonsters both produced
+        // "CapturedMonster-Earth-L5" and Run()'s final ToDictionary() threw
+        // "An item with the same key has already been added. Key: CapturedMonster-Earth-L5".
+        int companionIndex = 0;
         foreach (var c in companions)
         {
+            companionIndex++;
             var abilities = CompanionAbilityFactory.Build(c.Type, c.Element, c.Layer, c.Level);
             var companionHp    = 50 + c.Level * 10 + c.Layer * 5;
             var companionSpeed = 6 + c.Level;
@@ -213,7 +220,7 @@ public sealed class CombatSimulationService
             var scaledAbilities = PartyScaling.ScaleAbilities(abilities, partyFactor);
 
             playerSide.Add(Combatant.Create(
-                $"{c.Type}-{c.Element}-L{c.Layer}",
+                $"{c.Type}-{c.Element}-L{c.Layer}#{companionIndex}",
                 CombatantType.Companion,
                 Guid.NewGuid(),
                 companionHp,
@@ -351,9 +358,13 @@ public sealed class CombatSimulationService
             ? damageByCompanion.OrderByDescending(kv => kv.Value).First().Key
             : (Guid?)null;
 
-        var damageByName = damageByCompanion.ToDictionary(
-            kv => companionName[kv.Key],
-            kv => kv.Value);
+        // Defensive aggregation: we now guarantee unique names via the #index
+        // suffix in BuildEncounter, but keep this grouping so a future caller
+        // that constructs its own encounter with duplicate combatant names
+        // still gets a sane result instead of a hard crash.
+        var damageByName = damageByCompanion
+            .GroupBy(kv => companionName[kv.Key])
+            .ToDictionary(g => g.Key, g => g.Sum(kv => kv.Value));
 
         return new SimulationResult(
             outcome,
