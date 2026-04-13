@@ -1,0 +1,39 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "gem-supply",
+  "displayName": "Gem supply rate by tier / biome",
+  "description": "Measures per-hour acquisition of each gem tier across biomes for the 'balanced' playstyle. Tier-1 gems (Quartz, Obsidian) should be reliable — 5-10 per 40h. Tier-2 (Amethyst, Emerald, Topaz, Aquamarine) meaningful — 2-4 per 40h across all biomes combined. Tier-3 (Diamond, Black Pearl) scarce but present — 0-2 per 40h. If tier-3 never appears in a 40h sim that is a content bug; bump drop weights for the tier-3 entries in loot-tables.json biome-mountain / biome-desert / biome-water / biome-wyrd pools. NOTE: this playbook is an economy-sim spec, not a viability playbook — it is consumed by the gem-supply economy evaluator (follow-up). Today the file is a content contract that the economy-sim command can load; acceptance is via the content-layer test that verifies gems referenced here match the loot-tables entries.",
+  "kind": "economy",
+  "holdouts": {
+    "playstyle": "balanced",
+    "simHours": 40
+  },
+  "axes": [
+    { "name": "gemTier", "values": [1, 2, 3] },
+    { "name": "biome",   "values": ["mountain", "forest", "desert", "water", "swamp", "plains", "wyrd"] }
+  ],
+  "rolls": 5,
+  "seed": 1337,
+  "expectedYield": {
+    "perRunHours": 40,
+    "bands": {
+      "1": { "min": 5,  "max": 15 },
+      "2": { "min": 2,  "max": 6 },
+      "3": { "min": 0,  "max": 2 }
+    },
+    "biomeCoverage": {
+      "comment": "Which gem IDs each biome pool must be able to produce.",
+      "mountain": ["quartz", "emerald", "diamond"],
+      "desert":   ["obsidian", "topaz", "diamond"],
+      "water":    ["aquamarine", "quartz", "black-pearl"],
+      "wyrd":     ["amethyst", "black-pearl", "diamond"],
+      "forest":   ["quartz", "emerald"],
+      "plains":   ["quartz", "topaz"],
+      "swamp":    ["amethyst"]
+    },
+    "alerts": {
+      "tier3Missing": "If a 40h balanced sim produces zero tier-3 gems, treat as a content bug. First remediation: double the weight on Diamond/Black Pearl entries.",
+      "tier1Flooding": "If tier-1 output exceeds 25 per 40h, substrate gems are devaluing standard taper drops — halve Quartz weight."
+    }
+  }
+}
