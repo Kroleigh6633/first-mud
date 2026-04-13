@@ -311,6 +311,8 @@ public class ContentProviderTests
         WriteValidBuildings(dir);
         WriteValidRecipes(dir);
         WriteValidLootTables(dir);
+        WriteValidZones(dir);
+        WriteValidQuests(dir);
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────
@@ -885,6 +887,12 @@ public class ContentProviderTests
         File.Copy(Path.Combine(realRoot, "factions.json"), Path.Combine(dir, "factions.json"));
     }
 
+    internal static void WriteValidQuests(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "quests.json"), Path.Combine(dir, "quests.json"));
+    }
+
     /// <summary>
     /// Seed a temp content dir with all upstream-required content files so a
     /// negative test targeting a specific file can reach that file's validator.
@@ -899,6 +907,7 @@ public class ContentProviderTests
         if (!excludedSet.Contains("loot-tables")) WriteValidLootTables(dir);
         if (!excludedSet.Contains("zones")) WriteValidZones(dir);
         if (!excludedSet.Contains("factions")) WriteValidFactions(dir);
+        if (!excludedSet.Contains("quests")) WriteValidQuests(dir);
     }
 
     // ─── Zone definitions ─────────────────────────────────────────────────
@@ -1150,6 +1159,66 @@ public class ContentProviderTests
         }
     }
 
+    // ─── Quest definitions ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Happy path: the real content/quests.json loads, covers every quest
+    /// that used to live in the hardcoded LoreSeeder.BuildQuestSeedData
+    /// table, and round-trips representative entries exactly.
+    /// </summary>
+    [Fact]
+    public void Real_quests_file_reproduces_legacy_seed_definitions()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        provider.AllQuests().Should().HaveCount(13);
+
+        var rider001 = provider.GetQuest("RIDER_001");
+        rider001.Should().NotBeNull();
+        rider001!.Title.Should().Be("A Delivery Gone Wrong");
+        rider001.FactionId.Should().Be(FactionId.HouseCaervorn);
+        rider001.RequiredTier.Should().Be(ReputationTier.Unknown);
+        rider001.RequiredWorld.Should().Be(WorldId.Aeldran);
+        rider001.ReputationReward.Should().Be(150);
+        rider001.PossibleOutcomes.Should().ContainInOrder("reported", "concealed");
+        rider001.IsWyrdQuest.Should().BeFalse();
+
+        var ashen = provider.GetQuest("ASHEN_001");
+        ashen!.IsWyrdQuest.Should().BeTrue();
+        ashen.ReputationReward.Should().Be(0);
+
+        // 8 unlocks + 8 requires in the legacy seeder
+        provider.AllQuestEdges().Should().HaveCount(16);
+        provider.AllQuestEdges()
+            .Count(e => e.Kind == "unlocks").Should().Be(8);
+        provider.AllQuestEdges()
+            .Count(e => e.Kind == "requires").Should().Be(8);
+
+        provider.AllQuestEdges()
+            .Single(e => e.Kind == "unlocks" && e.FromQuestId == "RIDER_001" && e.ToQuestId == "RIDER_002a")
+            .Outcome.Should().Be("reported");
+
+        provider.GetQuest("NO_SUCH_QUEST").Should().BeNull();
+        provider.GetQuest("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Missing_quests_file_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "quests");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<FileNotFoundException>()
+               .Which.FileName.Should().EndWith("quests.json");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void Missing_faction_enum_value_throws_on_load()
     {
@@ -1181,6 +1250,145 @@ public class ContentProviderTests
     }
 
     [Fact]
+    public void Duplicate_quest_id_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "DUPE", "title": "A", "description": "x",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false },
+            { "questId": "DUPE", "title": "B", "description": "y",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*duplicate questId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_faction_id_on_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "NoSuchFaction", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*invalid factionId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_starting_zone_on_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false,
+              "startingZoneId": "not-a-real-zone" }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Dangling_edge_to_unknown_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": [
+            { "kind": "requires", "from": "Q1", "to": "NOPE" }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*unknown 'to' questId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unlocks_edge_with_undeclared_outcome_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false },
+            { "questId": "Q2", "title": "T2", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": [
+            { "kind": "unlocks", "from": "Q1", "to": "Q2", "outcome": "ghost_outcome" }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+                .WithMessage("*not in that quest's possibleOutcomes*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Invalid_hqZoneId_against_zones_file_throws_on_load()
     {
         var dir = Directory.CreateTempSubdirectory("fm-content-test-");
@@ -1197,6 +1405,38 @@ public class ContentProviderTests
             var act = () => new ContentProvider(dir.FullName);
             act.Should().Throw<InvalidDataException>()
                .WithMessage("*hqZoneId*is not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Orphan_node_in_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false,
+              "nodes": [
+                { "nodeId": "start",   "type": "dialogue", "content": "hi" },
+                { "nodeId": "orphan",  "type": "dialogue", "content": "lost" }
+              ],
+              "internalEdges": [
+                { "from": "start", "to": "start" }
+              ] }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*orphan/unreachable node*");
         }
         finally
         {
@@ -1284,6 +1524,32 @@ public class ContentProviderTests
         finally
         {
             dir.Delete(recursive: true);
+        }
+    }
+
+    private static DirectoryInfo MakeContentDirWithQuests(string questsJson)
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        WriteAllPrerequisitesExcept(dir.FullName);
+        File.WriteAllText(Path.Combine(dir.FullName, "quests.json"), questsJson);
+        return dir;
+    }
+
+    /// <summary>
+    /// Tightening assertion: every quest's factionId must resolve against the
+    /// authoritative factions.json (not just the FactionId enum). This guards
+    /// against a quest referencing an enum value that has been retired from
+    /// content/factions.json.
+    /// </summary>
+    [Fact]
+    public void Every_quest_factionId_is_present_in_factions_json()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        var authoredFactions = provider.AllFactions().Select(f => f.Id).ToHashSet();
+        foreach (var quest in provider.AllQuests())
+        {
+            authoredFactions.Should().Contain(quest.FactionId,
+                $"quest '{quest.QuestId}' references FactionId.{quest.FactionId} which must be authored in factions.json");
         }
     }
 }

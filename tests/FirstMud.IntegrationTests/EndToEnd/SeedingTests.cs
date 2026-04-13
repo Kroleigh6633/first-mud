@@ -28,9 +28,9 @@ public sealed class SeedingTests
         var db = _fixture.SqlServer.CreateContext();
         var driverWrapper = _fixture.Neo4j.CreateDriverWrapper();
         var questRepo = new QuestGraphRepository(driverWrapper);
-        var loreSeeder = new LoreSeeder(driverWrapper);
-        var logger = NullLogger<StartupSeeder>.Instance;
         var content = new ContentProvider(ContentRootResolver.Resolve());
+        var loreSeeder = new LoreSeeder(driverWrapper, content);
+        var logger = NullLogger<StartupSeeder>.Instance;
 
         return new StartupSeeder(db, questRepo, loreSeeder, content, logger);
     }
