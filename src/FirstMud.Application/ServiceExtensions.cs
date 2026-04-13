@@ -18,6 +18,7 @@ public static class ServiceExtensions
         services.AddScoped<ImbueService>();
         services.AddSingleton<AutoFarmService>();
         services.AddScoped<HomesteadCompanionService>();
+        services.AddScoped<SmeltService>();
         return services;
     }
 }

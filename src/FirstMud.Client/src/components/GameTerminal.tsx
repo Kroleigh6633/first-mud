@@ -872,6 +872,7 @@ export default function GameTerminal({
         <CraftingPanel
           recipes={recipes}
           inventoryItems={inventory?.items ?? []}
+          storageItems={storageView?.items ?? []}
           craftingSkill={inventory?.craftingSkill ?? worldState?.player?.craftingSkill ?? 1}
           lastCraftResult={lastCraftResult ?? null}
           onCraft={(recipeId, componentIds, taperId) =>

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import type { RecipeInfo, InventoryItem, CraftingCompleteEvent } from '../types/game';
+import type { RecipeInfo, InventoryItem, StorageItem, CraftingCompleteEvent } from '../types/game';
 
 interface Props {
   recipes: RecipeInfo[];
   inventoryItems: InventoryItem[];
+  storageItems: StorageItem[];
   craftingSkill: number;
   lastCraftResult: CraftingCompleteEvent | null;
   onCraft: (recipeId: string, componentIds: string[], taperId: string | null) => void;
@@ -101,9 +102,18 @@ function outcomeColor(outcome: string): string {
   return '#cccccc';
 }
 
+/** A unified item shape used internally so inventory and storage items can be handled together. */
+interface CraftItem {
+  id: string;
+  name: string;
+  workmanship: number;
+  source: 'inv' | 'storage';
+}
+
 export default function CraftingPanel({
   recipes,
   inventoryItems,
+  storageItems,
   craftingSkill,
   lastCraftResult,
   onCraft,
@@ -136,13 +146,30 @@ export default function CraftingPanel({
 
   const selectedRecipe = recipes.find(r => r.recipeId === selectedRecipeId) ?? null;
 
-  // Items in inventory grouped by name
-  const byName = (name: string, category?: string) =>
-    inventoryItems.filter(i =>
-      i.name === name &&
-      (!category || (i.category ?? '').toLowerCase() === category.toLowerCase()) &&
-      !i.isLocked
-    );
+  /**
+   * Returns all items (from inventory + storage combined) matching the given
+   * ingredient name and category, for use in component selection checkboxes.
+   */
+  function availableItems(name: string, category?: string): CraftItem[] {
+    const cat = category?.toLowerCase();
+
+    const fromInv: CraftItem[] = inventoryItems
+      .filter(i =>
+        i.name === name &&
+        (!cat || (i.category ?? '').toLowerCase() === cat) &&
+        !i.isLocked
+      )
+      .map(i => ({ id: i.id, name: i.name, workmanship: i.workmanship, source: 'inv' as const }));
+
+    const fromStorage: CraftItem[] = storageItems
+      .filter(i =>
+        i.name === name &&
+        (!cat || (i.category ?? '').toLowerCase() === cat)
+      )
+      .map(i => ({ id: i.id, name: i.name, workmanship: i.workmanship, source: 'storage' as const }));
+
+    return [...fromInv, ...fromStorage];
+  }
 
   const isTaper = (item: InventoryItem) =>
     item.name.toLowerCase().includes('taper') || item.category === 'Reagent';
@@ -172,6 +199,37 @@ export default function CraftingPanel({
     onCraft(selectedRecipe.recipeId, allComponentIds, selectedTaperId);
     setStatusMsg('Crafting...');
     setStatusColor('#cccccc');
+  }
+
+  /**
+   * Formats the availability string for an ingredient, e.g.:
+   *   "have 17 total (2 inv + 15 storage)"  — when both sources contribute
+   *   "have 3 (inventory)"                  — when only in inventory
+   *   "have 15 (storage)"                   — when only in storage
+   *   "have 0"                              — when not found anywhere
+   *
+   * Falls back to counting items in the passed arrays when the server hasn't
+   * yet returned cross-source counts in the recipe ingredient data.
+   */
+  function formatAvailability(ing: RecipeInfo['ingredients'][0], items: CraftItem[]): string {
+    // Prefer server-reported counts (populated by ViewRecipesCommandHandler)
+    if (ing.invCount !== undefined || ing.storageCount !== undefined) {
+      const inv = ing.invCount ?? 0;
+      const storage = ing.storageCount ?? 0;
+      const total = inv + storage;
+      if (inv > 0 && storage > 0) return `have ${total} total (${inv} inv + ${storage} storage)`;
+      if (inv > 0) return `have ${inv} (inventory)`;
+      if (storage > 0) return `have ${storage} (storage)`;
+      return 'have 0';
+    }
+    // Fallback: count items in the combined list
+    const invCount = items.filter(i => i.source === 'inv').length;
+    const storageCount = items.filter(i => i.source === 'storage').length;
+    const total = invCount + storageCount;
+    if (invCount > 0 && storageCount > 0) return `have ${total} total (${invCount} inv + ${storageCount} storage)`;
+    if (invCount > 0) return `have ${invCount} (inventory)`;
+    if (storageCount > 0) return `have ${storageCount} (storage)`;
+    return 'have 0';
   }
 
   return (
@@ -243,20 +301,24 @@ export default function CraftingPanel({
                 <div style={{ marginBottom: '12px' }}>
                   <div style={sectionLabel}>Ingredients</div>
                   {selectedRecipe.ingredients.map(ing => {
-                    const available = byName(ing.ingredientName, ing.category);
+                    const items = availableItems(ing.ingredientName, ing.category);
                     const chosen = selectedComponentIds[ing.ingredientName] ?? [];
+                    const availLine = formatAvailability(ing, items);
+                    const hasEnough = (ing.totalCount ?? items.length) >= ing.baseQuantity;
                     return (
                       <div key={ing.ingredientName} style={{ marginBottom: '8px' }}>
                         <div style={{ fontSize: '12px', marginBottom: '3px', color: chosen.length >= ing.baseQuantity ? '#00ff41' : '#ffaa00' }}>
-                          {ing.ingredientName} — need {ing.baseQuantity}, have {available.length}
+                          {ing.ingredientName} — need {ing.baseQuantity}, {availLine}
                           {chosen.length > 0 && ` (selected ${chosen.length})`}
                         </div>
-                        {available.length === 0 ? (
-                          <div style={{ color: '#555', fontSize: '11px', paddingLeft: '8px' }}>Not in inventory.</div>
+                        {items.length === 0 ? (
+                          <div style={{ color: hasEnough ? '#4488aa' : '#555', fontSize: '11px', paddingLeft: '8px' }}>
+                            {hasEnough ? 'Available in storage (select below when withdrawing, or craft directly).' : 'Not found in inventory or storage.'}
+                          </div>
                         ) : (
                           <div style={{ paddingLeft: '8px' }}>
-                            {available.slice(0, 8).map(item => (
-                              <label key={item.id} style={{ display: 'block', cursor: 'pointer', fontSize: '11px', color: '#ccc', marginBottom: '2px' }}>
+                            {items.slice(0, 8).map(item => (
+                              <label key={item.id} style={{ display: 'block', cursor: 'pointer', fontSize: '11px', color: item.source === 'storage' ? '#4488aa' : '#ccc', marginBottom: '2px' }}>
                                 <input
                                   type="checkbox"
                                   checked={chosen.includes(item.id)}
@@ -264,6 +326,7 @@ export default function CraftingPanel({
                                   style={{ marginRight: '6px', accentColor: '#00ff41' }}
                                 />
                                 {item.name} W{item.workmanship}
+                                {item.source === 'storage' && <span style={{ color: '#4488aa', marginLeft: '4px' }}>[storage]</span>}
                               </label>
                             ))}
                           </div>

@@ -22,6 +22,7 @@ public class StartupSeeder(
         await FixMisassignedEquipmentSlotsAsync(ct);
         await FixFlatStartingStatsAsync(ct);
         await FixDefaultInventorySlotsAsync(ct);
+        await RenameAndMergeLegacyMaterialsAsync(ct);
         await MergeDuplicateStorageStacksAsync(ct);
         await SeedDevPlayerAsync(ct);
         await SeedNeo4jLoreAsync(ct);
@@ -238,6 +239,53 @@ public class StartupSeeder(
         {
             await conn.CloseAsync();
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Legacy material rename + merge fixup
+    // -------------------------------------------------------------------------
+
+    // Renames "Wood Bundle" → "Wood" and "Herbs Bundle" → "Herbs" everywhere
+    // (player inventory + homestead storage).  After renaming, any duplicate
+    // stacks with the same canonical name in the same location are collapsed.
+    // "Metal" is intentionally left as-is — it remains a smeltable raw material.
+    // Safe to run on every startup — idempotent.
+    private static readonly Dictionary<string, string> LegacyMaterialRenames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Wood Bundle"]  = "Wood",
+        ["Herbs Bundle"] = "Herbs",
+    };
+
+    private async Task RenameAndMergeLegacyMaterialsAsync(CancellationToken ct)
+    {
+        var oldNames = LegacyMaterialRenames.Keys.ToList();
+        var legacyItems = await db.Items
+            .Where(i => oldNames.Contains(i.Name))
+            .ToListAsync(ct);
+
+        if (legacyItems.Count == 0)
+        {
+            logger.LogInformation("RenameAndMergeLegacyMaterials: no legacy material names found.");
+            return;
+        }
+
+        var renamedCount = 0;
+        foreach (var item in legacyItems)
+        {
+            if (!LegacyMaterialRenames.TryGetValue(item.Name, out var newName)) continue;
+            item.Rename(newName);
+            renamedCount++;
+            logger.LogWarning(
+                "RenameAndMergeLegacyMaterials: renamed item {Id} '{OldName}' → '{NewName}'.",
+                item.Id, item.Name, newName);
+        }
+
+        if (renamedCount > 0)
+            await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "RenameAndMergeLegacyMaterials: renamed {Count} item(s). MergeDuplicateStorageStacks will consolidate them.",
+            renamedCount);
     }
 
     // -------------------------------------------------------------------------

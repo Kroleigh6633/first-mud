@@ -7,6 +7,8 @@ interface Props {
   onDeposit: (itemId: string) => void;
   onWithdraw: (itemId: string) => void;
   onClose: () => void;
+  onSmelt?: (amount: number) => void;
+  atHomestead?: boolean;
 }
 
 interface GroupedItem<T> {
@@ -174,8 +176,9 @@ function groupItems<T extends { id: string; name: string; workmanship: number; c
   return Array.from(map.values());
 }
 
-export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWithdraw, onClose }: Props) {
+export default function StoragePanel({ snapshot, inventoryItems, onDeposit, onWithdraw, onClose, onSmelt, atHomestead }: Props) {
   const [activeTab, setActiveTab] = useState<TabCategory>('All');
+  const [smeltAmount, setSmeltAmount] = useState<number>(10);
 
   const filteredStorageItems = snapshot
     ? snapshot.items.filter(i => activeTab === 'All' || i.category === activeTab)

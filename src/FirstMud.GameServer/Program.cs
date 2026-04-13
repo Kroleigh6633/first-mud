@@ -86,6 +86,7 @@ builder.Services.AddScoped<ICommandHandler<CraftCommand>, CraftCommandHandler>()
 builder.Services.AddScoped<ICommandHandler<ViewRecipesCommand>, ViewRecipesCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<UseConsumableCommand>, UseConsumableCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<InteractQuestCommand>, InteractQuestCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<SmeltCommand>, SmeltCommandHandler>();
 
 var app = builder.Build();
 

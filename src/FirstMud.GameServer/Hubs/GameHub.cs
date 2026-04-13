@@ -255,6 +255,10 @@ public class GameHub : Hub
                 playerId,
                 TryGetString(payload, "questId") ?? string.Empty),
 
+            "smelt" => new SmeltCommand(
+                playerId,
+                TryGetInt(payload, "amount") is int sa and > 0 ? sa : 1),
+
             _ => null
         };
     }

@@ -137,6 +137,11 @@ public class Item
 
     public void MarkDiscoveredBy(string playerName) => DiscoveredByPlayerName = playerName;
 
+    /// <summary>
+    /// Renames the item (used for legacy migration of obsolete material names).
+    /// </summary>
+    public void Rename(string newName) => Name = newName;
+
     public void SetOwner(Guid? ownerId) => OwnerId = ownerId;
 
     public void Degrade(int amount)
