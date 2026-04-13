@@ -1,6 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WorldStateSnapshot, ZoneTile, WanderingNpc, QuestWaypoint, HomesteadBuilding, BuildingType } from '../types/game';
 import { getBiome, isPathTile, type BiomeType } from '../utils/biome';
+import TileProfileCard, { type TileProfileData } from './TileProfileCard';
 
 interface Props {
   worldState: WorldStateSnapshot | null;
@@ -1132,6 +1133,38 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
   // Hover state
   const hoverRef = useRef<{ gx: number; gy: number } | null>(null);
 
+  // ─── Camera pan state ──────────────────────────────────────────────────────
+  // Camera offset is expressed in GRID tiles (not pixels) so it is DPI-agnostic
+  // and trivially composed with the existing gridToScreen math.  When
+  // isFollowingPlayer is true (default) we ignore the offset and re-center on
+  // the player every render (legacy behaviour).  When false we honour the
+  // offset and let the player drift independently of the camera.
+  const cameraOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isFollowingPlayerRef = useRef<boolean>(true);
+  // Mirror into React state only for the "Recenter" button's rendered label /
+  // enabled-state; the render loop consults the refs directly.
+  const [isFollowing, setIsFollowing] = useState<boolean>(true);
+
+  // Drag-to-pan state — set on mousedown, updated on mousemove, cleared on up.
+  // Tracks whether the pointer has moved far enough to count as a drag (vs a
+  // click).  A click (no drag) opens the tile profile card; a drag pans.
+  const dragRef = useRef<{
+    active: boolean;
+    startClientX: number;
+    startClientY: number;
+    startCamX: number;
+    startCamY: number;
+    moved: boolean;
+  } | null>(null);
+  const DRAG_THRESHOLD_PX = 4;
+
+  // Tile profile card (null → hidden)
+  const [tileProfile, setTileProfile] = useState<{
+    anchorX: number;
+    anchorY: number;
+    data: TileProfileData;
+  } | null>(null);
+
   // Fog of war — visited tile set
   const visitedRef    = useRef<Set<string>>(new Set());
   const playerIdRef   = useRef<string | null>(null);
@@ -1200,9 +1233,16 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
     const { w, h } = sizeRef.current;
     const vpCx = w / 2;
     const vpCy = h / 2;
+    // Camera anchor: either the player (follow mode) OR player + pan offset.
+    // The render pass uses the exact same formula, so screen ↔ grid stays
+    // consistent.
     const playerX = worldStateRef.current?.player?.x ?? 0;
     const playerY = worldStateRef.current?.player?.y ?? 0;
-    const [psx, psy] = gridToScreen(playerX, playerY, vpCx, vpCy);
+    const follow = isFollowingPlayerRef.current;
+    const cam = cameraOffsetRef.current;
+    const anchorX = follow ? playerX : playerX + cam.x;
+    const anchorY = follow ? playerY : playerY + cam.y;
+    const [psx, psy] = gridToScreen(anchorX, anchorY, vpCx, vpCy);
     const offsetX = vpCx - psx;
     const offsetY = vpCy - psy;
     const sx = clientX - rect.left - offsetX;
@@ -1233,8 +1273,14 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
     // Mark player vicinity as visited
     markVisited(playerX, playerY);
 
-    // Camera offset: player always at viewport center
-    const [psx, psy] = gridToScreen(playerX, playerY, vpCx, vpCy);
+    // Camera offset: if following the player, center on player.  Otherwise
+    // center on (player + cameraOffset) tiles, so the user can pan around
+    // while the player stays pinned to their world coordinates.
+    const follow = isFollowingPlayerRef.current;
+    const cam = cameraOffsetRef.current;
+    const camAnchorX = follow ? playerX : playerX + cam.x;
+    const camAnchorY = follow ? playerY : playerY + cam.y;
+    const [psx, psy] = gridToScreen(camAnchorX, camAnchorY, vpCx, vpCy);
     const camOffX = vpCx - psx;
     const camOffY = vpCy - psy;
 
@@ -1250,8 +1296,12 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
 
     const entries: TileEntry[] = [];
 
-    for (let gx = playerX - halfW; gx <= playerX + halfW; gx++) {
-      for (let gy = playerY - halfH; gy <= playerY + halfH; gy++) {
+    // Iterate around the CAMERA anchor (not the player) so the visible-tile
+    // scan covers the viewport regardless of whether the camera is following.
+    const scanCx = Math.round(camAnchorX);
+    const scanCy = Math.round(camAnchorY);
+    for (let gx = scanCx - halfW; gx <= scanCx + halfW; gx++) {
+      for (let gy = scanCy - halfH; gy <= scanCy + halfH; gy++) {
         const [sx, sy] = gridToScreen(gx, gy, vpCx, vpCy);
         const asx = sx + camOffX;
         const asy = sy + camOffY;
@@ -1795,8 +1845,77 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
     return () => ro.disconnect();
   }, [handleResize]);
 
+  // ─── Recenter ─────────────────────────────────────────────────────────────
+  const recenter = useCallback(() => {
+    cameraOffsetRef.current = { x: 0, y: 0 };
+    isFollowingPlayerRef.current = true;
+    setIsFollowing(true);
+  }, []);
+
+  // ─── Keyboard pan (Shift+Arrow keys) ───────────────────────────────────────
+  // We use Shift+Arrow so plain Arrow keys continue to drive character
+  // movement.  Any arrow-key press while Shift is held pans one tile in that
+  // (isometric) direction and puts the camera into free-pan mode.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.shiftKey) return;
+      let dx = 0, dy = 0;
+      switch (e.key) {
+        case 'ArrowUp':    dy = -1; break;
+        case 'ArrowDown':  dy =  1; break;
+        case 'ArrowLeft':  dx = -1; break;
+        case 'ArrowRight': dx =  1; break;
+        default: return;
+      }
+      // Only consume when the map is the relevant surface.  We don't have a
+      // formal focus model; restrict to when no text input is active so we
+      // don't steal keys from chat/command boxes.
+      const active = document.activeElement;
+      const tag = active?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (active as HTMLElement | null)?.isContentEditable) return;
+      e.preventDefault();
+      cameraOffsetRef.current = {
+        x: cameraOffsetRef.current.x + dx,
+        y: cameraOffsetRef.current.y + dy,
+      };
+      if (isFollowingPlayerRef.current) {
+        isFollowingPlayerRef.current = false;
+        setIsFollowing(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // ─── Mouse handlers ──────────────────────────────────────────────────────────
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Drag-pan: if a drag is in progress, convert pixel delta to tile delta
+    // using the iso-tile metrics.  Note the inverse of the drag direction — a
+    // right-drag shifts the world right, which means the camera moves LEFT.
+    const drag = dragRef.current;
+    if (drag?.active) {
+      const pdx = e.clientX - drag.startClientX;
+      const pdy = e.clientY - drag.startClientY;
+      if (!drag.moved && Math.abs(pdx) + Math.abs(pdy) >= DRAG_THRESHOLD_PX) {
+        drag.moved = true;
+      }
+      if (drag.moved) {
+        // Screen (gx - gy)*TILE_W/2 / (gx+gy)*TILE_H/2 inversion:
+        //   gx = pdx / TILE_W + pdy / TILE_H
+        //   gy = pdy / TILE_H - pdx / TILE_W
+        const tileDx = pdx / TILE_W + pdy / TILE_H;
+        const tileDy = pdy / TILE_H - pdx / TILE_W;
+        cameraOffsetRef.current = {
+          x: drag.startCamX - tileDx,
+          y: drag.startCamY - tileDy,
+        };
+        if (isFollowingPlayerRef.current) {
+          isFollowingPlayerRef.current = false;
+          setIsFollowing(false);
+        }
+      }
+    }
+
     const coords = getGridCoords(e.clientX, e.clientY);
     if (coords) {
       hoverRef.current = { gx: coords[0], gy: coords[1] };
@@ -1808,6 +1927,43 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
   const onMouseLeave = useCallback(() => {
     hoverRef.current = null;
   }, []);
+
+  const onMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0) return;
+    dragRef.current = {
+      active: true,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startCamX: cameraOffsetRef.current.x,
+      startCamY: cameraOffsetRef.current.y,
+      moved: false,
+    };
+  }, []);
+
+  const onMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag) return;
+    // A true click (no drag motion) opens the tile profile card.
+    if (!drag.moved) {
+      const coords = getGridCoords(e.clientX, e.clientY);
+      if (!coords) return;
+      const [gx, gy] = coords;
+      const biome = getBiome(gx, gy);
+      const zone = zoneTilesRef.current.find(z => z.x === gx && z.y === gy) ?? null;
+      // Fog-of-war: a tile counts as "known" if it's been visited or is
+      // within the current visibility radius.
+      const playerX = worldStateRef.current?.player?.x ?? 0;
+      const playerY = worldStateRef.current?.player?.y ?? 0;
+      const dist = Math.sqrt((gx - playerX) ** 2 + (gy - playerY) ** 2);
+      const isKnown = dist <= VIS_RADIUS || visitedRef.current.has(`${gx},${gy}`);
+      setTileProfile({
+        anchorX: e.clientX,
+        anchorY: e.clientY,
+        data: { gx, gy, biome: biome.type, zone, isKnown },
+      });
+    }
+  }, [getGridCoords]);
 
   return (
     <div
@@ -1825,8 +1981,53 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
         ref={canvasRef}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
-        style={{ display: 'block', cursor: 'crosshair' }}
+        onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp}
+        onDoubleClick={recenter}
+        style={{ display: 'block', cursor: dragRef.current?.active ? 'grabbing' : 'crosshair' }}
       />
+      {!isFollowing && (
+        <button
+          onClick={recenter}
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            background: 'rgba(18, 14, 10, 0.9)',
+            border: '1px solid #7a5530',
+            color: '#ffcc66',
+            font: '12px monospace',
+            padding: '6px 10px',
+            cursor: 'pointer',
+            borderRadius: 3,
+            zIndex: 5,
+          }}
+          title="Recenter on player (double-click map also recenters)"
+        >
+          Recenter
+        </button>
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 6,
+          left: 8,
+          color: '#886644',
+          font: '10px monospace',
+          pointerEvents: 'none',
+          opacity: 0.75,
+        }}
+      >
+        Click tile = profile · Drag = pan · Shift+Arrows = pan · Dbl-click = recenter
+      </div>
+      {tileProfile && (
+        <TileProfileCard
+          anchorX={tileProfile.anchorX}
+          anchorY={tileProfile.anchorY}
+          data={tileProfile.data}
+          onClose={() => setTileProfile(null)}
+        />
+      )}
     </div>
   );
 }
