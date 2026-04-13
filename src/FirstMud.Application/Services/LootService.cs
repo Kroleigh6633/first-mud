@@ -259,12 +259,24 @@ public class LootService
         if (Random.Shared.Next(100) >= dropChance)
             return new LootDropResult(false, null, string.Empty);
 
-        // Select a template — pick from ALL templates at all danger levels.
-        // Previously this index-capped selection caused low-danger loot to only draw
-        // from the first few templates (mostly melee weapons), so legs/hands/feet armor
-        // never dropped at danger 1-3. Now we pick uniformly across every slot type;
-        // workmanship is already scaled by the danger bonus below.
-        var template = Templates[Random.Shared.Next(Templates.Length)];
+        // Select a template — at danger 7+ give rarer slots (Focus/Accessory) a boosted chance.
+        // Below danger 7 every template is equally likely; above, Focus and Accessory each get
+        // an extra +7 weight so the combined rare-slot share rises from ~8% to ~15%.
+        LootTemplate template;
+        if (dangerLevel >= 7)
+        {
+            var weightedPool = new List<LootTemplate>(Templates);
+            foreach (var t in Templates)
+            {
+                if (t.Slot is EquipmentSlot.Focus or EquipmentSlot.Accessory)
+                    weightedPool.Add(t); // double-weight these slots
+            }
+            template = weightedPool[Random.Shared.Next(weightedPool.Count)];
+        }
+        else
+        {
+            template = Templates[Random.Shared.Next(Templates.Length)];
+        }
 
         // For material categories, replace with a biome-appropriate material
         if (template.Category is ItemCategory.Component or ItemCategory.Reagent)
@@ -273,7 +285,10 @@ public class LootService
         }
 
         // Workmanship: template range + danger bonus
-        var workValue = template.MinWork + (int)(Random.Shared.NextDouble() * (template.MaxWork - template.MinWork + 1));
+        // danger / 2 bonus means danger 6 = +3W, danger 10 = +5W
+        int dangerBonus = dangerLevel / 2;
+        int range = template.MaxWork - template.MinWork;
+        var workValue = template.MinWork + dangerBonus + (range > 0 ? Random.Shared.Next(range + 1) : 0);
         workValue = Math.Clamp(workValue, 1, 10);
         // Auto-farm penalty: −2 workmanship (minimum W1)
         if (isAutoFarm)
@@ -283,6 +298,18 @@ public class LootService
         var item = Item.Create(template.Name, template.Description, template.Category, workmanship, originWorld,
             slot: template.Slot);
         item.SetOwner(ownerId);
+
+        // Pre-imbued loot: danger 8+ gives a 10% chance of arriving imbued with a biome-matching element
+        bool wasPreImbued = false;
+        if (dangerLevel >= 8
+            && item.Slot != EquipmentSlot.None          // only equipment, not materials
+            && !item.IsStackable
+            && Random.Shared.Next(100) < 10)
+        {
+            var imbueType = GetBiomeImbueType(zoneName);
+            item.ApplyImbue(imbueType, 0.2f);
+            wasPreImbued = true;
+        }
 
         // Auto-salvage check: if the player has a threshold set and this item qualifies, salvage immediately
         if (player is not null)
@@ -304,7 +331,8 @@ public class LootService
             {
                 existingStack.AddQuantity(1);
                 await _itemRepository.UpdateAsync(existingStack, ct);
-                var stackMessage = $"You found: {existingStack.Name} (now x{existingStack.Quantity}) [Workmanship {workValue}]!";
+                var dangerContext = dangerLevel >= 4 ? $" (danger {dangerLevel} bonus)" : string.Empty;
+                var stackMessage = $"You found: {existingStack.Name} (now x{existingStack.Quantity}) [Workmanship {workValue}]{dangerContext}!";
                 _logger.LogInformation("Loot stack merge for player {PlayerId}: {ItemName}", ownerId, template.Name);
                 return new LootDropResult(true, existingStack, stackMessage);
             }
@@ -312,10 +340,14 @@ public class LootService
 
         await _itemRepository.AddAsync(item, ct);
 
-        var message = $"You found: {item.Name} [Workmanship {workValue}]!";
+        // Build the loot message — include danger context when it's meaningful (danger 4+)
+        // and flag pre-imbued drops so the player knows why this find is special.
+        var dangerSuffix = dangerLevel >= 4 ? $" (danger {dangerLevel} bonus)" : string.Empty;
+        var imbueSuffix  = wasPreImbued ? " [pre-imbued!]" : string.Empty;
+        var message = $"You found: {item.Name} W{workValue}{dangerSuffix}{imbueSuffix}!";
         _logger.LogInformation(
-            "Loot drop for player {PlayerId}: {ItemName} W{Workmanship} Slot={Slot} Category={Category}",
-            ownerId, item.Name, workValue, item.Slot, item.Category);
+            "Loot drop for player {PlayerId}: {ItemName} W{Workmanship} Slot={Slot} Category={Category} DangerBonus={DangerBonus} PreImbued={PreImbued}",
+            ownerId, item.Name, workValue, item.Slot, item.Category, dangerBonus, wasPreImbued);
 
         return new LootDropResult(true, item, message);
     }
@@ -339,32 +371,43 @@ public class LootService
     /// <summary>
     /// Picks a material from the biome pool.
     /// 70% chance: biome-specific material (filtered by danger level for min workmanship).
-    /// 30% chance: common material.
+    /// 30% chance: common material (suppressed at danger 8+ to ensure tier-2 only drops).
+    /// At danger 8+, only Tier 2+ materials (MinWork >= 2) can drop — no basic Iron Ore from endgame zones.
     /// </summary>
     private static LootTemplate PickBiomeMaterial(string? zoneName, int dangerLevel)
     {
         var biome = GetBiome(zoneName);
 
-        // 30% chance: common material regardless of biome
-        if (Random.Shared.Next(100) < 30)
+        // At danger 8+ common (tier-1) materials are suppressed entirely — endgame zones always
+        // yield biome-specific rare drops. Below danger 8, 30% chance of a common material.
+        if (dangerLevel < 8 && Random.Shared.Next(100) < 30)
             return CommonMaterials[Random.Shared.Next(CommonMaterials.Length)];
 
         if (!BiomeMaterialTemplates.TryGetValue(biome, out var pool))
             pool = BiomeMaterialTemplates["plains"];
 
-        // Higher danger gives access to rarer (higher MinWork) materials
-        // Danger 1-3: all materials accessible; danger 4-6: rarer items more likely; 7+: rarest accessible
-        var maxMinWork = 1 + dangerLevel;  // danger 1 → max MinWork 2; danger 9 → max MinWork 10
-        var eligible = pool.Where(t => t.MinWork <= maxMinWork).ToArray();
-        if (eligible.Length == 0) eligible = pool;
+        // At danger 8+ restrict to Tier 2+ materials (MinWork >= 2) so no basic junk drops in
+        // endgame zones. Below that, filter up to maxMinWork as before.
+        LootTemplate[] eligible;
+        if (dangerLevel >= 8)
+        {
+            eligible = pool.Where(t => t.MinWork >= 2).ToArray();
+            if (eligible.Length == 0) eligible = pool; // safety: use full pool if nothing qualifies
+        }
+        else
+        {
+            // Higher danger gives access to rarer (higher MinWork) materials
+            var maxMinWork = 1 + dangerLevel;  // danger 1 → max MinWork 2; danger 9 → max MinWork 10
+            eligible = pool.Where(t => t.MinWork <= maxMinWork).ToArray();
+            if (eligible.Length == 0) eligible = pool;
+        }
 
         // Weight toward rarer items at higher danger: use weighted selection
-        // Weight = dangerLevel bonus for items with higher MinWork
+        // Base weight 10; rarer items get +2*dangerLevel bonus per point of MinWork above 1
         var totalWeight = 0;
         var weights = new int[eligible.Length];
         for (var i = 0; i < eligible.Length; i++)
         {
-            // Base weight 10; rarer items get +2*dangerLevel bonus per point of MinWork above 1
             weights[i] = 10 + (eligible[i].MinWork - 1) * dangerLevel;
             totalWeight += weights[i];
         }
@@ -380,6 +423,21 @@ public class LootService
 
         return eligible[^1];
     }
+
+    /// <summary>
+    /// Returns the ImbueType that best matches the biome of the given zone.
+    /// Used when pre-imbuing high-danger zone loot drops.
+    /// </summary>
+    private static ImbueType GetBiomeImbueType(string? zoneName) => GetBiome(zoneName) switch
+    {
+        "desert"   => ImbueType.Fire,
+        "water"    => ImbueType.Water,
+        "mountain" => ImbueType.Earth,
+        "forest"   => ImbueType.Earth,
+        "swamp"    => ImbueType.Water,
+        "wyrd"     => ImbueType.Wyrd,
+        _          => ImbueType.Air,   // plains / default
+    };
 
     private sealed record LootTemplate(
         string Name,

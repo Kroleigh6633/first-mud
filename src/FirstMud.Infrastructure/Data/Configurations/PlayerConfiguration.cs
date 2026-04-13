@@ -54,6 +54,8 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
             .HasDefaultValue(true);
         builder.Property(p => p.CombatVictoryCount)
             .HasDefaultValue(0);
+        builder.Property(p => p.TilesDiscovered)
+            .HasDefaultValue(0);
         builder.Property(p => p.CraftingSeed);
 
         builder.Property(p => p.CurrentHp);

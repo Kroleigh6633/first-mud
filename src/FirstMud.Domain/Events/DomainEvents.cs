@@ -23,6 +23,10 @@ public record WyrdTangleHighEvent(Guid PlayerId, int TangleLevel) : DomainEvent;
 public record PortalUnlockedEvent(Guid PlayerId, WorldId WorldId) : DomainEvent;
 public record FactionReputationTierChangedEvent(Guid PlayerId, FactionId FactionId, ReputationTier OldTier, ReputationTier NewTier) : DomainEvent;
 
+// Exploration events
+public record ExplorationMilestoneEvent(Guid PlayerId, int TilesDiscovered, string Label, int XpAwarded) : DomainEvent;
+public record HiddenTreasureFoundEvent(Guid PlayerId, int X, int Y) : DomainEvent;
+
 // Companion events
 public record CompanionLayerUnlockedEvent(Guid CompanionId, Guid OwnerId, int NewLayer) : DomainEvent;
 public record CompanionLayerDriftedEvent(Guid CompanionId, Guid OwnerId, int CurrentLayer) : DomainEvent;

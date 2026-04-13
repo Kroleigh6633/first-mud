@@ -37,6 +37,9 @@ public class Player
     public bool AutoRotateMaxedCompanions { get; private set; } = true;
     public int CombatVictoryCount { get; private set; }
 
+    // Exploration tracking
+    public int TilesDiscovered { get; private set; }
+
     // Position
     public Position Position { get; private set; } = new(WorldId.Aeldran, 1, 0, 0);
 
@@ -328,6 +331,39 @@ public class Player
     {
         CombatVictoryCount++;
         return CombatVictoryCount % 5 == 0;
+    }
+
+    /// <summary>
+    /// Increments the tiles-discovered counter.
+    /// Returns an ExplorationMilestone if a notable threshold was crossed, otherwise null.
+    /// Milestones: 50, 100, 200, 500, 1000 tiles.
+    /// </summary>
+    public ExplorationMilestone? RecordTileDiscovery()
+    {
+        var previous = TilesDiscovered;
+        TilesDiscovered++;
+
+        // Define milestones: (threshold, xpBonus, label)
+        var milestones = new (int Threshold, int Xp, string Label)[]
+        {
+            (50,   50,  "Explorer's milestone: 50 tiles discovered!"),
+            (100,  50,  "Explorer's milestone: 100 tiles discovered!"),
+            (200,  200, "Cartographer's achievement: 200 tiles mapped!"),
+            (500,  200, "Cartographer's achievement: 500 tiles mapped!"),
+            (1000, 500, "Master Explorer: 1000 tiles mapped!"),
+        };
+
+        foreach (var (threshold, xp, label) in milestones)
+        {
+            if (previous < threshold && TilesDiscovered >= threshold)
+            {
+                GainExperience(xp);
+                _domainEvents.Add(new ExplorationMilestoneEvent(Id, TilesDiscovered, label, xp));
+                return new ExplorationMilestone(TilesDiscovered, label, xp);
+            }
+        }
+
+        return null;
     }
 
     public void GainSalvageSkillXp(int amount)
