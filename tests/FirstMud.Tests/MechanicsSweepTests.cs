@@ -341,12 +341,18 @@ public class MechanicsSweepTests
     public void Companion_Bond5_ReceivesNormalUsage()
     {
         // Bond 5 companion: 10 usage per combat
+        // CapturedMonster thresholds: [0, 150, 400, 900, 1800, 3600]
+        // TryAdvanceLayer only advances one layer per RecordUsage call, so we call repeatedly.
         var companion = Companion.Create(Guid.NewGuid(), "Veteran", CompanionType.CapturedMonster, MagicElement.Earth);
-        // Simulate reaching layer 5 by forcing usage above thresholds
-        companion.RecordUsage(1800); // CapturedMonster layer thresholds: [0,150,400,900,1800,3600] → layer 5 at 1800
+
+        // Advance through layers one threshold at a time
+        companion.RecordUsage(150);  // → layer 2
+        companion.RecordUsage(250);  // total 400 → layer 3
+        companion.RecordUsage(500);  // total 900 → layer 4
+        companion.RecordUsage(900);  // total 1800 → layer 5
 
         companion.CurrentLayer.Should().BeGreaterThanOrEqualTo(5,
-            "companion should reach layer 5 after sufficient usage");
+            "companion should reach layer 5 after crossing all intermediate thresholds");
 
         var initialUsage = companion.UsageCounter;
         companion.RecordUsage(10);
@@ -696,14 +702,19 @@ public class MechanicsSweepTests
     [Fact]
     public void Companion_MaxLayer6_NoFurtherAdvancement()
     {
-        // Force to max layer via huge usage
+        // CapturedMonster thresholds: [0, 150, 400, 900, 1800, 3600]
+        // TryAdvanceLayer advances only one layer per call — step through each threshold.
         var companion = Companion.Create(Guid.NewGuid(), "Max Fox", CompanionType.CapturedMonster, MagicElement.Aether);
-        companion.RecordUsage(10000); // far above 3600 threshold
+
+        companion.RecordUsage(150);  // → layer 2 (threshold index 1 = 150)
+        companion.RecordUsage(250);  // total 400 → layer 3 (threshold 400)
+        companion.RecordUsage(500);  // total 900 → layer 4 (threshold 900)
+        companion.RecordUsage(900);  // total 1800 → layer 5 (threshold 1800)
+        companion.RecordUsage(1800); // total 3600 → layer 6 (threshold 3600)
 
         companion.CurrentLayer.Should().Be(6, "companion should max out at layer 6");
-        var previousCounter = companion.UsageCounter;
 
-        companion.RecordUsage(100);
+        companion.RecordUsage(1000);
         companion.CurrentLayer.Should().Be(6, "layer 6 is the cap — cannot go higher");
     }
 

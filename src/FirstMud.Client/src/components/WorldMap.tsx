@@ -1362,6 +1362,9 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
     }  // end terrain loop
 
     // ── Homestead buildings pass (after terrain, before player) ───────────────
+    if (homesteadBuildingsRef.current.length > 0) {
+      console.log(`[WorldMap] homesteadBuildings count=${homesteadBuildingsRef.current.length} deferred=${deferredBuildings.length} playerAt=(${playerX},${playerY})`);
+    }
     deferredBuildings.sort((a, b) => a.sortKey - b.sortKey);
     for (const db of deferredBuildings) {
       ctx.save();
