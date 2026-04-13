@@ -204,6 +204,7 @@ export interface CombatUpdate {
   currentActorId: string;
   round: number;
   lastActionText?: string;
+  dangerLevel?: number;
 }
 
 export interface InventorySnapshot {

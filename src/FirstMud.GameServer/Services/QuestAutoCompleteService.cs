@@ -1,4 +1,5 @@
 using FirstMud.Application.Services;
+using FirstMud.Domain.Entities;
 using FirstMud.Domain.Events;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Hubs;
@@ -79,6 +80,62 @@ public class QuestAutoCompleteService(
     }
 
     // -----------------------------------------------------------------------
+    // Synonym map for fuzzy item matching
+    // -----------------------------------------------------------------------
+
+    private static readonly (string Keyword, string[] Synonyms)[] ItemSynonyms =
+    [
+        ("beast hides",  ["leather", "hide"]),
+        ("hides",        ["leather", "hide"]),
+        ("iron",         ["iron ore", "iron"]),
+        ("herbs",        ["herb", "herbs"]),
+        ("wood",         ["wood", "timber", "lumber"]),
+        ("stone",        ["stone", "rock"]),
+        ("bones",        ["bone"]),
+        ("fangs",        ["fang"]),
+        ("claws",        ["claw"]),
+        ("scales",       ["scale"]),
+        ("pelt",         ["pelt", "leather", "hide"]),
+    ];
+
+    /// <summary>
+    /// Finds items in the player's inventory that match the given keyword.
+    /// Tries exact contains match first, then common synonyms.
+    /// </summary>
+    private static List<Domain.Entities.Item> FindMatchingItems(
+        IReadOnlyList<Domain.Entities.Item> items,
+        string keyword)
+    {
+        // 1. Exact contains match
+        var exact = items.Where(i => i.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (exact.Count > 0) return exact;
+
+        // 2. Synonym lookup
+        var lowerKeyword = keyword.ToLowerInvariant();
+        foreach (var (kw, synonyms) in ItemSynonyms)
+        {
+            if (!lowerKeyword.Contains(kw, StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var syn in synonyms)
+            {
+                var synMatches = items.Where(i => i.Name.Contains(syn, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (synMatches.Count > 0) return synMatches;
+            }
+        }
+
+        // 3. Partial word match: check each word in the keyword against item names
+        var words = keyword.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length >= 4)
+            .ToArray();
+        foreach (var word in words)
+        {
+            var wordMatches = items.Where(i => i.Name.Contains(word, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (wordMatches.Count > 0) return wordMatches;
+        }
+
+        return [];
+    }
+
+    // -----------------------------------------------------------------------
     // Core: check + complete a single quest if objectives are met
     // Returns true if the quest was completed.
     // -----------------------------------------------------------------------
@@ -122,11 +179,21 @@ public class QuestAutoCompleteService(
                 var required = ParseItemCount(quest.Description);
                 var items    = await itemRepository.GetByOwnerAsync(playerId, ct);
                 var matching = keyword is not null
-                    ? items.Where(i => i.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)).ToList()
+                    ? FindMatchingItems(items, keyword)
                     : [];
                 var heldCount = matching.Sum(i => i.IsStackable ? i.Quantity : 1);
                 if (heldCount < required)
-                    failReason = $"Only {heldCount}/{required} items held.";
+                {
+                    // Diagnostic: tell the player what we're looking for and what we found
+                    var inventorySummary = items
+                        .Where(i => i.IsStackable ? i.Quantity > 0 : true)
+                        .OrderByDescending(i => i.IsStackable ? i.Quantity : 1)
+                        .Take(8)
+                        .Select(i => i.IsStackable ? $"{i.Name} x{i.Quantity}" : i.Name);
+                    failReason = keyword is not null
+                        ? $"Need {required} '{keyword}' but found: {string.Join(", ", inventorySummary)}"
+                        : $"Only {heldCount}/{required} items held.";
+                }
                 break;
             }
 
@@ -145,9 +212,7 @@ public class QuestAutoCompleteService(
             if (keyword is not null)
             {
                 var items    = await itemRepository.GetByOwnerAsync(playerId, ct);
-                var matching = items
-                    .Where(i => i.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                var matching = FindMatchingItems(items, keyword);
 
                 var toConsume = required;
                 foreach (var item in matching)

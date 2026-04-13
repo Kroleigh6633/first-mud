@@ -947,7 +947,7 @@ public class FarmingOrchestrator(
                 }
 
                 var encounter = await combatSvc.StartEncounterAsync(
-                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, farmActiveCompanions, monsters, ct: farmCt);
+                    playerId, nearbyZone?.Id ?? Guid.NewGuid(), freshPlayer, farmActiveCompanions, monsters, ct: farmCt, dangerLevel: dangerLevel);
 
                 var encounterCategory = CombatHelpers.GetCombatDifficultyCategory(avgMonsterLevel, freshPlayer.Level);
                 await hubContext.Clients
@@ -990,7 +990,7 @@ public class FarmingOrchestrator(
                     }
                 }
 
-                var initDto = CombatHelpers.BuildCombatUpdateDto(encounter);
+                var initDto = CombatHelpers.BuildCombatUpdateDto(encounter, dangerLevel: dangerLevel);
                 await hubContext.Clients
                     .Group(playerId.ToString())
                     .SendAsync("CombatUpdate", initDto, farmCt);
@@ -1026,7 +1026,7 @@ public class FarmingOrchestrator(
                                 var (_, healNarr, _) = await combatSvc.ExecuteActionAsync(encounter.Id, actor.Id, healAbility.Name, actor.Id, farmCt);
                                 actionText = healNarr;
                                 encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
-                                var healDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText);
+                                var healDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText, dangerLevel);
                                 await hubContext.Clients.Group(playerId.ToString()).SendAsync("CombatUpdate", healDto, farmCt);
                                 await Task.Delay(800, farmCt);
                                 continue;
@@ -1072,7 +1072,7 @@ public class FarmingOrchestrator(
 
                     encounter = combatSvc.GetEncounter(encounter.Id) ?? encounter;
 
-                    var actionDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText);
+                    var actionDto = CombatHelpers.BuildCombatUpdateDto(encounter, actionText, dangerLevel);
                     await hubContext.Clients
                         .Group(playerId.ToString())
                         .SendAsync("CombatUpdate", actionDto, farmCt);
@@ -1080,7 +1080,7 @@ public class FarmingOrchestrator(
                 }
 
                 // Broadcast final encounter state
-                var finalDto = CombatHelpers.BuildCombatUpdateDto(encounter);
+                var finalDto = CombatHelpers.BuildCombatUpdateDto(encounter, dangerLevel: dangerLevel);
                 await hubContext.Clients
                     .Group(playerId.ToString())
                     .SendAsync("CombatUpdate", finalDto, farmCt);

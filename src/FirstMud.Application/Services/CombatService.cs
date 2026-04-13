@@ -11,6 +11,7 @@ public class CombatService
 {
     private readonly ILogger<CombatService> _logger;
     private readonly ConcurrentDictionary<Guid, Encounter> _activeEncounters = new();
+    private readonly ConcurrentDictionary<Guid, int> _encounterDangerLevels = new();
 
     public CombatService(ILogger<CombatService> logger)
     {
@@ -29,7 +30,8 @@ public class CombatService
         IReadOnlyList<Companion> activeCompanions,
         IReadOnlyList<MonsterTemplate> enemies,
         IReadOnlyDictionary<EquipmentSlot, Item>? equippedItems = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int dangerLevel = 0)
     {
         equippedItems ??= new Dictionary<EquipmentSlot, Item>();
         var element = player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement;
@@ -175,6 +177,7 @@ public class CombatService
 
         var encounter = Encounter.Create(playerId, zoneId, playerSide, enemySide);
         _activeEncounters[encounter.Id] = encounter;
+        _encounterDangerLevels[encounter.Id] = dangerLevel;
 
         _logger.LogInformation("Combat started: Encounter {EncounterId} for player {PlayerId} in zone {ZoneId}",
             encounter.Id, playerId, zoneId);
@@ -350,6 +353,10 @@ public class CombatService
     /// <summary>Returns the encounter or null.</summary>
     public Encounter? GetEncounter(Guid encounterId)
         => _activeEncounters.TryGetValue(encounterId, out var enc) ? enc : null;
+
+    /// <summary>Returns the danger level stored when the encounter was created, or 0.</summary>
+    public int GetEncounterDangerLevel(Guid encounterId)
+        => _encounterDangerLevels.TryGetValue(encounterId, out var dl) ? dl : 0;
 
     // -------------------------------------------------------------------------
     // Private helpers

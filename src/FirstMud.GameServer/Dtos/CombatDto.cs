@@ -25,4 +25,5 @@ public sealed record CombatUpdateDto(
     List<CombatantDto> Combatants,
     Guid CurrentActorId,
     int Round,
-    string? LastActionText = null);
+    string? LastActionText = null,
+    int DangerLevel = 0);

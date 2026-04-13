@@ -250,7 +250,21 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           letterSpacing: '0.12em',
         }}>
-          <span style={{ color: '#ff4444' }}>COMBAT — Round {combat.round}</span>
+          <span style={{ color: '#ff4444' }}>
+            COMBAT — Round {combat.round}
+            {combat.dangerLevel != null && combat.dangerLevel > 0 && (
+              <>
+                {' · Danger '}
+                <span style={{
+                  color: combat.dangerLevel <= 3 ? '#00ff41'
+                       : combat.dangerLevel <= 6 ? '#ffcc00'
+                       : '#ff4444',
+                }}>
+                  {combat.dangerLevel}/10
+                </span>
+              </>
+            )}
+          </span>
           <span style={{ color: isOver ? '#ccaa00' : '#888', fontSize: '11px' }}>{combat.state}</span>
         </div>
 

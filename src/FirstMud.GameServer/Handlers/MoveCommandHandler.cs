@@ -165,7 +165,7 @@ public class MoveCommandHandler(
         }
 
         var encounter = await combatService.StartEncounterAsync(
-            playerId, Guid.NewGuid(), player, activeCompanions, monsters, ct: ct);
+            playerId, Guid.NewGuid(), player, activeCompanions, monsters, ct: ct, dangerLevel: dangerLevel);
 
         var combatCategory = CombatHelpers.GetCombatDifficultyCategory(avgMonsterLevel, player.Level);
 
@@ -179,7 +179,7 @@ public class MoveCommandHandler(
 
         await combatHelpers.ProcessEnemyTurnsAsync(playerId, encounter, ct);
 
-        var dto = CombatHelpers.BuildCombatUpdateDto(encounter);
+        var dto = CombatHelpers.BuildCombatUpdateDto(encounter, dangerLevel: dangerLevel);
         await hubContext.Clients
             .Group(playerId.ToString())
             .SendAsync("CombatUpdate", dto, ct);

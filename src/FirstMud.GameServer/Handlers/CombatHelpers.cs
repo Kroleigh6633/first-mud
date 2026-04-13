@@ -530,8 +530,19 @@ public class CombatHelpers(
             var companion = await companionRepository.GetByIdAsync(companionId, ct);
             if (companion is null || companion.IsPermanentlyGone) continue;
 
+            // Scale usage points by bond level deficit — low-bond companions catch up faster
+            var scaledUsage = companion.CurrentLayer switch
+            {
+                1 => 25,  // Bond 1: 2.5× fast catch-up
+                2 => 20,
+                3 => 15,
+                4 => 12,
+                5 => 10,
+                _ => 10   // Bond 6 MAX: standard (but won't level further)
+            };
+
             var layerBefore = companion.CurrentLayer;
-            companion.RecordUsage(usagePoints);
+            companion.RecordUsage(scaledUsage);
             await companionRepository.UpdateAsync(companion, ct);
 
             // Broadcast layer-up events raised by RecordUsage → TryAdvanceLayer
@@ -557,7 +568,7 @@ public class CombatHelpers(
 
             logger.LogDebug(
                 "Companion {Name} ({Id}) usage +{Points} → {Counter}/{Threshold} (Layer {Layer})",
-                companion.Name, companion.Id, usagePoints,
+                companion.Name, companion.Id, scaledUsage,
                 companion.UsageCounter, companion.NextLayerThreshold, companion.CurrentLayer);
         }
 
@@ -722,7 +733,7 @@ public class CombatHelpers(
     // DTO builder
     // -------------------------------------------------------------------------
 
-    public static CombatUpdateDto BuildCombatUpdateDto(Encounter encounter, string? lastActionText = null)
+    public static CombatUpdateDto BuildCombatUpdateDto(Encounter encounter, string? lastActionText = null, int dangerLevel = 0)
     {
         var combatantDtos = encounter.Combatants
             .Select(c => new CombatantDto(
@@ -749,7 +760,8 @@ public class CombatHelpers(
             combatantDtos,
             encounter.CurrentActor?.Id ?? Guid.Empty,
             encounter.RoundNumber,
-            lastActionText);
+            lastActionText,
+            dangerLevel);
     }
 
     // -------------------------------------------------------------------------

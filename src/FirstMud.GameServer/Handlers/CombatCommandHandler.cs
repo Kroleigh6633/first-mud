@@ -49,11 +49,11 @@ public class StartCombatCommandHandler(
         }
 
         var encounter = await combatService.StartEncounterAsync(
-            cmd.PlayerId, cmd.ZoneId, player, activeCompanions, monsters, equippedItems, ct);
+            cmd.PlayerId, cmd.ZoneId, player, activeCompanions, monsters, equippedItems, ct, dangerLevel);
 
         await combatHelpers.ProcessEnemyTurnsAsync(cmd.PlayerId, encounter, ct);
 
-        var dto = CombatHelpers.BuildCombatUpdateDto(encounter);
+        var dto = CombatHelpers.BuildCombatUpdateDto(encounter, dangerLevel: dangerLevel);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
@@ -116,7 +116,8 @@ public class UseCombatAbilityCommandHandler(
             await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
         }
 
-        var dto = CombatHelpers.BuildCombatUpdateDto(updated, message);
+        var dangerLevel = combatService.GetEncounterDangerLevel(cmd.EncounterId);
+        var dto = CombatHelpers.BuildCombatUpdateDto(updated, message, dangerLevel);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
@@ -132,12 +133,13 @@ public class FleeCombatCommandHandler(
 {
     public async Task<CommandResult> HandleAsync(FleeCombatCommand cmd, CancellationToken ct)
     {
+        var dangerLevel = combatService.GetEncounterDangerLevel(cmd.EncounterId);
         var (success, message, updated) = await combatService.FleeAsync(cmd.EncounterId, ct);
 
         if (!success || updated is null)
             return new CommandResult(false, message);
 
-        var dto = CombatHelpers.BuildCombatUpdateDto(updated);
+        var dto = CombatHelpers.BuildCombatUpdateDto(updated, dangerLevel: dangerLevel);
 
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
