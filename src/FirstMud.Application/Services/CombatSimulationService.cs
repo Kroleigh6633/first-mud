@@ -48,6 +48,29 @@ public sealed class CombatSimulationService
         int Layer,
         int Level);
 
+    /// <summary>
+    /// Sim-side proxy for player loadout axes the live game tracks separately.
+    /// Keeps playbooks honest: gear and imbue should affect the fight
+    /// DIFFERENTLY from raw level so a `gear-only` and `imbue-only` playbook
+    /// don't collapse into the level curve.
+    ///
+    /// Multipliers (documented in tools/design/playbooks/README.md):
+    ///   - GearTier t: +15% weapon damage per tier (Strike + bolt BasePower),
+    ///                 and player takes (1 - 0.07*t) incoming damage (armor).
+    ///                 Gear does NOT scale HP pool.
+    ///   - ImbueLevel i: +20% ability power per imbue level on magical abilities
+    ///                   (Weave Bolt / Restore / elemental abilities) PLUS a flat
+    ///                   +4*i to every ability base. Imbues do NOT scale HP.
+    ///   - CompanionCount / CompanionLayer: already modelled via the party list.
+    /// </summary>
+    public sealed record CombatContext(
+        int PlayerLevel,
+        MagicElement PlayerElement,
+        int GearTier,
+        int ImbueLevel,
+        IReadOnlyList<PartyMember> Companions,
+        IReadOnlyList<MonsterTemplate> Enemies);
+
     public sealed record SimulationResult(
         Outcome Outcome,
         int Rounds,
@@ -60,6 +83,60 @@ public sealed class CombatSimulationService
     public enum Outcome { Victory, Defeat, Timeout }
 
     // ─── Build sides (mirrors CombatService.StartEncounterAsync, no gear) ───
+
+    /// <summary>
+    /// Context-aware overload. Applies gear-tier and imbue-level effects
+    /// DISTINCTLY from raw playerLevel so playbooks can isolate each axis.
+    /// See <see cref="CombatContext"/> for the multiplier documentation.
+    ///
+    /// Implementation: builds the level-based encounter via the legacy path
+    /// then re-creates the player combatant with gear- and imbue-tuned
+    /// abilities and agility. Combatant is immutable post-creation, so the
+    /// player is rebuilt rather than mutated.
+    /// </summary>
+    public Encounter BuildEncounter(CombatContext ctx)
+    {
+        var encounter = BuildEncounter(ctx.PlayerElement, ctx.PlayerLevel, ctx.Companions, ctx.Enemies);
+        if (ctx.GearTier == 0 && ctx.ImbueLevel == 0) return encounter;
+
+        var oldPlayer = encounter.Combatants.First(c => c.CombatantType == CombatantType.Player);
+
+        double gearMult  = 1.0 + 0.15 * ctx.GearTier;
+        double imbueMult = 1.0 + 0.20 * ctx.ImbueLevel;
+        int flatImbue    = 4 * ctx.ImbueLevel;
+
+        var scaled = new List<CombatAbility>(oldPlayer.Abilities.Count);
+        foreach (var ab in oldPlayer.Abilities)
+        {
+            double mult = ab.Name == "Strike" ? gearMult
+                        : ab.Category == AbilityCategory.Attack ? imbueMult
+                        : 1.0;
+            int newBase = (int)Math.Round(ab.BasePower * mult) + flatImbue;
+            scaled.Add(ab with { BasePower = newBase });
+        }
+
+        // Gear mitigation proxy: bump Agility by +3 per gear tier (raises dodge
+        // chance in ResolveAction without modifying the HP pool).
+        int newAgility = oldPlayer.Agility + 3 * ctx.GearTier;
+
+        var newPlayer = Combatant.Create(
+            oldPlayer.Name,
+            CombatantType.Player,
+            oldPlayer.SourceEntityId,
+            oldPlayer.MaxHp,
+            oldPlayer.Speed,
+            oldPlayer.Element,
+            isPlayerSide: true,
+            oldPlayer.Level,
+            scaled,
+            agility: newAgility);
+
+        // Rebuild encounter with the new player + existing companions/enemies.
+        var playerSide = new List<Combatant> { newPlayer };
+        playerSide.AddRange(encounter.Combatants.Where(c => c.CombatantType == CombatantType.Companion));
+        var enemySide = encounter.Combatants.Where(c => !c.IsPlayerSide).ToList();
+        return Encounter.Create(Guid.NewGuid(), Guid.NewGuid(), playerSide, enemySide);
+    }
 
     public Encounter BuildEncounter(
         MagicElement playerElement,

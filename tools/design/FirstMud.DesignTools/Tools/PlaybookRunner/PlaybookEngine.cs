@@ -50,9 +50,10 @@ public sealed class PlaybookEngine
         var seed = seedOverride ?? playbook.Seed;
         var cells = new List<CellResult>();
 
-        foreach (var combo in Cartesian(playbook.Axes))
+        foreach (var (combo, idx) in CartesianWithIndices(playbook.Axes))
         {
-            var summary = RunCell(playbook, combo, seed);
+            var cellSalt = DeterministicCellSalt(idx);
+            var summary = RunCell(playbook, combo, seed, cellSalt);
             var actual  = Classify(summary.WinRate, playbook.ToleranceBands);
             var expected = LookupExpected(playbook, combo);
             cells.Add(new CellResult(combo, summary, actual, expected, actual != expected && expected.Length > 0));
@@ -62,18 +63,39 @@ public sealed class PlaybookEngine
         return new PlaybookRunResult(playbook.Id, seed, playbook.Rolls, cells, divergences);
     }
 
+    /// <summary>
+    /// Deterministic per-cell salt from the axis-index tuple. No string hashing —
+    /// <c>string.GetHashCode()</c> is randomized per-process in .NET 6+, which
+    /// would make the same playbook+seed produce different results across runs.
+    /// This folds the index at each axis into a stable integer using a
+    /// Cantor-style positional mix.
+    /// </summary>
+    public static int DeterministicCellSalt(int[] cellIndexPerAxis)
+    {
+        int salt = 0;
+        for (int a = 0; a < cellIndexPerAxis.Length; a++)
+        {
+            // Prime-weighted positional mix. All arithmetic is deterministic.
+            salt = unchecked(salt * 1_000_003 + (cellIndexPerAxis[a] + 1) * (a + 1) * 257);
+        }
+        return salt;
+    }
+
     // ─── Loadout construction ───────────────────────────────────────────────
 
     private EncounterSim.EncounterSimCommand.Summary RunCell(
-        Playbook pb, IReadOnlyDictionary<string, int> axisValues, int masterSeed)
+        Playbook pb, IReadOnlyDictionary<string, int> axisValues, int masterSeed, int cellSalt)
     {
         int playerLevel = pb.Holdouts.PlayerLevel ?? 5;
         if (axisValues.TryGetValue("playerLevel", out var pl)) playerLevel = pl;
-        if (axisValues.TryGetValue("gearTier",    out var gt)) playerLevel += gt * 2;
-        else if (pb.Holdouts.GearTier is int hgt) playerLevel += hgt * 2;
-        if (axisValues.TryGetValue("imbueLevel",  out var il)) playerLevel += il;
-        else if (pb.Holdouts.ImbueLevel is int hil) playerLevel += hil;
         playerLevel = Math.Max(1, playerLevel);
+
+        // Gear and imbue are now handled DISTINCTLY via CombatContext, not as
+        // flat level bonuses. This is the heart of Fix #2 from the pass #7
+        // follow-ups: `gear-only` and `imbue-only` playbooks must not collapse
+        // into the player-level curve.
+        int gearTier   = axisValues.TryGetValue("gearTier",   out var gt) ? gt : (pb.Holdouts.GearTier   ?? 0);
+        int imbueLevel = axisValues.TryGetValue("imbueLevel", out var il) ? il : (pb.Holdouts.ImbueLevel ?? 0);
 
         var playerElement = ParseElement(pb.Holdouts.PlayerElement ?? "Aether");
 
@@ -85,23 +107,40 @@ public sealed class PlaybookEngine
         // Party composition
         var party = BuildParty(pb, axisValues);
 
+        // Pack size: how many enemies. Either via axis, or a single monster.
+        int packSize = axisValues.TryGetValue("packSize", out var ps) ? Math.Max(1, ps) : 1;
+
         // Monster selection: fixed via holdout, else pick by (danger tier proxy).
         var monsterId = pb.Holdouts.MonsterId ?? PickRepresentative(dangerLevel);
         var def = _content.GetMonster(monsterId)
             ?? throw new InvalidOperationException($"Unknown monster id '{monsterId}'.");
         var baseTemplate = new MonsterTemplate(def.Name, def.Hp, def.Speed, def.Level, def.Element, def.Abilities);
         var scaled = MonsterScaling.Apply(baseTemplate, dangerLevel, _content.CombatCurves.MonsterScaling, isBoss: false);
+        var enemies = Enumerable.Repeat(scaled, packSize).ToArray();
 
-        // Mix cell index into the seed so every cell diverges deterministically.
-        int cellSalt = 0;
-        foreach (var kv in axisValues) cellSalt = unchecked(cellSalt * 31 + kv.Key.GetHashCode() * 17 + kv.Value * 7);
+        // partySize axis: override companion count (overrides holdouts)
+        if (axisValues.TryGetValue("partySize", out var partySize))
+        {
+            // partySize = 1 means solo player, 2 = player + 1 companion, etc.
+            int companionsWanted = Math.Max(0, partySize - 1);
+            var layer = axisValues.TryGetValue("companionLayer", out var cl) ? cl : (pb.Holdouts.CompanionLayer ?? 1);
+            party = Enumerable.Range(0, companionsWanted)
+                .Select(i => new CombatSimulationService.PartyMember(
+                    CompanionType.Wildfolk,
+                    (MagicElement)(i % 5),
+                    layer,
+                    Math.Max(1, layer * 2)))
+                .ToList();
+        }
 
         var results = new List<CombatSimulationService.SimulationResult>(pb.Rolls);
         for (int i = 0; i < pb.Rolls; i++)
         {
             var rng = new Random(unchecked(masterSeed * 1_000_003 + cellSalt * 97 + i));
             var svc = new CombatSimulationService(rng);
-            var enc = svc.BuildEncounter(playerElement, playerLevel, party, new[] { scaled });
+            var ctx = new CombatSimulationService.CombatContext(
+                playerLevel, playerElement, gearTier, imbueLevel, party, enemies);
+            var enc = svc.BuildEncounter(ctx);
             results.Add(svc.Run(enc));
         }
 
@@ -190,13 +229,23 @@ public sealed class PlaybookEngine
 
     public static IEnumerable<IReadOnlyDictionary<string, int>> Cartesian(IReadOnlyList<Axis> axes)
     {
-        if (axes.Count == 0) { yield return new Dictionary<string, int>(); yield break; }
+        foreach (var (dict, _) in CartesianWithIndices(axes)) yield return dict;
+    }
+
+    /// <summary>
+    /// Same as <see cref="Cartesian"/> but also yields the cell-index tuple
+    /// (position in each axis's values array). Callers use the index tuple
+    /// to derive a deterministic per-cell salt independent of string hashing.
+    /// </summary>
+    public static IEnumerable<(IReadOnlyDictionary<string, int> values, int[] indices)> CartesianWithIndices(IReadOnlyList<Axis> axes)
+    {
+        if (axes.Count == 0) { yield return (new Dictionary<string, int>(), Array.Empty<int>()); yield break; }
         var idx = new int[axes.Count];
         while (true)
         {
             var dict = new Dictionary<string, int>(axes.Count);
             for (int a = 0; a < axes.Count; a++) dict[axes[a].Name] = axes[a].Values[idx[a]];
-            yield return dict;
+            yield return (dict, (int[])idx.Clone());
             int k = axes.Count - 1;
             while (k >= 0)
             {

@@ -2,7 +2,7 @@
   "$schema": "../schemas/playbook.schema.json",
   "id": "imbue-only",
   "displayName": "Imbue-only contribution",
-  "description": "Baseline gear tier 3, no companions, varying imbue level (proxy: +1 effective level per imbue). DESIGN INTENT (creative pass #7): with gearTier=3 baseline (effective pl ~11), the overworld danger curve is already cleared by gear alone; imbues are a marginal buff against the top end. This playbook should flag REGRESSIONS (imbue 0 at d9 suddenly falling off a cliff) rather than prescribe a steep viability curve. In its current form most cells are trivial because the proxy stack (pl 5 + gt 3 = pl 11) already exceeds danger; a more informative variant will pull gearTier baseline down once 'balanced expectation' can be expressed in proxy-free form.",
+  "description": "Baseline gear tier 3, no companions, varying imbue level. DESIGN INTENT (CP7 Fix #2): imbues now apply DISTINCTLY from level — +20% magical ability BasePower per imbue level + flat +4 per imbue to every ability base. Because the auto-sim player prefers Strike (physical, weave-cost 0), imbue contribution is weaker than gear in this config but still shows a clean upward trend. Expected: low danger (d<=5) trivial regardless of imbue; d=7 moves hard→balanced as imbue climbs; d=9 stays punishing until multiple imbue levels stack. A pure magic-caster playbook (if added) would show a steeper imbue curve.",
   "holdouts": {
     "playerLevel": 5,
     "playerElement": "Aether",
@@ -18,28 +18,28 @@
     "cells": [
       { "imbueLevel": 0, "dangerLevel": 3, "expected": "trivial" },
       { "imbueLevel": 0, "dangerLevel": 5, "expected": "trivial" },
-      { "imbueLevel": 0, "dangerLevel": 7, "expected": "trivial" },
-      { "imbueLevel": 0, "dangerLevel": 9, "expected": "balanced" },
+      { "imbueLevel": 0, "dangerLevel": 7, "expected": "hard" },
+      { "imbueLevel": 0, "dangerLevel": 9, "expected": "punishing" },
 
       { "imbueLevel": 1, "dangerLevel": 3, "expected": "trivial" },
       { "imbueLevel": 1, "dangerLevel": 5, "expected": "trivial" },
-      { "imbueLevel": 1, "dangerLevel": 7, "expected": "trivial" },
-      { "imbueLevel": 1, "dangerLevel": 9, "expected": "easy" },
+      { "imbueLevel": 1, "dangerLevel": 7, "expected": "hard" },
+      { "imbueLevel": 1, "dangerLevel": 9, "expected": "punishing" },
 
       { "imbueLevel": 2, "dangerLevel": 3, "expected": "trivial" },
       { "imbueLevel": 2, "dangerLevel": 5, "expected": "trivial" },
-      { "imbueLevel": 2, "dangerLevel": 7, "expected": "trivial" },
-      { "imbueLevel": 2, "dangerLevel": 9, "expected": "trivial" },
+      { "imbueLevel": 2, "dangerLevel": 7, "expected": "hard" },
+      { "imbueLevel": 2, "dangerLevel": 9, "expected": "punishing" },
 
       { "imbueLevel": 3, "dangerLevel": 3, "expected": "trivial" },
       { "imbueLevel": 3, "dangerLevel": 5, "expected": "trivial" },
-      { "imbueLevel": 3, "dangerLevel": 7, "expected": "trivial" },
-      { "imbueLevel": 3, "dangerLevel": 9, "expected": "trivial" },
+      { "imbueLevel": 3, "dangerLevel": 7, "expected": "hard" },
+      { "imbueLevel": 3, "dangerLevel": 9, "expected": "punishing" },
 
       { "imbueLevel": 4, "dangerLevel": 3, "expected": "trivial" },
       { "imbueLevel": 4, "dangerLevel": 5, "expected": "trivial" },
-      { "imbueLevel": 4, "dangerLevel": 7, "expected": "trivial" },
-      { "imbueLevel": 4, "dangerLevel": 9, "expected": "trivial" }
+      { "imbueLevel": 4, "dangerLevel": 7, "expected": "hard" },
+      { "imbueLevel": 4, "dangerLevel": 9, "expected": "punishing" }
     ]
   },
   "toleranceBands": {

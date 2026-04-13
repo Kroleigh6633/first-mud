@@ -1,0 +1,309 @@
+{
+  "playbookId": "gear-only",
+  "displayName": "Gear-only viability",
+  "seed": 42,
+  "rolls": 200,
+  "cells": [
+    {
+      "axis": {
+        "gearTier": 1,
+        "dangerLevel": 1
+      },
+      "winRate": 1,
+      "avgRounds": 1.265,
+      "avgHpPct": 0.988732394366197,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 1,
+        "dangerLevel": 3
+      },
+      "winRate": 0.995,
+      "avgRounds": 3.67,
+      "avgHpPct": 0.6424729280203836,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 1,
+        "dangerLevel": 5
+      },
+      "winRate": 0.75,
+      "avgRounds": 4.56,
+      "avgHpPct": 0.41431924882629084,
+      "actual": "balanced",
+      "expected": "balanced",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 1,
+        "dangerLevel": 7
+      },
+      "winRate": 0.09,
+      "avgRounds": 4.595,
+      "avgHpPct": 0.27543035993740217,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 1,
+        "dangerLevel": 9
+      },
+      "winRate": 0.02,
+      "avgRounds": 4.175,
+      "avgHpPct": 0.323943661971831,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 2,
+        "dangerLevel": 1
+      },
+      "winRate": 1,
+      "avgRounds": 1.075,
+      "avgHpPct": 0.9963732394366198,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 2,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 3.28,
+      "avgHpPct": 0.7191197183098594,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 2,
+        "dangerLevel": 5
+      },
+      "winRate": 0.875,
+      "avgRounds": 4.24,
+      "avgHpPct": 0.4641046277665996,
+      "actual": "easy",
+      "expected": "easy",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 2,
+        "dangerLevel": 7
+      },
+      "winRate": 0.195,
+      "avgRounds": 4.755,
+      "avgHpPct": 0.33134705669916936,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 2,
+        "dangerLevel": 9
+      },
+      "winRate": 0.05,
+      "avgRounds": 4.435,
+      "avgHpPct": 0.26901408450704223,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 3,
+        "dangerLevel": 1
+      },
+      "winRate": 1,
+      "avgRounds": 1.055,
+      "avgHpPct": 0.9972887323943662,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 3,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 3.03,
+      "avgHpPct": 0.7587323943661969,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 3,
+        "dangerLevel": 5
+      },
+      "winRate": 0.96,
+      "avgRounds": 3.9,
+      "avgHpPct": 0.5441607981220657,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 3,
+        "dangerLevel": 7
+      },
+      "winRate": 0.345,
+      "avgRounds": 4.96,
+      "avgHpPct": 0.36956521739130427,
+      "actual": "hard",
+      "expected": "hard",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 3,
+        "dangerLevel": 9
+      },
+      "winRate": 0.095,
+      "avgRounds": 4.61,
+      "avgHpPct": 0.18124536693847296,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 4,
+        "dangerLevel": 1
+      },
+      "winRate": 1,
+      "avgRounds": 1.045,
+      "avgHpPct": 0.9979577464788731,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 4,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.865,
+      "avgHpPct": 0.8033098591549294,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 4,
+        "dangerLevel": 5
+      },
+      "winRate": 0.98,
+      "avgRounds": 3.69,
+      "avgHpPct": 0.6167720609370512,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 4,
+        "dangerLevel": 7
+      },
+      "winRate": 0.46,
+      "avgRounds": 4.945,
+      "avgHpPct": 0.38686466625841975,
+      "actual": "hard",
+      "expected": "hard",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 4,
+        "dangerLevel": 9
+      },
+      "winRate": 0.215,
+      "avgRounds": 4.85,
+      "avgHpPct": 0.25892564690468395,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 5,
+        "dangerLevel": 1
+      },
+      "winRate": 1,
+      "avgRounds": 1.05,
+      "avgHpPct": 0.9986619718309859,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 5,
+        "dangerLevel": 3
+      },
+      "winRate": 1,
+      "avgRounds": 2.785,
+      "avgHpPct": 0.8163380281690141,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 5,
+        "dangerLevel": 5
+      },
+      "winRate": 0.995,
+      "avgRounds": 3.57,
+      "avgHpPct": 0.6435699624884983,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 5,
+        "dangerLevel": 7
+      },
+      "winRate": 0.62,
+      "avgRounds": 5.085,
+      "avgHpPct": 0.3842003634711496,
+      "actual": "balanced",
+      "expected": "balanced",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "gearTier": 5,
+        "dangerLevel": 9
+      },
+      "winRate": 0.285,
+      "avgRounds": 4.95,
+      "avgHpPct": 0.26501111934766497,
+      "actual": "punishing",
+      "expected": "punishing",
+      "divergent": false
+    }
+  ],
+  "divergences": []
+}

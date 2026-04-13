@@ -1,0 +1,94 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "pack-viability",
+  "displayName": "Pack viability (party vs pack size)",
+  "description": "Mid-game holdouts (playerLevel 5, gearTier 3, imbueLevel 2, companionLayer 3) swept across partySize x packSize x dangerLevel. DESIGN INTENT (CP7 Fix #3): pack-viability is the first playbook that varies enemy pack size distinctly from dangerLevel, so we can observe the pack-cap / party-scaling interaction the way a real encounter would. Expected curve: when partySize >= packSize at the same dangerLevel, fights are balanced-to-trivial (the player side has position to focus-fire); when partySize + 2 < packSize (heavily outnumbered), mid-danger fights skew hard/punishing because the pack-cap can't help you if you show up solo. Standard 'fair-matched' cases (e.g. partySize=3 vs packSize=3 at danger=5) should land balanced/easy; asymmetric cases (partySize=1 vs packSize=4 at danger=5+) should land punishing.",
+  "holdouts": {
+    "playerLevel": 5,
+    "playerElement": "Aether",
+    "gearTier": 3,
+    "imbueLevel": 2,
+    "companionLayer": 3
+  },
+  "axes": [
+    { "name": "partySize",   "values": [1, 2, 3, 4] },
+    { "name": "packSize",    "values": [1, 2, 3, 4] },
+    { "name": "dangerLevel", "values": [3, 5, 7] }
+  ],
+  "rolls": 120,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "partySize": 1, "packSize": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 1, "packSize": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 1, "packSize": 1, "dangerLevel": 7, "expected": "hard" },
+
+      { "partySize": 1, "packSize": 2, "dangerLevel": 3, "expected": "balanced" },
+      { "partySize": 1, "packSize": 2, "dangerLevel": 5, "expected": "hard" },
+      { "partySize": 1, "packSize": 2, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 1, "packSize": 3, "dangerLevel": 3, "expected": "punishing" },
+      { "partySize": 1, "packSize": 3, "dangerLevel": 5, "expected": "punishing" },
+      { "partySize": 1, "packSize": 3, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 1, "packSize": 4, "dangerLevel": 3, "expected": "punishing" },
+      { "partySize": 1, "packSize": 4, "dangerLevel": 5, "expected": "punishing" },
+      { "partySize": 1, "packSize": 4, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 2, "packSize": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 2, "packSize": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 2, "packSize": 1, "dangerLevel": 7, "expected": "trivial" },
+
+      { "partySize": 2, "packSize": 2, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 2, "packSize": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 2, "packSize": 2, "dangerLevel": 7, "expected": "hard" },
+
+      { "partySize": 2, "packSize": 3, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 2, "packSize": 3, "dangerLevel": 5, "expected": "balanced" },
+      { "partySize": 2, "packSize": 3, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 2, "packSize": 4, "dangerLevel": 3, "expected": "balanced" },
+      { "partySize": 2, "packSize": 4, "dangerLevel": 5, "expected": "punishing" },
+      { "partySize": 2, "packSize": 4, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 3, "packSize": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 3, "packSize": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 3, "packSize": 1, "dangerLevel": 7, "expected": "trivial" },
+
+      { "partySize": 3, "packSize": 2, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 3, "packSize": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 3, "packSize": 2, "dangerLevel": 7, "expected": "easy" },
+
+      { "partySize": 3, "packSize": 3, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 3, "packSize": 3, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 3, "packSize": 3, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 3, "packSize": 4, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 3, "packSize": 4, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 3, "packSize": 4, "dangerLevel": 7, "expected": "punishing" },
+
+      { "partySize": 4, "packSize": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 4, "packSize": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 4, "packSize": 1, "dangerLevel": 7, "expected": "trivial" },
+
+      { "partySize": 4, "packSize": 2, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 4, "packSize": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 4, "packSize": 2, "dangerLevel": 7, "expected": "trivial" },
+
+      { "partySize": 4, "packSize": 3, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 4, "packSize": 3, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 4, "packSize": 3, "dangerLevel": 7, "expected": "balanced" },
+
+      { "partySize": 4, "packSize": 4, "dangerLevel": 3, "expected": "trivial" },
+      { "partySize": 4, "packSize": 4, "dangerLevel": 5, "expected": "trivial" },
+      { "partySize": 4, "packSize": 4, "dangerLevel": 7, "expected": "punishing" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

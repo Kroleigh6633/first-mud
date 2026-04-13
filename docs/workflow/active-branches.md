@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | creative-pass-7 | ready-to-merge | content-layer-pilot | Creative pass #7: playbook balance sweep + combat-curves tune + playbook spec rewrites | - | content/combat-curves.json, tools/design/playbooks, docs/design, tests/FirstMud.Tests | 2026-04-13 |
+| creative-pass-7-followups | ready-to-merge | content-layer-pilot | CP7 follow-ups: (1) deterministic playbook cell seed, (2) CombatContext gear/imbue decoupling, (3) pack-viability playbook | - | tools/design/FirstMud.DesignTools, src/FirstMud.Application, tools/design/playbooks, docs/design | 2026-04-13 |
 <!-- agents add rows above this line -->
