@@ -37,15 +37,17 @@ public class CombatService
         var element = player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement;
 
         // Equipment bonuses per slot
-        int meleeBonus    = equippedItems.TryGetValue(EquipmentSlot.MeleeWeapon,  out var mw) ? mw.Workmanship.Value * 3 : 0;
-        int rangedBonus   = equippedItems.TryGetValue(EquipmentSlot.RangedWeapon, out var rw) ? rw.Workmanship.Value * 2 : 0;
-        int focusBonus    = equippedItems.TryGetValue(EquipmentSlot.Focus,        out var fc) ? fc.Workmanship.Value * 4 : 0;
-        int headBonusHp   = equippedItems.TryGetValue(EquipmentSlot.Head,         out var hd) ? hd.Workmanship.Value * 3 : 0;
-        int chestBonusHp  = equippedItems.TryGetValue(EquipmentSlot.Chest,        out var ch) ? ch.Workmanship.Value * 5 : 0;
-        int legsBonusHp   = equippedItems.TryGetValue(EquipmentSlot.Legs,         out var lg) ? lg.Workmanship.Value * 3 : 0;
-        int handsBonus    = equippedItems.TryGetValue(EquipmentSlot.Hands,        out var ha) ? ha.Workmanship.Value * 2 : 0;
+        // Weapon bonuses use W*5 (up from W*3) so higher-tier gear meaningfully outpaces level scaling.
+        // Armor bonuses use W*8 (up from W*5) so investing in armor provides a real HP cushion.
+        int meleeBonus    = equippedItems.TryGetValue(EquipmentSlot.MeleeWeapon,  out var mw) ? mw.Workmanship.Value * 5 : 0;
+        int rangedBonus   = equippedItems.TryGetValue(EquipmentSlot.RangedWeapon, out var rw) ? rw.Workmanship.Value * 3 : 0;
+        int focusBonus    = equippedItems.TryGetValue(EquipmentSlot.Focus,        out var fc) ? fc.Workmanship.Value * 5 : 0;
+        int headBonusHp   = equippedItems.TryGetValue(EquipmentSlot.Head,         out var hd) ? hd.Workmanship.Value * 5 : 0;
+        int chestBonusHp  = equippedItems.TryGetValue(EquipmentSlot.Chest,        out var ch) ? ch.Workmanship.Value * 8 : 0;
+        int legsBonusHp   = equippedItems.TryGetValue(EquipmentSlot.Legs,         out var lg) ? lg.Workmanship.Value * 5 : 0;
+        int handsBonus    = equippedItems.TryGetValue(EquipmentSlot.Hands,        out var ha) ? ha.Workmanship.Value * 3 : 0;
         int feetBonus     = equippedItems.TryGetValue(EquipmentSlot.Feet,         out var ft) ? ft.Workmanship.Value * 1 : 0;
-        int accBonusHp    = equippedItems.TryGetValue(EquipmentSlot.Accessory,    out var ac) ? ac.Workmanship.Value * 2 : 0;
+        int accBonusHp    = equippedItems.TryGetValue(EquipmentSlot.Accessory,    out var ac) ? ac.Workmanship.Value * 3 : 0;
 
         // Stat bonuses:
         // Strength: adds to melee Strike damage (Str / 5)
@@ -69,6 +71,11 @@ public class CombatService
         bool hasWyrdImbue       = false;
         float wyrdPower         = 0f;
 
+        // Level-scaled base powers used throughout ability construction below.
+        int levelScaledStrikeBase   = 18 + (player.Level * 2);
+        int levelScaledBoltBase     = 30 + (player.Level * 3);
+        int levelScaledRestoreBase  = 30 + (player.Level * 2);
+
         if (equippedWeapon is not null)
         {
             foreach (var imbue in equippedWeapon.Imbues)
@@ -79,8 +86,8 @@ public class CombatService
                     case Domain.Enums.ImbueType.Water:
                     case Domain.Enums.ImbueType.Earth:
                     case Domain.Enums.ImbueType.Air:
-                        // Each elemental imbue adds a flat bonus: power * base Strike damage
-                        elementalImbueBonus += (int)(18 * imbue.Power);
+                        // Each elemental imbue adds a flat bonus: power * level-scaled Strike base
+                        elementalImbueBonus += (int)(levelScaledStrikeBase * imbue.Power);
                         break;
                     case Domain.Enums.ImbueType.Restoration:
                         restorationPower = Math.Max(restorationPower, imbue.Power);
@@ -93,10 +100,11 @@ public class CombatService
             }
         }
 
-        // Build Strike with embedded imbue effects
+        // Build Strike with embedded imbue effects.
+        // Base scales with level: 18 + (level * 2), keeping combat pressure viable at all tiers.
         var strikeAbility = new CombatAbility(
             "Strike",
-            18 + strikeBonus + elementalImbueBonus,
+            levelScaledStrikeBase + strikeBonus + elementalImbueBonus,
             0,
             element,
             AbilityTargetType.SingleEnemy,
@@ -107,17 +115,19 @@ public class CombatService
         var playerAbilities = new List<CombatAbility>
         {
             strikeAbility,
-            new("Weave Bolt", 30 + weaveBoltBonus, 10, element,
+            // Weave Bolt scales with level: 30 + (level * 3) — powerful but costs Weave.
+            new("Weave Bolt", levelScaledBoltBase + weaveBoltBonus, 10, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
-            new("Restore", 30, 5, MagicElement.Aether,
+            // Restore scales with level: 30 + (level * 2) so healing stays relevant.
+            new("Restore", levelScaledRestoreBase, 5, MagicElement.Aether,
                 AbilityTargetType.Self, AbilityCategory.Heal)
         };
 
-        // Wyrd imbue: also add a dedicated Wyrd Pulse ability
+        // Wyrd imbue: also add a dedicated Wyrd Pulse ability scaled from current Strike base.
         if (hasWyrdImbue)
         {
             playerAbilities.Add(new CombatAbility(
-                "Wyrd Pulse", (int)(18 * wyrdPower), 5, MagicElement.Aether,
+                "Wyrd Pulse", (int)(levelScaledStrikeBase * wyrdPower), 5, MagicElement.Aether,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack,
                 WyrdProcChance: wyrdPower));
         }
@@ -141,9 +151,10 @@ public class CombatService
         foreach (var companion in activeCompanions)
         {
             // Layer-based ability table: higher layers unlock more powerful abilities.
-            // HP and Speed also scale with both Level and Layer so layer investment matters.
+            // Ability base powers also scale with companion Level and Layer so investment matters.
+            // HP and Speed scale with both Level and Layer.
             var companionAbilities = CompanionAbilityFactory.Build(
-                companion.Type, companion.Element, companion.CurrentLayer);
+                companion.Type, companion.Element, companion.CurrentLayer, companion.Level);
 
             var companionHp    = 50 + companion.Level * 10 + companion.CurrentLayer * 5;
             var companionSpeed = 6 + companion.Level;

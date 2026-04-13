@@ -11,20 +11,33 @@ namespace FirstMud.Domain.Services;
 /// </summary>
 public static class CompanionAbilityFactory
 {
-    /// <summary>Returns all combat abilities available to a companion at or below their current layer.</summary>
-    public static IReadOnlyList<CombatAbility> Build(CompanionType type, MagicElement element, int layer)
+    /// <summary>
+    /// Returns all combat abilities available to a companion at or below their current layer.
+    /// Ability base powers scale with both companion level and bond layer so higher investment
+    /// meaningfully increases companion combat contribution.
+    /// </summary>
+    public static IReadOnlyList<CombatAbility> Build(CompanionType type, MagicElement element, int layer, int companionLevel = 1)
     {
         layer = Math.Clamp(layer, 1, 6);
+        companionLevel = Math.Max(1, companionLevel);
         return type switch
         {
-            CompanionType.Wildfolk         => BuildWildfolk(element, layer),
-            CompanionType.CapturedMonster  => BuildCapturedMonster(element, layer),
-            CompanionType.ArdweldConstruct => BuildArdweldConstruct(element, layer),
-            CompanionType.HiredHero        => BuildHiredHero(element, layer),
-            CompanionType.BoundShade       => BuildHiredHero(element, layer), // BoundShade uses HiredHero table as fallback
-            _                             => BuildWildfolk(element, layer),
+            CompanionType.Wildfolk         => BuildWildfolk(element, layer, companionLevel),
+            CompanionType.CapturedMonster  => BuildCapturedMonster(element, layer, companionLevel),
+            CompanionType.ArdweldConstruct => BuildArdweldConstruct(element, layer, companionLevel),
+            CompanionType.HiredHero        => BuildHiredHero(element, layer, companionLevel),
+            CompanionType.BoundShade       => BuildHiredHero(element, layer, companionLevel), // BoundShade uses HiredHero table as fallback
+            _                             => BuildWildfolk(element, layer, companionLevel),
         };
     }
+
+    /// <summary>
+    /// Scales a companion ability's base power by level and bond layer.
+    /// Formula: basePower + (companionLevel * 2) + (layer * 3)
+    /// A Bond-4 Level-10 companion does substantially more than a Bond-1 Level-1 companion.
+    /// </summary>
+    private static int ScaleAbilityPower(int basePower, int companionLevel, int layer)
+        => basePower + (companionLevel * 2) + (layer * 3);
 
     // -------------------------------------------------------------------------
     // Wildfolk — balanced, nature allies
@@ -36,31 +49,31 @@ public static class CompanionAbilityFactory
     // Layer 6: + Elemental Storm (AOE damage ultimate)
     // -------------------------------------------------------------------------
 
-    private static IReadOnlyList<CombatAbility> BuildWildfolk(MagicElement element, int layer)
+    private static IReadOnlyList<CombatAbility> BuildWildfolk(MagicElement element, int layer, int companionLevel)
     {
         var abilities = new List<CombatAbility>
         {
-            new($"{element} Touch", 14, 0, element, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
+            new($"{element} Touch", ScaleAbilityPower(14, companionLevel, layer), 0, element, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
         };
 
         if (layer >= 2)
-            abilities.Add(new("Nature Mend", 18, 4, MagicElement.Aether,
+            abilities.Add(new("Nature Mend", ScaleAbilityPower(18, companionLevel, layer), 4, MagicElement.Aether,
                 AbilityTargetType.SingleAlly, AbilityCategory.Heal));
 
         if (layer >= 3)
-            abilities.Add(new($"{element} Strike", 28, 6, element,
+            abilities.Add(new($"{element} Strike", ScaleAbilityPower(28, companionLevel, layer), 6, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack));
 
         if (layer >= 4)
-            abilities.Add(new("Pack Bond", 20, 8, MagicElement.Aether,
+            abilities.Add(new("Pack Bond", ScaleAbilityPower(20, companionLevel, layer), 8, MagicElement.Aether,
                 AbilityTargetType.SingleAlly, AbilityCategory.Buff));
 
         if (layer >= 5)
-            abilities.Add(new("Wild Revive", 25, 12, MagicElement.Aether,
+            abilities.Add(new("Wild Revive", ScaleAbilityPower(25, companionLevel, layer), 12, MagicElement.Aether,
                 AbilityTargetType.SingleAlly, AbilityCategory.Revive));
 
         if (layer >= 6)
-            abilities.Add(new($"{element} Storm", 55, 15, element,
+            abilities.Add(new($"{element} Storm", ScaleAbilityPower(55, companionLevel, layer), 15, element,
                 AbilityTargetType.AllEnemies, AbilityCategory.Attack));
 
         return abilities.AsReadOnly();
@@ -76,31 +89,31 @@ public static class CompanionAbilityFactory
     // Layer 6: + Rampage (triple-hit ultimate)
     // -------------------------------------------------------------------------
 
-    private static IReadOnlyList<CombatAbility> BuildCapturedMonster(MagicElement element, int layer)
+    private static IReadOnlyList<CombatAbility> BuildCapturedMonster(MagicElement element, int layer, int companionLevel)
     {
         var abilities = new List<CombatAbility>
         {
-            new("Claw", 16, 0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
+            new("Claw", ScaleAbilityPower(16, companionLevel, layer), 0, MagicElement.Earth, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
         };
 
         if (layer >= 2)
-            abilities.Add(new($"{element} Breath", 26, 5, element,
+            abilities.Add(new($"{element} Breath", ScaleAbilityPower(26, companionLevel, layer), 5, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack));
 
         if (layer >= 3)
-            abilities.Add(new("Frenzy", 38, 0, MagicElement.Earth,
+            abilities.Add(new("Frenzy", ScaleAbilityPower(38, companionLevel, layer), 0, MagicElement.Earth,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack));
 
         if (layer >= 4)
-            abilities.Add(new("Terrify", 12, 8, MagicElement.Aether,
+            abilities.Add(new("Terrify", ScaleAbilityPower(12, companionLevel, layer), 8, MagicElement.Aether,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Debuff));
 
         if (layer >= 5)
-            abilities.Add(new("Devour", 32, 6, element,
+            abilities.Add(new("Devour", ScaleAbilityPower(32, companionLevel, layer), 6, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Lifesteal));
 
         if (layer >= 6)
-            abilities.Add(new("Rampage", 60, 10, element,
+            abilities.Add(new("Rampage", ScaleAbilityPower(60, companionLevel, layer), 10, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack));
 
         return abilities.AsReadOnly();
@@ -116,11 +129,11 @@ public static class CompanionAbilityFactory
     // Layer 6: + Aegis (absorb hits ultimate)
     // -------------------------------------------------------------------------
 
-    private static IReadOnlyList<CombatAbility> BuildArdweldConstruct(MagicElement element, int layer)
+    private static IReadOnlyList<CombatAbility> BuildArdweldConstruct(MagicElement element, int layer, int companionLevel)
     {
         var abilities = new List<CombatAbility>
         {
-            new("Shield Bash", 10, 0, element, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
+            new("Shield Bash", ScaleAbilityPower(10, companionLevel, layer), 0, element, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
         };
 
         if (layer >= 2)
@@ -128,7 +141,7 @@ public static class CompanionAbilityFactory
                 AbilityTargetType.SingleAlly, AbilityCategory.Buff));
 
         if (layer >= 3)
-            abilities.Add(new("Repair", 22, 5, MagicElement.Aether,
+            abilities.Add(new("Repair", ScaleAbilityPower(22, companionLevel, layer), 5, MagicElement.Aether,
                 AbilityTargetType.Self, AbilityCategory.Heal));
 
         if (layer >= 4)
@@ -156,15 +169,15 @@ public static class CompanionAbilityFactory
     // Layer 6: + Commander (extra actions ultimate — modelled as AoE buff)
     // -------------------------------------------------------------------------
 
-    private static IReadOnlyList<CombatAbility> BuildHiredHero(MagicElement element, int layer)
+    private static IReadOnlyList<CombatAbility> BuildHiredHero(MagicElement element, int layer, int companionLevel)
     {
         var abilities = new List<CombatAbility>
         {
-            new("Sword Strike", 16, 0, element, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
+            new("Sword Strike", ScaleAbilityPower(16, companionLevel, layer), 0, element, AbilityTargetType.SingleEnemy, AbilityCategory.Attack),
         };
 
         if (layer >= 2)
-            abilities.Add(new("Quick Shot", 20, 0, MagicElement.Air,
+            abilities.Add(new("Quick Shot", ScaleAbilityPower(20, companionLevel, layer), 0, MagicElement.Air,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack));
 
         if (layer >= 3)
@@ -172,11 +185,11 @@ public static class CompanionAbilityFactory
                 AbilityTargetType.SingleAlly, AbilityCategory.Buff));
 
         if (layer >= 4)
-            abilities.Add(new("Tactical Strike", 30, 6, element,
+            abilities.Add(new("Tactical Strike", ScaleAbilityPower(30, companionLevel, layer), 6, element,
                 AbilityTargetType.SingleEnemy, AbilityCategory.Attack));
 
         if (layer >= 5)
-            abilities.Add(new("Rally", 20, 10, MagicElement.Aether,
+            abilities.Add(new("Rally", ScaleAbilityPower(20, companionLevel, layer), 10, MagicElement.Aether,
                 AbilityTargetType.SingleAlly, AbilityCategory.Heal));
 
         if (layer >= 6)
