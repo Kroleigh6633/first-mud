@@ -509,6 +509,10 @@ export function useGameConnection(): GameConnectionResult {
       }
     });
 
+    connection.on('CityView', (snapshot: CityViewSnapshot) => {
+      setCityView(snapshot ?? null);
+    });
+
     // Server acknowledgment after every SendCommand — no client action needed.
     connection.on('CommandReceived', () => { /* ack — no action needed */ });
 
@@ -640,5 +644,6 @@ export function useGameConnection(): GameConnectionResult {
     lastSmeltResult,
     questWaypoint,
     questProgress,
+    cityView,
   };
 }

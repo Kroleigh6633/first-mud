@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { WorldStateSnapshot, ZoneTile, WanderingNpc, QuestWaypoint } from '../types/game';
+import type { WorldStateSnapshot, ZoneTile, WanderingNpc, QuestWaypoint, HomesteadBuilding, BuildingType } from '../types/game';
 import { getBiome, isPathTile, type BiomeType } from '../utils/biome';
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   zoneTiles: ZoneTile[];
   wanderingNpcs?: WanderingNpc[];
   questWaypoint?: QuestWaypoint | null;
+  homesteadBuildings?: HomesteadBuilding[];
 }
 
 // ─── Tile dimensions ────────────────────────────────────────────────────────
@@ -304,6 +305,167 @@ function zoneBuildingColors(tile: ZoneTile): { wall: string; roof: string } {
   return { wall: '#2a1a12', roof: '#4a2a1a' };
 }
 
+// ─── Homestead building draw helpers ─────────────────────────────────────────
+
+function buildingBaseColors(type: BuildingType): { wall: string; roof: string; accent: string } {
+  switch (type) {
+    case 'Forge':          return { wall: '#5a3020', roof: '#8a4830', accent: '#ff6622' };
+    case 'Fletcher':       return { wall: '#3a4a20', roof: '#5a7030', accent: '#88bb44' };
+    case 'Tannery':        return { wall: '#5a4030', roof: '#7a5a40', accent: '#cc8855' };
+    case 'EnchantingTower':return { wall: '#2a2050', roof: '#4a3a80', accent: '#cc88ff' };
+    case 'AlchemistHut':   return { wall: '#203040', roof: '#304a60', accent: '#44ccaa' };
+    case 'Stoneworker':    return { wall: '#4a4a4a', roof: '#6a6a6a', accent: '#aaaaaa' };
+    case 'Woodworker':     return { wall: '#4a3020', roof: '#6a4a30', accent: '#88cc44' };
+    case 'MarketStall':    return { wall: '#5a4a20', roof: '#cc8844', accent: '#ffdd88' };
+    case 'Farm':           return { wall: '#3a5020', roof: '#5a7030', accent: '#88dd44' };
+    case 'Mine':           return { wall: '#302828', roof: '#484040', accent: '#888888' };
+    case 'Barracks':       return { wall: '#3a2020', roof: '#5a3030', accent: '#cc4444' };
+    case 'Library':        return { wall: '#2a3040', roof: '#4a5060', accent: '#44aacc' };
+    case 'Warehouse':      return { wall: '#404040', roof: '#606060', accent: '#aaaaaa' };
+    default:               return { wall: '#3a3a3a', roof: '#5a5a5a', accent: '#888888' };
+  }
+}
+
+/** Draw a homestead building on the isometric grid. */
+function drawHomesteadBuilding(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  tileW: number,
+  tileH: number,
+  type: BuildingType,
+  isConstructed: boolean,
+  progress: number,
+  dpr: number,
+) {
+  const colors = buildingBaseColors(type);
+  const baseY = sy - tileH / 2;
+
+  if (!isConstructed) {
+    // Draw construction scaffold (grey wireframe + progress indicator)
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.35 * (progress / 100);
+
+    // Scaffolding outline
+    ctx.strokeStyle = '#886644';
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.setLineDash([4 * dpr, 3 * dpr]);
+    ctx.strokeRect(sx - 7 * dpr, baseY - 12 * dpr, 14 * dpr, 14 * dpr);
+    ctx.setLineDash([]);
+
+    // Progress fill
+    const fillH = (12 * dpr) * (progress / 100);
+    ctx.fillStyle = colors.wall + '88';
+    ctx.fillRect(sx - 7 * dpr, baseY - fillH, 14 * dpr, fillH);
+
+    // "%" label
+    ctx.font = `bold ${7 * dpr}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffcc44';
+    ctx.fillText(`${progress}%`, sx, baseY - 6 * dpr);
+
+    ctx.restore();
+    return;
+  }
+
+  // ── Completed building ──
+  ctx.save();
+
+  // Wall block
+  ctx.fillStyle = colors.wall;
+  ctx.fillRect(sx - 7 * dpr, baseY - 10 * dpr, 14 * dpr, 10 * dpr);
+
+  // Roof
+  ctx.beginPath();
+  ctx.moveTo(sx,              baseY - 10 * dpr);
+  ctx.lineTo(sx + 9 * dpr,   baseY - 3 * dpr);
+  ctx.lineTo(sx - 9 * dpr,   baseY - 3 * dpr);
+  ctx.closePath();
+  ctx.fillStyle = colors.roof;
+  ctx.fill();
+
+  // Building-specific accent details
+  switch (type) {
+    case 'Forge': {
+      // Chimney smoke puff
+      ctx.beginPath();
+      ctx.arc(sx + 4 * dpr, baseY - 16 * dpr, 3 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = '#666';
+      ctx.globalAlpha = 0.6;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(sx + 5 * dpr, baseY - 20 * dpr, 2 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = '#555';
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Chimney
+      ctx.fillStyle = '#4a3020';
+      ctx.fillRect(sx + 2 * dpr, baseY - 14 * dpr, 4 * dpr, 6 * dpr);
+      break;
+    }
+    case 'Farm': {
+      // Crop rows around the building
+      ctx.fillStyle = colors.accent;
+      for (let r = 0; r < 3; r++) {
+        ctx.fillRect(sx - 12 * dpr + r * 4 * dpr, baseY + 1 * dpr, 2 * dpr, 4 * dpr);
+      }
+      break;
+    }
+    case 'EnchantingTower': {
+      // Taller tower
+      ctx.fillStyle = colors.wall;
+      ctx.fillRect(sx - 5 * dpr, baseY - 20 * dpr, 10 * dpr, 12 * dpr);
+      // Glow at top
+      ctx.beginPath();
+      ctx.arc(sx, baseY - 21 * dpr, 4 * dpr, 0, Math.PI * 2);
+      ctx.fillStyle = colors.accent;
+      ctx.shadowColor = colors.accent;
+      ctx.shadowBlur = 6 * dpr;
+      ctx.globalAlpha = 0.8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case 'MarketStall': {
+      // Open awning
+      ctx.fillStyle = colors.accent;
+      ctx.fillRect(sx - 10 * dpr, baseY - 14 * dpr, 20 * dpr, 3 * dpr);
+      break;
+    }
+    case 'Mine': {
+      // Dark entrance arch
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.ellipse(sx, baseY - 3 * dpr, 4 * dpr, 5 * dpr, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'Barracks': {
+      // Flag
+      ctx.fillStyle = colors.accent;
+      ctx.fillRect(sx + 6 * dpr, baseY - 18 * dpr, 1.5 * dpr, 8 * dpr);
+      ctx.beginPath();
+      ctx.moveTo(sx + 7.5 * dpr, baseY - 18 * dpr);
+      ctx.lineTo(sx + 13 * dpr,  baseY - 15 * dpr);
+      ctx.lineTo(sx + 7.5 * dpr, baseY - 12 * dpr);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    default: break;
+  }
+
+  // Accent dot on door
+  ctx.fillStyle = colors.accent;
+  ctx.beginPath();
+  ctx.arc(sx, baseY - 2 * dpr, 1.5 * dpr, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 // ─── Visited tiles storage ────────────────────────────────────────────────────
 function visitedKey(playerId: string): string {
   return `firstmud_visited_${playerId}`;
@@ -334,7 +496,7 @@ const MINI_SIZE = 100;
 const MINI_DOT  = 3;
 const MINI_PAD  = 8;
 
-export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], questWaypoint = null }: Props) {
+export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], questWaypoint = null, homesteadBuildings = [] }: Props) {
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -354,14 +516,16 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
   const lastSaveFrame = useRef<number>(0);
 
   // Stable prop refs
-  const worldStateRef    = useRef(worldState);
-  const zoneTilesRef     = useRef(zoneTiles);
-  const wanderingNpcsRef = useRef(wanderingNpcs);
-  const questWaypointRef = useRef(questWaypoint);
-  worldStateRef.current    = worldState;
-  zoneTilesRef.current     = zoneTiles;
-  wanderingNpcsRef.current = wanderingNpcs;
-  questWaypointRef.current = questWaypoint;
+  const worldStateRef         = useRef(worldState);
+  const zoneTilesRef          = useRef(zoneTiles);
+  const wanderingNpcsRef      = useRef(wanderingNpcs);
+  const questWaypointRef      = useRef(questWaypoint);
+  const homesteadBuildingsRef = useRef(homesteadBuildings);
+  worldStateRef.current         = worldState;
+  zoneTilesRef.current          = zoneTiles;
+  wanderingNpcsRef.current      = wanderingNpcs;
+  questWaypointRef.current      = questWaypoint;
+  homesteadBuildingsRef.current = homesteadBuildings;
 
   // ─── Load visited tiles when player ID becomes available ──────────────────
   useEffect(() => {

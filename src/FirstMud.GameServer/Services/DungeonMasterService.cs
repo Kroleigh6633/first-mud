@@ -22,7 +22,7 @@ public class DungeonMasterService : BackgroundService
 
     private const int WorldEventIntervalSeconds     = 60;        // 1 minute
     private const int WanderingNpcIntervalSeconds   = 300;       // 5 minutes
-    private const int NewQuestIntervalSeconds       = 900;       // 15 minutes
+    private const int NewQuestIntervalSeconds       = 1800;      // 30 minutes
     private const int NewZoneIntervalSeconds        = 1800;      // 30 minutes
     private const int NpcDespawnIntervalSeconds     = 600;       // 10 minutes (NPC lifespan)
     private const int LoopDelayMs                   = 1000;      // Heartbeat: 1 second
@@ -288,10 +288,33 @@ public class DungeonMasterService : BackgroundService
     // 3. QUEST GENERATION
     // =======================================================================
 
+    private const int ActiveDmQuestCap = 10;
+
     private async Task GenerateQuestAsync(CancellationToken ct)
     {
         try
         {
+            // Check active DM quest count before generating
+            await using var capScope    = _scopeFactory.CreateAsyncScope();
+            var capDriver               = capScope.ServiceProvider.GetRequiredService<Neo4jDriverWrapper>();
+            var activeCount             = await capDriver.ExecuteReadAsync(async tx =>
+            {
+                var cursor = await tx.RunAsync(
+                    "MATCH (q:Quest {isDmGenerated: true}) " +
+                    "WHERE NOT ()-[:COMPLETED]->(q) " +
+                    "RETURN count(q) AS cnt");
+                var record = await cursor.SingleAsync();
+                return record["cnt"].As<int>();
+            }, ct);
+
+            if (activeCount >= ActiveDmQuestCap)
+            {
+                _logger.LogDebug(
+                    "Skipping quest generation — {Count} active DM quests (cap: {Cap})",
+                    activeCount, ActiveDmQuestCap);
+                return;
+            }
+
             var questId    = $"DM_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_{_rng.Next(1000)}";
             var factionId  = PickFactionId();
             var difficulty = _rng.Next(1, 6); // 1-5

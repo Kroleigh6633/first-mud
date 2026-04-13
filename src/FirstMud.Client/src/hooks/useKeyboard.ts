@@ -18,6 +18,7 @@ export type KeyAction =
   | { type: 'navigate' }
   | { type: 'autoquest' }
   | { type: 'mute' }
+  | { type: 'city' }
   | null;
 
 export function useKeyboard(): KeyAction {
@@ -111,6 +112,10 @@ export function useKeyboard(): KeyAction {
         case 'm':
         case 'M':
           next = { type: 'mute' };
+          break;
+        case 'g':
+        case 'G':
+          next = { type: 'city' };
           break;
         case 'Escape':
           next = { type: 'escape' };

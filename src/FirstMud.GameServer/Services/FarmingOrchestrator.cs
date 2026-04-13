@@ -1319,7 +1319,7 @@ public class FarmingOrchestrator(
                         {
                             var droppedItem = lootResult.Item;
 
-                            // Auto-equip: if the slot is empty, equip immediately (same logic as TryRollLootAsync)
+                            // Auto-equip: if the slot is empty or new item is an upgrade, equip immediately
                             if (droppedItem.Slot != Domain.Enums.EquipmentSlot.None)
                             {
                                 var equipPlayer = await playerRepo.GetByIdAsync(playerId, farmCt);
@@ -1330,6 +1330,11 @@ public class FarmingOrchestrator(
 
                                     if (currentEquippedId is null)
                                     {
+                                        logger.LogInformation(
+                                            "[Auto-farm] Auto-equip check: {ItemName} W{W} (eff W{EffW}) Slot={Slot} | Current equipped: (empty) | Decision: equip",
+                                            droppedItem.DisplayName, droppedItem.Workmanship.Value,
+                                            droppedItem.Workmanship.Value + droppedItem.Imbues.Count, itemSlot);
+
                                         // Slot is empty — auto-equip
                                         equipPlayer.Equip(itemSlot, droppedItem.Id);
                                         await playerRepo.UpdateAsync(equipPlayer, farmCt);
@@ -1344,10 +1349,25 @@ public class FarmingOrchestrator(
                                     }
                                     else
                                     {
-                                        // Compare workmanship — swap if new item is strictly better and old is unlocked
+                                        // Compare effective workmanship (raw W + imbue count per item)
                                         var currentEquipped = await itemRepo.GetByIdAsync(currentEquippedId.Value, farmCt);
+                                        var newEffW     = droppedItem.Workmanship.Value + droppedItem.Imbues.Count;
+                                        var currentEffW = currentEquipped is not null
+                                            ? currentEquipped.Workmanship.Value + currentEquipped.Imbues.Count
+                                            : 0;
+
+                                        logger.LogInformation(
+                                            "[Auto-farm] Auto-equip check: {ItemName} W{W} (eff W{EffW}) Slot={Slot} | Current equipped: {CurrentName} W{CurrentW} (eff W{CurrentEffW}) Locked={Locked} | Decision: {Decision}",
+                                            droppedItem.DisplayName, droppedItem.Workmanship.Value, newEffW, itemSlot,
+                                            currentEquipped?.DisplayName ?? "unknown", currentEquipped?.Workmanship.Value ?? 0, currentEffW,
+                                            currentEquipped?.IsLocked ?? false,
+                                            currentEquipped is null ? "skip/no-current"
+                                                : currentEquipped.IsLocked ? "skip/locked"
+                                                : newEffW > currentEffW ? "swap"
+                                                : "skip/not-better");
+
                                         if (currentEquipped is not null
-                                            && droppedItem.Workmanship.Value > currentEquipped.Workmanship.Value
+                                            && newEffW > currentEffW
                                             && !currentEquipped.IsLocked)
                                         {
                                             equipPlayer.Equip(itemSlot, droppedItem.Id);
@@ -1358,7 +1378,7 @@ public class FarmingOrchestrator(
                                                 {
                                                     timestamp = DateTime.UtcNow.ToString("O"),
                                                     category  = farmMsgCategory,
-                                                    text      = $"[Auto-farm] You swap your {currentEquipped.DisplayName} W{currentEquipped.Workmanship.Value} for {droppedItem.DisplayName} W{droppedItem.Workmanship.Value}. Much better."
+                                                    text      = $"[Auto-farm] You swap your {currentEquipped.DisplayName} W{currentEquipped.Workmanship.Value}{(currentEquipped.Imbues.Count > 0 ? $"+{currentEquipped.Imbues.Count}i" : "")} for {droppedItem.DisplayName} W{droppedItem.Workmanship.Value}{(droppedItem.Imbues.Count > 0 ? $"+{droppedItem.Imbues.Count}i" : "")}. Much better."
                                                 }, farmCt);
                                         }
                                     }
