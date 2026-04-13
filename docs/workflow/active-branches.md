@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | creative-pass-7 | ready-to-merge | content-layer-pilot | Creative pass #7: playbook balance sweep + combat-curves tune + playbook spec rewrites | - | content/combat-curves.json, tools/design/playbooks, docs/design, tests/FirstMud.Tests | 2026-04-13 |
+| worktree-agent-ac6b115e | ready-to-merge | content-layer-pilot | Auto-smelt via Forge building + leather supply audit/tune | - | src/FirstMud.Application/Services/HomesteadCompanionService.cs, src/FirstMud.Application/Services/SalvageService.cs, content/loot-tables.json, tools/design/playbooks/forge-throughput.json, tools/design/playbooks/leather-flow.json, tests/FirstMud.Tests/Application/HomesteadCompanionForgeTests.cs, tools/design/FirstMud.DesignTools.Tests/EconomyPlaybookTests.cs, tools/design/FirstMud.DesignTools.Tests/PlaybookRunnerTests.cs | 2026-04-13 |
 <!-- agents add rows above this line -->

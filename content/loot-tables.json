@@ -83,6 +83,7 @@
       "entries": [
         { "itemName": "Thornwood Heartwood", "description": "Dense heartwood from a thornwood tree. Superior to common timber.",         "category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 },
         { "itemName": "Beast Leather",       "description": "Thick, supple leather stripped from a large forest creature.",              "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
+        { "itemName": "Leather",             "description": "Tanned hide from a forest creature. Standard armor material.",              "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 2 },
         { "itemName": "Amber Resin",         "description": "Golden tree resin with mild magical adhesive properties.",                  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Moonbloom Petal",     "description": "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 3 },
         { "itemName": "Spider Silk",         "description": "Fine, strong thread spun by giant forest spiders. Used in light armor.",    "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
@@ -126,6 +127,7 @@
       "entries": [
         { "itemName": "Cotton Fiber",   "description": "Soft white fiber from plains cotton plants. Basic cloth material.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Horse Hair",     "description": "Coarse hair from a plains horse. Used in bowstrings and rope.",    "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
+        { "itemName": "Leather",        "description": "Tanned hide from a plains herd animal. Standard armor material.",  "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 2 },
         { "itemName": "Flint",          "description": "A piece of flint knapped to a sharp edge. Essential for tool making.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Wheat Sheaf",    "description": "A bundle of harvested wheat. Ingredient in future food crafting.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Copper Nugget",  "description": "A small nugget of soft copper ore. Used in basic metalworking.",   "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 },

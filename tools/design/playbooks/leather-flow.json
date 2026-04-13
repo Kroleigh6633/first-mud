@@ -1,0 +1,81 @@
+{
+  "id": "leather-flow",
+  "displayName": "Leather supply vs demand",
+  "kind": "economy-analytical",
+  "description": "Tracks Leather net balance over a 40-hour balanced playstyle session. Supply comes from armor salvage (primary), common-materials loot rolls, and biome-plains/biome-forest loot rolls. Demand comes from armor recipes (Leather Armor, Leather Cap, Leather Boots, Leather Leggings, Leather Gloves, Reinforced Leather, mixed weapon/armor recipes requiring Leather as a binding) and the Tannery construction cost.",
+  "playstyle": {
+    "name": "balanced",
+    "killsPerHour": 30,
+    "armorDropFraction": 0.5,
+    "autoSalvageRate": 0.6,
+    "armorCraftsPerHour": 1.5,
+    "weaponCraftsPerHour": 1.0,
+    "craftingStartsAtHour": 5
+  },
+  "supplyModel": {
+    "armorSalvage": {
+      "formula": "killsPerHour * dropChance * armorDropFraction * autoSalvageRate * avgLeatherPerSalvage",
+      "dropChance": 0.50,
+      "avgLeatherPerSalvage": 4.0,
+      "comment": "Post-tune: BuildArmorYields base 3, clamped [3,6], avg ~4 with bonus from workmanship/skill."
+    },
+    "commonMaterialsLoot": {
+      "formula": "killsPerHour * dropChance * commonMaterialChance * (1/6)",
+      "commonMaterialChance": 0.30,
+      "comment": "common-materials pool has 6 equal-weight entries, one of which is Leather."
+    },
+    "biomePlainsLoot": {
+      "formula": "killsPerHour * dropChance * plainsFraction * (2/7)",
+      "plainsFraction": 0.25,
+      "comment": "Post-tune: Leather added to biome-plains with weight 2 of 7 total."
+    },
+    "biomeForestLoot": {
+      "formula": "killsPerHour * dropChance * forestFraction * (2/7)",
+      "forestFraction": 0.25,
+      "comment": "Post-tune: Leather added to biome-forest with weight 2 of 7 total."
+    }
+  },
+  "demandModel": {
+    "armorRecipes": {
+      "avgLeatherPerCraft": 3.0,
+      "perHour": 1.5
+    },
+    "weaponRecipes": {
+      "avgLeatherPerCraft": 1.0,
+      "perHour": 1.0
+    },
+    "tanneryConstruction": {
+      "oneTime": 5,
+      "atHour": 3
+    }
+  },
+  "expectedBands": {
+    "netPerHour": {
+      "chronic_deficit": [-99, -5],
+      "balanced":       [-5, 5],
+      "healthy_surplus":[5, 15],
+      "flood":          [15, 99]
+    }
+  },
+  "preTuneSnapshot": {
+    "avgLeatherPerSalvage_base2": 3.0,
+    "leatherInPlainsPool": false,
+    "leatherInForestPool": false,
+    "netAtHour10":  -1,
+    "netAtHour20":  -1,
+    "netAtHour40":  -1,
+    "band":         "chronic_deficit",
+    "comment": "Tight break-even on paper but in practice -1/hour due to armor drops often being W1 (yielding only 2-3 leather) + Tannery burning 5 upfront + leather-heavy recipe bursts. Matches user playtest feedback: 'leather qtys are very low'."
+  },
+  "postTuneSnapshot": {
+    "avgLeatherPerSalvage_base3": 4.0,
+    "leatherInPlainsPool": true,
+    "leatherInForestPool": true,
+    "netAtHour10":  6,
+    "netAtHour20":  6,
+    "netAtHour40":  6,
+    "band":         "healthy_surplus",
+    "comment": "Tune applied: (1) BuildArmorYields base 2 → 3, clamp [3,6]; (2) Leather added to biome-plains (weight 2); (3) Leather added to biome-forest (weight 2). Result: +~7/hour leather supply, net +6/hour — comfortably above break-even without flooding."
+  },
+  "designIntent": "Leather should be a mild bottleneck that the player actively manages, not a chronic drag. A small sustained surplus (+5-10/hour) is the design target: it encourages players to explore plains/forest biomes and rewards salvage habit, without making Leather feel worthless."
+}

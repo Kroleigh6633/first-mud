@@ -361,7 +361,11 @@ public class SalvageService
 
     private static IReadOnlyList<SalvageYield> BuildArmorYields(int bonus)
     {
-        var leather = Math.Clamp(2 + bonus, 2, 5);
+        // Armor salvage is the dominant leather source — leather supply audit (2026-04-13)
+        // showed base-2 left a chronic -1/hour deficit in the balanced playstyle, so the
+        // base yield was bumped to 3 with a higher cap of 6 to match demand from armor
+        // recipes + Tannery construction. Iron yield unchanged.
+        var leather = Math.Clamp(3 + bonus, 3, 6);
         var metal   = Math.Clamp(1 + bonus / 2, 1, 3);
         return [new SalvageYield("Leather", leather), new SalvageYield("Iron Ore", metal)];
     }
