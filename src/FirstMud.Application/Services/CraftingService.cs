@@ -258,10 +258,10 @@ public class CraftingService
         IReadOnlyList<Item> componentItems,
         IReadOnlyList<int> seededQuantities)
     {
-        // Count components by ingredient name
+        // Sum quantities by ingredient name — stacked items contribute their Quantity value
         var providedCounts = componentItems
             .GroupBy(i => i.Name)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .ToDictionary(g => g.Key, g => g.Sum(i => Math.Max(1, i.Quantity)));
 
         for (int i = 0; i < recipe.Ingredients.Count; i++)
         {
@@ -286,9 +286,10 @@ public class CraftingService
         if (components.Count == 0)
             return Workmanship.Of(1);
 
-        // Average workmanship of all components
+        // Average workmanship weighted by quantity — stacked items count proportionally
+        var totalUnits = components.Sum(c => Math.Max(1, c.Quantity));
         var avgComponentWorkmanship = (int)Math.Round(
-            components.Average(c => c.Workmanship.Value));
+            components.Sum(c => c.Workmanship.Value * Math.Max(1, c.Quantity)) / (double)totalUnits);
 
         // Taper quality bonus
         int taperBonus = taperItem?.TaperQuality switch

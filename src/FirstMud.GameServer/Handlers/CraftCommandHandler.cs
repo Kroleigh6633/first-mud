@@ -1,5 +1,6 @@
 using FirstMud.Application.Models;
 using FirstMud.Application.Services;
+using FirstMud.Domain.Entities;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Hubs;
@@ -14,9 +15,13 @@ namespace FirstMud.GameServer.Handlers;
 /// persist component consumption on loss outcomes, and broadcast the result.
 /// Components may come from inventory (OwnerId set) or homestead storage (OwnerId null).
 /// When consuming a storage-sourced component its HomesteadStorageItem join row is also removed.
+///
+/// When ComponentIds is empty the handler auto-resolves the required items from the player's
+/// inventory and homestead storage by ingredient name, supporting stacked items correctly.
 /// </summary>
 public class CraftCommandHandler(
     CraftingService craftingService,
+    IRecipeRepository recipeRepository,
     IItemRepository itemRepository,
     IHomesteadRepository homesteadRepository,
     GameNotificationService notificationService,
@@ -28,12 +33,34 @@ public class CraftCommandHandler(
         if (string.IsNullOrWhiteSpace(cmd.RecipeId))
             return new CommandResult(false, "Recipe ID is required.");
 
-        if (cmd.ComponentIds is null || cmd.ComponentIds.Count == 0)
-            return new CommandResult(false, "No component items provided.");
+        // When no explicit component IDs are provided, auto-resolve from inventory + storage.
+        // This is the primary code path for stackable materials (Leather, Wood, etc.).
+        List<Guid> componentIds = cmd.ComponentIds is { Count: > 0 }
+            ? cmd.ComponentIds
+            : await ResolveComponentIdsAsync(cmd.PlayerId, cmd.RecipeId, ct);
+
+        if (componentIds.Count == 0)
+        {
+            // Could not satisfy the recipe — send a proper CraftingComplete failure event
+            await hubContext.Clients
+                .Group(cmd.PlayerId.ToString())
+                .SendAsync("CraftingComplete", new
+                {
+                    Outcome = CraftingOutcome.NearMiss.ToString(),
+                    ItemId = (Guid?)null,
+                    ItemName = (string?)null,
+                    Workmanship = 0,
+                    Category = (string?)null,
+                    Slot = (string?)null,
+                    IsDiscovery = false,
+                    Message = "Not enough materials to craft this recipe.",
+                }, ct);
+            return new CommandResult(false, "Not enough materials to craft this recipe.");
+        }
 
         // Delegate all validation, outcome rolling, and item creation to CraftingService
         var result = await craftingService.AttemptCraftAsync(
-            cmd.PlayerId, cmd.RecipeId, cmd.ComponentIds, cmd.TaperId, ct);
+            cmd.PlayerId, cmd.RecipeId, componentIds, cmd.TaperId, ct);
 
         // Consume components on success or component-loss outcomes
         bool consumeComponents = result.Outcome is CraftingOutcome.Success
@@ -45,26 +72,27 @@ public class CraftCommandHandler(
             // Resolve the player's homestead once (needed to clean up storage join rows)
             var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
 
-            foreach (var componentId in cmd.ComponentIds)
+            // Build a map of item ID → units to consume.
+            // For stacked items (Components/Reagents) we must consume the ingredient's BaseQuantity
+            // from the stack, not just delete the item row. We derive the correct unit count by
+            // loading the recipe and pairing each resolved item ID against its ingredient quantity.
+            var consumeMap = await BuildConsumeMapAsync(cmd.RecipeId, componentIds, ct);
+
+            // Load distinct items so we don't process the same row twice
+            var resolvedItems = await itemRepository.GetByIdsAsync(componentIds.Distinct(), ct);
+
+            foreach (var item in resolvedItems)
             {
+                if (!consumeMap.TryGetValue(item.Id, out var unitsToConsume))
+                    continue;
+
                 try
                 {
-                    var item = await itemRepository.GetByIdAsync(componentId, ct);
-                    if (item is not null)
-                    {
-                        // If the item has no owner it lives in homestead storage —
-                        // remove the join row before deleting the item.
-                        if (item.OwnerId is null && homestead is not null)
-                        {
-                            await homesteadRepository.RemoveStorageItemAsync(homestead.Id, item.Id, ct);
-                        }
-
-                        await itemRepository.DeleteAsync(item.Id, ct);
-                    }
+                    await ConsumeItemUnitsAsync(item, unitsToConsume, homestead, ct);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to delete component {ItemId} after crafting", componentId);
+                    logger.LogWarning(ex, "Failed to consume component {ItemId} (×{Units}) after crafting", item.Id, unitsToConsume);
                 }
             }
 
@@ -75,14 +103,7 @@ public class CraftCommandHandler(
                 {
                     var taperItem = await itemRepository.GetByIdAsync(cmd.TaperId.Value, ct);
                     if (taperItem is not null)
-                    {
-                        if (taperItem.OwnerId is null && homestead is not null)
-                        {
-                            await homesteadRepository.RemoveStorageItemAsync(homestead.Id, taperItem.Id, ct);
-                        }
-
-                        await itemRepository.DeleteAsync(taperItem.Id, ct);
-                    }
+                        await ConsumeItemUnitsAsync(taperItem, 1, homestead, ct);
                 }
                 catch (Exception ex)
                 {
@@ -142,6 +163,143 @@ public class CraftCommandHandler(
         return new CommandResult(result.Outcome == CraftingOutcome.Success || result.Outcome == CraftingOutcome.Discovery,
             result.Message,
             result.ProducedItem is not null ? new { result.ProducedItem.Id, result.ProducedItem.Name } : null);
+    }
+
+    /// <summary>
+    /// Builds a map of item-ID → units-to-consume for the component list.
+    /// When an item ID appears once in componentIds but represents a stacked ingredient
+    /// (e.g. one Leather stack covering a need of 3), the map records the ingredient's
+    /// BaseQuantity so the stack is reduced by the correct amount.
+    /// Falls back to counting ID occurrences for manually-provided (non-stacked) lists.
+    /// </summary>
+    private async Task<Dictionary<Guid, int>> BuildConsumeMapAsync(
+        string recipeId, List<Guid> componentIds, CancellationToken ct)
+    {
+        var recipe = await recipeRepository.GetByRecipeIdAsync(recipeId, ct);
+        if (recipe is null)
+        {
+            // Fallback: consume 1 unit per occurrence
+            return componentIds
+                .GroupBy(id => id)
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+
+        // Load the items to know their names
+        var items = await itemRepository.GetByIdsAsync(componentIds.Distinct(), ct);
+        var itemById = items.ToDictionary(i => i.Id);
+
+        var consumeMap = new Dictionary<Guid, int>();
+
+        // Process each ingredient in recipe order, matching against componentIds
+        var remaining = new List<Guid>(componentIds);
+        foreach (var ingredient in recipe.Ingredients)
+        {
+            var needed = ingredient.BaseQuantity;
+
+            // Find items in the component list that match this ingredient
+            var matchingIds = remaining
+                .Where(id => itemById.TryGetValue(id, out var it)
+                             && string.Equals(it.Name, ingredient.IngredientName, StringComparison.OrdinalIgnoreCase))
+                .Distinct()
+                .ToList();
+
+            foreach (var id in matchingIds)
+            {
+                if (needed <= 0) break;
+                var itemQty = itemById.TryGetValue(id, out var it) ? Math.Max(1, it.Quantity) : 1;
+                var toConsume = Math.Min(needed, itemQty);
+                consumeMap[id] = consumeMap.GetValueOrDefault(id) + toConsume;
+                needed -= toConsume;
+                remaining.Remove(id);
+            }
+        }
+
+        // Any leftover IDs (e.g. manually-provided list with extras) — consume 1 each
+        foreach (var id in remaining)
+            consumeMap[id] = consumeMap.GetValueOrDefault(id) + 1;
+
+        return consumeMap;
+    }
+
+    /// <summary>
+    /// Auto-resolves component item IDs for a recipe by looking up items in the player's
+    /// inventory and homestead storage by ingredient name. For stacked items a single item ID
+    /// is returned once — the caller passes the full ID list to CraftingService which reads
+    /// the Quantity field. Returns an empty list when materials are insufficient.
+    /// </summary>
+    private async Task<List<Guid>> ResolveComponentIdsAsync(
+        Guid playerId, string recipeId, CancellationToken ct)
+    {
+        var recipe = await recipeRepository.GetByRecipeIdAsync(recipeId, ct);
+        if (recipe is null) return [];
+
+        // Load all inventory items for the player
+        var inventoryItems = await itemRepository.GetByOwnerAsync(playerId, ct);
+
+        // Load all homestead storage items
+        var homestead = await homesteadRepository.GetByPlayerIdAsync(playerId, ct);
+        IReadOnlyList<Item> storageItems = [];
+        if (homestead is not null)
+        {
+            var storageEntries = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
+            if (storageEntries.Count > 0)
+                storageItems = await itemRepository.GetByIdsAsync(storageEntries.Select(s => s.ItemId), ct);
+        }
+
+        var resolved = new List<Guid>();
+
+        foreach (var ingredient in recipe.Ingredients)
+        {
+            var needed = ingredient.BaseQuantity;
+
+            // Prefer inventory items first, then storage items
+            foreach (var source in new[] { inventoryItems, storageItems })
+            {
+                if (needed <= 0) break;
+
+                var matching = source
+                    .Where(i => string.Equals(i.Name, ingredient.IngredientName, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(i => i.Quantity) // prefer largest stacks first
+                    .ToList();
+
+                foreach (var item in matching)
+                {
+                    if (needed <= 0) break;
+                    resolved.Add(item.Id);
+                    needed -= Math.Max(1, item.Quantity);
+                }
+            }
+
+            // If we still need more than 0 units, materials are insufficient
+            if (needed > 0) return [];
+        }
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// Consumes <paramref name="units"/> from <paramref name="item"/>.
+    /// For stacked items, reduces the Quantity and persists; deletes the item only when the
+    /// stack reaches zero. For non-stacked items, always deletes.
+    /// Also removes the HomesteadStorageItem join row when the item is fully consumed.
+    /// </summary>
+    private async Task ConsumeItemUnitsAsync(
+        Item item, int units, Homestead? homestead, CancellationToken ct)
+    {
+        if (item.IsStackable && item.Quantity > units)
+        {
+            // Reduce the stack — do NOT delete the item
+            item.TryRemoveQuantity(units, out _);
+            await itemRepository.UpdateAsync(item, ct);
+        }
+        else
+        {
+            // Non-stacked or consuming the entire stack — remove join row then delete
+            if (item.OwnerId is null && homestead is not null)
+                await homesteadRepository.RemoveStorageItemAsync(homestead.Id, item.Id, ct);
+
+            await itemRepository.DeleteAsync(item.Id, ct);
+        }
     }
 }
 

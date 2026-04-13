@@ -173,20 +173,12 @@ function getCraftDurationMs(requiredSkill: number): number {
   return 12_000;
 }
 
-/** A unified item shape used internally so inventory and storage items can be handled together. */
-interface CraftItem {
-  id: string;
-  name: string;
-  workmanship: number;
-  source: 'inv' | 'storage';
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CraftingPanel({
   recipes,
   inventoryItems,
-  storageItems,
+  storageItems: _storageItems,
   craftingSkill,
   lastCraftResult,
   onCraft,
@@ -195,7 +187,6 @@ export default function CraftingPanel({
   onClose,
 }: Props) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
-  const [selectedComponentIds, setSelectedComponentIds] = useState<Record<string, string[]>>({});
   const [selectedTaperId, setSelectedTaperId] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusColor, setStatusColor] = useState('#cccccc');
@@ -232,7 +223,6 @@ export default function CraftingPanel({
     // Clear selection after success/discovery (single craft mode)
     if (!craftAllRef.current) {
       if (lastCraftResult.outcome === 'Success' || lastCraftResult.outcome === 'Discovery') {
-        setSelectedComponentIds({});
         setSelectedTaperId(null);
       }
     }
@@ -293,50 +283,17 @@ export default function CraftingPanel({
     ? recipes
     : recipes.filter(r => tabCategoryMap[categoryTab]?.includes(r.resultCategory));
 
-  /**
-   * Returns all items (from inventory + storage combined) matching the given
-   * ingredient name and category, for use in component selection checkboxes.
-   */
-  function availableItems(name: string, category?: string): CraftItem[] {
-    const cat = category?.toLowerCase();
-
-    const fromInv: CraftItem[] = inventoryItems
-      .filter(i =>
-        i.name === name &&
-        (!cat || (i.category ?? '').toLowerCase() === cat) &&
-        !i.isLocked
-      )
-      .map(i => ({ id: i.id, name: i.name, workmanship: i.workmanship, source: 'inv' as const }));
-
-    const fromStorage: CraftItem[] = storageItems
-      .filter(i =>
-        i.name === name &&
-        (!cat || (i.category ?? '').toLowerCase() === cat)
-      )
-      .map(i => ({ id: i.id, name: i.name, workmanship: i.workmanship, source: 'storage' as const }));
-
-    return [...fromInv, ...fromStorage];
-  }
-
   const isTaper = (item: InventoryItem) =>
     item.name.toLowerCase().includes('taper') || item.category === 'Reagent';
 
   const tapers = inventoryItems.filter(isTaper);
 
-  function handleSelectComponent(ingredientName: string, itemId: string, checked: boolean) {
-    setSelectedComponentIds(prev => {
-      const current = prev[ingredientName] ?? [];
-      if (checked) return { ...prev, [ingredientName]: [...current, itemId] };
-      return { ...prev, [ingredientName]: current.filter(id => id !== itemId) };
-    });
-  }
-
   function canCraft(): boolean {
     if (!selectedRecipe) return false;
     if (crafting || craftAllActive) return false;
     for (const ing of selectedRecipe.ingredients) {
-      const chosen = (selectedComponentIds[ing.ingredientName] ?? []).length;
-      if (chosen < ing.baseQuantity) return false;
+      const total = (ing.invCount ?? 0) + (ing.storageCount ?? 0);
+      if (total < ing.baseQuantity) return false;
     }
     return true;
   }
@@ -356,8 +313,7 @@ export default function CraftingPanel({
     setCrafting(true);
     setCraftProgress(0);
 
-    const allComponentIds = Object.values(selectedComponentIds).flat();
-
+    // Component IDs are resolved server-side; send an empty array.
     const interval = setInterval(() => {
       tick++;
       const pct = Math.min(100, Math.round((tick / totalTicks) * 100));
@@ -369,11 +325,11 @@ export default function CraftingPanel({
         setCraftProgress(0);
 
         if (!isCraftAll || craftAllRef.current) {
-          onCraft(selectedRecipe.recipeId, allComponentIds, selectedTaperId);
+          onCraft(selectedRecipe.recipeId, [], selectedTaperId);
         }
       }
     }, tickMs);
-  }, [selectedRecipe, selectedComponentIds, selectedTaperId, onCraft]);
+  }, [selectedRecipe, selectedTaperId, onCraft]);
 
   function handleCraft() {
     if (!selectedRecipe) {
@@ -383,25 +339,23 @@ export default function CraftingPanel({
     }
     if (crafting || craftAllActive) return;
 
-    // Compute per-ingredient shortfalls before firing
+    // Compute per-ingredient shortfalls from available counts
     const shortfalls: string[] = [];
     for (const ing of selectedRecipe.ingredients) {
-      const chosen = (selectedComponentIds[ing.ingredientName] ?? []).length;
-      if (chosen < ing.baseQuantity) {
-        shortfalls.push(`${ing.ingredientName}: need ${ing.baseQuantity}, selected ${chosen}`);
+      const total = (ing.invCount ?? 0) + (ing.storageCount ?? 0);
+      if (total < ing.baseQuantity) {
+        shortfalls.push(`${ing.ingredientName}: need ${ing.baseQuantity}, have ${total}`);
       }
     }
     if (shortfalls.length > 0) {
-      setStatusMsg(`Cannot craft — insufficient selections: ${shortfalls.join('; ')}`);
+      setStatusMsg(`Cannot craft — insufficient materials: ${shortfalls.join('; ')}`);
       setStatusColor('#ff4444');
       return;
     }
 
-    const allComponentIds = Object.values(selectedComponentIds).flat();
     console.log(
       `CRAFT clicked: recipeId=${selectedRecipe.recipeId}, ` +
-      `componentIds=[${allComponentIds.join(', ')}], ` +
-      `taperId=${selectedTaperId ?? 'null'}`,
+      `taperId=${selectedTaperId ?? 'null'} (components resolved server-side)`,
     );
 
     setStatusMsg(null);
@@ -425,28 +379,6 @@ export default function CraftingPanel({
     setCraftProgress(0);
     setStatusMsg(`Craft All cancelled after ${craftAllCountRef.current} craft(s).`);
     setStatusColor('#ffaa00');
-  }
-
-  /**
-   * Formats the availability string for an ingredient.
-   */
-  function formatAvailability(ing: RecipeInfo['ingredients'][0], items: CraftItem[]): string {
-    if (ing.invCount !== undefined || ing.storageCount !== undefined) {
-      const inv = ing.invCount ?? 0;
-      const storage = ing.storageCount ?? 0;
-      const total = inv + storage;
-      if (inv > 0 && storage > 0) return `have ${total} total (${inv} inv + ${storage} storage)`;
-      if (inv > 0) return `have ${inv} (inventory)`;
-      if (storage > 0) return `have ${storage} (storage)`;
-      return 'have 0';
-    }
-    const invCount = items.filter(i => i.source === 'inv').length;
-    const storageCount = items.filter(i => i.source === 'storage').length;
-    const total = invCount + storageCount;
-    if (invCount > 0 && storageCount > 0) return `have ${total} total (${invCount} inv + ${storageCount} storage)`;
-    if (invCount > 0) return `have ${invCount} (inventory)`;
-    if (storageCount > 0) return `have ${storageCount} (storage)`;
-    return 'have 0';
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -526,7 +458,6 @@ export default function CraftingPanel({
                   key={r.recipeId}
                   onClick={() => {
                     setSelectedRecipeId(r.recipeId);
-                    setSelectedComponentIds({});
                     setSelectedTaperId(null);
                     setStatusMsg(null);
                   }}
@@ -592,36 +523,25 @@ export default function CraftingPanel({
                 <div style={{ marginBottom: '12px' }}>
                   <div style={sectionLabel}>Ingredients</div>
                   {selectedRecipe.ingredients.map(ing => {
-                    const items = availableItems(ing.ingredientName, ing.category);
-                    const chosen = selectedComponentIds[ing.ingredientName] ?? [];
-                    const availLine = formatAvailability(ing, items);
-                    const hasEnough = (ing.totalCount ?? items.length) >= ing.baseQuantity;
+                    const inv = ing.invCount ?? 0;
+                    const storage = ing.storageCount ?? 0;
+                    const total = inv + storage;
+                    const hasEnough = total >= ing.baseQuantity;
+                    const statusIcon = hasEnough ? '✓' : '✗';
+                    const statusColor = hasEnough ? '#00ff41' : '#ff4444';
+                    let haveLabel = `have ${total}`;
+                    if (inv > 0 && storage > 0) haveLabel += ` (${inv} inv + ${storage} storage)`;
+                    else if (inv > 0) haveLabel += ' (inventory)';
+                    else if (storage > 0) haveLabel += ' (storage)';
                     return (
-                      <div key={ing.ingredientName} style={{ marginBottom: '8px' }}>
-                        <div style={{ fontSize: '12px', marginBottom: '3px', color: chosen.length >= ing.baseQuantity ? '#00ff41' : '#ffaa00' }}>
-                          {ing.ingredientName} — need {ing.baseQuantity}, {availLine}
-                          {chosen.length > 0 && ` (selected ${chosen.length})`}
-                        </div>
-                        {items.length === 0 ? (
-                          <div style={{ color: hasEnough ? '#4488aa' : '#555', fontSize: '11px', paddingLeft: '8px' }}>
-                            {hasEnough ? 'Available in storage (select below when withdrawing, or craft directly).' : 'Not found in inventory or storage.'}
-                          </div>
-                        ) : (
-                          <div style={{ paddingLeft: '8px' }}>
-                            {items.slice(0, 8).map(item => (
-                              <label key={item.id} style={{ display: 'block', cursor: 'pointer', fontSize: '11px', color: item.source === 'storage' ? '#4488aa' : '#ccc', marginBottom: '2px' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={chosen.includes(item.id)}
-                                  onChange={e => handleSelectComponent(ing.ingredientName, item.id, e.target.checked)}
-                                  style={{ marginRight: '6px', accentColor: '#00ff41' }}
-                                />
-                                {item.name} W{item.workmanship}
-                                {item.source === 'storage' && <span style={{ color: '#4488aa', marginLeft: '4px' }}>[storage]</span>}
-                              </label>
-                            ))}
-                          </div>
-                        )}
+                      <div key={ing.ingredientName} style={{ marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                        <span style={{ fontSize: '14px', color: statusColor, flexShrink: 0 }}>{statusIcon}</span>
+                        <span style={{ fontSize: '12px', color: hasEnough ? '#cccccc' : '#ff8888' }}>
+                          {ing.ingredientName}
+                          <span style={{ color: '#888', marginLeft: '6px' }}>
+                            need {ing.baseQuantity}, {haveLabel}
+                          </span>
+                        </span>
                       </div>
                     );
                   })}
