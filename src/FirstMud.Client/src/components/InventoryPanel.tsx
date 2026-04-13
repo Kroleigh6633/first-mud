@@ -44,6 +44,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
   };
 
   const salvageSkill    = snapshot?.salvageSkill ?? 1;
+  const craftingSkill   = snapshot?.craftingSkill ?? 1;
   const maxSalvageable  = maxSalvageableWorkmanship(salvageSkill);
   const weaponThreshold = snapshot?.autoSalvageWeaponThreshold ?? 0;
   const armorThreshold  = snapshot?.autoSalvageArmorThreshold ?? 0;
@@ -65,6 +66,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
     atHomestead,
     hasSalvager,
     imbuingItemId,
+    craftingSkill,
     onEquip: handleEquip,
     onUnequip: handleUnequip,
     onSalvage: handleSalvage,

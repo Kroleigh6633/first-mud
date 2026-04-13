@@ -53,6 +53,7 @@ interface InventoryItemRowProps {
   atHomestead: boolean;
   hasSalvager: boolean;
   imbuingItemId: string | null;
+  craftingSkill: number;
   onEquip: (itemId: string, slot?: string) => void;
   onUnequip: (slot: string) => void;
   onSalvage: (itemId: string) => void;
@@ -76,6 +77,7 @@ export default function InventoryItemRow({
   atHomestead,
   hasSalvager,
   imbuingItemId,
+  craftingSkill,
   onEquip,
   onUnequip,
   onSalvage,
@@ -244,6 +246,7 @@ export default function InventoryItemRow({
         <ImbuePanel
           item={item}
           availableTapers={availableTapers}
+          craftingSkill={craftingSkill}
           onImbue={onImbue}
           onCancel={() => onSetImbuingItem(null)}
         />
