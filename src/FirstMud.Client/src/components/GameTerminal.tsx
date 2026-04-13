@@ -457,6 +457,9 @@ export default function GameTerminal({
     });
   };
 
+  // Tracks the questId we are currently waiting on a waypoint for
+  const pendingWaypointQuestIdRef = useRef<string | null>(null);
+
   // Auto-quest orchestration: when autoQuestActive, walk through unfinished quests
   // in rep-reward order, accepting each and auto-navigating.
   useEffect(() => {
@@ -475,6 +478,7 @@ export default function GameTerminal({
     if (!nextQuest) {
       // All done
       setAutoQuestActive(false);
+      pendingWaypointQuestIdRef.current = null;
       appendMessage({
         timestamp: new Date().toISOString(),
         category: 'quest',
@@ -490,15 +494,37 @@ export default function GameTerminal({
       sendCommand('acceptquest', { questId: nextQuest.questId });
     }
 
-    // Start auto-navigate toward this quest's waypoint
+    // Mark that we are waiting for this quest's waypoint
+    pendingWaypointQuestIdRef.current = nextQuest.questId;
+
+    // Start auto-navigate immediately if the waypoint is already present
     const wp = questWaypointRef.current;
     if (wp && wp.questId === nextQuest.questId) {
+      pendingWaypointQuestIdRef.current = null;
       setAutoNavigating(true);
-    } else {
-      // Waypoint may arrive shortly after acceptquest; start navigating on next
-      // interval once questWaypoint is set
     }
+    // Otherwise the questWaypoint watcher below will fire once the server
+    // responds with the waypoint and start navigation at that point.
   }, [autoQuestActive, autoQuestIndex, sendCommand, appendMessage]);
+
+  // Watch for the questWaypoint to arrive while auto-quest is waiting for it,
+  // then kick off navigation.  This is the fix for the L-key not moving bug:
+  // acceptquest is async — the waypoint arrives after the orchestration effect
+  // runs, so we need a separate effect that reacts to the new prop value.
+  useEffect(() => {
+    if (!questWaypoint) return;
+    if (!autoQuestActiveRef.current) return;
+    if (pendingWaypointQuestIdRef.current !== questWaypoint.questId) return;
+
+    // The waypoint we were waiting for has arrived — start navigating
+    pendingWaypointQuestIdRef.current = null;
+    setAutoNavigating(true);
+    appendMessage({
+      timestamp: new Date().toISOString(),
+      category: 'quest',
+      text: `Waypoint received — navigating to ${questWaypoint.questTitle}...`,
+    });
+  }, [questWaypoint, appendMessage]);
 
   // When auto-quest is running and we arrive (autoNavigating stops), advance to next quest
   useEffect(() => {
