@@ -326,24 +326,28 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
       {!building.isConstructed && (
         <div style={{ fontSize: '11px', marginTop: '2px' }}>
           <ProgressBar pct={building.constructionProgress} />
-          {building.assignedCompanionName ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-              <span style={{ color: '#aaaaaa' }}>
-                Builder: <span style={{ color: '#00ccff' }}>{building.assignedCompanionName}</span>
-              </span>
-              <button
-                type="button"
-                onClick={handleUnassign}
-                style={unassignBtnStyle}
-                title="Recall builder"
-              >
-                Unassign
-              </button>
+          {(building.assignedCompanionName || (building as any).workers?.length > 0) ? (
+            <div style={{ marginTop: '3px' }}>
+              {((building as any).workers ?? (building.assignedCompanionName ? [{ name: building.assignedCompanionName }] : [])).map((w: any, i: number) => (
+                <div key={w.id || i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                  <span style={{ color: '#aaaaaa' }}>
+                    Builder: <span style={{ color: '#00ccff' }}>{w.name}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleUnassign}
+                    style={unassignBtnStyle}
+                    title="Recall builder"
+                  >
+                    Unassign
+                  </button>
+                </div>
+              ))}
             </div>
           ) : (
             <div style={{ marginTop: '4px' }}>
               <div style={{ color: '#888888', marginBottom: '4px' }}>
-                No builder — assign a Builder companion:
+                No builder — the administrator will auto-assign one.
               </div>
               {availableCompanions.length === 0 ? (
                 <div style={{ color: '#555555', fontSize: '10px' }}>
@@ -540,6 +544,7 @@ interface WorkforceStats {
   total: number;
   adventuring: number;
   working: number;
+  builders: number;
   guards: number;
   housed: number;
   housingCapacity: number;
@@ -571,8 +576,18 @@ function computeWorkforceStats(
 
   // Count by companion duty (not building type) for accurate workforce totals
   const nonAdventuring = companionRoster.filter(c => !activeCompanionIds.includes(c.id));
+
+  // Builders = companions assigned to under-construction buildings
+  const builderIds = new Set(
+    underConstruction.flatMap(b => {
+      const workers: { id: string }[] = (b as any).workers ?? [];
+      return workers.map(w => w.id);
+    })
+  );
+
+  const builders = builderIds.size;
   const working = nonAdventuring.filter(
-    c => c.assignedDuty && c.assignedDuty !== 'Guard'
+    c => c.assignedDuty && c.assignedDuty !== 'Guard' && !builderIds.has(c.id)
   ).length;
   const guards = nonAdventuring.filter(
     c => c.assignedDuty === 'Guard'
@@ -601,10 +616,10 @@ function computeWorkforceStats(
   const allProductionStaffed = productionBuildings.length > 0 &&
     productionBuildings.every(b => !!b.assignedCompanionName);
 
-  const buildingsNeedingBuilders = underConstruction.filter(b => !b.assignedCompanionName);
+  const buildingsNeedingBuilders = underConstruction.filter(b => !b.assignedCompanionName && !((b as any).workers?.length > 0));
 
   return {
-    total, adventuring, working, guards, housed, housingCapacity, hutCount,
+    total, adventuring, working, builders, guards, housed, housingCapacity, hutCount,
     homeless, unemployed, productionBuildings, housingBuildings, underConstruction,
     allProductionStaffed, buildingsNeedingBuilders,
   };
@@ -684,6 +699,10 @@ function OverviewTab({ stats }: OverviewTabProps) {
       <div style={{ ...rowStyle, marginLeft: '12px' }}>
         <span style={labelStyle}>Working (production):</span>
         <span style={{ color: '#00cc88' }}>{stats.working}</span>
+      </div>
+      <div style={{ ...rowStyle, marginLeft: '12px' }}>
+        <span style={labelStyle}>Builders:</span>
+        <span style={{ color: stats.builders > 0 ? '#ff8800' : '#555555' }}>{stats.builders}</span>
       </div>
       <div style={{ ...rowStyle, marginLeft: '12px' }}>
         <span style={labelStyle}>Guards:</span>

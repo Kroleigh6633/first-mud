@@ -683,14 +683,33 @@ public class BuildingService
             }
         }
 
-        // ── Step 2: Assign builders to under-construction buildings ───────────────
+        // ── Step 2: Auto-detect housing shortage → place huts BEFORE assigning builders
+        buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        companions = await _companions.GetByOwnerAsync(playerId, ct);
+        var totalNonActive = companions.Count(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id));
+        var totalHousingCapacity = buildings
+            .Where(b => IsHousingType(b.Type))  // count ALL huts, including under-construction
+            .Sum(b => GetHutCapacity(b.Tier));
+
+        if (totalNonActive > totalHousingCapacity)
+        {
+            int hutsNeeded = (int)Math.Ceiling((totalNonActive - totalHousingCapacity) / 3.0);
+            for (int i = 0; i < hutsNeeded; i++)
+            {
+                var (success, _, _) = await PlaceBuildingAsync(playerId, BuildingType.Hut,
+                    AutoPositionSentinel, AutoPositionSentinel, ct);
+                if (success) changes++;
+            }
+        }
+
+        // ── Step 3: Assign builders to ALL under-construction buildings (pull guards) ─
+        buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
+        companions = await _companions.GetByOwnerAsync(playerId, ct);
+        pool = companions.Where(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id)).ToList();
+
         var needBuilders = buildings
             .Where(b => !b.IsConstructed && b.WorkerCount == 0)
             .ToList();
-
-        // Reload companions state after step 1 assignments
-        companions = await _companions.GetByOwnerAsync(playerId, ct);
-        pool = companions.Where(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id)).ToList();
 
         foreach (var building in needBuilders)
         {
@@ -727,8 +746,7 @@ public class BuildingService
             changes++;
         }
 
-        // ── Step 3: Overflow → Guard duty ─────────────────────────────────────────
-        // Reload to get final state
+        // ── Step 4: Overflow → Guard duty ─────────────────────────────────────────
         companions = await _companions.GetByOwnerAsync(playerId, ct);
         foreach (var idle in companions
             .Where(c => !c.IsPermanentlyGone
@@ -740,26 +758,7 @@ public class BuildingService
             changes++;
         }
 
-        // ── Step 3b: Auto-detect housing shortage → place huts if materials available
-        buildings = await _buildings.GetByHomesteadIdAsync(homestead.Id, ct);
-        companions = await _companions.GetByOwnerAsync(playerId, ct);
-        var totalNonActive = companions.Count(c => !c.IsPermanentlyGone && !activeIds.Contains(c.Id));
-        var totalHousingCapacity = buildings
-            .Where(b => IsHousingType(b.Type) && b.IsConstructed)
-            .Sum(b => GetHutCapacity(b.Tier));
-
-        if (totalNonActive > totalHousingCapacity)
-        {
-            int hutsNeeded = (int)Math.Ceiling((totalNonActive - totalHousingCapacity) / 3.0);
-            for (int i = 0; i < hutsNeeded; i++)
-            {
-                var (success, _, _) = await PlaceBuildingAsync(playerId, BuildingType.Hut,
-                    AutoPositionSentinel, AutoPositionSentinel, ct);
-                if (success) changes++;
-            }
-        }
-
-        // ── Step 4: House all unhoused companions ─────────────────────────────────
+        // ── Step 5: House all unhoused companions ─────────────────────────────────
         companions = await _companions.GetByOwnerAsync(playerId, ct);
         var huts = buildings.Where(b => IsHousingType(b.Type) && b.IsConstructed).ToList();
         foreach (var hut in huts)

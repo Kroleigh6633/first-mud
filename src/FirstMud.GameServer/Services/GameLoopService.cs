@@ -305,20 +305,85 @@ public class GameLoopService : BackgroundService
 
             var results = await service.ProcessAllDutiesAsync(ct);
 
-            foreach (var result in results)
-            {
-                await hubContext.Clients
-                    .Group(result.PlayerId.ToString())
-                    .SendAsync("GameMessage", new
-                    {
-                        timestamp = DateTime.UtcNow.ToString("O"),
-                        category = "system",
-                        text = result.Message
-                    }, ct);
-            }
-
             if (results.Count > 0)
+            {
+                // Batch results into one summary message per player instead of spamming
+                var byPlayer = results.GroupBy(r => r.PlayerId);
+                foreach (var group in byPlayer)
+                {
+                    var playerId = group.Key;
+                    var msgs = group.ToList();
+
+                    // Aggregate harvested materials: "Wood x6, Herbs x8, Sand x2"
+                    var harvested = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    int crafted = 0, salvaged = 0, otherCount = 0;
+                    var otherMsgs = new List<string>();
+
+                    foreach (var m in msgs)
+                    {
+                        // Parse "companion X harvested Material xN" pattern
+                        var match = System.Text.RegularExpressions.Regex.Match(
+                            m.Message, @"harvested (\w[\w\s]*?) x(\d+)");
+                        if (match.Success)
+                        {
+                            var mat = match.Groups[1].Value.Trim();
+                            var qty = int.Parse(match.Groups[2].Value);
+                            harvested[mat] = harvested.GetValueOrDefault(mat) + qty;
+                        }
+                        else if (m.Message.Contains("crafted", StringComparison.OrdinalIgnoreCase))
+                            crafted++;
+                        else if (m.Message.Contains("salvaged", StringComparison.OrdinalIgnoreCase))
+                            salvaged++;
+                        else
+                        {
+                            otherMsgs.Add(m.Message);
+                            otherCount++;
+                        }
+                    }
+
+                    var parts = new List<string>();
+                    if (harvested.Count > 0)
+                    {
+                        var total = harvested.Values.Sum();
+                        var matList = string.Join(", ", harvested.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} x{kv.Value}"));
+                        parts.Add($"Harvested {total} materials ({matList})");
+                    }
+                    if (crafted > 0) parts.Add($"Crafted {crafted} item(s)");
+                    if (salvaged > 0) parts.Add($"Salvaged {salvaged} item(s)");
+
+                    int workerCount = msgs.Count - otherCount;
+                    var summary = parts.Count > 0
+                        ? $"Homestead report ({workerCount} workers): {string.Join(" · ", parts)}."
+                        : null;
+
+                    if (summary is not null)
+                    {
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category = "system",
+                                text = summary,
+                            }, ct);
+                    }
+
+                    // Send any non-harvest/craft/salvage messages individually (rare events)
+                    foreach (var other in otherMsgs)
+                    {
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category = "system",
+                                text = other,
+                            }, ct);
+                    }
+                }
+
                 _logger.LogDebug("Homestead companion tick complete. {Count} duty action(s) processed.", results.Count);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -191,6 +191,22 @@ internal static class CityViewBuilder
 
                 var capacity = BuildingService.GetHutCapacity(b.Tier);
 
+                // For under-construction huts, also show builder info
+                var builders = new List<object>();
+                string? builderName = null;
+                if (!b.IsConstructed)
+                {
+                    foreach (var companionId in b.AssignedCompanionIds)
+                    {
+                        var companion = allCompanions.FirstOrDefault(c => c.Id == companionId);
+                        if (companion is not null)
+                        {
+                            builders.Add(new { id = companion.Id, name = companion.Name, duty = "Crafter" });
+                            builderName ??= companion.Name;
+                        }
+                    }
+                }
+
                 dtos.Add(new
                 {
                     id                   = b.Id,
@@ -201,8 +217,10 @@ internal static class CityViewBuilder
                     gridY                = b.GridY,
                     isConstructed        = b.IsConstructed,
                     constructionProgress = b.ConstructionProgress,
-                    assignedCompanionId  = (Guid?)null,
-                    assignedCompanionName= (string?)null,
+                    assignedCompanionId  = b.AssignedCompanionId,
+                    assignedCompanionName= builderName,
+                    workers              = builders.Count > 0 ? builders : null,
+                    workerCapacity       = builders.Count > 0 ? 1 : 0,
                     residents,
                     residentCapacity     = capacity,
                 });
