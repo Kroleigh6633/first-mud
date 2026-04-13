@@ -138,7 +138,7 @@ public class MoveCommandHandler(
         }
 
         int partySize = 1 + activeCompanions.Count;
-        var monsters = CombatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome, partySize);
+        var monsters = combatHelpers.BuildMonsterPack(dangerLevel, player.Level, biome, partySize);
 
         // Aggro check: high-level players in low-level zones don't get bothered
         var avgMonsterLevel = monsters.Count > 0

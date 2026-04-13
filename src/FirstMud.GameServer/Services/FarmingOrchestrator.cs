@@ -29,8 +29,11 @@ public class FarmingOrchestrator(
     AutoFarmService autoFarmService,
     IServiceScopeFactory scopeFactory,
     ILogger<FarmingOrchestrator> logger,
-    InventoryDepositService inventoryDepositService)
+    InventoryDepositService inventoryDepositService,
+    MonsterFactory monsterFactory)
 {
+    private readonly MonsterFactory _monsterFactory = monsterFactory;
+
     // -------------------------------------------------------------------------
     // Clockwise spiral step generator
     // -------------------------------------------------------------------------
@@ -660,7 +663,7 @@ public class FarmingOrchestrator(
                 }
 
                 int partySize = 1 + farmActiveCompanions.Count;
-                var monsters = MonsterFactory.BuildMonsterPack(dangerLevel, freshPlayer.Level, biome, partySize);
+                var monsters = _monsterFactory.BuildMonsterPack(dangerLevel, freshPlayer.Level, biome, partySize);
 
                 var avgMonsterLevel = monsters.Count > 0
                     ? (int)Math.Round(monsters.Average(m => (double)m.Level))

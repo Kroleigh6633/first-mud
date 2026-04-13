@@ -59,6 +59,20 @@ public interface IContentProvider
     /// </summary>
     RecipeDefinition? GetRecipe(string recipeId);
 
+    // ─── Monsters ────────────────────────────────────────────────────────────
+
+    /// <summary>All monster definitions, in file order.</summary>
+    IReadOnlyList<MonsterDefinition> AllMonsters();
+
+    /// <summary>Lookup a monster by its stable id. Returns null if unknown.</summary>
+    MonsterDefinition? GetMonster(string id);
+
+    /// <summary>All monsters whose biome matches (ordinal equality, lowercase).</summary>
+    IReadOnlyList<MonsterDefinition> MonstersByBiome(string biome);
+
+    /// <summary>All monsters in a given biome + tier (0-3).</summary>
+    IReadOnlyList<MonsterDefinition> MonstersByBiomeAndTier(string biome, int tier);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>

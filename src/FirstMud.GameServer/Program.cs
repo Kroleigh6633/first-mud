@@ -94,6 +94,7 @@ builder.Services.AddScoped<ITickHandler, BuildingConstructionTickHandler>();
 builder.Services.AddScoped<ITickHandler, ResourceRegenTickHandler>();
 
 // Shared combat utilities and farming orchestrator
+builder.Services.AddSingleton<MonsterFactory>();
 builder.Services.AddScoped<CombatHelpers>();
 builder.Services.AddScoped<FarmingOrchestrator>();
 builder.Services.AddSingleton<InventoryDepositService>();
