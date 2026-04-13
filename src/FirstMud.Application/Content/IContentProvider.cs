@@ -143,6 +143,16 @@ public interface IContentProvider
     /// content/quests.json.</summary>
     IReadOnlyList<QuestEdgeDefinition> AllQuestEdges();
 
+    // ─── Combat Curves ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tunable combat scaling coefficients (monster danger-level multipliers,
+    /// boss bonuses). Loaded from <c>content/combat-curves.json</c>. Consumed
+    /// by both the live game's <c>MonsterFactory</c> and the design-time
+    /// <c>encounter-sim</c> tool — one source of truth.
+    /// </summary>
+    CombatCurvesDefinition CombatCurves { get; }
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>

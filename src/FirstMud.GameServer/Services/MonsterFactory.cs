@@ -83,7 +83,7 @@ public sealed class MonsterFactory
     private static MonsterTemplate ToTemplate(MonsterDefinition def) =>
         new(def.Name, def.Hp, def.Speed, def.Level, def.Element, def.Abilities);
 
-    private static MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel, bool isBoss = false)
+    private MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel, bool isBoss = false)
     {
         var variance = Random.Shared.Next(-1, 2); // -1, 0, or 1
         var monsterLevel = Math.Max(1, dangerLevel + variance);
@@ -91,32 +91,11 @@ public sealed class MonsterFactory
         if (playerLevel > dangerLevel * 2)
             monsterLevel = Math.Max(monsterLevel, playerLevel - 2);
 
-        // HP scales aggressively with danger: danger 10 = 5x base HP
-        double hpMultiplier = 1.0 + dangerLevel * 0.4;
-        int scaledHp = (int)(template.Hp * hpMultiplier);
+        // Curve-based HP / power / speed / boss scaling lives in the shared
+        // MonsterScaling helper so the design-tool encounter-sim runs use
+        // identical math (one source of truth via content/combat-curves.json).
+        var scaled = MonsterScaling.Apply(template, dangerLevel, _content.CombatCurves.MonsterScaling, isBoss);
 
-        // Speed scales with danger so high-danger monsters act first more often
-        int scaledSpeed = template.Speed + dangerLevel;
-
-        // Ability damage scales with danger: danger 10 = 4x base power
-        double powerMultiplier = 1.0 + dangerLevel * 0.3;
-        var scaledAbilities = template.Abilities
-            .Select(a => a with { BasePower = (int)(a.BasePower * powerMultiplier) })
-            .ToArray();
-
-        // Boss at danger 10: double HP and +5 speed on top of normal scaling
-        if (isBoss)
-        {
-            scaledHp   *= 2;
-            scaledSpeed += 5;
-        }
-
-        return template with
-        {
-            Level     = monsterLevel,
-            Hp        = scaledHp,
-            Speed     = scaledSpeed,
-            Abilities = scaledAbilities,
-        };
+        return scaled with { Level = monsterLevel };
     }
 }
