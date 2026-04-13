@@ -168,6 +168,38 @@ function samplePathDanger(
   return maxDanger;
 }
 
+/**
+ * Client-side quest-objective classifier. Mirrors the server's
+ * QuestAutoCompleteService.GetQuestType so the auto-quest runner's
+ * `fulfilling` phase and the server's completion check agree on what
+ * kind of sub-loop each quest needs. Dynamically-generated quests
+ * (DungeonMasterService) don't carry a typed `objective` field, so we
+ * parse the title exactly as the server does.
+ */
+type QuestObjectiveType = 'kill' | 'gather' | 'interact' | 'visit';
+function classifyQuestObjective(title: string): QuestObjectiveType {
+  const t = title.toLowerCase();
+  if (t.includes('defeat') || t.includes('slay') || t.includes('hunt')) return 'kill';
+  if (t.includes('gather') || t.includes('collect') || t.includes('retrieve')) return 'gather';
+  if (t.includes('deliver') || t.includes('bring') || t.includes('escort')) return 'gather';
+  // Everything else (Investigate / Uncover / Protect / Negotiate / narrative
+  // quest titles) is treated as interact: arrival + interactquest completes it.
+  return 'interact';
+}
+
+/** Extracts the first integer from quest title/description, defaulting to 3
+ *  (matches server QuestAutoCompleteService default). */
+function parseRequiredCountFromQuestText(title: string, description: string): number {
+  const m = (title + ' ' + description).match(/\b(\d+)\b/);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (n > 0) return n;
+  }
+  return 3;
+}
+
+type MoveDeltaLike = { deltaX: number; deltaY: number };
+
 export default function GameTerminal({
   connectionState,
   sendCommand,
@@ -269,9 +301,20 @@ export default function GameTerminal({
   // Single interval ref for the auto-quest runner — avoids the broken
   // multi-effect chain.  Cleared whenever the run stops.
   const autoQuestIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Phase of the current auto-quest step: 'accept' | 'navigate' | 'interact'
+  // Phase of the current auto-quest step:
+  //   'accept'    → sent acceptquest, waiting for waypoint
+  //   'navigate'  → walking to waypoint
+  //   'fulfilling'→ at waypoint; running objective-specific loop
+  //                 (harvest for gather; wait-for-combat for kill; interact for narrative/visit)
+  //   'interact'  → sends interactquest/completequest once fulfilled
   // Stored as a ref so the interval closure always reads the latest value.
-  const autoQuestPhaseRef = useRef<'idle' | 'accept' | 'navigate' | 'interact'>('idle');
+  const autoQuestPhaseRef = useRef<'idle' | 'accept' | 'navigate' | 'fulfilling' | 'interact'>('idle');
+  // Tick counter while in 'fulfilling' — used as a safety stall-out cap so the
+  // runner can't get wedged harvesting forever in a tile with no yield.
+  const fulfillTicksRef = useRef(0);
+  // Throttle for harvest commands sent from the fulfilling phase (server caps
+  // at ~1/s; we aim for ~800 ms between sends as spec'd in the briefing).
+  const lastHarvestAtRef = useRef(0);
   // How many ticks we have been in 'accept' phase waiting for a waypoint
   const acceptWaitTicksRef = useRef(0);
   // Set to true when an Error message arrives while in the 'interact' phase —
@@ -1077,16 +1120,41 @@ export default function GameTerminal({
         console.log(`[autoquest navigate] dist=(${distX},${distY}) to (${wp.targetX},${wp.targetY})`);
 
         if (distX <= 2 && distY <= 2) {
-          console.log(`[autoquest navigate] Arrived at waypoint for "${nextQuest.title}" — interacting`);
           autoQuestInteractFailedRef.current = false;
-          autoQuestPhaseRef.current = 'interact';
           setAutoNavigating(false);
+
+          // Classify the objective from the quest title (matches server-side
+          // QuestAutoCompleteService.GetQuestType). Narrative quests go
+          // straight to 'interact'; kill/gather must run a fulfilling loop
+          // first or the server will reject the completion.
+          const objType = classifyQuestObjective(nextQuest.title);
+          console.log(`[autoquest navigate] Arrived at "${nextQuest.title}" (objective=${objType})`);
+
+          if (objType === 'visit' || objType === 'interact') {
+            // No sub-objective to satisfy — proceed straight to completion
+            autoQuestPhaseRef.current = 'interact';
+            wrappedAppendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'quest',
+              text: `Arrived at ${wp.questTitle} — completing quest...`,
+            });
+            commands.interactQuest({ questId: wp.questId });
+            return;
+          }
+
+          // gather / kill — enter the fulfilling phase and run an
+          // objective-specific sub-loop until the server reports progress
+          // meets the requirement.
+          autoQuestPhaseRef.current = 'fulfilling';
+          fulfillTicksRef.current = 0;
+          lastHarvestAtRef.current = 0;
           wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'quest',
-            text: `Arrived at ${wp.questTitle} — completing quest...`,
+            text: objType === 'gather'
+              ? `Arrived at ${wp.questTitle} — gathering required resources...`
+              : `Arrived at ${wp.questTitle} — hunting targets...`,
           });
-          commands.interactQuest({ questId: wp.questId });
           return;
         }
 
@@ -1133,6 +1201,101 @@ export default function GameTerminal({
 
         console.log(`[autoquest navigate] Moving delta=(${step.deltaX},${step.deltaY})`);
         commands.move(step);
+        return;
+      }
+
+      // ── Fulfilling phase: objective-type-specific sub-loop ─────────
+      // Runs at the waypoint until server progress events show the
+      // objective is satisfied, then transitions to 'interact'.
+      if (phase === 'fulfilling') {
+        fulfillTicksRef.current += 1;
+
+        const objType = classifyQuestObjective(nextQuest.title);
+        const progress = questProgressRef.current[nextQuest.questId];
+        const requiredFromTitle = parseRequiredCountFromQuestText(
+          nextQuest.title, nextQuest.description,
+        );
+
+        // Stall-out cap: 300 ms × 200 = 60 s max in fulfilling before we
+        // give up and mark the quest skipped. Prevents wedged runners.
+        if (fulfillTicksRef.current > 200) {
+          console.warn(`[autoquest fulfilling] Stall timeout on "${nextQuest.title}" — skipping`);
+          autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+          wrappedAppendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'warning',
+            text: `Quest '${nextQuest.title}' objective not met after 60s — skipping.`,
+          });
+          autoQuestPhaseRef.current = 'idle';
+          if (autoQuestIntervalRef.current !== null) {
+            clearInterval(autoQuestIntervalRef.current);
+            autoQuestIntervalRef.current = null;
+          }
+          setAutoQuestIndex(prev => prev + 1);
+          return;
+        }
+
+        if (objType === 'gather') {
+          const gathered = progress?.gathered ?? 0;
+          const required = progress?.required ?? requiredFromTitle;
+          if (gathered >= required) {
+            console.log(`[autoquest fulfilling] Gather objective met (${gathered}/${required}) — completing`);
+            autoQuestPhaseRef.current = 'interact';
+            wrappedAppendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'quest',
+              text: `Gathered ${gathered}/${required} — completing ${wp?.questTitle ?? nextQuest.title}...`,
+            });
+            commands.interactQuest({ questId: nextQuest.questId });
+            return;
+          }
+          // Throttle harvest to ~800 ms
+          if (Date.now() - lastHarvestAtRef.current >= 800) {
+            lastHarvestAtRef.current = Date.now();
+            console.log(`[autoquest fulfilling gather] harvest (${gathered}/${required})`);
+            commands.harvest();
+          }
+          return;
+        }
+
+        if (objType === 'kill') {
+          const kills = progress?.kills ?? 0;
+          const required = progress?.required ?? requiredFromTitle;
+          if (kills >= required) {
+            console.log(`[autoquest fulfilling] Kill objective met (${kills}/${required}) — completing`);
+            autoQuestPhaseRef.current = 'interact';
+            wrappedAppendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'quest',
+              text: `Defeated ${kills}/${required} — completing ${wp?.questTitle ?? nextQuest.title}...`,
+            });
+            commands.interactQuest({ questId: nextQuest.questId });
+            return;
+          }
+          // No active combat — step to a random adjacent safe tile to try
+          // to trigger an encounter. Existing combat guard higher up in
+          // the tick pauses us while a fight is active.
+          const safeStepCap = Math.min(Math.ceil((player.level ?? 1) * 0.6), 7);
+          const deltas: MoveDeltaLike[] = [
+            { deltaX: 1, deltaY: 0 }, { deltaX: -1, deltaY: 0 },
+            { deltaX: 0, deltaY: 1 }, { deltaX: 0, deltaY: -1 },
+          ];
+          const pick = deltas[Math.floor(Math.random() * deltas.length)];
+          const step = stepTowardSafe(
+            player.x, player.y,
+            player.x + pick.deltaX, player.y + pick.deltaY,
+            safeStepCap,
+          );
+          if (step && step !== 'danger') {
+            commands.move(step);
+          }
+          return;
+        }
+
+        // Fallthrough (shouldn't reach here — visit/interact route directly
+        // to 'interact' on arrival). Treat as complete.
+        autoQuestPhaseRef.current = 'interact';
+        commands.interactQuest({ questId: nextQuest.questId });
         return;
       }
 

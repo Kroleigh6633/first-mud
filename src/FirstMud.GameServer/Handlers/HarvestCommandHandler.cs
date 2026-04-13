@@ -14,6 +14,8 @@ public class HarvestCommandHandler(
     IItemRepository itemRepository,
     IZoneRepository zoneRepository,
     IResourceNodeRepository resourceNodeRepository,
+    IQuestGraphRepository questGraphRepository,
+    QuestProgressTracker questProgressTracker,
     CombatHelpers combatHelpers,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext) : ICommandHandler<HarvestCommand>
@@ -194,6 +196,13 @@ public class HarvestCommandHandler(
                 ResourceType = harvestType.ToString()
             }, ct);
 
+        // ── Quest harvest-progress tracking ─────────────────────────────────
+        // Mirror the CombatHelpers.TrackQuestKillsAsync pattern: for each
+        // active gather/deliver quest whose keyword matches the item we just
+        // harvested, record the yield and broadcast QuestHarvestProgress so
+        // the client's auto-quest "fulfilling" phase can observe completion.
+        await TrackQuestHarvestAsync(cmd.PlayerId, itemName, actual, ct);
+
         player.GainExperience(5);
         await playerRepository.UpdateAsync(player, ct);
         await notificationService.SendMessageAsync(cmd.PlayerId, "system", "You gained 5 experience from harvesting.", ct);
@@ -202,4 +211,62 @@ public class HarvestCommandHandler(
 
         return new CommandResult(true, message);
     }
+
+    /// <summary>
+    /// Records gather-quest progress after a successful harvest and broadcasts
+    /// <c>QuestHarvestProgress</c> events — payload shape mirrors
+    /// <c>QuestKillProgress</c> so the client can treat them uniformly.
+    /// </summary>
+    private async Task TrackQuestHarvestAsync(
+        Guid playerId,
+        string harvestedItemName,
+        int amount,
+        CancellationToken ct)
+    {
+        if (amount <= 0) return;
+
+        var inProgressQuests = await questGraphRepository.GetAvailableQuestsAsync(playerId, null, ct);
+        var gatherQuests = inProgressQuests
+            .Where(q => q.IsTaken && IsGatherQuest(q.Title))
+            .ToList();
+        if (gatherQuests.Count == 0) return;
+
+        // Use the player's actual inventory so the progress count reflects
+        // reality, not a decoupled counter. This keeps the auto-complete
+        // handler (which also inspects inventory) in sync with the client.
+        var currentItems = await itemRepository.GetByOwnerAsync(playerId, ct);
+
+        foreach (var quest in gatherQuests)
+        {
+            var keyword = QuestAutoCompleteService.ExtractItemKeyword(quest.Description);
+            if (keyword is null) continue;
+
+            var matching = QuestAutoCompleteService.FindMatchingItemsForKeyword(currentItems, keyword);
+            // Only broadcast if the just-harvested item actually matches this quest
+            if (!matching.Any(i => i.Name.Equals(harvestedItemName, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            var heldCount = matching.Sum(i => i.IsStackable ? i.Quantity : 1);
+            var required  = QuestAutoCompleteService.ParseItemCount(quest.Description);
+
+            // Keep the shared counter fresh for any server-side consumers
+            questProgressTracker.RecordItemGathered(playerId, quest.QuestId, amount);
+
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("QuestHarvestProgress", new
+                {
+                    QuestId  = quest.QuestId,
+                    Gathered = heldCount,
+                    Required = required,
+                }, ct);
+        }
+    }
+
+    private static bool IsGatherQuest(string title) =>
+        title.Contains("Gather",   StringComparison.OrdinalIgnoreCase)
+     || title.Contains("Collect",  StringComparison.OrdinalIgnoreCase)
+     || title.Contains("Retrieve", StringComparison.OrdinalIgnoreCase)
+     || title.Contains("Bring",    StringComparison.OrdinalIgnoreCase)
+     || title.Contains("Deliver",  StringComparison.OrdinalIgnoreCase);
 }

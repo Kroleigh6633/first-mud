@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | creative-pass-7 | ready-to-merge | content-layer-pilot | Creative pass #7: playbook balance sweep + combat-curves tune + playbook spec rewrites | - | content/combat-curves.json, tools/design/playbooks, docs/design, tests/FirstMud.Tests | 2026-04-13 |
+| worktree-agent-ad504678 | ready-to-merge | main | Auto-quest runner: add `fulfilling` phase + server QuestHarvestProgress event for gather/kill objectives | - | src/FirstMud.Client/src/components/GameTerminal.tsx, src/FirstMud.Client/src/hooks/useGameState.ts, src/FirstMud.Client/src/types/game.ts, src/FirstMud.GameServer/Handlers/HarvestCommandHandler.cs, src/FirstMud.GameServer/Services/QuestAutoCompleteService.cs | 2026-04-13 |
 <!-- agents add rows above this line -->
