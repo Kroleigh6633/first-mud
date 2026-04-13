@@ -11,6 +11,7 @@ public class CraftingService
     private readonly IPlayerRepository _players;
     private readonly IRecipeRepository _recipes;
     private readonly IItemRepository _items;
+    private readonly IHomesteadRepository _homesteads;
 
     // Primes used to diversify per-ingredient seed offset
     private static readonly int[] IngredientPrimes = [17, 31, 47, 61, 79];
@@ -18,11 +19,13 @@ public class CraftingService
     public CraftingService(
         IPlayerRepository players,
         IRecipeRepository recipes,
-        IItemRepository items)
+        IItemRepository items,
+        IHomesteadRepository homesteads)
     {
         _players = players;
         _recipes = recipes;
         _items = items;
+        _homesteads = homesteads;
     }
 
     public async Task<CraftingResult> AttemptCraftAsync(
@@ -42,7 +45,7 @@ public class CraftingService
         if (recipe is null)
             return Fail(CraftingOutcome.NearMiss, "Recipe not found.");
 
-        // Load component items
+        // Load component items — may come from inventory OR homestead storage
         var componentItems = await _items.GetByIdsAsync(componentItemIds, ct);
         if (componentItems.Count != componentItemIds.Count)
             return Fail(CraftingOutcome.NearMiss, "One or more component items could not be found.");
@@ -142,14 +145,40 @@ public class CraftingService
             item.ApplyTaperImbue(taperType, taperQuality, element, polarity);
         }
 
-        // Persist the new item
-        await _items.AddAsync(item, ct);
+        // 8. Place crafted item in inventory (if room) or homestead storage (if inventory full)
+        var inventoryItems = await _items.GetByOwnerAsync(playerId, ct);
+        if (player.CanCarryMore(inventoryItems.Count))
+        {
+            // Room in inventory — add directly to player's inventory
+            item.SetOwner(playerId);
+            await _items.AddAsync(item, ct);
+        }
+        else
+        {
+            // Inventory full — deposit to homestead storage
+            var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+            if (homestead is not null)
+            {
+                await _items.AddAsync(item, ct);
+                var storageEntry = HomesteadStorageItem.Create(homestead.Id, item.Id);
+                await _homesteads.AddStorageItemAsync(storageEntry, ct);
+            }
+            else
+            {
+                // No homestead — just add to inventory regardless of cap
+                item.SetOwner(playerId);
+                await _items.AddAsync(item, ct);
+            }
+        }
 
-        // 8. Discovery check — first discovery flag returned to caller for logging
+        // 9. Discovery check — first discovery flag returned to caller for logging
         string? discoveryRecipeId = isDiscovery ? recipeId : null;
         string message = isDiscovery
             ? $"Extraordinary! You've crafted a variant of {recipe.ResultItemName} — a first discovery!"
             : $"You successfully crafted {item.Name}.";
+
+        if (!player.CanCarryMore(inventoryItems.Count) && await _homesteads.GetByPlayerIdAsync(playerId, ct) is not null)
+            message += " (sent to homestead storage — inventory full)";
 
         return new CraftingResult(
             isDiscovery ? CraftingOutcome.Discovery : CraftingOutcome.Success,
@@ -157,6 +186,33 @@ public class CraftingService
             message,
             isDiscovery,
             discoveryRecipeId);
+    }
+
+    /// <summary>
+    /// Returns storage item counts for a player's homestead, keyed by item name (case-insensitive).
+    /// Used by ViewRecipesCommandHandler to include cross-source availability in the recipe list.
+    /// </summary>
+    public async Task<Dictionary<string, int>> GetStorageItemCountsAsync(
+        Guid playerId,
+        CancellationToken ct = default)
+    {
+        var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
+        if (homestead is null)
+            return [];
+
+        var storageEntries = await _homesteads.GetStorageItemsAsync(homestead.Id, ct);
+        if (storageEntries.Count == 0)
+            return [];
+
+        var storageItemIds = storageEntries.Select(s => s.ItemId).ToList();
+        var storageItems = await _items.GetByIdsAsync(storageItemIds, ct);
+
+        return storageItems
+            .GroupBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(i => i.Quantity > 0 ? i.Quantity : 1),
+                StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<IReadOnlyList<int>> GetSeededQuantitiesAsync(

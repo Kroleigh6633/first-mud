@@ -40,7 +40,7 @@ public class Player
     public Position? SavedReturnPosition { get; private set; }
 
     // Carry capacity
-    private int _maxInventorySlots = 20;
+    private int _maxInventorySlots = 40;
     public int MaxInventorySlots => _maxInventorySlots;
 
     // Per-player crafting seed (never exposed to client directly)

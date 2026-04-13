@@ -69,6 +69,7 @@ builder.Services.AddScoped<ICommandHandler<HarvestCommand>, HarvestCommandHandle
 builder.Services.AddScoped<ICommandHandler<DepositCommand>, DepositCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<WithdrawCommand>, WithdrawCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<OpenStorageCommand>, OpenStorageCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ExpandStorageCommand>, ExpandStorageCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<AutoFarmCommand>, AutoFarmCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SalvageCommand>, SalvageCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SalvageAllCommand>, SalvageAllCommandHandler>();

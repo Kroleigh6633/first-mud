@@ -293,6 +293,12 @@ export interface RecipeIngredient {
   ingredientName: string;
   baseQuantity: number;
   category: string;
+  /** Items of this ingredient held in inventory (undefined if not yet reported by server) */
+  invCount?: number;
+  /** Items of this ingredient in homestead storage (undefined if not yet reported by server) */
+  storageCount?: number;
+  /** Combined total across inventory + storage */
+  totalCount?: number;
 }
 
 export interface RecipeInfo {

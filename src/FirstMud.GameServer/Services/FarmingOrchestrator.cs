@@ -189,11 +189,122 @@ public class FarmingOrchestrator(
             var storageItems = await homesteadRepo.GetStorageItemsAsync(homestead.Id, ct);
             int freeSlots = homestead.StorageSlots - storageItems.Count;
 
+            // ---- STORAGE FULL: auto-salvage to make room before depositing ----
+            if (freeSlots <= 0)
+            {
+                // Refresh player for threshold info
+                var salvagePlayer = await playerRepo.GetByIdAsync(playerId, ct);
+
+                if (salvagePlayer is not null)
+                {
+                    await using var salvageScope = scopeFactory.CreateAsyncScope();
+                    var salvageSvc = salvageScope.ServiceProvider.GetRequiredService<SalvageService>();
+
+                    // Step 1: salvage all non-locked, non-equipped weapons/armor below auto-salvage threshold
+                    var candidates = allItems
+                        .Where(i => !i.IsLocked && !equippedIds.Contains(i.Id))
+                        .Where(i => i.Category == ItemCategory.Weapon || i.Category == ItemCategory.Armor)
+                        .Where(i =>
+                        {
+                            var threshold = i.Category == ItemCategory.Weapon
+                                ? salvagePlayer.AutoSalvageWeaponThreshold
+                                : salvagePlayer.AutoSalvageArmorThreshold;
+                            return threshold > 0 && i.Workmanship.Value <= threshold;
+                        })
+                        .ToList();
+
+                    int autoSalvaged = 0;
+                    foreach (var item in candidates)
+                    {
+                        var result = await salvageSvc.SalvageAsync(playerId, item.Id, ct);
+                        if (result.Success)
+                        {
+                            autoSalvaged++;
+                            autoFarmService.RecordAutoSalvage(playerId);
+                            session.ItemsAutoSalvaged = autoFarmService.GetSession(playerId)?.ItemsAutoSalvaged ?? session.ItemsAutoSalvaged;
+                        }
+                    }
+
+                    if (autoSalvaged > 0)
+                    {
+                        await hubContext.Clients
+                            .Group(playerId.ToString())
+                            .SendAsync("GameMessage", new
+                            {
+                                timestamp = DateTime.UtcNow.ToString("O"),
+                                category  = "system",
+                                text      = $"Auto-farm: storage full — auto-salvaged {autoSalvaged} item(s) below threshold to free space."
+                            }, ct);
+                    }
+
+                    // Step 2: if still no room, salvage the lowest-W non-locked gear
+                    var freshStorageItems = await homesteadRepo.GetStorageItemsAsync(homestead.Id, ct);
+                    freeSlots = homestead.StorageSlots - freshStorageItems.Count;
+
+                    if (freeSlots <= 0)
+                    {
+                        var freshItems = await itemRepo.GetByOwnerAsync(playerId, ct);
+                        var lowestGear = freshItems
+                            .Where(i => !i.IsLocked && !equippedIds.Contains(i.Id))
+                            .Where(i => i.Category == ItemCategory.Weapon || i.Category == ItemCategory.Armor)
+                            .OrderBy(i => i.Workmanship.Value)
+                            .FirstOrDefault();
+
+                        if (lowestGear is not null)
+                        {
+                            var result = await salvageSvc.SalvageAsync(playerId, lowestGear.Id, ct);
+                            if (result.Success)
+                            {
+                                autoFarmService.RecordAutoSalvage(playerId);
+                                session.ItemsAutoSalvaged = autoFarmService.GetSession(playerId)?.ItemsAutoSalvaged ?? session.ItemsAutoSalvaged;
+
+                                await hubContext.Clients
+                                    .Group(playerId.ToString())
+                                    .SendAsync("GameMessage", new
+                                    {
+                                        timestamp = DateTime.UtcNow.ToString("O"),
+                                        category  = "system",
+                                        text      = $"Auto-farm: storage full — salvaged lowest-grade gear ({lowestGear.Name} W{lowestGear.Workmanship.Value}) to free a slot."
+                                    }, ct);
+                            }
+                        }
+                    }
+
+                    // Recompute free slots after salvaging
+                    var postSalvageStorageItems = await homesteadRepo.GetStorageItemsAsync(homestead.Id, ct);
+                    freeSlots = homestead.StorageSlots - postSalvageStorageItems.Count;
+                }
+            }
+            // ---- END STORAGE FULL HANDLING ----
+
+            // Refresh item list after any salvaging
+            allItems = await itemRepo.GetByOwnerAsync(playerId, ct);
+
             foreach (var item in allItems)
             {
                 if (freeSlots <= 0) break;
                 if (equippedIds.Contains(item.Id)) continue;
                 if (item.IsLocked) continue;
+
+                // Materials stack into existing storage stacks; no slot cost for merges
+                if (item.IsStackable)
+                {
+                    var currentStorage = await homesteadRepo.GetStorageItemsAsync(homestead.Id, ct);
+                    var storageItemIds = currentStorage.Select(s => s.ItemId).ToList();
+                    var storageEntities = await itemRepo.GetByIdsAsync(storageItemIds, ct);
+                    var existingStack = storageEntities.FirstOrDefault(s =>
+                        s.Name == item.Name && s.Category == item.Category && s.IsStackable);
+
+                    if (existingStack is not null)
+                    {
+                        existingStack.AddQuantity(item.Quantity);
+                        await itemRepo.UpdateAsync(existingStack, ct);
+                        await itemRepo.DeleteAsync(item.Id, ct);
+                        deposited++;
+                        // No freeSlots decrement — stacking doesn't consume a slot
+                        continue;
+                    }
+                }
 
                 item.SetOwner(null);
                 await itemRepo.UpdateAsync(item, ct);
@@ -203,6 +314,24 @@ public class FarmingOrchestrator(
 
                 deposited++;
                 freeSlots--;
+            }
+
+            // If still full after all salvaging, warn the player
+            if (freeSlots <= 0)
+            {
+                var remainingInv = await itemRepo.GetByOwnerAsync(playerId, ct);
+                var nonEquippedCount = remainingInv.Count(i => !equippedIds.Contains(i.Id) && !i.IsLocked);
+                if (nonEquippedCount > 0)
+                {
+                    await hubContext.Clients
+                        .Group(playerId.ToString())
+                        .SendAsync("GameMessage", new
+                        {
+                            timestamp = DateTime.UtcNow.ToString("O"),
+                            category  = "system",
+                            text      = "Storage and inventory both full. Consider expanding storage (expandstorage command: 20x Wood + 10x Stone = +25 slots) or salvaging more."
+                        }, ct);
+                }
             }
         }
 
@@ -1095,6 +1224,11 @@ public class FarmingOrchestrator(
                     await using var compScope = scopeFactory.CreateAsyncScope();
                     var compHelpers = compScope.ServiceProvider.GetRequiredService<CombatHelpers>();
                     await compHelpers.UpdateCompanionUsageAsync(playerId, 10, farmCt);
+
+                    // Companion capture — 25% per defeated enemy
+                    await using var captureScope = scopeFactory.CreateAsyncScope();
+                    var captureHelpers = captureScope.ServiceProvider.GetRequiredService<CombatHelpers>();
+                    await captureHelpers.TryCaptureCompanionAsync(playerId, encounter, farmCt);
 
                     // Loot — check inventory full before rolling
                     var currentItems = await itemRepo.GetByOwnerAsync(playerId, farmCt);

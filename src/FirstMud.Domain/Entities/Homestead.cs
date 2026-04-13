@@ -15,7 +15,7 @@ public class Homestead
 
     private Homestead() { }
 
-    public static Homestead Create(Guid playerId, string name, int storageSlots = 50)
+    public static Homestead Create(Guid playerId, string name, int storageSlots = 100)
     {
         return new Homestead
         {
@@ -25,6 +25,16 @@ public class Homestead
             StorageSlots = storageSlots,
             SalvageQueue = [],
         };
+    }
+
+    /// <summary>
+    /// Expands storage by the given number of additional slots.
+    /// Called by ExpandStorageCommandHandler after verifying material cost.
+    /// </summary>
+    public void ExpandStorage(int additionalSlots)
+    {
+        if (additionalSlots <= 0) return;
+        StorageSlots += additionalSlots;
     }
 
     /// <summary>

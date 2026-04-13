@@ -12,10 +12,13 @@ namespace FirstMud.GameServer.Handlers;
 /// <summary>
 /// Handles the CraftCommand: validate inputs, delegate to CraftingService,
 /// persist component consumption on loss outcomes, and broadcast the result.
+/// Components may come from inventory (OwnerId set) or homestead storage (OwnerId null).
+/// When consuming a storage-sourced component its HomesteadStorageItem join row is also removed.
 /// </summary>
 public class CraftCommandHandler(
     CraftingService craftingService,
     IItemRepository itemRepository,
+    IHomesteadRepository homesteadRepository,
     GameNotificationService notificationService,
     IHubContext<GameHub> hubContext,
     ILogger<CraftCommandHandler> logger) : ICommandHandler<CraftCommand>
@@ -39,13 +42,25 @@ public class CraftCommandHandler(
 
         if (consumeComponents)
         {
+            // Resolve the player's homestead once (needed to clean up storage join rows)
+            var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+
             foreach (var componentId in cmd.ComponentIds)
             {
                 try
                 {
                     var item = await itemRepository.GetByIdAsync(componentId, ct);
                     if (item is not null)
+                    {
+                        // If the item has no owner it lives in homestead storage —
+                        // remove the join row before deleting the item.
+                        if (item.OwnerId is null && homestead is not null)
+                        {
+                            await homesteadRepository.RemoveStorageItemAsync(homestead.Id, item.Id, ct);
+                        }
+
                         await itemRepository.DeleteAsync(item.Id, ct);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -60,7 +75,14 @@ public class CraftCommandHandler(
                 {
                     var taperItem = await itemRepository.GetByIdAsync(cmd.TaperId.Value, ct);
                     if (taperItem is not null)
+                    {
+                        if (taperItem.OwnerId is null && homestead is not null)
+                        {
+                            await homesteadRepository.RemoveStorageItemAsync(homestead.Id, taperItem.Id, ct);
+                        }
+
                         await itemRepository.DeleteAsync(taperItem.Id, ct);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -75,7 +97,6 @@ public class CraftCommandHandler(
         // If an item was produced, notify the client so the inventory updates
         if (result.ProducedItem is not null)
         {
-            result.ProducedItem.SetOwner(cmd.PlayerId);
             // Item was already persisted by CraftingService; broadcast to client
             await hubContext.Clients
                 .Group(cmd.PlayerId.ToString())
@@ -125,11 +146,15 @@ public class CraftCommandHandler(
 }
 
 /// <summary>
-/// Returns all recipes the player can craft (filtered by crafting skill and current world).
+/// Returns all recipes the player can craft (filtered by crafting skill and current world),
+/// enriched with per-ingredient counts from both inventory and homestead storage so the
+/// client can show availability across both sources without the player needing to withdraw first.
 /// </summary>
 public class ViewRecipesCommandHandler(
     IRecipeRepository recipeRepository,
     IPlayerRepository playerRepository,
+    IItemRepository itemRepository,
+    IHomesteadRepository homesteadRepository,
     IHubContext<GameHub> hubContext) : ICommandHandler<ViewRecipesCommand>
 {
     public async Task<CommandResult> HandleAsync(ViewRecipesCommand cmd, CancellationToken ct)
@@ -140,6 +165,34 @@ public class ViewRecipesCommandHandler(
 
         // Return all recipes the player's crafting skill can attempt
         var recipes = await recipeRepository.GetByCraftingSkillAsync(player.CraftingSkill, ct);
+
+        // Build inventory count map (name → count) from player's carried items
+        var inventoryItems = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+        var invCounts = inventoryItems
+            .GroupBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(i => i.Quantity > 0 ? i.Quantity : 1),
+                StringComparer.OrdinalIgnoreCase);
+
+        // Build storage count map (name → count) from homestead storage
+        var storageCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is not null)
+        {
+            var storageEntries = await homesteadRepository.GetStorageItemsAsync(homestead.Id, ct);
+            if (storageEntries.Count > 0)
+            {
+                var storageItemIds = storageEntries.Select(s => s.ItemId).ToList();
+                var storageItems = await itemRepository.GetByIdsAsync(storageItemIds, ct);
+                storageCounts = storageItems
+                    .GroupBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Sum(i => i.Quantity > 0 ? i.Quantity : 1),
+                        StringComparer.OrdinalIgnoreCase);
+            }
+        }
 
         var dtos = recipes.Select(r => new
         {
@@ -153,11 +206,19 @@ public class ViewRecipesCommandHandler(
             BaseWorkmanshipMin = r.BaseWorkmanshipMin,
             BaseWorkmanshipMax = r.BaseWorkmanshipMax,
             IsDiscoverable = r.IsDiscoverable,
-            Ingredients = r.Ingredients.Select(i => new
+            Ingredients = r.Ingredients.Select(i =>
             {
-                i.IngredientName,
-                i.BaseQuantity,
-                Category = i.Category.ToString(),
+                invCounts.TryGetValue(i.IngredientName, out var invCount);
+                storageCounts.TryGetValue(i.IngredientName, out var storageCount);
+                return new
+                {
+                    i.IngredientName,
+                    i.BaseQuantity,
+                    Category = i.Category.ToString(),
+                    InvCount = invCount,
+                    StorageCount = storageCount,
+                    TotalCount = invCount + storageCount,
+                };
             }).ToList(),
         }).ToList();
 

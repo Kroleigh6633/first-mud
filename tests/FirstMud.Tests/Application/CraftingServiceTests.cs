@@ -84,7 +84,7 @@ public class CraftingServiceTests
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
         recipes.GetByRecipeIdAsync("recipe_basic", Arg.Any<CancellationToken>()).Returns(recipe);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var first = await svc.GetSeededQuantitiesAsync(player.Id, "recipe_basic");
         var second = await svc.GetSeededQuantitiesAsync(player.Id, "recipe_basic");
@@ -109,7 +109,7 @@ public class CraftingServiceTests
         players.GetByIdAsync(player99.Id, Arg.Any<CancellationToken>()).Returns(player99);
         recipes.GetByRecipeIdAsync("recipe_basic", Arg.Any<CancellationToken>()).Returns(recipe);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var qty42 = await svc.GetSeededQuantitiesAsync(player42.Id, "recipe_basic");
         var qty99 = await svc.GetSeededQuantitiesAsync(player99.Id, "recipe_basic");
@@ -127,7 +127,7 @@ public class CraftingServiceTests
 
         players.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Player?)null);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(Guid.NewGuid(), "recipe_basic", [], null);
 
@@ -146,7 +146,7 @@ public class CraftingServiceTests
         players.GetByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
         recipes.GetByRecipeIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Recipe?)null);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "nonexistent", [], null);
 
@@ -173,7 +173,7 @@ public class CraftingServiceTests
         items.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<Item> { component }.AsReadOnly());
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", [componentId], null);
 
@@ -199,7 +199,7 @@ public class CraftingServiceTests
         items.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<Item> { component }.AsReadOnly());
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", [componentId], null);
 
@@ -225,7 +225,7 @@ public class CraftingServiceTests
         items.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<Item> { component }.AsReadOnly());
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         // taperId is null → no taper provided
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", componentIds, null);
@@ -256,7 +256,7 @@ public class CraftingServiceTests
             .Returns(new List<Item> { component }.AsReadOnly());
         items.GetByIdAsync(taperId, Arg.Any<CancellationToken>()).Returns(taperItem);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", componentIds, taperId);
 
@@ -281,7 +281,7 @@ public class CraftingServiceTests
         items.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<Item>().AsReadOnly()); // empty list matches 0 ids
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_mismatch", [], null);
 
@@ -307,7 +307,7 @@ public class CraftingServiceTests
         items.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(matchingComponents.AsReadOnly());
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", componentIds, null);
 
@@ -345,7 +345,7 @@ public class CraftingServiceTests
             .Returns(matchingComponents.AsReadOnly());
         items.GetByIdAsync(taperId, Arg.Any<CancellationToken>()).Returns(taperItem);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", componentIds, taperId);
 
@@ -374,7 +374,7 @@ public class CraftingServiceTests
         items.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<Item> { CreateComponent() }.AsReadOnly()); // only 1 returned for 2 requested
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", [id1, id2], null);
 
@@ -400,7 +400,7 @@ public class CraftingServiceTests
             .Returns(new List<Item> { CreateComponent() }.AsReadOnly());
         items.GetByIdAsync(taperId, Arg.Any<CancellationToken>()).Returns((Item?)null);
 
-        var svc = new CraftingService(players, recipes, items);
+        var svc = new CraftingService(players, recipes, items, Substitute.For<IHomesteadRepository>());
 
         var result = await svc.AttemptCraftAsync(player.Id, "recipe_basic", [componentId], taperId);
 

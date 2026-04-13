@@ -183,6 +183,8 @@ public class GameHub : Hub
 
             "openstorage" => new OpenStorageCommand(playerId),
 
+            "expandstorage" => new ExpandStorageCommand(playerId),
+
             "autofarm" => new AutoFarmCommand(
                 playerId,
                 TryGetNullableIntFromNested(payload, "targetZone", "x"),

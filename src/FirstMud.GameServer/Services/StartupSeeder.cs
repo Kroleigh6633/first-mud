@@ -21,6 +21,7 @@ public class StartupSeeder(
         await FixTrailingCommaEquippedItemsJsonAsync(ct);
         await FixMisassignedEquipmentSlotsAsync(ct);
         await FixFlatStartingStatsAsync(ct);
+        await FixDefaultInventorySlotsAsync(ct);
         await MergeDuplicateStorageStacksAsync(ct);
         await SeedDevPlayerAsync(ct);
         await SeedNeo4jLoreAsync(ct);
@@ -210,6 +211,33 @@ public class StartupSeeder(
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("FixFlatStartingStats: updated {Count} player(s).", flatPlayers.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // Inventory slot fixup
+    // -------------------------------------------------------------------------
+
+    // Players created before the 40-slot default were stored with MaxInventorySlots=20.
+    // Bump those rows to 40 on every startup so existing characters get the larger cap.
+    // Safe to run on every startup — only touches rows where the value is exactly 20.
+    private async Task FixDefaultInventorySlotsAsync(CancellationToken ct)
+    {
+        var conn = db.Database.GetDbConnection();
+        await conn.OpenAsync(ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE Players SET MaxInventorySlots = 40 WHERE MaxInventorySlots = 20";
+            var affected = await cmd.ExecuteNonQueryAsync(ct);
+            if (affected > 0)
+                logger.LogWarning("FixDefaultInventorySlots: updated MaxInventorySlots to 40 for {Count} player(s).", affected);
+            else
+                logger.LogInformation("FixDefaultInventorySlots: no players with MaxInventorySlots=20 found.");
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -561,6 +589,15 @@ public class StartupSeeder(
                 logger.LogInformation("Created homestead for player {Name} ({Id})", player.Name, player.Id);
             }
         }
+
+        // Migrate any legacy homesteads that still have the old 50-slot default to 100
+        var legacyHomesteads = db.Homesteads.Where(h => h.StorageSlots == 50);
+        foreach (var h in legacyHomesteads)
+        {
+            h.ExpandStorage(50);  // 50 → 100
+            logger.LogInformation("Upgraded homestead {Id} storage from 50 to 100 slots", h.Id);
+        }
+
         await db.SaveChangesAsync(ct);
     }
 

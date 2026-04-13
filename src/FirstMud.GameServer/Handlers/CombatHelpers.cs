@@ -432,7 +432,7 @@ public class CombatHelpers(
 
         foreach (var enemy in defeatedEnemies)
         {
-            if (Random.Shared.Next(100) >= 15) continue;
+            if (Random.Shared.Next(100) >= 25) continue;
 
             // Generate a flavourful name for the captured creature
             var companionName = GenerateCapturedName(enemy.Element);

@@ -5,8 +5,97 @@ using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 
 namespace FirstMud.GameServer.Handlers;
+
+/// <summary>
+/// Expands homestead storage by 25 slots in exchange for 20 Wood + 10 Stone from the player's inventory.
+/// No Guard companion is required — this is a pure material cost.
+/// </summary>
+public class ExpandStorageCommandHandler(
+    IPlayerRepository playerRepository,
+    IItemRepository itemRepository,
+    IHomesteadRepository homesteadRepository,
+    GameNotificationService notificationService,
+    IHubContext<GameHub> hubContext,
+    ILogger<ExpandStorageCommandHandler> logger) : ICommandHandler<ExpandStorageCommand>
+{
+    private const int WoodCost  = 20;
+    private const int StoneCost = 10;
+    private const int SlotsGained = 25;
+
+    public async Task<CommandResult> HandleAsync(ExpandStorageCommand cmd, CancellationToken ct)
+    {
+        var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
+        if (player is null)
+            return new CommandResult(false, "Player not found.");
+
+        if (player.Position.X != -100 || player.Position.Y != -100)
+            return new CommandResult(false, "You must be at your homestead to expand storage.");
+
+        var homestead = await homesteadRepository.GetByPlayerIdAsync(cmd.PlayerId, ct);
+        if (homestead is null)
+            return new CommandResult(false, "Homestead not found.");
+
+        // Locate the material stacks in inventory
+        var allItems = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
+
+        var woodStack  = allItems.FirstOrDefault(i =>
+            i.Category == ItemCategory.Component &&
+            i.Name.Equals("Wood", StringComparison.OrdinalIgnoreCase));
+        var stoneStack = allItems.FirstOrDefault(i =>
+            i.Category == ItemCategory.Component &&
+            i.Name.Equals("Stone", StringComparison.OrdinalIgnoreCase));
+
+        int woodAvail  = woodStack?.Quantity  ?? 0;
+        int stoneAvail = stoneStack?.Quantity ?? 0;
+
+        if (woodAvail < WoodCost || stoneAvail < StoneCost)
+        {
+            return new CommandResult(false,
+                $"Expanding storage costs {WoodCost}x Wood + {StoneCost}x Stone. " +
+                $"You have {woodAvail}x Wood and {stoneAvail}x Stone.");
+        }
+
+        // Deduct materials
+        if (woodStack!.Quantity == WoodCost)
+            await itemRepository.DeleteAsync(woodStack.Id, ct);
+        else
+        {
+            woodStack.TryRemoveQuantity(WoodCost, out _);
+            await itemRepository.UpdateAsync(woodStack, ct);
+        }
+
+        if (stoneStack!.Quantity == StoneCost)
+            await itemRepository.DeleteAsync(stoneStack.Id, ct);
+        else
+        {
+            stoneStack.TryRemoveQuantity(StoneCost, out _);
+            await itemRepository.UpdateAsync(stoneStack, ct);
+        }
+
+        // Expand and persist
+        homestead.ExpandStorage(SlotsGained);
+        await homesteadRepository.UpdateAsync(homestead, ct);
+
+        logger.LogInformation(
+            "Player {PlayerId} expanded homestead storage to {Slots} slots (cost: {Wood}x Wood, {Stone}x Stone)",
+            cmd.PlayerId, homestead.StorageSlots, WoodCost, StoneCost);
+
+        var message = $"Storage expanded by {SlotsGained} slots! " +
+                      $"New capacity: {homestead.StorageSlots} base slots. " +
+                      $"(Cost: {WoodCost}x Wood + {StoneCost}x Stone)";
+
+        await notificationService.SendMessageAsync(cmd.PlayerId, "system", message, ct);
+
+        await hubContext.Clients
+            .Group(cmd.PlayerId.ToString())
+            .SendAsync("StorageUpdated", new { homesteadId = homestead.Id }, ct);
+
+        return new CommandResult(true, message);
+    }
+}
 
 public class DepositCommandHandler(
     IPlayerRepository playerRepository,

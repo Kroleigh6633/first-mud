@@ -48,3 +48,4 @@ public record QueueSalvageCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record ViewRecipesCommand(Guid PlayerId) : IGameCommand;
 public record UseConsumableCommand(Guid PlayerId, Guid ItemId) : IGameCommand;
 public record InteractQuestCommand(Guid PlayerId, string QuestId) : IGameCommand;
+public record ExpandStorageCommand(Guid PlayerId) : IGameCommand;

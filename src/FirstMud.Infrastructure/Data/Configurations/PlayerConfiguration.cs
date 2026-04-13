@@ -126,7 +126,7 @@ internal sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
 
         builder.Property(p => p.MaxInventorySlots)
             .HasColumnName("MaxInventorySlots")
-            .HasDefaultValue(20);
+            .HasDefaultValue(40);
 
         // SavedReturnPosition owned type — nullable, stored as 4 nullable columns
         builder.OwnsOne(p => p.SavedReturnPosition, pos =>
