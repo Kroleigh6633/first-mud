@@ -1,12 +1,9 @@
-using FirstMud.GameServer.Commands;
-using FirstMud.GameServer.Services;
-
-namespace FirstMud.GameServer.Handlers;
+namespace FirstMud.Engine.Commands;
 
 /// <summary>
 /// Handles a specific command type. Each implementation is responsible for
-/// exactly one command — satisfying Single Responsibility and Open/Closed
-/// (new commands add a new handler, never modify existing ones).
+/// exactly one command. Register per-command in DI; the dispatcher resolves
+/// the correct handler at runtime.
 /// </summary>
 public interface ICommandHandler<TCommand> where TCommand : IGameCommand
 {

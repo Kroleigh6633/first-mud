@@ -1,8 +1,7 @@
 using FirstMud.Domain.Enums;
+using FirstMud.Engine.Commands;
 
 namespace FirstMud.GameServer.Commands;
-
-public interface IGameCommand { Guid PlayerId { get; } }
 
 public record MoveCommand(Guid PlayerId, int DeltaX, int DeltaY) : IGameCommand;
 public record AttackCommand(Guid PlayerId, Guid TargetId) : IGameCommand;

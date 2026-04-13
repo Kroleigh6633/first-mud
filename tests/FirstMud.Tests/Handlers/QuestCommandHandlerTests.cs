@@ -3,6 +3,7 @@ using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
+using FirstMud.Engine.Commands;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Handlers;
 using FirstMud.GameServer.Hubs;

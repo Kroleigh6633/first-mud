@@ -3,12 +3,16 @@ using FirstMud.Application.Events;
 using FirstMud.Application.Services;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Interfaces;
+using FirstMud.Engine.Commands;
+using FirstMud.Engine.Messaging;
+using FirstMud.Engine.Tick;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Handlers;
 using FirstMud.GameServer.Hubs;
 using FirstMud.GameServer.Services;
 using FirstMud.GameServer.Services.EventOrchestrators;
 using FirstMud.GameServer.Services.Snapshots;
+using FirstMud.GameServer.TickHandlers;
 using FirstMud.Infrastructure;
 using FirstMud.Infrastructure.Data;
 using FirstMud.Infrastructure.Neo4j;
@@ -37,13 +41,20 @@ builder.Services.AddApplicationServices();
 
 // Game services
 builder.Services.AddSingleton<AiPlayerService>();
+
+// Engine: generic command dispatcher + tick loop
+builder.Services.AddScoped<CommandDispatcher>();
 builder.Services.AddSingleton<GameLoopService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoopService>());
+
 builder.Services.AddSingleton<DungeonMasterService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DungeonMasterService>());
-builder.Services.AddScoped<CommandDispatcher>();
 builder.Services.AddScoped<WorldStateService>();
 builder.Services.AddScoped<GameNotificationService>();
+// Expose the SignalR-backed notifier under the engine's abstraction so the
+// generic GameLoopService can broadcast command errors without knowing about
+// IHubContext<GameHub>.
+builder.Services.AddScoped<IGameNotifier>(sp => sp.GetRequiredService<GameNotificationService>());
 builder.Services.AddScoped<StartupSeeder>();
 
 // Snapshot services — single source of truth for building Inventory/Storage/City/Companion payloads
@@ -65,6 +76,16 @@ builder.Services.AddScoped<IGameEventSubscriber<StorageChangedEvent>>(sp => sp.G
 builder.Services.AddScoped<IGameEventSubscriber<CompanionStateChangedEvent>>(sp => sp.GetRequiredService<CompanionListOrchestrator>());
 builder.Services.AddScoped<IGameEventSubscriber<CompanionStateChangedEvent>>(sp => sp.GetRequiredService<CityRefreshOrchestrator>());
 builder.Services.AddScoped<IGameEventSubscriber<CityStateChangedEvent>>(sp => sp.GetRequiredService<CityRefreshOrchestrator>());
+
+// Tick handlers — each is one periodic job the loop fires on its own cadence.
+builder.Services.AddScoped<ITickHandler, AiPlayerTickHandler>();
+builder.Services.AddScoped<ITickHandler, AutomationSweepTickHandler>();
+builder.Services.AddScoped<ITickHandler, HomesteadHealTickHandler>();
+builder.Services.AddScoped<ITickHandler, WeaveRegenTickHandler>();
+builder.Services.AddScoped<ITickHandler, HomesteadCompanionTickHandler>();
+builder.Services.AddScoped<ITickHandler, CompanionDriftTickHandler>();
+builder.Services.AddScoped<ITickHandler, BuildingConstructionTickHandler>();
+builder.Services.AddScoped<ITickHandler, ResourceRegenTickHandler>();
 
 // Shared combat utilities and farming orchestrator
 builder.Services.AddScoped<CombatHelpers>();

@@ -155,16 +155,6 @@ function buildingColor(type: BuildingType): string {
   }
 }
 
-function AptitudeStars({ count }: { count: number }) {
-  return (
-    <span>
-      {Array.from({ length: 3 }, (_, i) => (
-        <span key={i} style={{ color: i < count ? '#ffcc00' : '#333333', fontSize: '10px' }}>★</span>
-      ))}
-    </span>
-  );
-}
-
 function constructionTimeStr(pct: number): string {
   const remainingPercent = 100 - pct;
   const minutesRemaining = Math.ceil(remainingPercent / 5); // 5% per minute per builder
@@ -214,15 +204,6 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
   const isHousing = HOUSING_TYPES.has(building.type);
   const duty = isHousing ? undefined : BUILDING_DUTY[building.type];
   const workerCapacity = WORKER_CAPACITY[building.type] ?? 1;
-
-  // Sort available companions by aptitude for this building's duty (best first)
-  const sorted = duty
-    ? [...availableCompanions].sort((a, b) => {
-        const aApt = APTITUDE[a.type]?.[duty] ?? 1;
-        const bApt = APTITUDE[b.type]?.[duty] ?? 1;
-        return bApt - aApt;
-      })
-    : [];
 
   const handleAssign = () => {
     if (!selectedCompanionId) return;

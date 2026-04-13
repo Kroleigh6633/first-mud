@@ -1,9 +1,10 @@
+using FirstMud.Engine.Messaging;
 using FirstMud.GameServer.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
 namespace FirstMud.GameServer.Services;
 
-public class GameNotificationService(IHubContext<GameHub> hubContext)
+public class GameNotificationService(IHubContext<GameHub> hubContext) : IGameNotifier
 {
     /// <summary>
     /// Send a colored game message to a player's SignalR group.
