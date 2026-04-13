@@ -117,7 +117,7 @@ const LAYER_THRESHOLDS: Record<CompanionType, number[]> = {
   BoundShade:       [0, 300, 700, 1500, 3000, 6000],
 };
 
-function LayerStars({ layer }: { layer: number }) {
+function BondStars({ layer }: { layer: number }) {
   return (
     <span>
       {Array.from({ length: 6 }, (_, i) => (
@@ -127,13 +127,31 @@ function LayerStars({ layer }: { layer: number }) {
   );
 }
 
+function companionStatusLabel(companion: CompanionState): { label: string; color: string } {
+  if (companion.isActive) {
+    return { label: 'ACTIVE (adventuring)', color: '#00ff41' };
+  }
+  if (companion.assignedDuty) {
+    const dutyColors: Record<string, string> = {
+      Guard:     '#ccaa44',
+      Harvester: '#ccaa44',
+      Salvager:  '#ccaa44',
+      Crafter:   '#ccaa44',
+    };
+    const color = dutyColors[companion.assignedDuty] ?? '#ccaa44';
+    return { label: `${companion.assignedDuty.toUpperCase()} (homestead)`, color };
+  }
+  return { label: 'IDLE', color: '#ff4444' };
+}
+
 function CompanionRow({ companion }: { companion: CompanionState }) {
   const isDrifting = companion.driftAccumulator >= 30;
   const isDanger   = companion.driftAccumulator >= 40;
+  const status = companionStatusLabel(companion);
 
   const layerBarContent = (() => {
     if (companion.currentLayer >= 6) {
-      return <span style={{ color: '#ffcc00' }}>MAX</span>;
+      return <span style={{ color: '#ffcc00' }}>MAX ✦</span>;
     }
     const thresholds = LAYER_THRESHOLDS[companion.type] ?? LAYER_THRESHOLDS.Wildfolk;
     const current = thresholds[companion.currentLayer - 1] ?? 0;
@@ -150,23 +168,24 @@ function CompanionRow({ companion }: { companion: CompanionState }) {
 
   return (
     <div style={{ marginBottom: '4px', fontSize: '11px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
         <span style={{ color: companionElementColor(companion.element) }}>
           [{companionTypeIcon(companion.type)}]
         </span>
         <span style={{ color: '#00ccff' }}>{companion.name}</span>
-        <LayerStars layer={companion.currentLayer} />
+        <BondStars layer={companion.currentLayer} />
+        <span style={{ color: status.color, fontSize: '10px' }}>{status.label}</span>
         {isDrifting && (
           <span style={{ color: isDanger ? '#ff4444' : '#ff8800', fontSize: '10px' }}>
-            {isDanger ? '⚠ DANGER' : '⚠ Drifting!'}
+            {isDanger ? '⚠ DANGER' : '⚠ drifting'}
           </span>
         )}
       </div>
       <div style={{ color: '#555555', paddingLeft: '4px' }}>
-        Lv.{companion.level} {companion.type} · L{companion.currentLayer}
+        Lv.{companion.level} {companion.type} · Bond {companion.currentLayer}
       </div>
       <div style={{ paddingLeft: '4px' }}>
-        <span style={{ color: '#888888' }}>Layer: </span>
+        <span style={{ color: '#888888' }}>Bond: </span>
         {layerBarContent}
       </div>
     </div>
@@ -341,33 +360,32 @@ export default function StatusPanel({ player, currentTile, equipment, companionR
         </div>
       ))}
 
-      <div style={sectionHeaderStyle}>Companions <span style={{ color: '#555555', fontWeight: 'normal' }}>[B]</span></div>
-      {(player.activeCompanions?.length ?? 0) === 0 ? (
-        <div style={{ color: '#888888', fontSize: '11px' }}>
-          {player.activeCompanionIds.length === 0 ? 'None active' : `${player.activeCompanionIds.length} active`}
-        </div>
+      <div style={sectionHeaderStyle}>
+        Companions [{companionRoster.length > 0 ? companionRoster.length : (player.activeCompanions?.length ?? 0)}]
+        {' '}<span style={{ color: '#555555', fontWeight: 'normal' }}>[B]</span>
+      </div>
+      {companionRoster.length > 0 ? (
+        companionRoster
+          .slice()
+          .sort((a, b) => {
+            // Active first, then homestead, then idle; within group sort by layer desc
+            const rank = (c: CompanionState) => c.isActive ? 0 : c.assignedDuty ? 1 : 2;
+            const r = rank(a) - rank(b);
+            return r !== 0 ? r : b.currentLayer - a.currentLayer;
+          })
+          .map(companion => (
+            <CompanionRow key={companion.id} companion={companion} />
+          ))
+      ) : (player.activeCompanions?.length ?? 0) === 0 ? (
+        <div style={{ color: '#888888', fontSize: '11px' }}>No companions</div>
       ) : (
-        player.activeCompanions!.map(companion => (
-          <CompanionRow key={companion.id} companion={companion} />
-        ))
+        player.activeCompanions!
+          .slice()
+          .sort((a, b) => b.currentLayer - a.currentLayer)
+          .map(companion => (
+            <CompanionRow key={companion.id} companion={companion} />
+          ))
       )}
-
-      {/* Homestead companions */}
-      {(() => {
-        const homesteadCompanions = companionRoster.filter(c => c.assignedDuty && !c.isActive);
-        if (homesteadCompanions.length === 0) return null;
-        return (
-          <div style={{ marginTop: '4px', fontSize: '11px' }}>
-            <div style={{ color: '#555555', fontSize: '10px', marginBottom: '3px' }}>HOMESTEAD DUTY</div>
-            {homesteadCompanions.map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                <span style={{ color: '#aaaaaa' }}>{c.name}</span>
-                <span style={{ color: '#ccaa44' }}>{c.assignedDuty}</span>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
 
       <div style={sectionHeaderStyle}>Portals</div>
       {player.unlockedPortals.length === 0 ? (

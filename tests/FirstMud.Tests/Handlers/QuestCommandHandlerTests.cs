@@ -180,8 +180,9 @@ public class QuestCommandHandlerTests
         questGraph.GetUnlockedByCompletionAsync(quest.QuestId, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new List<QuestNode>().AsReadOnly());
 
+        var autoComplete = new QuestAutoCompleteService(questGraph, itemRepo, players, questService, progressTracker, hub);
         var handler = new InteractQuestCommandHandler(
-            players, itemRepo, questService, questGraph, progressTracker, hub,
+            itemRepo, questGraph, progressTracker, autoComplete, hub,
             NullLogger<InteractQuestCommandHandler>.Instance);
 
         // Act
@@ -209,8 +210,9 @@ public class QuestCommandHandlerTests
         questGraph.GetQuestAsync(quest.QuestId, Arg.Any<CancellationToken>()).Returns(quest);
         questGraph.IsQuestInProgressAsync(player.Id, quest.QuestId, Arg.Any<CancellationToken>()).Returns(false);
 
+        var autoComplete = new QuestAutoCompleteService(questGraph, itemRepo, players, questService, progressTracker, hub);
         var handler = new InteractQuestCommandHandler(
-            players, itemRepo, questService, questGraph, progressTracker, hub,
+            itemRepo, questGraph, progressTracker, autoComplete, hub,
             NullLogger<InteractQuestCommandHandler>.Instance);
 
         // Act
@@ -244,8 +246,9 @@ public class QuestCommandHandlerTests
         questGraph.GetQuestAsync(quest.QuestId, Arg.Any<CancellationToken>()).Returns(quest);
         questGraph.IsQuestInProgressAsync(player.Id, quest.QuestId, Arg.Any<CancellationToken>()).Returns(true);
 
+        var autoComplete = new QuestAutoCompleteService(questGraph, itemRepo, players, questService, progressTracker, hub);
         var handler = new InteractQuestCommandHandler(
-            players, itemRepo, questService, questGraph, progressTracker, hub,
+            itemRepo, questGraph, progressTracker, autoComplete, hub,
             NullLogger<InteractQuestCommandHandler>.Instance);
 
         // Act

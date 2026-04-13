@@ -13,44 +13,44 @@ interface Props {
 
 const ABILITY_LABELS: Record<CompanionType, string[]> = {
   Wildfolk: [
-    'L1: Elemental Touch (attack)',
-    'L2: Nature Mend (heal ally)',
-    'L3: Elemental Strike (medium attack)',
-    'L4: Pack Bond (party buff)',
-    'L5: Wild Revive (revive ally)',
-    'L6: Elemental Storm (AOE ultimate)',
+    'Bond 1: Elemental Touch (attack)',
+    'Bond 2: Nature Mend (heal ally)',
+    'Bond 3: Elemental Strike (medium attack)',
+    'Bond 4: Pack Bond (party buff)',
+    'Bond 5: Wild Revive (revive ally)',
+    'Bond 6: Elemental Storm (AOE ultimate)',
   ],
   CapturedMonster: [
-    'L1: Claw (physical attack)',
-    'L2: Elemental Breath (medium attack)',
-    'L3: Frenzy (high damage)',
-    'L4: Terrify (debuff enemy)',
-    'L5: Devour (lifesteal)',
-    'L6: Rampage (triple-hit ultimate)',
+    'Bond 1: Claw (physical attack)',
+    'Bond 2: Elemental Breath (medium attack)',
+    'Bond 3: Frenzy (high damage)',
+    'Bond 4: Terrify (debuff enemy)',
+    'Bond 5: Devour (lifesteal)',
+    'Bond 6: Rampage (triple-hit ultimate)',
   ],
   ArdweldConstruct: [
-    'L1: Shield Bash (low damage)',
-    'L2: Protect (redirect damage to self)',
-    'L3: Repair (self-heal)',
-    'L4: Fortify (party buff)',
-    'L5: Reflect (return damage)',
-    'L6: Aegis (absorb hits ultimate)',
+    'Bond 1: Shield Bash (low damage)',
+    'Bond 2: Protect (redirect damage to self)',
+    'Bond 3: Repair (self-heal)',
+    'Bond 4: Fortify (party buff)',
+    'Bond 5: Reflect (return damage)',
+    'Bond 6: Aegis (absorb hits ultimate)',
   ],
   HiredHero: [
-    'L1: Sword Strike (physical)',
-    'L2: Quick Shot (ranged)',
-    'L3: Battle Cry (party buff)',
-    'L4: Tactical Strike (targets weakest foe)',
-    'L5: Rally (party heal)',
-    'L6: Commander (extra actions ultimate)',
+    'Bond 1: Sword Strike (physical)',
+    'Bond 2: Quick Shot (ranged)',
+    'Bond 3: Battle Cry (party buff)',
+    'Bond 4: Tactical Strike (targets weakest foe)',
+    'Bond 5: Rally (party heal)',
+    'Bond 6: Commander (extra actions ultimate)',
   ],
   BoundShade: [
-    'L1: Sword Strike (physical)',
-    'L2: Quick Shot (ranged)',
-    'L3: Battle Cry (party buff)',
-    'L4: Tactical Strike (targets weakest foe)',
-    'L5: Rally (party heal)',
-    'L6: Commander (extra actions ultimate)',
+    'Bond 1: Sword Strike (physical)',
+    'Bond 2: Quick Shot (ranged)',
+    'Bond 3: Battle Cry (party buff)',
+    'Bond 4: Tactical Strike (targets weakest foe)',
+    'Bond 5: Rally (party heal)',
+    'Bond 6: Commander (extra actions ultimate)',
   ],
 };
 
@@ -100,7 +100,7 @@ function typeIcon(type: CompanionType): string {
   }
 }
 
-// ---- Layer stars -------------------------------------------------------------
+// ---- Bond stars -------------------------------------------------------------
 
 function LayerStars({ layer }: { layer: number }) {
   return (
@@ -140,7 +140,7 @@ const LAYER_THRESHOLDS: Record<CompanionType, number[]> = {
 
 function UsageBar({ type, layer, usage }: { type: CompanionType; layer: number; usage: number }) {
   if (layer >= 6) {
-    return <span style={{ color: '#ffcc00', fontSize: '10px' }}>MAX LAYER</span>;
+    return <span style={{ color: '#ffcc00', fontSize: '10px' }}>Bond: MAX ✦</span>;
   }
   const thresholds = LAYER_THRESHOLDS[type] ?? LAYER_THRESHOLDS.Wildfolk;
   const current = thresholds[layer - 1] ?? 0;
@@ -422,12 +422,12 @@ function CompanionCard({
         Lv.{companion.level}
         {'  '}
         <LayerStars layer={companion.currentLayer} />
-        {' '}Layer {companion.currentLayer}
+        {' '}Bond {companion.currentLayer}
       </div>
 
-      {/* Layer progress bar */}
+      {/* Bond progress bar */}
       <div style={{ marginBottom: '4px' }}>
-        <span style={{ color: '#666666', fontSize: '10px', marginRight: '4px' }}>Progress:</span>
+        <span style={{ color: '#666666', fontSize: '10px', marginRight: '4px' }}>Bond:</span>
         <UsageBar type={companion.type} layer={companion.currentLayer} usage={companion.usageCounter} />
       </div>
 
@@ -689,7 +689,12 @@ export default function CompanionPanel({ companions, onActivate, onDeactivate, o
         {/* Strategy note */}
         <div style={{ padding: '6px 14px', fontSize: '11px', color: '#888888', borderBottom: '1px solid #1a1a1a' }}>
           Choose 3 companions to adventure — or assign inactive companions to homestead duty for passive income.
-          Higher layers = stronger combat abilities. Use-or-lose: idle companions drift and lose layers.
+          Higher bond = stronger combat abilities. Use-or-lose: idle companions drift and lose bond.
+        </div>
+        {/* Bond tooltip */}
+        <div style={{ padding: '4px 14px 6px', fontSize: '10px', color: '#555555', borderBottom: '1px solid #1a1a1a' }}>
+          <span style={{ color: '#666666' }}>Bond level (1–6).</span>{' '}
+          Higher bond = stronger abilities. Increases through combat (+10) and homestead duty (+3). Idle companions drift and lose bond.
         </div>
 
         {companions.length === 0 && (

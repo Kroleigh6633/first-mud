@@ -244,21 +244,13 @@ public class GetAvailableQuestsCommandHandler(
 ///   deliver  — Deliver / Escort / Bring
 /// </summary>
 public class InteractQuestCommandHandler(
-    IPlayerRepository playerRepository,
     IItemRepository itemRepository,
-    QuestService questService,
     IQuestGraphRepository questGraphRepository,
     QuestProgressTracker progressTracker,
+    QuestAutoCompleteService questAutoCompleteService,
     IHubContext<GameHub> hubContext,
     ILogger<InteractQuestCommandHandler> logger) : ICommandHandler<InteractQuestCommand>
 {
-    // Number of kills required before a kill quest is completable.
-    // Quest description may embed a number like "defeat 5 bandits"; we try to parse it.
-    private const int DefaultKillsRequired = 3;
-
-    // Number of matching inventory items required for gather/deliver quests.
-    private const int DefaultGatherRequired = 3;
-
     // -----------------------------------------------------------------------
     // Lore text fragments for explore completions
     // -----------------------------------------------------------------------
@@ -297,8 +289,6 @@ public class InteractQuestCommandHandler(
 
         if (!inProgress)
             return new CommandResult(false, "You have not accepted this quest.");
-
-        var firstOutcome = quest.PossibleOutcomes.FirstOrDefault() ?? "Success";
 
         // ── 2. Determine quest type ────────────────────────────────────────
         var questType = GetQuestType(quest.Title);
@@ -364,45 +354,7 @@ public class InteractQuestCommandHandler(
             return new CommandResult(false, failReason);
         }
 
-        // ── 5. Consume gathered/delivered items from inventory ─────────────
-        if (questType is "gather" or "deliver")
-        {
-            var keyword  = ExtractItemKeyword(quest.Description);
-            var required = ParseItemCount(quest.Description);
-
-            if (keyword is not null)
-            {
-                var items    = await itemRepository.GetByOwnerAsync(cmd.PlayerId, ct);
-                var matching = items
-                    .Where(i => i.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                var toConsume = required;
-                foreach (var item in matching)
-                {
-                    if (toConsume <= 0) break;
-                    if (item.IsStackable && item.Quantity > 1)
-                    {
-                        var take = Math.Min(toConsume, item.Quantity);
-                        if (item.TryRemoveQuantity(take, out var remaining))
-                        {
-                            if (remaining <= 0)
-                                await itemRepository.DeleteAsync(item.Id, ct);
-                            else
-                                await itemRepository.UpdateAsync(item, ct);
-                            toConsume -= take;
-                        }
-                    }
-                    else
-                    {
-                        await itemRepository.DeleteAsync(item.Id, ct);
-                        toConsume--;
-                    }
-                }
-            }
-        }
-
-        // ── 6. Broadcast immersive completion text ─────────────────────────
+        // ── 5. Broadcast immersive completion text ─────────────────────────
         var completionNarrative = BuildCompletionNarrative(questType, quest.Title, quest.Description);
         await hubContext.Clients
             .Group(cmd.PlayerId.ToString())
@@ -413,158 +365,31 @@ public class InteractQuestCommandHandler(
                 text      = completionNarrative,
             }, ct);
 
-        // ── 7. Complete the quest via QuestService (rep + XP + events) ─────
-        var result = await questService.CompleteQuestAsync(cmd.PlayerId, cmd.QuestId, firstOutcome, ct);
-        if (!result.Success)
-            return new CommandResult(false, result.Message);
+        // ── 6-9. Delegate shared completion (consume items, award rep/XP, broadcast) ──
+        var completed = await questAutoCompleteService.TryCompleteQuestAsync(
+            cmd.PlayerId, cmd.QuestId, autoFarmMode: false, ct);
 
-        // ── 8. Clear in-memory progress ────────────────────────────────────
-        progressTracker.Clear(cmd.PlayerId, cmd.QuestId);
+        if (!completed)
+            return new CommandResult(false, "Quest could not be completed at this time.");
 
-        // ── 9. Notify client ───────────────────────────────────────────────
-        var player = await playerRepository.GetByIdAsync(cmd.PlayerId, ct);
-
-        var questXp = result.ReputationGained * 2;
-        if (questXp > 0 && player is not null)
-        {
-            player.GainExperience(questXp);
-            await playerRepository.UpdateAsync(player, ct);
-
-            await hubContext.Clients
-                .Group(cmd.PlayerId.ToString())
-                .SendAsync("GameMessage", new
-                {
-                    timestamp = DateTime.UtcNow.ToString("O"),
-                    category  = "quest",
-                    text      = $"You gained {questXp} experience!",
-                }, ct);
-        }
-
-        var questCompletedPayload = new
-        {
-            cmd.PlayerId,
-            QuestId         = cmd.QuestId,
-            result.Message,
-            result.ReputationGained,
-            UnlockedQuests  = result.UnlockedQuests.Select(q => q.QuestId).ToList(),
-            result.WyrdSettled,
-        };
-
-        await hubContext.Clients
-            .Group(cmd.PlayerId.ToString())
-            .SendAsync("QuestCompleted", questCompletedPayload, ct);
-
-        if (player is not null)
-        {
-            var factionTiers = player.Reputations.ToDictionary(
-                r => r.FactionId.ToString(),
-                r => r.Score.Tier.ToString());
-
-            await hubContext.Clients
-                .Group(cmd.PlayerId.ToString())
-                .SendAsync("ReputationChanged", new { cmd.PlayerId, FactionTiers = factionTiers }, ct);
-
-            // Bubble any domain events (level-up, portal-unlock, etc.)
-            foreach (var domainEvent in player.DomainEvents)
-            {
-                switch (domainEvent)
-                {
-                    case PortalUnlockedEvent portalEvent:
-                        await hubContext.Clients
-                            .Group(cmd.PlayerId.ToString())
-                            .SendAsync("PortalUnlocked", new
-                            {
-                                PlayerId = portalEvent.PlayerId,
-                                WorldId  = portalEvent.WorldId.ToString(),
-                                Message  = $"Portal to {portalEvent.WorldId} unlocked!",
-                            }, ct);
-                        break;
-
-                    case PlayerLeveledUpEvent levelEvent:
-                        await hubContext.Clients
-                            .Group(cmd.PlayerId.ToString())
-                            .SendAsync("PlayerLeveledUp", new
-                            {
-                                PlayerId = levelEvent.PlayerId,
-                                NewLevel = levelEvent.NewLevel,
-                                Message  = $"You reached level {levelEvent.NewLevel}!",
-                            }, ct);
-                        break;
-                }
-            }
-
-            player.ClearDomainEvents();
-        }
-
-        // Refresh the quest log so the completed quest is removed
-        await hubContext.Clients
-            .Group(cmd.PlayerId.ToString())
-            .SendAsync("CommandReceived", new { command = "getquests" }, ct);
-
-        return new CommandResult(true, result.Message, questCompletedPayload);
+        return new CommandResult(true, $"Quest '{quest.Title}' completed.");
     }
 
     // -----------------------------------------------------------------------
-    // Helpers
+    // Helpers — delegate to QuestAutoCompleteService for shared logic
     // -----------------------------------------------------------------------
 
-    private static string GetQuestType(string title) => title switch
-    {
-        var t when t.Contains("Defeat", StringComparison.OrdinalIgnoreCase)
-                || t.Contains("Slay",    StringComparison.OrdinalIgnoreCase)
-                || t.Contains("Hunt",    StringComparison.OrdinalIgnoreCase)   => "kill",
+    private static string GetQuestType(string title)
+        => QuestAutoCompleteService.GetQuestType(title);
 
-        var t when t.Contains("Gather",   StringComparison.OrdinalIgnoreCase)
-                || t.Contains("Collect",  StringComparison.OrdinalIgnoreCase)
-                || t.Contains("Retrieve", StringComparison.OrdinalIgnoreCase)  => "gather",
-
-        var t when t.Contains("Deliver",  StringComparison.OrdinalIgnoreCase)
-                || t.Contains("Escort",   StringComparison.OrdinalIgnoreCase)
-                || t.Contains("Bring",    StringComparison.OrdinalIgnoreCase)  => "deliver",
-
-        _ => "explore"   // Investigate / Explore / Uncover / anything else
-    };
-
-    /// <summary>
-    /// Tries to parse a number from the description, e.g. "defeat 5 bandits" → 5.
-    /// Falls back to <see cref="DefaultKillsRequired"/>.
-    /// </summary>
     private static int ParseKillCount(string description)
-    {
-        var match = Regex.Match(description, @"\b(\d+)\b");
-        return match.Success && int.TryParse(match.Value, out var n) && n > 0 ? n : DefaultKillsRequired;
-    }
+        => QuestAutoCompleteService.ParseKillCount(description);
 
-    /// <summary>Same as ParseKillCount but for gather/deliver quantities.</summary>
     private static int ParseItemCount(string description)
-    {
-        var match = Regex.Match(description, @"\b(\d+)\b");
-        return match.Success && int.TryParse(match.Value, out var n) && n > 0 ? n : DefaultGatherRequired;
-    }
+        => QuestAutoCompleteService.ParseItemCount(description);
 
-    /// <summary>
-    /// Extracts a single relevant noun from the quest description for inventory matching.
-    /// E.g. "Gather 3 units of thornweed" → "thornweed".
-    /// Very simple: takes the last 'significant' word after known quantity phrases.
-    /// </summary>
     private static string? ExtractItemKeyword(string description)
-    {
-        // Strip leading digits and common filler words to get a resource noun.
-        var lower = description.ToLowerInvariant();
-
-        // Patterns like "gather N units of X", "collect N X", "retrieve the X"
-        var match = Regex.Match(lower,
-            @"\b(?:gather|collect|retrieve|bring|deliver|find|obtain)\b[\w\s]*\bof\s+([a-z]+)",
-            RegexOptions.IgnoreCase);
-        if (match.Success) return match.Groups[1].Value;
-
-        match = Regex.Match(lower,
-            @"\b(?:gather|collect|retrieve|bring|deliver|find|obtain)\s+(?:\d+\s+)?(?:units?\s+of\s+)?([a-z]{4,})",
-            RegexOptions.IgnoreCase);
-        if (match.Success) return match.Groups[1].Value;
-
-        return null;
-    }
+        => QuestAutoCompleteService.ExtractItemKeyword(description);
 
     private static string BuildCompletionNarrative(string questType, string title, string description)
     {

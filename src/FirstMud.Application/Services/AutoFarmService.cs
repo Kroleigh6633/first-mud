@@ -18,6 +18,7 @@ public record AutoFarmSession(
     public int ItemsFound { get; set; }
     public int ItemsAutoSalvaged { get; set; }
     public int ItemsDeposited { get; set; }
+    public int QuestsCompleted { get; set; }
 
     /// <summary>Current loop state: idle | walking | fighting | resting | depositing</summary>
     public string FarmState { get; set; } = "idle";
@@ -101,6 +102,10 @@ public class AutoFarmService
     public void RecordDeposit(Guid playerId, int count) =>
         _sessions.GetValueOrDefault(playerId)
             ?.Let(s => s.ItemsDeposited += count);
+
+    public void RecordQuestComplete(Guid playerId) =>
+        _sessions.GetValueOrDefault(playerId)
+            ?.Let(s => s.QuestsCompleted++);
 
     public void SetState(Guid playerId, string state) =>
         _sessions.GetValueOrDefault(playerId)

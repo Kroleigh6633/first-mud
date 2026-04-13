@@ -392,6 +392,7 @@ public class FarmingOrchestrator(
                 items     = session.ItemsFound,
                 salvaged  = session.ItemsAutoSalvaged,
                 deposited = session.ItemsDeposited,
+                quests    = session.QuestsCompleted,
                 biome,
                 dangerLevel
             }, ct);
@@ -750,6 +751,19 @@ public class FarmingOrchestrator(
                     await using var walkScope = scopeFactory.CreateAsyncScope();
                     var walkHelpers = walkScope.ServiceProvider.GetRequiredService<CombatHelpers>();
                     await walkHelpers.UpdateCompanionUsageAsync(playerId, 1, farmCt);
+                }
+
+                // --- AUTO-COMPLETE explore quests after each move step ---
+                await using (var exploreQuestScope = scopeFactory.CreateAsyncScope())
+                {
+                    var exploreQuestSvc = exploreQuestScope.ServiceProvider.GetRequiredService<QuestAutoCompleteService>();
+                    var exploreQuestsCompleted = await exploreQuestSvc.TryAutoCompleteQuestsAsync(playerId, farmCt);
+                    if (exploreQuestsCompleted > 0)
+                    {
+                        for (int _q = 0; _q < exploreQuestsCompleted; _q++)
+                            autoFarmService.RecordQuestComplete(playerId);
+                        session.QuestsCompleted = autoFarmService.GetSession(playerId)?.QuestsCompleted ?? session.QuestsCompleted;
+                    }
                 }
 
                 // --- HARVEST resource nodes (skipped for combat-only priority) ---
@@ -1112,7 +1126,8 @@ public class FarmingOrchestrator(
                             kills     = session.Kills,
                             items     = session.ItemsFound,
                             salvaged  = session.ItemsAutoSalvaged,
-                            deposited = session.ItemsDeposited
+                            deposited = session.ItemsDeposited,
+                            quests    = session.QuestsCompleted
                         }, serverCt);
                     return;
                 }
@@ -1354,6 +1369,19 @@ public class FarmingOrchestrator(
                         }
                     }
 
+                    // --- AUTO-COMPLETE QUESTS (kill / gather quests after each victory) ---
+                    await using (var questCompScope = scopeFactory.CreateAsyncScope())
+                    {
+                        var questCompSvc = questCompScope.ServiceProvider.GetRequiredService<QuestAutoCompleteService>();
+                        var questsCompletedThisFight = await questCompSvc.TryAutoCompleteQuestsAsync(playerId, farmCt);
+                        if (questsCompletedThisFight > 0)
+                        {
+                            for (int _q = 0; _q < questsCompletedThisFight; _q++)
+                                autoFarmService.RecordQuestComplete(playerId);
+                            session.QuestsCompleted = autoFarmService.GetSession(playerId)?.QuestsCompleted ?? session.QuestsCompleted;
+                        }
+                    }
+
                     // --- REST between fights ---
                     autoFarmService.SetState(playerId, "resting");
                     await BroadcastStatusAsync(playerId, session, "resting", biome, dangerLevel, farmCt);
@@ -1383,7 +1411,7 @@ public class FarmingOrchestrator(
                         {
                             timestamp = DateTime.UtcNow.ToString("O"),
                             category = "system",
-                            text = $"Auto-farm: {session.Kills} kill(s), {session.ItemsFound} item(s) kept, {session.ItemsAutoSalvaged} auto-salvaged, {session.ItemsDeposited} deposited."
+                            text = $"Auto-farm: Kills: {session.Kills}, Items: {session.ItemsFound}, Quests: {session.QuestsCompleted} | salvaged: {session.ItemsAutoSalvaged}, deposited: {session.ItemsDeposited}."
                         }, farmCt);
                 }
             }
@@ -1435,6 +1463,7 @@ public class FarmingOrchestrator(
             var items     = finalSession?.ItemsFound        ?? session.ItemsFound;
             var salvaged  = finalSession?.ItemsAutoSalvaged ?? session.ItemsAutoSalvaged;
             var deposited = finalSession?.ItemsDeposited    ?? session.ItemsDeposited;
+            var quests    = finalSession?.QuestsCompleted   ?? session.QuestsCompleted;
             autoFarmService.EndSession(playerId);
 
             await hubContext.Clients
@@ -1443,7 +1472,7 @@ public class FarmingOrchestrator(
                 {
                     timestamp = DateTime.UtcNow.ToString("O"),
                     category = "system",
-                    text = $"Auto-farm stopped: {kills} kill(s), {items} item(s) kept, {salvaged} auto-salvaged, {deposited} deposited."
+                    text = $"Auto-farm stopped: Kills: {kills}, Items: {items}, Quests: {quests} | salvaged: {salvaged}, deposited: {deposited}."
                 }, serverCt);
 
             await hubContext.Clients
@@ -1454,7 +1483,8 @@ public class FarmingOrchestrator(
                     kills,
                     items,
                     salvaged,
-                    deposited
+                    deposited,
+                    quests
                 }, serverCt);
         }
     }

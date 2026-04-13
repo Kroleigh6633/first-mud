@@ -49,6 +49,7 @@ builder.Services.AddScoped<FarmingOrchestrator>();
 
 // Quest objective interaction
 builder.Services.AddSingleton<QuestProgressTracker>();
+builder.Services.AddScoped<QuestAutoCompleteService>();
 
 // Command handlers — one per command type (ICommandHandler<TCommand>)
 builder.Services.AddScoped<ICommandHandler<MoveCommand>, MoveCommandHandler>();

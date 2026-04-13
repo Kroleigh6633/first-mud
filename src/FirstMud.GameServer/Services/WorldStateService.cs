@@ -145,14 +145,17 @@ public class WorldStateService
         int bonusStrikeDamage   = meleeBonus + rangedBonus + handsBonus + statStrikeBonus;
         int bonusSpellDamage    = focusBonus + statSpellBonus;
 
-        // Load active companions with full detail for the status panel
+        // Load all companions (active + homestead + idle) for the status panel
         var allCompanions = await _companionRepository.GetByOwnerAsync(playerId, ct);
         var activeCompanionDetails = allCompanions
-            .Where(c => c.IsActive && !c.IsPermanentlyGone)
+            .Where(c => !c.IsPermanentlyGone)
+            .OrderBy(c => c.IsActive ? 0 : 1)
+            .ThenByDescending(c => c.CurrentLayer)
             .Select(c => new CompanionDto(
                 c.Id, c.Name, c.Type.ToString(), c.Element.ToString(),
                 c.Level, c.CurrentLayer, c.UsageCounter, c.NextLayerThreshold,
-                c.DriftAccumulator, c.IsActive, c.RelationshipDepth))
+                c.DriftAccumulator, c.IsActive, c.RelationshipDepth,
+                c.AssignedDuty?.ToString(), c.DutyStartedAt))
             .ToList();
 
         var playerDto = new PlayerStateDto(

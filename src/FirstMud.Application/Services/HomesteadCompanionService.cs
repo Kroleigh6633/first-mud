@@ -73,8 +73,8 @@ public class HomesteadCompanionService
                         _ => null
                     };
 
-                    // Accumulate usage slowly (homestead duty counts at 20% rate)
-                    companion.RecordUsage(1);
+                    // Accumulate usage slowly (homestead duty counts at ~30% of combat rate)
+                    companion.RecordUsage(3);
                     await _companions.UpdateAsync(companion, ct);
 
                     if (msg is not null)
