@@ -5,41 +5,43 @@ import {
   skillRowStyle, closeBtnStyle, salvageAllBtnStyle, slotsStyle, emptyStyle,
 } from './inventoryStyles';
 import InventoryItemRow, { isEquipped, maxSalvageableWorkmanship } from './InventoryItemRow';
+import { useGameCommands, type SendCommandFn } from '../hooks/useGameCommands';
 
 interface Props {
   snapshot: InventorySnapshot | null;
   equipment: EquipmentSlots;
   onClose: () => void;
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   atHomestead?: boolean;
   hasSalvager?: boolean;
 }
 
 export default function InventoryPanel({ snapshot, equipment, onClose, sendCommand, atHomestead = false, hasSalvager = false }: Props) {
+  const commands = useGameCommands(sendCommand);
   const [imbuingItemId, setImbuingItemId] = useState<string | null>(null);
 
-  const handleEquip       = (itemId: string, slot?: string) => sendCommand('equip', { itemId, slot });
-  const handleUnequip     = (slot: string)                  => sendCommand('unequip', { slot });
-  const handleSalvage     = (itemId: string)                => sendCommand('salvage', { itemId });
-  const handleQueueSalvage= (itemId: string)                => sendCommand('queuesalvage', { itemId });
-  const handleSalvageAll  = (category: string)              => sendCommand('salvageall', { category });
-  const handleToggleLock  = (itemId: string)                => sendCommand('lockitem', { itemId });
+  const handleEquip       = (itemId: string, slot?: string) => commands.equip({ itemId, slot });
+  const handleUnequip     = (slot: string)                  => commands.unequip({ slot });
+  const handleSalvage     = (itemId: string)                => commands.salvage({ itemId });
+  const handleQueueSalvage= (itemId: string)                => commands.queueSalvage({ itemId });
+  const handleSalvageAll  = (category: string)              => commands.salvageAll({ category });
+  const handleToggleLock  = (itemId: string)                => commands.lockItem({ itemId });
 
   const handleAutoSalvageChange = (category: string, value: string) =>
-    sendCommand('autosalvage', { category, maxWorkmanship: parseInt(value, 10) });
+    commands.autoSalvage({ category, maxWorkmanship: parseInt(value, 10) });
 
   const handleStore = (itemId: string) => {
-    sendCommand('deposit', { itemId });
-    setTimeout(() => sendCommand('openinventory', null), 400);
+    commands.deposit({ itemId });
+    setTimeout(() => commands.openInventory(), 400);
   };
 
   const handleUseConsumable = (itemId: string) => {
-    sendCommand('useconsumable', { itemId });
-    setTimeout(() => sendCommand('openinventory', null), 400);
+    commands.useConsumable({ itemId });
+    setTimeout(() => commands.openInventory(), 400);
   };
 
   const handleImbue = (itemId: string, taperId: string) => {
-    sendCommand('imbue', { itemId, taperId });
+    commands.imbue({ itemId, taperId });
     setImbuingItemId(null);
   };
 
@@ -69,7 +71,7 @@ export default function InventoryPanel({ snapshot, equipment, onClose, sendComma
   const hasTapers = allItems.some(i => i.category === 'Reagent');
   const canPracticeEnchanting = imbueableItems.length > 0 && hasTapers;
 
-  const handlePracticeEnchanting = () => sendCommand('practiceenchanting', {});
+  const handlePracticeEnchanting = () => commands.practiceEnchanting();
 
   const sharedRowProps = {
     allItems,

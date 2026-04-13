@@ -17,12 +17,13 @@ import CraftingPanel from './CraftingPanel';
 import CityPanel from './CityPanel';
 import AutoFarmPicker from './AutoFarmPicker';
 import type { AutoFarmSettings } from './AutoFarmPicker';
-import { useKeyboard } from '../hooks/useKeyboard';
+import { useKeybinds, type KeyBinding } from '../hooks/useKeybinds';
 import { useAudio } from '../hooks/useAudio';
+import { useGameCommands, type SendCommandFn } from '../hooks/useGameCommands';
 
 interface Props {
   connectionState: ConnectionState;
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   worldState: WorldStateSnapshot | null;
   messages: GameMessage[];
   appendMessage: (msg: GameMessage) => void;
@@ -192,7 +193,7 @@ export default function GameTerminal({
   questProgress = {},
   cityView = null,
 }: Props) {
-  const keyAction = useKeyboard();
+  const commands = useGameCommands(sendCommand);
 
   // Derive biome type from player position for audio
   const currentBiomeType = useMemo(() => {
@@ -368,7 +369,7 @@ export default function GameTerminal({
           text: `Arrived at waypoint: ${wp.questTitle}.`,
         });
         // Auto-attempt quest interaction on arrival
-        sendCommand('interactquest', { questId: wp.questId });
+        commands.interactQuest({ questId: wp.questId });
         return;
       }
 
@@ -384,234 +385,235 @@ export default function GameTerminal({
       }
 
       console.log(`[auto-navigate] Moving delta=(${step.deltaX},${step.deltaY})`);
-      sendCommand('move', step);
+      commands.move(step);
     }, 300);
 
     return () => clearInterval(intervalId);
-  }, [autoNavigating, sendCommand, appendMessage]);
+  }, [autoNavigating, commands, appendMessage]);
 
-  useEffect(() => {
-    if (!keyAction) return;
-    switch (keyAction.type) {
-      case 'move':
-        // Cancel auto-navigate on manual movement
-        if (autoNavigatingRef.current) {
-          setAutoNavigating(false);
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'system',
-            text: 'Auto-navigate cancelled.',
-          });
+  // ── Keybinds ─────────────────────────────────────────────────────────────
+  // The bindings table is the single source of truth for keyboard shortcuts.
+  // Each handler is the body of what used to be a `case` in the giant switch.
+  // Reads of mutable game state (atHomestead, autoFarm status, currentTile,
+  // questWaypoint, …) go through *Ref values so this array doesn't need to be
+  // rebuilt on every state change — `useKeybinds` reads it via a ref anyway,
+  // but keeping handlers ref-driven preserves the original behaviour where the
+  // listener saw stale-but-via-ref state without re-attaching.
+  const move = (dx: number, dy: number) => {
+    if (autoNavigatingRef.current) {
+      setAutoNavigating(false);
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'system',
+        text: 'Auto-navigate cancelled.',
+      });
+    }
+    // Server-side MoveCommand expects `deltaX`/`deltaY`, not dx/dy.
+    commands.move({ deltaX: dx, deltaY: dy });
+  };
+
+  const keybindings: KeyBinding[] = [
+    { keys: ['ArrowUp', 'w', 'W'],    description: 'move north', handler: () => move(0, -1) },
+    { keys: ['ArrowDown', 's', 'S'],  description: 'move south', handler: () => move(0,  1) },
+    { keys: ['ArrowLeft', 'a', 'A'],  description: 'move west',  handler: () => move(-1, 0) },
+    { keys: ['ArrowRight', 'd', 'D'], description: 'move east',  handler: () => move( 1, 0) },
+
+    { keys: ['Enter'], description: 'interact', handler: () => {
+      const wp = questWaypointRef.current;
+      const player = worldStateRef.current?.player;
+      if (wp && player) {
+        const dx = Math.abs(wp.targetX - player.x);
+        const dy = Math.abs(wp.targetY - player.y);
+        if (dx <= 2 && dy <= 2) {
+          commands.interactQuest({ questId: wp.questId });
+          return;
         }
-        // Server-side MoveCommand expects `deltaX`/`deltaY`, not dx/dy.
-        sendCommand('move', { deltaX: keyAction.dx, deltaY: keyAction.dy });
-        break;
-      case 'interact': {
-        // Check if the player is within 2 tiles of a quest waypoint first
-        const wp = questWaypointRef.current;
-        const player = worldStateRef.current?.player;
-        if (wp && player) {
-          const dx = Math.abs(wp.targetX - player.x);
-          const dy = Math.abs(wp.targetY - player.y);
-          if (dx <= 2 && dy <= 2) {
-            sendCommand('interactquest', { questId: wp.questId });
-            break;
-          }
-        }
-        // Fall back to zone tile description
-        const tile = currentTileRef.current;
-        if (tile) {
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'npc',
-            text: `You take stock of ${tile.name}. ${tile.description}`,
-          });
-        } else {
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'system',
-            text: 'There is nothing here to interact with. Keep riding.',
-          });
-        }
-        break;
       }
-      case 'inventory':
-        // Ask the server for the latest inventory and open the panel.
-        sendCommand('openinventory');
-        setShowInventory(prev => !prev);
-        break;
-      case 'character':
-        setShowCharSheet(prev => !prev);
-        break;
-      case 'quest':
-        setShowQuestLog(prev => {
-          const next = !prev;
-          if (next) fetchAvailableQuests();
-          return next;
+      const tile = currentTileRef.current;
+      if (tile) {
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'npc',
+          text: `You take stock of ${tile.name}. ${tile.description}`,
         });
-        break;
-      case 'help':
-        setShowHelp(prev => !prev);
-        break;
-      case 'portal':
-        // Ignore rapid re-presses for 2 s after any portal command fires
-        if (Date.now() < portalCooldownUntilRef.current) break;
-        portalCooldownUntilRef.current = Date.now() + 2000;
-        if (atHomesteadRef.current) {
-          sendCommand('portalback', null);
-        } else {
-          sendCommand('portalhome', null);
-        }
-        break;
-      case 'harvest':
-        sendCommand('harvest', null);
-        break;
-      case 'autofarm':
-        if (autoFarmRef.current?.active) {
-          // Already running — stop it
-          sendCommand('autofarm', null);
-        } else {
-          // Show the picker panel instead of immediately starting
-          setShowAutoFarmPicker(true);
-        }
-        break;
-      case 'storage':
-        if (!atHomesteadRef.current) {
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'system',
-            text: 'You must be at your homestead to access storage. Press [P] to portal home.',
-          });
-        } else {
-          sendCommand('openstorage', null);
-          setShowStorage(prev => !prev);
-        }
-        break;
-      case 'companions':
-        sendCommand('viewcompanions', null);
-        setShowCompanions(prev => !prev);
-        break;
-      case 'crafting':
-        sendCommand('viewrecipes', null);
-        // Also refresh storage so storage-sourced ingredients show up as
-        // selectable checkboxes in the crafting panel.
-        if (atHomestead) sendCommand('openstorage', null);
-        setShowCrafting(prev => !prev);
-        break;
-      case 'navigate': {
-        const wp = questWaypointRef.current;
-        if (!wp) {
-          // Try to auto-accept the first available quest then navigate
-          const quests = availableQuestsRef.current;
-          const first = quests.find(q => !q.isTaken) ?? quests[0];
-          if (first && !first.isTaken) {
-            sendCommand('acceptquest', { questId: first.questId });
-            appendMessage({
-              timestamp: new Date().toISOString(),
-              category: 'quest',
-              text: `Accepted "${first.title}". Waiting for waypoint — press [N] again to navigate.`,
-            });
-          } else {
-            appendMessage({
-              timestamp: new Date().toISOString(),
-              category: 'system',
-              text: 'No active quest waypoint. Open the quest log [Q] to accept a quest.',
-            });
-          }
-          break;
-        }
-        if (autoNavigatingRef.current) {
-          setAutoNavigating(false);
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'system',
-            text: 'Auto-navigate cancelled.',
-          });
-        } else {
-          setAutoNavigating(true);
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'system',
-            text: `Navigating to ${wp.questTitle}... Press [N] or any movement key to cancel.`,
-          });
-        }
-        break;
-      }
-      case 'autoquest': {
-        if (autoQuestActiveRef.current) {
-          // Stop auto-quest run
-          console.log('[L key] Stopping auto-quest run');
-          setAutoQuestActive(false);
-          setAutoNavigating(false);
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'quest',
-            text: 'Quest auto-run stopped.',
-          });
-        } else {
-          const quests = availableQuestsRef.current;
-          console.log(`[L key] Starting auto-quest run. availableQuests.length=${quests.length}`);
-          if (quests.length === 0) {
-            appendMessage({
-              timestamp: new Date().toISOString(),
-              category: 'system',
-              text: 'No quests available. Press [Q] to open the quest log.',
-            });
-            break;
-          }
-          // Sort: taken quests first, then by rep reward desc.
-          // Per-quest path danger is pre-checked live when the waypoint arrives
-          // (in the accept→navigate transition), so no upfront sort by danger is
-          // possible here — waypoint coords are not known until accepted.
-          const ordered = [...quests].sort((a, b) => {
-            if (a.isTaken && !b.isTaken) return -1;
-            if (!a.isTaken && b.isTaken) return 1;
-            return b.reputationReward - a.reputationReward;
-          });
-          console.log('[L key] Ordered quests:', ordered.map(q => `${q.questId}(${q.title},taken=${q.isTaken})`));
-          setAutoQuestActive(true);
-          setAutoQuestIndex(0);
-          setAutoQuestTotal(ordered.length);
-          setAutoQuestTitle(ordered[0]?.title ?? '');
-          appendMessage({
-            timestamp: new Date().toISOString(),
-            category: 'quest',
-            text: `Quest auto-run started — ${ordered.length} quest${ordered.length !== 1 ? 's' : ''} queued. Press [L] to stop.`,
-          });
-        }
-        break;
-      }
-      case 'city':
-        sendCommand('viewcity', null);
-        setShowCity(prev => !prev);
-        break;
-      case 'escape':
-        setAutoNavigating(false);
-        setAutoQuestActive(false);
-        setShowHelp(false);
-        setShowQuestLog(false);
-        setShowInventory(false);
-        setShowCharSheet(false);
-        setShowStorage(false);
-        setShowCompanions(false);
-        setShowCrafting(false);
-        setShowAutoFarmPicker(false);
-        setShowCity(false);
-        break;
-      case 'mute':
-        toggleMute();
-        break;
-      case 'pass':
+      } else {
         appendMessage({
           timestamp: new Date().toISOString(),
           category: 'system',
-          text: 'You wait. The world continues around you.',
+          text: 'There is nothing here to interact with. Keep riding.',
         });
-        break;
-    }
-  // Only re-run when keyAction or the stable callbacks change — NOT when
-  // atHomestead / autoFarmStatus / currentTile change (read via refs).
-  }, [keyAction, sendCommand, fetchAvailableQuests, appendMessage, toggleMute]);
+      }
+    } },
+
+    { keys: ['i', 'I'], description: 'open inventory', handler: () => {
+      commands.openInventory();
+      setShowInventory(prev => !prev);
+    } },
+
+    { keys: ['c', 'C'], description: 'character sheet', handler: () => setShowCharSheet(prev => !prev) },
+
+    { keys: ['q', 'Q'], description: 'quest log', handler: () => {
+      setShowQuestLog(prev => {
+        const next = !prev;
+        if (next) fetchAvailableQuests();
+        return next;
+      });
+    } },
+
+    { keys: [' '], description: 'wait / pass turn', handler: () => {
+      appendMessage({
+        timestamp: new Date().toISOString(),
+        category: 'system',
+        text: 'You wait. The world continues around you.',
+      });
+    } },
+
+    { keys: ['?', 'h', 'H'], description: 'help', handler: () => setShowHelp(prev => !prev) },
+
+    { keys: ['p', 'P'], description: 'portal home / back', handler: () => {
+      if (Date.now() < portalCooldownUntilRef.current) return;
+      portalCooldownUntilRef.current = Date.now() + 2000;
+      if (atHomesteadRef.current) {
+        commands.portalBack();
+      } else {
+        commands.portalHome();
+      }
+    } },
+
+    { keys: ['e', 'E'], description: 'harvest', handler: () => commands.harvest() },
+
+    { keys: ['f', 'F'], description: 'auto-farm toggle / open picker', handler: () => {
+      if (autoFarmRef.current?.active) {
+        commands.autoFarm();
+      } else {
+        setShowAutoFarmPicker(true);
+      }
+    } },
+
+    { keys: ['v', 'V'], description: 'storage (homestead only)', handler: () => {
+      if (!atHomesteadRef.current) {
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: 'You must be at your homestead to access storage. Press [P] to portal home.',
+        });
+      } else {
+        commands.openStorage();
+        setShowStorage(prev => !prev);
+      }
+    } },
+
+    { keys: ['b', 'B'], description: 'companions', handler: () => {
+      commands.viewCompanions();
+      setShowCompanions(prev => !prev);
+    } },
+
+    { keys: ['r', 'R'], description: 'crafting', handler: () => {
+      commands.viewRecipes();
+      if (atHomestead) commands.openStorage();
+      setShowCrafting(prev => !prev);
+    } },
+
+    { keys: ['n', 'N'], description: 'navigate to quest waypoint', handler: () => {
+      const wp = questWaypointRef.current;
+      if (!wp) {
+        const quests = availableQuestsRef.current;
+        const first = quests.find(q => !q.isTaken) ?? quests[0];
+        if (first && !first.isTaken) {
+          commands.acceptQuest({ questId: first.questId });
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'quest',
+            text: `Accepted "${first.title}". Waiting for waypoint — press [N] again to navigate.`,
+          });
+        } else {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'No active quest waypoint. Open the quest log [Q] to accept a quest.',
+          });
+        }
+        return;
+      }
+      if (autoNavigatingRef.current) {
+        setAutoNavigating(false);
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: 'Auto-navigate cancelled.',
+        });
+      } else {
+        setAutoNavigating(true);
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'system',
+          text: `Navigating to ${wp.questTitle}... Press [N] or any movement key to cancel.`,
+        });
+      }
+    } },
+
+    { keys: ['l', 'L'], description: 'auto-quest run toggle', handler: () => {
+      if (autoQuestActiveRef.current) {
+        console.log('[L key] Stopping auto-quest run');
+        setAutoQuestActive(false);
+        setAutoNavigating(false);
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'quest',
+          text: 'Quest auto-run stopped.',
+        });
+      } else {
+        const quests = availableQuestsRef.current;
+        console.log(`[L key] Starting auto-quest run. availableQuests.length=${quests.length}`);
+        if (quests.length === 0) {
+          appendMessage({
+            timestamp: new Date().toISOString(),
+            category: 'system',
+            text: 'No quests available. Press [Q] to open the quest log.',
+          });
+          return;
+        }
+        const ordered = [...quests].sort((a, b) => {
+          if (a.isTaken && !b.isTaken) return -1;
+          if (!a.isTaken && b.isTaken) return 1;
+          return b.reputationReward - a.reputationReward;
+        });
+        console.log('[L key] Ordered quests:', ordered.map(q => `${q.questId}(${q.title},taken=${q.isTaken})`));
+        setAutoQuestActive(true);
+        setAutoQuestIndex(0);
+        setAutoQuestTotal(ordered.length);
+        setAutoQuestTitle(ordered[0]?.title ?? '');
+        appendMessage({
+          timestamp: new Date().toISOString(),
+          category: 'quest',
+          text: `Quest auto-run started — ${ordered.length} quest${ordered.length !== 1 ? 's' : ''} queued. Press [L] to stop.`,
+        });
+      }
+    } },
+
+    { keys: ['m', 'M'], description: 'mute audio', handler: () => toggleMute() },
+
+    { keys: ['g', 'G'], description: 'city panel', handler: () => {
+      commands.viewCity();
+      setShowCity(prev => !prev);
+    } },
+
+    { keys: ['Escape'], description: 'close panels / cancel', handler: () => {
+      setAutoNavigating(false);
+      setAutoQuestActive(false);
+      setShowHelp(false);
+      setShowQuestLog(false);
+      setShowInventory(false);
+      setShowCharSheet(false);
+      setShowStorage(false);
+      setShowCompanions(false);
+      setShowCrafting(false);
+      setShowAutoFarmPicker(false);
+      setShowCity(false);
+    } },
+  ];
+
+  useKeybinds(keybindings);
 
   // ── Audio SFX triggers from incoming messages ─────────────────────────────
   const lastMessageCountRef = useRef(0);
@@ -681,7 +683,7 @@ export default function GameTerminal({
 
   const handleAutoFarmStart = (settings: AutoFarmSettings) => {
     setShowAutoFarmPicker(false);
-    sendCommand('autofarm', {
+    commands.autoFarm({
       targetZone: settings.targetZone
         ? { x: settings.targetZone.x, y: settings.targetZone.y }
         : null,
@@ -766,7 +768,7 @@ export default function GameTerminal({
     autoQuestInteractFailedRef.current = false;
 
     // Fire acceptquest to get (or refresh) the waypoint
-    sendCommand('acceptquest', { questId: nextQuest.questId });
+    commands.acceptQuest({ questId: nextQuest.questId });
     console.log(`[autoquest] Sent acceptquest for ${nextQuest.questId}`);
     autoQuestPhaseRef.current = 'accept';
     acceptWaitTicksRef.current = 0;
@@ -812,7 +814,7 @@ export default function GameTerminal({
 
         if (dangerTooHigh || playerHpLow) {
           console.warn(`[autoquest combat] Unwinnable fight detected (dangerTooHigh=${dangerTooHigh}, playerHpLow=${playerHpLow}) — fleeing`);
-          sendCommand('flee', null);
+          commands.flee();
           autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
           wrappedAppendMessage({
             timestamp: new Date().toISOString(),
@@ -882,7 +884,7 @@ export default function GameTerminal({
         // server missed it or returned a "already taken" no-op
         if (acceptWaitTicksRef.current % 10 === 0) {
           console.log(`[autoquest] Still waiting for waypoint (tick ${acceptWaitTicksRef.current}) — re-sending acceptquest`);
-          sendCommand('acceptquest', { questId: nextQuest.questId });
+          commands.acceptQuest({ questId: nextQuest.questId });
         }
 
         // Timeout after ~15 s (50 ticks) — skip this quest
@@ -909,7 +911,7 @@ export default function GameTerminal({
           console.warn('[autoquest navigate] Waypoint lost — returning to accept phase');
           autoQuestPhaseRef.current = 'accept';
           acceptWaitTicksRef.current = 0;
-          sendCommand('acceptquest', { questId: nextQuest.questId });
+          commands.acceptQuest({ questId: nextQuest.questId });
           return;
         }
 
@@ -929,7 +931,7 @@ export default function GameTerminal({
             console.log('[autoquest navigate] Player is at homestead — sending portalback before navigating');
             autoQuestPortalSentRef.current = true;
             portalCooldownUntilRef.current = Date.now() + 2000;
-            sendCommand('portalback', null);
+            commands.portalBack();
           }
           return; // wait for next tick when player has arrived on the world map
         }
@@ -944,7 +946,7 @@ export default function GameTerminal({
         if (hpPercent < 0.7 && Date.now() >= portalCooldownUntilRef.current) {
           console.log(`[autoquest navigate] HP at ${Math.round(hpPercent * 100)}% — portaling home to heal`);
           portalCooldownUntilRef.current = Date.now() + 2000;
-          sendCommand('portalhome', null);
+          commands.portalHome();
           wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'system',
@@ -967,7 +969,7 @@ export default function GameTerminal({
             category: 'quest',
             text: `Arrived at ${wp.questTitle} — completing quest...`,
           });
-          sendCommand('interactquest', { questId: wp.questId });
+          commands.interactQuest({ questId: wp.questId });
           return;
         }
 
@@ -1013,7 +1015,7 @@ export default function GameTerminal({
         }
 
         console.log(`[autoquest navigate] Moving delta=(${step.deltaX},${step.deltaY})`);
-        sendCommand('move', step);
+        commands.move(step);
         return;
       }
 
@@ -1053,17 +1055,17 @@ export default function GameTerminal({
       }
     };
   // Re-run when active state changes or we advance to the next quest index
-  }, [autoQuestActive, autoQuestIndex, sendCommand, wrappedAppendMessage]);
+  }, [autoQuestActive, autoQuestIndex, commands, wrappedAppendMessage]);
 
   const handleAcceptQuest = (questId: string) => {
-    sendCommand('acceptquest', { questId });
+    commands.acceptQuest({ questId });
   };
 
   const handleAcceptAll = () => {
     const unaccepted = availableQuests.filter(q => !q.isTaken);
     unaccepted.forEach((q, i) => {
       setTimeout(() => {
-        sendCommand('acceptquest', { questId: q.questId });
+        commands.acceptQuest({ questId: q.questId });
       }, i * 120);
     });
     if (unaccepted.length > 0) {
@@ -1077,23 +1079,23 @@ export default function GameTerminal({
 
   const handleCompleteQuest = (questId: string, outcome: string) => {
     // Server parses `chosenOutcome`, not `outcome`.
-    sendCommand('completequest', { questId, chosenOutcome: outcome });
+    commands.completeQuest({ questId, chosenOutcome: outcome });
   };
 
   const handleDeposit = (itemId: string) => {
-    sendCommand('deposit', { itemId });
+    commands.deposit({ itemId });
     // Re-fetch storage and inventory after deposit
     setTimeout(() => {
-      sendCommand('openstorage', null);
-      sendCommand('openinventory', null);
+      commands.openStorage();
+      commands.openInventory();
     }, 300);
   };
 
   const handleWithdraw = (itemId: string) => {
-    sendCommand('withdraw', { itemId });
+    commands.withdraw({ itemId });
     setTimeout(() => {
-      sendCommand('openstorage', null);
-      sendCommand('openinventory', null);
+      commands.openStorage();
+      commands.openInventory();
     }, 300);
   };
 
@@ -1412,7 +1414,7 @@ export default function GameTerminal({
             const quest = availableQuests.find(q => q.questId === questId);
             // Auto-accept if not yet taken, then navigate
             if (quest && !quest.isTaken) {
-              sendCommand('acceptquest', { questId });
+              commands.acceptQuest({ questId });
               appendMessage({
                 timestamp: new Date().toISOString(),
                 category: 'quest',
@@ -1469,7 +1471,7 @@ export default function GameTerminal({
           onWithdraw={handleWithdraw}
           onClose={() => setShowStorage(false)}
           atHomestead={atHomestead}
-          onSmelt={(amount) => sendCommand('smelt', { amount })}
+          onSmelt={(amount) => commands.smelt({ amount })}
           lastSmeltResult={lastSmeltResult ?? null}
         />
       )}
@@ -1477,8 +1479,8 @@ export default function GameTerminal({
         <CompanionPanel
           companions={companionRoster}
           activeCompanionIds={worldState?.player?.activeCompanionIds ?? []}
-          onActivate={(id) => sendCommand('activatecompanion', { companionId: id })}
-          onDeactivate={(id) => sendCommand('deactivatecompanion', { companionId: id })}
+          onActivate={(id) => commands.activateCompanion({ companionId: id })}
+          onDeactivate={(id) => commands.deactivateCompanion({ companionId: id })}
           onClose={() => setShowCompanions(false)}
           sendCommand={sendCommand}
         />
@@ -1491,9 +1493,9 @@ export default function GameTerminal({
           craftingSkill={inventory?.craftingSkill ?? worldState?.player?.craftingSkill ?? 1}
           lastCraftResult={lastCraftResult ?? null}
           onCraft={(recipeId, componentIds, taperId) =>
-            sendCommand('craft', { recipeId, componentIds, taperId })}
-          onSalvage={(itemId) => sendCommand('salvage', { itemId })}
-          onRequestRecipes={() => sendCommand('viewrecipes', null)}
+            commands.craft({ recipeId, componentIds, taperId })}
+          onSalvage={(itemId) => commands.salvage({ itemId })}
+          onRequestRecipes={() => commands.viewRecipes()}
           onClose={() => setShowCrafting(false)}
         />
       )}

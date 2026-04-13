@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import type { CombatUpdate, CombatantState, AutoFarmStatus } from '../types/game';
 import type { SoundName } from '../hooks/useAudio';
+import { useGameCommands, type SendCommandFn } from '../hooks/useGameCommands';
 
 interface Props {
   combat: CombatUpdate;
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   autoFarmStatus?: AutoFarmStatus | null;
   forceAutoCombat?: boolean;
   playSound?: (name: SoundName) => void;
@@ -105,6 +106,7 @@ function PartyRow({ c, isCurrentActor }: { c: CombatantState; isCurrentActor: bo
 // Abilities are now sourced from the current actor's CombatantState.
 
 export default function CombatPanel({ combat, sendCommand, autoFarmStatus, forceAutoCombat, playSound }: Props) {
+  const commands = useGameCommands(sendCommand);
   const isAutoFarm = autoFarmStatus?.active === true;
   const isOver = combat.state === 'Victory' || combat.state === 'Defeat' || combat.state === 'Fled';
   const playerSide = combat.combatants.filter(c => c.isPlayerSide);
@@ -177,7 +179,7 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
     // — the server should have blocked these, but this is the client-side safety net.
     if (forceAutoCombat && combat.dangerLevel != null && combat.dangerLevel >= 9) {
       const timer = setTimeout(() => {
-        sendCommand('combat flee', { encounterId: combat.encounterId });
+        commands.combatFlee({ encounterId: combat.encounterId });
       }, 400);
       return () => clearTimeout(timer);
     }
@@ -200,7 +202,7 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
         ? (currentActor?.id ?? targetId)
         : (firstLivingEnemy?.id ?? targetId);
 
-      sendCommand('combat use', {
+      commands.combatUse({
         encounterId: combat.encounterId,
         abilityName: chosenAbility.name,
         targetId: chosenTargetId,
@@ -232,15 +234,15 @@ export default function CombatPanel({ combat, sendCommand, autoFarmStatus, force
   }, [isOver]);
 
   const handleAbility = (abilityName: string) => {
-    sendCommand('combat use', {
+    commands.combatUse({
       encounterId: combat.encounterId,
       abilityName,
-      targetId,
+      targetId: targetId ?? null,
     });
   };
 
   const handleFlee = () => {
-    sendCommand('combat flee', { encounterId: combat.encounterId });
+    commands.combatFlee({ encounterId: combat.encounterId });
   };
 
   return (
