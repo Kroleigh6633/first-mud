@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { CompanionState, CompanionType, MagicElement, HomesteadDuty } from '../types/game';
+import { useGameCommands, type SendCommandFn } from '../hooks/useGameCommands';
 
 interface Props {
   companions: CompanionState[];
@@ -7,7 +8,7 @@ interface Props {
   onActivate: (id: string) => void;
   onDeactivate: (id: string) => void;
   onClose: () => void;
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
 }
 
 // ---- Layer ability descriptions per type --------------------------------
@@ -635,6 +636,7 @@ const cancelPickerBtnStyle: React.CSSProperties = {
 };
 
 export default function CompanionPanel({ companions, activeCompanionIds, onActivate, onDeactivate, onClose, sendCommand }: Props) {
+  const commands = useGameCommands(sendCommand);
   // Use player.activeCompanionIds as ground truth, not companion.isActive (which can be stale)
   const activeCompanions    = companions.filter(c => activeCompanionIds.includes(c.id));
   const dutyCompanions      = companions.filter(c => !activeCompanionIds.includes(c.id) && !!c.assignedDuty);
@@ -642,18 +644,18 @@ export default function CompanionPanel({ companions, activeCompanionIds, onActiv
   const activeCount         = activeCompanions.length;
 
   const handleAssign = (companionId: string, duty: HomesteadDuty) => {
-    sendCommand('assigncompanionduty', { companionId, duty });
+    commands.assignCompanionDuty({ companionId, duty });
   };
 
   const handleRecall = (companionId: string) => {
-    sendCommand('recallcompanion', { companionId });
+    commands.recallCompanion({ companionId });
   };
 
   // One-click: deactivate then assign duty in sequence
   const handleQuickAssign = (companionId: string, duty: HomesteadDuty) => {
     onDeactivate(companionId);
     setTimeout(() => {
-      sendCommand('assigncompanionduty', { companionId, duty });
+      commands.assignCompanionDuty({ companionId, duty });
     }, 300);
   };
 

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useGameCommands, type SendCommandFn } from '../hooks/useGameCommands';
 import type {
   CityViewSnapshot,
   HomesteadBuilding,
@@ -181,7 +182,7 @@ function ProgressBar({ pct }: { pct: number }) {
 interface Props {
   cityView: CityViewSnapshot | null;
   onClose: () => void;
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   companionRoster?: CompanionState[];
   activeCompanionIds?: string[];
   storageItems?: StorageItem[];
@@ -193,10 +194,11 @@ interface Props {
 interface BuildingRowProps {
   building: HomesteadBuilding;
   availableCompanions: CompanionState[];
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
 }
 
 function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRowProps) {
+  const commands = useGameCommands(sendCommand);
   const [selectedCompanionId, setSelectedCompanionId] = useState<string>('');
   const color = buildingColor(building.type);
   const icon = buildingIcon(building.type);
@@ -207,12 +209,12 @@ function BuildingRow({ building, availableCompanions, sendCommand }: BuildingRow
 
   const handleAssign = () => {
     if (!selectedCompanionId) return;
-    sendCommand('assignbuilder', { companionId: selectedCompanionId, buildingId: building.id });
+    commands.assignBuilder({ companionId: selectedCompanionId, buildingId: building.id });
     setSelectedCompanionId('');
   };
 
   const handleUnassign = () => {
-    sendCommand('unassignbuilder', { buildingId: building.id });
+    commands.unassignBuilder({ buildingId: building.id });
   };
 
   const residents: HutResident[] = building.residents ?? [];
@@ -378,7 +380,7 @@ interface PlaceBuildingSectionProps {
   buildings: HomesteadBuilding[];
   storageItems: StorageItem[];
   inventoryItems: InventoryItem[];
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   /** When set, only this building type is offered and it is pre-selected. */
   restrictTo?: BuildingType;
 }
@@ -387,6 +389,7 @@ interface PlaceBuildingSectionProps {
 const MULTI_PLACE_TYPES = new Set<BuildingType>(ALL_BUILDING_TYPES);
 
 function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCommand, restrictTo }: PlaceBuildingSectionProps) {
+  const commands = useGameCommands(sendCommand);
   const placedTypes = new Set(buildings.map(b => b.type));
   // Multi-place types are always available; single-place types only if not yet placed
   const availableTypes = restrictTo
@@ -422,7 +425,7 @@ function PlaceBuildingSection({ buildings, storageItems, inventoryItems, sendCom
   const handlePlace = () => {
     if (!selectedType) return;
     const pos = nextAvailablePosition(buildings);
-    sendCommand('placebuilding', { buildingType: selectedType, gridX: pos.x, gridY: pos.y });
+    commands.placeBuilding({ buildingType: selectedType, gridX: pos.x, gridY: pos.y });
     // When restricted to a single type, keep it selected for quick repeat placing
     if (!restrictTo) setSelectedType('');
   };
@@ -753,7 +756,7 @@ function OverviewTab({ stats }: OverviewTabProps) {
 interface ProductionTabProps {
   buildings: HomesteadBuilding[];
   availableCompanions: CompanionState[];
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   storageItems: StorageItem[];
   inventoryItems: InventoryItem[];
 }
@@ -821,7 +824,7 @@ function ProductionTab({ buildings, availableCompanions, sendCommand, storageIte
 interface HousingTabProps {
   buildings: HomesteadBuilding[];
   availableCompanions: CompanionState[];
-  sendCommand: (command: string, payload?: unknown) => void;
+  sendCommand: SendCommandFn;
   storageItems: StorageItem[];
   inventoryItems: InventoryItem[];
 }
@@ -911,6 +914,7 @@ export default function CityPanel({
   storageItems = [],
   inventoryItems = [],
 }: Props) {
+  const commands = useGameCommands(sendCommand);
   const [activeTab, setActiveTab] = useState<CityTab>('OVERVIEW');
 
   const panelStyle: React.CSSProperties = {
@@ -998,16 +1002,16 @@ export default function CityPanel({
         })[0];
 
       if (best) {
-        sendCommand('assignbuilder', { companionId: best.id, buildingId: building.id });
+        commands.assignBuilder({ companionId: best.id, buildingId: building.id });
         usedIds.add(best.id);
       }
     }
-  }, [cityView.buildings, availableCompanions, sendCommand]);
+  }, [cityView.buildings, availableCompanions, commands]);
 
   // One-click master action: server seeds all missing buildings then auto-staffs empty slots
   const handleBuildStaffEverything = useCallback(() => {
-    sendCommand('buildstaffeverything', null);
-  }, [sendCommand]);
+    commands.buildStaffEverything();
+  }, [commands]);
 
   const unassignedBuildings = cityView.buildings.filter(
     b => !HOUSING_TYPES.has(b.type) && !b.assignedCompanionName
@@ -1083,7 +1087,7 @@ export default function CityPanel({
         </button>
         <button
           type="button"
-          onClick={() => { sendCommand('viewcity', null); }}
+          onClick={() => { commands.viewCity(); }}
           style={{
             background: '#1a1a1a',
             border: '1px solid #333',
