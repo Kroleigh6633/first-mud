@@ -5,14 +5,14 @@ services:
     container_name: firstmud-sqlserver
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "REDACTED_DEV_SA_PASSWORD"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in docker/.env — see docs/dev-setup.md}"
       MSSQL_PID: "Developer"
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'REDACTED_DEV_SA_PASSWORD' -Q 'SELECT 1' -No -C"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -No -C"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
     image: neo4j:5-community
     container_name: firstmud-neo4j
     environment:
-      NEO4J_AUTH: "neo4j/REDACTED_DEV_NEO4J_PASSWORD"
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in docker/.env — see docs/dev-setup.md}"
       NEO4J_PLUGINS: '["apoc"]'
     ports:
       - "7474:7474"   # Browser UI
@@ -48,10 +48,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://+:5000"
-      ConnectionStrings__GameDb: "Server=sqlserver,1433;Database=FirstMud;User Id=sa;Password=REDACTED_DEV_SA_PASSWORD;TrustServerCertificate=True;"
+      ConnectionStrings__GameDb: "Server=sqlserver,1433;Database=FirstMud;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
       Neo4j__Uri: "bolt://neo4j:7687"
       Neo4j__Username: "neo4j"
-      Neo4j__Password: "REDACTED_DEV_NEO4J_PASSWORD"
+      Neo4j__Password: "${NEO4J_PASSWORD}"
     ports:
       - "5000:5000"
     volumes:

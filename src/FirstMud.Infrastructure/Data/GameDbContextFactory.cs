@@ -10,9 +10,16 @@ internal sealed class GameDbContextFactory : IDesignTimeDbContextFactory<GameDbC
 {
     public GameDbContext CreateDbContext(string[] args)
     {
+        // Design-time only. Developers export FIRSTMUD_DESIGNTIME_CONNECTION locally;
+        // see docs/dev-setup.md. Never commit a real connection string here.
+        var connectionString = Environment.GetEnvironmentVariable("FIRSTMUD_DESIGNTIME_CONNECTION")
+            ?? throw new InvalidOperationException(
+                "Set FIRSTMUD_DESIGNTIME_CONNECTION before running EF Core design-time tools. "
+                + "See docs/dev-setup.md.");
+
         var options = new DbContextOptionsBuilder<GameDbContext>()
             .UseSqlServer(
-                "Server=localhost,1433;Database=FirstMud;User Id=sa;Password=REDACTED_DEV_SA_PASSWORD;TrustServerCertificate=True;",
+                connectionString,
                 sqlOptions => sqlOptions.MigrationsAssembly(typeof(GameDbContext).Assembly.FullName))
             .Options;
 

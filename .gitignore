@@ -3,25 +3,33 @@ bin/
 obj/
 *.user
 *.suo
+*.pdb
 .vs/
+.vscode/
+.idea/
 *.nupkg
 *.snupkg
 project.lock.json
 project.fragment.lock.json
 artifacts/
 
-## Secrets
+## Secrets / local config
 appsettings.*.json
 !appsettings.json
-!appsettings.Development.json
+!appsettings.*.template.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.*.Local.json
 secrets.json
+*.env
+.env
+.env.*
+.env.local
+.env.*.local
 
 ## Node / React
 node_modules/
 dist/
-.env
-.env.local
-.env.*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -31,6 +39,9 @@ docker/volumes/
 
 ## Claude worktrees (embedded repos)
 .claude/worktrees/
+
+## Sim logs (local playtest artifacts)
+docs/design/sim-logs/*.json
 
 ## OS
 .DS_Store
