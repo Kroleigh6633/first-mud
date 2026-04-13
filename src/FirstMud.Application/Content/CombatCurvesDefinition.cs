@@ -16,7 +16,18 @@ namespace FirstMud.Application.Content;
 /// curves.
 /// </summary>
 public sealed record CombatCurvesDefinition(
-    MonsterScalingCurve MonsterScaling);
+    MonsterScalingCurve MonsterScaling,
+    PartyScalingCurve PartyScaling);
+
+/// <summary>
+/// Symmetry counterpart to <see cref="MonsterScalingCurve"/>. Enemies scale
+/// with zone danger; the party needs a matching progression tier bonus or
+/// the player hits a wall at mid-danger. Applied to player + companion
+/// MaxHp and ability BasePower at combat start:
+/// <c>factor = 1 + ScalingPerTier * (playerLevel + avgCompanionLayer)</c>.
+/// </summary>
+public sealed record PartyScalingCurve(
+    double ScalingPerTier);
 
 /// <summary>
 /// Coefficients for <c>MonsterFactory.ScaleMonster</c>:

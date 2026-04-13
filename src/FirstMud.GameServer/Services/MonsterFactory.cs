@@ -37,12 +37,14 @@ public sealed class MonsterFactory
             _    => 3,
         };
 
-        // Pack size scales with party size + danger:
-        // danger 1-2:  party + 0  (fair fight)
-        // danger 3-5:  party + 1  (slightly outnumbered)
-        // danger 6-8:  party + 2  (outnumbered)
-        // danger 9-10: party + 3  (heavily outnumbered)
-        int maxEnemies = partySize + (dangerLevel / 3);
+        // Pack size scales with party size + danger (Fix C — softened from /3
+        // to /4 so mid-danger fights aren't brutally outnumbered):
+        // danger 1-3:   party + 0  (fair fight)
+        // danger 4-7:   party + 1  (slightly outnumbered)
+        // danger 8-10:  party + 2  (outnumbered)
+        // Pre-fix (/3) combined with +40% HP + +30% power per danger was
+        // producing three-TPK-in-a-row play sessions at danger 5–7.
+        int maxEnemies = partySize + (dangerLevel / 4);
 
         int packSize = dangerLevel switch
         {

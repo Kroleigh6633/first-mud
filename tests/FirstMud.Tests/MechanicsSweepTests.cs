@@ -281,10 +281,11 @@ public class MechanicsSweepTests
     [Fact]
     public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf4_MaxPack()
     {
-        // partySize=4, danger=10: maxEnemies = 4 + 10/3 = 4 + 3 = 7
+        // Fix C (post-TPK tune): pack-cap is party + danger/4, down from /3.
+        // partySize=4, danger=10: maxEnemies = 4 + 10/4 = 4 + 2 = 6.
         var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 4);
 
-        int maxEnemies = 4 + (10 / 3); // 7
+        int maxEnemies = 4 + (10 / 4); // 6
         pack.Count.Should().Be(maxEnemies,
             $"party of 4 at danger 10 should produce exactly {maxEnemies} enemies");
     }

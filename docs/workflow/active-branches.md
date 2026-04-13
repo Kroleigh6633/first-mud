@@ -28,4 +28,6 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 
+| worktree-agent-a6d6f55c | ready-to-merge | content-layer-pilot | soften monster scaling + add party scaling + cap pack size to fix TPK runaway | - | content/combat-curves.json, content/schemas/combat-curves.schema.json, src/FirstMud.Application/MonsterScaling.cs, src/FirstMud.Application/PartyScaling.cs, src/FirstMud.Application/Content/*, src/FirstMud.Application/Services/CombatService.cs, src/FirstMud.Application/Services/CombatSimulationService.cs, src/FirstMud.GameServer/Services/MonsterFactory.cs, tests/FirstMud.Tests, tools/design/* | 2026-04-13 |
+
 <!-- agents add rows above this line -->

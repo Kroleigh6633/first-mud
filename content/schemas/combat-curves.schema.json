@@ -5,6 +5,19 @@
   "type": "object",
   "required": ["monsterScaling"],
   "properties": {
+    "partyScaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scalingPerTier"],
+      "properties": {
+        "scalingPerTier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Multiplier added to player-side HP + ability power per (playerLevel + avgCompanionLayer) tier. Final party factor = 1 + scalingPerTier * (playerLevel + avgCompanionLayer)."
+        }
+      }
+    },
     "monsterScaling": {
       "type": "object",
       "additionalProperties": false,
