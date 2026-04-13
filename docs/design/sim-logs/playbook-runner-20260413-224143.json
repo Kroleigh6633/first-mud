@@ -1,0 +1,521 @@
+{
+  "playbookId": "crafting-success",
+  "kind": "crafting",
+  "displayName": "Crafting outcome distribution",
+  "seed": 42,
+  "rolls": 500,
+  "cells": [
+    {
+      "axis": {
+        "craftingSkill": 1,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 47.916666666666664,
+        "NearMiss": 30.833333333333332,
+        "UnexpectedResult": 14.166666666666666,
+        "ComponentLoss": 4.583333333333333,
+        "Discovery": 2.5
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 1,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 55.625,
+        "NearMiss": 25.208333333333332,
+        "UnexpectedResult": 12.708333333333334,
+        "ComponentLoss": 4.791666666666667,
+        "Discovery": 1.6666666666666667
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 1,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 42.916666666666664,
+        "NearMiss": 33.541666666666664,
+        "UnexpectedResult": 16.25,
+        "ComponentLoss": 5.833333333333333,
+        "Discovery": 1.4583333333333333
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 1,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 55.833333333333336,
+        "NearMiss": 21.875,
+        "UnexpectedResult": 14.166666666666666,
+        "ComponentLoss": 5.833333333333333,
+        "Discovery": 2.2916666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 2,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 41.875,
+        "NearMiss": 33.75,
+        "UnexpectedResult": 16.041666666666668,
+        "ComponentLoss": 4.791666666666667,
+        "Discovery": 3.5416666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 2,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 53.75,
+        "NearMiss": 26.666666666666668,
+        "UnexpectedResult": 13.333333333333334,
+        "ComponentLoss": 4.583333333333333,
+        "Discovery": 1.6666666666666667
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 2,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 46.041666666666664,
+        "NearMiss": 31.458333333333332,
+        "UnexpectedResult": 15.625,
+        "ComponentLoss": 5.208333333333333,
+        "Discovery": 1.6666666666666667
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 2,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 49.791666666666664,
+        "NearMiss": 27.083333333333332,
+        "UnexpectedResult": 15.208333333333334,
+        "ComponentLoss": 5.208333333333333,
+        "Discovery": 2.7083333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 3,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 49.791666666666664,
+        "NearMiss": 28.75,
+        "UnexpectedResult": 13.958333333333334,
+        "ComponentLoss": 5,
+        "Discovery": 2.5
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 3,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 46.041666666666664,
+        "NearMiss": 32.5,
+        "UnexpectedResult": 14.791666666666666,
+        "ComponentLoss": 4.791666666666667,
+        "Discovery": 1.875
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 3,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 53.333333333333336,
+        "NearMiss": 25.208333333333332,
+        "UnexpectedResult": 13.958333333333334,
+        "ComponentLoss": 6.458333333333333,
+        "Discovery": 1.0416666666666667
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 3,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 53.75,
+        "NearMiss": 27.5,
+        "UnexpectedResult": 11.875,
+        "ComponentLoss": 4.791666666666667,
+        "Discovery": 2.0833333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 5,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 49.166666666666664,
+        "NearMiss": 28.958333333333332,
+        "UnexpectedResult": 14.166666666666666,
+        "ComponentLoss": 5.625,
+        "Discovery": 2.0833333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 5,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 55.833333333333336,
+        "NearMiss": 23.958333333333332,
+        "UnexpectedResult": 14.166666666666666,
+        "ComponentLoss": 3.75,
+        "Discovery": 2.2916666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 5,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 45.625,
+        "NearMiss": 31.458333333333332,
+        "UnexpectedResult": 15.416666666666666,
+        "ComponentLoss": 5.416666666666667,
+        "Discovery": 2.0833333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 5,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 52.5,
+        "NearMiss": 26.041666666666668,
+        "UnexpectedResult": 13.541666666666666,
+        "ComponentLoss": 5.416666666666667,
+        "Discovery": 2.5
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 8,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 52.708333333333336,
+        "NearMiss": 25,
+        "UnexpectedResult": 13.75,
+        "ComponentLoss": 6.041666666666667,
+        "Discovery": 2.5
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 8,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 41.666666666666664,
+        "NearMiss": 34.375,
+        "UnexpectedResult": 16.041666666666668,
+        "ComponentLoss": 5.833333333333333,
+        "Discovery": 2.0833333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 8,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 48.541666666666664,
+        "NearMiss": 30,
+        "UnexpectedResult": 13.75,
+        "ComponentLoss": 5.625,
+        "Discovery": 2.0833333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 8,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 58.541666666666664,
+        "NearMiss": 21.458333333333332,
+        "UnexpectedResult": 13.125,
+        "ComponentLoss": 5.833333333333333,
+        "Discovery": 1.0416666666666667
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 12,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 50.208333333333336,
+        "NearMiss": 27.708333333333332,
+        "UnexpectedResult": 14.791666666666666,
+        "ComponentLoss": 5,
+        "Discovery": 2.2916666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 12,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 46.458333333333336,
+        "NearMiss": 32.708333333333336,
+        "UnexpectedResult": 13.125,
+        "ComponentLoss": 5.416666666666667,
+        "Discovery": 2.2916666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 12,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 50.625,
+        "NearMiss": 28.958333333333332,
+        "UnexpectedResult": 13.125,
+        "ComponentLoss": 5,
+        "Discovery": 2.2916666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 12,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 53.333333333333336,
+        "NearMiss": 25.833333333333332,
+        "UnexpectedResult": 14.375,
+        "ComponentLoss": 5.208333333333333,
+        "Discovery": 1.25
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 20,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 43.541666666666664,
+        "NearMiss": 32.708333333333336,
+        "UnexpectedResult": 16.25,
+        "ComponentLoss": 5.416666666666667,
+        "Discovery": 2.0833333333333335
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 20,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 52.916666666666664,
+        "NearMiss": 25.625,
+        "UnexpectedResult": 14.583333333333334,
+        "ComponentLoss": 4.583333333333333,
+        "Discovery": 2.2916666666666665
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": false,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 20,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 48.75,
+        "NearMiss": 30.625,
+        "UnexpectedResult": 13.75,
+        "ComponentLoss": 5.416666666666667,
+        "Discovery": 1.4583333333333333
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 20,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 51.875,
+        "NearMiss": 28.125,
+        "UnexpectedResult": 14.166666666666666,
+        "ComponentLoss": 3.9583333333333335,
+        "Discovery": 1.875
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 40,
+        "recipeDifficulty": 1
+      },
+      "outcomes": {
+        "Success": 56.875,
+        "NearMiss": 24.375,
+        "UnexpectedResult": 11.875,
+        "ComponentLoss": 4.375,
+        "Discovery": 2.5
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 40,
+        "recipeDifficulty": 3
+      },
+      "outcomes": {
+        "Success": 50.416666666666664,
+        "NearMiss": 28.333333333333332,
+        "UnexpectedResult": 13.958333333333334,
+        "ComponentLoss": 5.833333333333333,
+        "Discovery": 1.4583333333333333
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 40,
+        "recipeDifficulty": 5
+      },
+      "outcomes": {
+        "Success": 42.5,
+        "NearMiss": 37.5,
+        "UnexpectedResult": 12.916666666666666,
+        "ComponentLoss": 5.208333333333333,
+        "Discovery": 1.875
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    },
+    {
+      "axis": {
+        "craftingSkill": 40,
+        "recipeDifficulty": 8
+      },
+      "outcomes": {
+        "Success": 52.291666666666664,
+        "NearMiss": 27.291666666666668,
+        "UnexpectedResult": 13.541666666666666,
+        "ComponentLoss": 5.208333333333333,
+        "Discovery": 1.6666666666666667
+      },
+      "totalRolls": 480,
+      "quantitiesMatchedSample": true,
+      "divergences": []
+    }
+  ]
+}

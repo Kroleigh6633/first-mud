@@ -276,7 +276,11 @@ public class PlaybookRunnerTests
             var pb = PlaybookRunnerCommand.LoadPlaybook(f);
             Assert.False(string.IsNullOrWhiteSpace(pb.Id), $"{f}: id missing");
             Assert.NotEmpty(pb.Axes);
-            Assert.NotEmpty(pb.ToleranceBands);
+            var kind = string.IsNullOrWhiteSpace(pb.Kind) ? "combat" : pb.Kind.ToLowerInvariant();
+            if (kind == "combat")
+                Assert.NotEmpty(pb.ToleranceBands);
+            else if (kind == "crafting")
+                Assert.NotEmpty(pb.ExpectedDistribution.Cells);
             Assert.True(pb.Rolls > 0, $"{f}: rolls must be positive");
         }
     }
