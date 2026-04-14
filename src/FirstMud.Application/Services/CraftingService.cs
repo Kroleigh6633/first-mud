@@ -78,8 +78,11 @@ public class CraftingService
         var playerSeed = player.CraftingSeed;
         var seededQuantities = CalculateSeededQuantities(recipe, playerSeed);
 
-        // 4. Check provided quantities match seeded requirements (±5% tolerance)
-        bool quantitiesMatch = CheckQuantities(recipe, componentItems, seededQuantities);
+        // 4. Check provided quantities match seeded requirements
+        //    (±tolerance scales with craftingSkill/requiredCraftingSkill — task #133).
+        bool quantitiesMatch = CheckQuantities(
+            recipe, componentItems, seededQuantities,
+            player.CraftingSkill, recipe.RequiredCraftingSkill);
 
         // 5. Roll crafting outcome — use fresh RNG each attempt (not deterministic per recipe)
         var outcome = RollOutcome(Random.Shared, quantitiesMatch);
@@ -325,11 +328,23 @@ public class CraftingService
 
     /// <summary>
     /// Quantity-match test: provided value within ±5% of seeded (tolerance min 1).
-    /// Public for sim harness.
+    /// Kept as a baseline overload for callers that predate skill-scaling
+    /// (task #133). Prefer <see cref="QuantityMatches(int, int, int, int)"/>.
     /// </summary>
     public static bool QuantityMatches(int provided, int seeded)
+        => QuantityMatches(provided, seeded, 1, 1);
+
+    /// <summary>
+    /// Skill-scaled quantity-match test (task #133). Tolerance is pulled from
+    /// <see cref="FirstMud.Domain.Configuration.ProgressionCurvesAccessor.CraftingTolerance"/>
+    /// so higher-skill crafters get a wider ± window on their seeded quantity.
+    /// Public for sim harness.
+    /// </summary>
+    public static bool QuantityMatches(int provided, int seeded, int playerSkill, int requiredSkill)
     {
-        var tolerance = Math.Max(1, (int)Math.Round(seeded * 0.05));
+        var frac = FirstMud.Domain.Configuration.ProgressionCurvesAccessor.CraftingTolerance(
+            playerSkill, requiredSkill);
+        var tolerance = Math.Max(1, (int)Math.Round(seeded * frac));
         return Math.Abs(provided - seeded) <= tolerance;
     }
 
@@ -350,12 +365,20 @@ public class CraftingService
     private static bool CheckQuantities(
         Recipe recipe,
         IReadOnlyList<Item> componentItems,
-        IReadOnlyList<int> seededQuantities)
+        IReadOnlyList<int> seededQuantities,
+        int playerCraftingSkill,
+        int requiredCraftingSkill)
     {
         // Sum quantities by ingredient name — stacked items contribute their Quantity value
         var providedCounts = componentItems
             .GroupBy(i => i.Name)
             .ToDictionary(g => g.Key, g => g.Sum(i => Math.Max(1, i.Quantity)));
+
+        // Skill-scaled tolerance (task #133). playerSkill ≥ requiredSkill here
+        // because the RequiredCraftingSkill gate ran earlier; still we pass both
+        // through so the accessor's formula stays the single source of truth.
+        var frac = FirstMud.Domain.Configuration.ProgressionCurvesAccessor.CraftingTolerance(
+            playerCraftingSkill, requiredCraftingSkill);
 
         for (int i = 0; i < recipe.Ingredients.Count; i++)
         {
@@ -363,8 +386,7 @@ public class CraftingService
             var required = seededQuantities[i];
             providedCounts.TryGetValue(ingredient.IngredientName, out var provided);
 
-            // ±5% tolerance
-            var tolerance = Math.Max(1, (int)Math.Round(required * 0.05));
+            var tolerance = Math.Max(1, (int)Math.Round(required * frac));
             if (Math.Abs(provided - required) > tolerance)
                 return false;
         }

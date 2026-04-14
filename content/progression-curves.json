@@ -16,5 +16,11 @@
     "playerLevelWeight": 3,
     "perGapBonus": 0.15,
     "maxMultiplier": 3.0
+  },
+  "craftingSkillScaling": {
+    "_note": "Skill-scaled tolerance on CraftingService quantity check (task #133). Formula: tolerance = clamp(baseTolerance + max(0, craftingSkill/max(1,requiredCraftingSkill) - 1) * tolerancePerSkillTier, baseTolerance, maxTolerance). At skill == required: baseTolerance (5%). At skill = 2x required: 7%. At skill = 4x required: 11%. Capped at maxTolerance so legendary crafters still face real risk on the hardest recipes.",
+    "baseTolerance": 0.05,
+    "tolerancePerSkillTier": 0.02,
+    "maxTolerance": 0.20
   }
 }

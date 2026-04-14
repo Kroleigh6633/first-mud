@@ -33,6 +33,11 @@ public static class ProgressionCurvesAccessor
     public const double DefaultRubberBandPerGapBonus = 0.15;
     public const double DefaultRubberBandMaxMultiplier = 3.0;
 
+    /// <summary>Historical default crafting-skill-scaling coefficients (task #133).</summary>
+    public const double DefaultCraftingBaseTolerance = 0.05;
+    public const double DefaultCraftingTolerancePerSkillTier = 0.02;
+    public const double DefaultCraftingMaxTolerance = 0.20;
+
     /// <summary>Historical default per-type companion layer thresholds (pre-tune).</summary>
     public static readonly IReadOnlyDictionary<CompanionType, IReadOnlyList<int>> DefaultCompanionLayerThresholds =
         new Dictionary<CompanionType, IReadOnlyList<int>>
@@ -50,6 +55,9 @@ public static class ProgressionCurvesAccessor
     private static int _rubberBandPlayerLevelWeight = DefaultRubberBandPlayerLevelWeight;
     private static double _rubberBandPerGapBonus = DefaultRubberBandPerGapBonus;
     private static double _rubberBandMaxMultiplier = DefaultRubberBandMaxMultiplier;
+    private static double _craftingBaseTolerance = DefaultCraftingBaseTolerance;
+    private static double _craftingTolerancePerSkillTier = DefaultCraftingTolerancePerSkillTier;
+    private static double _craftingMaxTolerance = DefaultCraftingMaxTolerance;
     private static readonly object _gate = new();
 
     /// <summary>Currently-effective workmanship skill divisor.</summary>
@@ -96,6 +104,38 @@ public static class ProgressionCurvesAccessor
         return Math.Min(mult, _rubberBandMaxMultiplier);
     }
 
+    /// <summary>Currently-effective crafting baseline tolerance (fraction of seeded qty).</summary>
+    public static double CraftingBaseTolerance => _craftingBaseTolerance;
+
+    /// <summary>Currently-effective additional tolerance per skill-tier above requirement.</summary>
+    public static double CraftingTolerancePerSkillTier => _craftingTolerancePerSkillTier;
+
+    /// <summary>Currently-effective upper clamp on the skill-scaled crafting tolerance.</summary>
+    public static double CraftingMaxTolerance => _craftingMaxTolerance;
+
+    /// <summary>
+    /// Returns the skill-scaled ±tolerance (fraction of seeded quantity) for a
+    /// crafting attempt. Formula:
+    ///   skillRatio = playerSkill / max(1, requiredSkill)
+    ///   tolerance  = clamp(base + max(0, skillRatio - 1) * perSkillTier, base, max)
+    /// At <c>playerSkill == requiredSkill</c> → base (historical 5%).
+    /// At <c>playerSkill == 2 × requiredSkill</c> → base + 1 × perSkillTier (7%).
+    /// At <c>playerSkill == 4 × requiredSkill</c> → base + 3 × perSkillTier (11%).
+    /// Clamped to <see cref="CraftingMaxTolerance"/> so legendary crafters still
+    /// face real risk on the hardest recipes. Task #133.
+    /// </summary>
+    public static double CraftingTolerance(int playerSkill, int requiredSkill)
+    {
+        var required = Math.Max(1, requiredSkill);
+        var skill = Math.Max(0, playerSkill);
+        var skillRatio = skill / (double)required;
+        var bonus = Math.Max(0.0, skillRatio - 1.0) * _craftingTolerancePerSkillTier;
+        var tol = _craftingBaseTolerance + bonus;
+        if (tol < _craftingBaseTolerance) tol = _craftingBaseTolerance;
+        if (tol > _craftingMaxTolerance) tol = _craftingMaxTolerance;
+        return tol;
+    }
+
     /// <summary>
     /// Called by <c>ContentProvider</c> on (re)load. Any parameter may be
     /// <c>null</c> to mean "keep the current value".
@@ -105,7 +145,10 @@ public static class ProgressionCurvesAccessor
         IReadOnlyDictionary<CompanionType, IReadOnlyList<int>>? companionLayerThresholds,
         int? rubberBandPlayerLevelWeight = null,
         double? rubberBandPerGapBonus = null,
-        double? rubberBandMaxMultiplier = null)
+        double? rubberBandMaxMultiplier = null,
+        double? craftingBaseTolerance = null,
+        double? craftingTolerancePerSkillTier = null,
+        double? craftingMaxTolerance = null)
     {
         lock (_gate)
         {
@@ -115,6 +158,9 @@ public static class ProgressionCurvesAccessor
             if (rubberBandPlayerLevelWeight is int w && w > 0) _rubberBandPlayerLevelWeight = w;
             if (rubberBandPerGapBonus is double b && b >= 0) _rubberBandPerGapBonus = b;
             if (rubberBandMaxMultiplier is double m && m >= 1) _rubberBandMaxMultiplier = m;
+            if (craftingBaseTolerance is double cb && cb >= 0) _craftingBaseTolerance = cb;
+            if (craftingTolerancePerSkillTier is double ct && ct >= 0) _craftingTolerancePerSkillTier = ct;
+            if (craftingMaxTolerance is double cm && cm >= 0) _craftingMaxTolerance = cm;
         }
     }
 
@@ -128,6 +174,20 @@ public static class ProgressionCurvesAccessor
             _rubberBandPlayerLevelWeight = DefaultRubberBandPlayerLevelWeight;
             _rubberBandPerGapBonus = DefaultRubberBandPerGapBonus;
             _rubberBandMaxMultiplier = DefaultRubberBandMaxMultiplier;
+            _craftingBaseTolerance = DefaultCraftingBaseTolerance;
+            _craftingTolerancePerSkillTier = DefaultCraftingTolerancePerSkillTier;
+            _craftingMaxTolerance = DefaultCraftingMaxTolerance;
+        }
+    }
+
+    /// <summary>Narrow test seam — restores ONLY the crafting-skill-scaling coefficients.</summary>
+    public static void ResetCraftingSkillScalingForTests()
+    {
+        lock (_gate)
+        {
+            _craftingBaseTolerance = DefaultCraftingBaseTolerance;
+            _craftingTolerancePerSkillTier = DefaultCraftingTolerancePerSkillTier;
+            _craftingMaxTolerance = DefaultCraftingMaxTolerance;
         }
     }
 
