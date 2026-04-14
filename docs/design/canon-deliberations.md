@@ -120,6 +120,7 @@ context.
 | Q1 Rider refusal | Once per arc, -500 rep, logged | Yes — user may declare unlimited refusal, or zero |
 | Q2 Ashen silence | Story-trigger AND 60-day floor | Yes — user may declare pure time or pure story |
 | Q3 Child recruits | 16+ only until approved | Yes — user may approve minors or forbid entirely |
+| Q4 Feed-the-stone (Ashen sacrifice) | Forbidden until approved | Yes — user may unlock, restrict, or forbid permanently |
 
 Overturning any of these is a one-line user statement; the later creative
 agent edits this file and the downstream quest / thread docs. Lore is
@@ -401,3 +402,42 @@ agent should weight HP% alongside win-rate when citing encounter-sim
 results in design proposals. `progression-tune-proposal-v1.md` §5 does
 this manually for now.
 
+---
+
+## Pass #8 follow-up (creative pass #8)
+
+## Q4 — Player-initiated Ashen sacrifice
+
+> Can a player actively *feed* an Ashen-aligned artifact by offering a
+> named traveling-companion NPC to it?
+
+**Ruling (conservative): Forbidden until explicitly approved.**
+
+Surfaced by the Ashen Reach chain draft (`quest-chain-ashen-reach.md`,
+Beat 4 "Feed it" option). The machinery is spec'd but content-locked
+behind a flag. Reasoning parallels Q3: canon is silent on player-as-Ashen-
+agent; design should not open that door on silence.
+
+**Implications if approved:**
+- "Feed it" becomes an Ashen-aligned win path (+world-event tick +3,
+  permanent Ashen-sympathizer flag on player, blacklists all three
+  major factions by one tier).
+- Requires NPC-sacrifice dialogue scenes which lint will need to police
+  for consent/agency (is the NPC aware? is the player told what happens?).
+
+**If permanently forbidden:** Beat 4 ships with three options (Extract /
+Unmake / Leave). No machinery change.
+
+---
+
+## Pass-7 follow-ups resolved in this pass
+
+- **Zone rumors (GH #8):** Delivered as `content/zone-rumors.json`, 4–5
+  strings per zone across all 9 Aeldran zones. Text-only, no mechanical
+  coupling. Schema-free for now (shape is obvious; schema can be added
+  when a consuming service exists).
+- **Ashen Reach quest coverage:** Chain drafted (see
+  `quest-chain-ashen-reach.md`) with an escort sub-step designed to
+  ship the day the escort-template blocklist is partially lifted, plus
+  a fallback travel-montage implementation that runs today against
+  existing `content/monsters.json` biome spawns.
