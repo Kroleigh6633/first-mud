@@ -88,6 +88,12 @@ export interface GameStateResult {
   questProgress: QuestProgressMap;
   completedQuestIds: string[];
   cityView: CityViewSnapshot | null;
+  /**
+   * Server-emitted harvest failure. The `seq` field increments on every new
+   * failure so consumers (the auto-quest runner in particular) can distinguish
+   * "new failure since last tick" from a stale value.
+   */
+  lastHarvestFailure: { reason: string; seq: number } | null;
 }
 
 export function useGameState(): GameStateResult {
@@ -116,6 +122,7 @@ export function useGameState(): GameStateResult {
   const [questProgress, setQuestProgress] = useState<QuestProgressMap>({});
   const [completedQuestIds, setCompletedQuestIds] = useState<string[]>([]);
   const [cityView, setCityView] = useState<CityViewSnapshot | null>(null);
+  const [lastHarvestFailure, setLastHarvestFailure] = useState<{ reason: string; seq: number } | null>(null);
 
   const appendMessage = useCallback((msg: GameMessage) => {
     setMessages(prev => {
@@ -462,6 +469,11 @@ export function useGameState(): GameStateResult {
         });
       });
 
+      connection.on('HarvestFailed', (payload: { reason?: string }) => {
+        const reason = payload?.reason ?? 'unknown';
+        setLastHarvestFailure(prev => ({ reason, seq: (prev?.seq ?? 0) + 1 }));
+      });
+
       connection.on('AutoFarmStatus', (status: AutoFarmStatus) => {
         setAutoFarmStatus(status.active ? status : null);
       });
@@ -640,5 +652,6 @@ export function useGameState(): GameStateResult {
     questProgress,
     completedQuestIds,
     cityView,
+    lastHarvestFailure,
   };
 }

@@ -48,6 +48,7 @@ interface Props {
   questProgress?: QuestProgressMap;
   completedQuestIds?: string[];
   cityView?: CityViewSnapshot | null;
+  lastHarvestFailure?: { reason: string; seq: number } | null;
 }
 
 /**
@@ -275,6 +276,7 @@ export default function GameTerminal({
   questProgress = {},
   completedQuestIds = [],
   cityView = null,
+  lastHarvestFailure = null,
 }: Props) {
   const commands = useGameCommands(sendCommand);
 
@@ -366,6 +368,15 @@ export default function GameTerminal({
   // Throttle for harvest commands sent from the fulfilling phase (server caps
   // at ~1/s; we aim for ~800 ms between sends as spec'd in the briefing).
   const lastHarvestAtRef = useRef(0);
+  // Last harvest-failure seq processed by the fulfilling-gather sub-loop.
+  // Compared against lastHarvestFailure.seq to detect a *new* failure since
+  // the previous tick (separate from older stale ones on first mount).
+  const lastHarvestFailureSeqRef = useRef(0);
+  // Consecutive "no-resource" failures at the current tile. After 2, the
+  // runner steps to a random adjacent safe tile; after 12 total without any
+  // progress, it stalls and skips the quest.
+  const consecutiveHarvestFailuresRef = useRef(0);
+  const totalHarvestFailuresRef = useRef(0);
   // How many ticks we have been in 'accept' phase waiting for a waypoint
   const acceptWaitTicksRef = useRef(0);
   // Set to true when an Error message arrives while in the 'interact' phase —
@@ -413,6 +424,8 @@ export default function GameTerminal({
   combatRef.current = combat;
   const currentTileRef = useRef(currentTile);
   currentTileRef.current = currentTile;
+  const lastHarvestFailureRef = useRef(lastHarvestFailure);
+  lastHarvestFailureRef.current = lastHarvestFailure;
   const questWaypointRef = useRef(questWaypoint);
   if (questWaypointRef.current !== questWaypoint) {
     console.log('[questWaypoint prop] Changed:', questWaypoint);
@@ -1226,6 +1239,12 @@ export default function GameTerminal({
           autoQuestPhaseRef.current = 'fulfilling';
           fulfillTicksRef.current = 0;
           lastHarvestAtRef.current = 0;
+          // Reset harvest-failure tracking for this fulfillment attempt.
+          // Seed the seq baseline to the latest observed value so pre-existing
+          // failures from an earlier quest can't trip the step-out logic.
+          consecutiveHarvestFailuresRef.current = 0;
+          totalHarvestFailuresRef.current = 0;
+          lastHarvestFailureSeqRef.current = lastHarvestFailureRef.current?.seq ?? 0;
           wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'quest',
@@ -1327,6 +1346,69 @@ export default function GameTerminal({
             commands.interactQuest({ questId: nextQuest.questId });
             return;
           }
+
+          // Drain any new HarvestFailed events since our last tick. The server
+          // emits a typed { reason } code — no English-parsing required.
+          const failure = lastHarvestFailureRef.current;
+          if (failure && failure.seq > lastHarvestFailureSeqRef.current) {
+            lastHarvestFailureSeqRef.current = failure.seq;
+            if (failure.reason === 'no-resource') {
+              consecutiveHarvestFailuresRef.current += 1;
+              totalHarvestFailuresRef.current += 1;
+            }
+            // Inventory-full and other reasons are surfaced elsewhere; don't
+            // treat them as "step out" triggers.
+          }
+
+          // Hard stall: too many no-resource failures this fulfillment.
+          // 12 failures × 800 ms ≈ 10 s of fruitless harvesting.
+          if (totalHarvestFailuresRef.current >= 12) {
+            console.warn(`[autoquest fulfilling gather] Stalled — no resource nearby for "${nextQuest.title}"`);
+            autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+            const zoneId = currentTileRef.current?.zoneId ?? 'unknown zone';
+            wrappedAppendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'warning',
+              text: `AUTO-QUEST (STALLED) — no harvestable resource near ${zoneId}; skipping '${nextQuest.title}'.`,
+            });
+            autoQuestPhaseRef.current = 'idle';
+            if (autoQuestIntervalRef.current !== null) {
+              clearInterval(autoQuestIntervalRef.current);
+              autoQuestIntervalRef.current = null;
+            }
+            setAutoQuestIndex(prev => prev + 1);
+            return;
+          }
+
+          // Soft step-out: after 2 consecutive no-resource failures at the
+          // current tile, nudge to a random adjacent safe tile and retry.
+          if (consecutiveHarvestFailuresRef.current >= 2) {
+            const safeStepCap = Math.min(Math.ceil((player.level ?? 1) * 0.6), 7);
+            const deltas: MoveDeltaLike[] = [
+              { deltaX: 1, deltaY: 0 }, { deltaX: -1, deltaY: 0 },
+              { deltaX: 0, deltaY: 1 }, { deltaX: 0, deltaY: -1 },
+            ];
+            const pick = deltas[Math.floor(Math.random() * deltas.length)];
+            const step = stepTowardSafe(
+              player.x, player.y,
+              player.x + pick.deltaX, player.y + pick.deltaY,
+              safeStepCap,
+            );
+            if (step && step !== 'danger') {
+              console.log('[autoquest fulfilling gather] Stepping out after 2 no-resource failures');
+              consecutiveHarvestFailuresRef.current = 0;
+              commands.move(step);
+              // Reset throttle so we harvest promptly on arrival.
+              lastHarvestAtRef.current = 0;
+            } else {
+              // Couldn't find a safe step — count as a total failure so the
+              // stall cap still fires.
+              totalHarvestFailuresRef.current += 1;
+              consecutiveHarvestFailuresRef.current = 0;
+            }
+            return;
+          }
+
           // Throttle harvest to ~800 ms
           if (Date.now() - lastHarvestAtRef.current >= 800) {
             lastHarvestAtRef.current = Date.now();
