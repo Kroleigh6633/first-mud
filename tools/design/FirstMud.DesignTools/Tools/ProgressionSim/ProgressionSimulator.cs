@@ -352,6 +352,17 @@ public sealed class ProgressionSimulator
                     if (pool != null) RollFromPool(state, pool);
                 }
             }
+            // Boss drops (#140): if the picked monster is flagged isBoss,
+            // roll each authored bossDrops[] entry at its dropChance. Additive
+            // to the standard biome pool above.
+            if (monster.IsBoss)
+            {
+                foreach (var bd in _content.GetBossDropsFor(monster.Id))
+                {
+                    if (_rng.NextDouble() < bd.DropChance)
+                        AddMaterial(state, bd.ItemName, 1);
+                }
+            }
             return (true, $"{monster.Name}@d{zone.DangerLevel} +{xp}xp");
         }
         else

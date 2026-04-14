@@ -73,6 +73,21 @@ public interface IContentProvider
     /// <summary>All monsters in a given biome + tier (0-3).</summary>
     IReadOnlyList<MonsterDefinition> MonstersByBiomeAndTier(string biome, int tier);
 
+    /// <summary>
+    /// All boss-drop entries loaded from the top-level <c>bossDrops[]</c>
+    /// array in <c>content/monsters.json</c>. Consumed by <c>LootService</c>
+    /// to roll bonus material drops on boss kills (in addition to the
+    /// standard biome/equipment loot pool).
+    /// </summary>
+    IReadOnlyList<BossDropDefinition> AllBossDrops();
+
+    /// <summary>
+    /// Returns the boss-drop entries for <paramref name="monsterId"/>, or an
+    /// empty list if the monster has no authored boss drops (or is not a
+    /// boss). Each entry is rolled independently at its <c>DropChance</c>.
+    /// </summary>
+    IReadOnlyList<BossDropDefinition> GetBossDropsFor(string monsterId);
+
     // ─── Loot Tables ─────────────────────────────────────────────────────────
 
     /// <summary>Complete loot-table data block.</summary>

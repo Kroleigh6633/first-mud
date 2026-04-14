@@ -366,7 +366,8 @@ public class CombatHelpers(
     // Loot rolling
     // -------------------------------------------------------------------------
 
-    public async Task TryRollLootAsync(Guid playerId, Guid zoneId, CancellationToken ct)
+    public async Task TryRollLootAsync(Guid playerId, Guid zoneId, CancellationToken ct,
+        Encounter? encounter = null)
     {
         var player = await playerRepository.GetByIdAsync(playerId, ct);
         if (player is null) return;
@@ -417,6 +418,7 @@ public class CombatHelpers(
         {
             if (!string.IsNullOrEmpty(result.Message))
                 await notificationService.SendMessageAsync(playerId, "loot", result.Message, ct);
+            await RollBossDropsIfAnyAsync(playerId, encounter, player, ct);
             return;
         }
 
@@ -433,6 +435,7 @@ public class CombatHelpers(
         {
             var salvageCategory = GetSalvageCategory(item.Workmanship.Value);
             await notificationService.SendMessageAsync(playerId, salvageCategory, result.Message, ct);
+            await RollBossDropsIfAnyAsync(playerId, encounter, player, ct);
             return;
         }
 
@@ -499,6 +502,51 @@ public class CombatHelpers(
                 Category = item.Category.ToString(),
                 Slot = item.Slot.ToString()
             }, ct);
+
+        // Boss drops — bonus kill-drops authored in content/monsters.json
+        // bossDrops[]. Rolls AFTER standard loot so bosses still get biome
+        // drops, not replaced by boss-only drops (#140). Safe no-op when
+        // encounter is null (older call sites) or no defeated combatants are bosses.
+        await RollBossDropsIfAnyAsync(playerId, encounter, player, ct);
+    }
+
+    /// <summary>
+    /// Rolls per-boss bonus drops for any boss monsters among the defeated
+    /// enemies of the encounter. Sends a loot notification + <c>LootDropped</c>
+    /// hub message per awarded item. Safe no-op when <paramref name="encounter"/>
+    /// is null or no defeated enemy matches a boss in the content registry.
+    /// </summary>
+    private async Task RollBossDropsIfAnyAsync(Guid playerId, Encounter? encounter, Player? player, CancellationToken ct)
+    {
+        if (encounter is null || player is null) return;
+
+        var defeatedNames = encounter.Combatants
+            .Where(c => !c.IsPlayerSide && c.IsDefeated)
+            .Select(c => c.Name)
+            .ToList();
+        if (defeatedNames.Count == 0) return;
+
+        var items = await itemRepository.GetByOwnerAsync(playerId, ct);
+        var bossItems = await lootService.RollBossDropsByEnemyNamesAsync(
+            defeatedNames, playerId, player.Position.World,
+            items.Count, player.MaxInventorySlots, ct);
+
+        foreach (var b in bossItems)
+        {
+            var msg = $"The boss yields: {b.DisplayName} W{b.Workmanship.Value}!";
+            await notificationService.SendMessageAsync(playerId, "loot-legendary", msg, ct);
+            await hubContext.Clients
+                .Group(playerId.ToString())
+                .SendAsync("LootDropped", new
+                {
+                    b.Id,
+                    Name = b.DisplayName,
+                    b.Description,
+                    Workmanship = b.Workmanship.Value,
+                    Category = b.Category.ToString(),
+                    Slot = b.Slot.ToString()
+                }, ct);
+        }
     }
 
     // -------------------------------------------------------------------------

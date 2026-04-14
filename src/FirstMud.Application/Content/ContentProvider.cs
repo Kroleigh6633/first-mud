@@ -57,6 +57,9 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<string, RecipeDefinition> _recipesById = new(StringComparer.Ordinal);
     private IReadOnlyList<MonsterDefinition> _monsters = Array.Empty<MonsterDefinition>();
     private Dictionary<string, MonsterDefinition> _monstersById = new(StringComparer.Ordinal);
+    private IReadOnlyList<BossDropDefinition> _bossDrops = Array.Empty<BossDropDefinition>();
+    private Dictionary<string, IReadOnlyList<BossDropDefinition>> _bossDropsByMonsterId =
+        new(StringComparer.Ordinal);
     private LootTablesDefinition _lootTables = EmptyLootTables();
     private Dictionary<string, DropPoolDefinition> _poolsById = new(StringComparer.Ordinal);
     private Dictionary<string, MonsterDropDefinition> _monsterDropsById = new(StringComparer.Ordinal);
@@ -190,6 +193,17 @@ public sealed class ContentProvider : IContentProvider
             string.Equals(m.Biome, biome, StringComparison.Ordinal)).ToList();
     }
 
+    public IReadOnlyList<BossDropDefinition> AllBossDrops() => _bossDrops;
+
+    public IReadOnlyList<BossDropDefinition> GetBossDropsFor(string monsterId)
+    {
+        if (string.IsNullOrWhiteSpace(monsterId))
+            return Array.Empty<BossDropDefinition>();
+        return _bossDropsByMonsterId.TryGetValue(monsterId, out var list)
+            ? list
+            : Array.Empty<BossDropDefinition>();
+    }
+
     public DropPoolDefinition? GetDropPool(string id)
     {
         if (string.IsNullOrWhiteSpace(id)) return null;
@@ -312,6 +326,13 @@ public sealed class ContentProvider : IContentProvider
         _lootTables = LoadLootTables();
         _poolsById = _lootTables.DropPools.ToDictionary(p => p.Id, StringComparer.Ordinal);
         _monsterDropsById = _lootTables.MonsterDrops.ToDictionary(m => m.MonsterId, StringComparer.Ordinal);
+        _bossDrops = LoadBossDrops();
+        _bossDropsByMonsterId = _bossDrops
+            .GroupBy(b => b.MonsterId, StringComparer.Ordinal)
+            .ToDictionary<IGrouping<string, BossDropDefinition>, string, IReadOnlyList<BossDropDefinition>>(
+                g => g.Key,
+                g => g.ToList(),
+                StringComparer.Ordinal);
         _tierCurvesByTier = _lootTables.TierCurves.ToDictionary(c => c.Tier);
         _zones = LoadZones();
         _zonesById = _zones.ToDictionary(z => z.ZoneId, StringComparer.Ordinal);
@@ -1706,9 +1727,67 @@ public sealed class ContentProvider : IContentProvider
                 Speed: raw.Speed,
                 Level: raw.Level,
                 Element: element,
-                Abilities: abilities));
+                Abilities: abilities,
+                IsBoss: raw.IsBoss));
         }
 
+        return list;
+    }
+
+    /// <summary>
+    /// Loads the top-level <c>bossDrops[]</c> array from <c>content/monsters.json</c>.
+    /// Validates:
+    ///   * Every <c>monsterId</c> exists in the monsters registry and is flagged <c>isBoss</c>.
+    ///   * <c>dropChance</c> is in (0, 1].
+    ///   * <c>itemName</c> is non-empty. Unknown item names (not present in any
+    ///     loot-table drop pool) produce a logger warning but do NOT throw —
+    ///     many awardable items are implicitly defined (crafted results, quest
+    ///     rewards, etc.) and are not enumerated in drop pools.
+    /// </summary>
+    private IReadOnlyList<BossDropDefinition> LoadBossDrops()
+    {
+        var path = Path.Combine(_contentRoot, "monsters.json");
+        if (!File.Exists(path)) return Array.Empty<BossDropDefinition>();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<MonstersFile>(stream, JsonOptions);
+        if (doc?.BossDrops is null || doc.BossDrops.Count == 0)
+            return Array.Empty<BossDropDefinition>();
+
+        // Universe of known itemNames (soft-validation set).
+        var knownItemNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pool in _lootTables.DropPools)
+            foreach (var e in pool.Entries)
+                knownItemNames.Add(e.ItemName);
+        foreach (var tpl in _lootTables.EquipmentTemplates)
+            knownItemNames.Add(tpl.Name);
+
+        var list = new List<BossDropDefinition>(doc.BossDrops.Count);
+        foreach (var raw in doc.BossDrops)
+        {
+            if (string.IsNullOrWhiteSpace(raw.MonsterId))
+                throw new InvalidDataException($"{path}: bossDrop entry missing monsterId.");
+            if (string.IsNullOrWhiteSpace(raw.ItemName))
+                throw new InvalidDataException(
+                    $"{path}: bossDrop for '{raw.MonsterId}' missing itemName.");
+            if (raw.DropChance <= 0d || raw.DropChance > 1d)
+                throw new InvalidDataException(
+                    $"{path}: bossDrop '{raw.MonsterId} → {raw.ItemName}' has dropChance " +
+                    $"{raw.DropChance:0.###} outside (0, 1].");
+            if (!_monstersById.TryGetValue(raw.MonsterId, out var monster))
+                throw new InvalidDataException(
+                    $"{path}: bossDrop references unknown monsterId '{raw.MonsterId}'.");
+            if (!monster.IsBoss)
+                throw new InvalidDataException(
+                    $"{path}: bossDrop monsterId '{raw.MonsterId}' is not flagged isBoss.");
+
+            if (!knownItemNames.Contains(raw.ItemName))
+                _logger?.LogWarning(
+                    "{Path}: bossDrop '{Monster} → {Item}' references itemName not found in any loot-table drop pool or equipment template. This is allowed (many items are implicitly defined) but verify the spelling.",
+                    path, raw.MonsterId, raw.ItemName);
+
+            list.Add(new BossDropDefinition(raw.MonsterId, raw.ItemName, raw.DropChance));
+        }
         return list;
     }
 
@@ -1719,6 +1798,21 @@ public sealed class ContentProvider : IContentProvider
 
         [JsonPropertyName("monsters")]
         public List<RawMonster>? Monsters { get; set; }
+
+        [JsonPropertyName("bossDrops")]
+        public List<RawBossDrop>? BossDrops { get; set; }
+    }
+
+    private sealed class RawBossDrop
+    {
+        [JsonPropertyName("monsterId")]
+        public string MonsterId { get; set; } = "";
+
+        [JsonPropertyName("itemName")]
+        public string ItemName { get; set; } = "";
+
+        [JsonPropertyName("dropChance")]
+        public double DropChance { get; set; }
     }
 
     private sealed class RawAbility
@@ -1745,6 +1839,9 @@ public sealed class ContentProvider : IContentProvider
         public int Level { get; set; }
         public string Element { get; set; } = "";
         public List<string>? Abilities { get; set; }
+
+        [JsonPropertyName("isBoss")]
+        public bool IsBoss { get; set; }
     }
 
     private sealed class LootTablesFile

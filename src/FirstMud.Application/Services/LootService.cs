@@ -220,6 +220,154 @@ public class LootService
     }
 
     /// <summary>
+    /// Rolls per-boss bonus drops for a set of defeated monsters. Any monster
+    /// flagged <c>isBoss</c> in <c>content/monsters.json</c> rolls each of its
+    /// authored <c>bossDrops[]</c> entries at the entry's <c>dropChance</c>.
+    /// Non-boss monsters are skipped silently. This runs AFTER the standard
+    /// loot pool (<see cref="RollLootDropAsync"/>) — boss drops are additive,
+    /// not a replacement.
+    ///
+    /// Returned items are already persisted to the player's inventory
+    /// (stack-merged for stackable categories). Caller receives the list for
+    /// notification / diagnostics. Inventory-full short-circuits: if the
+    /// player is at cap when a roll succeeds, the drop is skipped with a
+    /// logger warning.
+    ///
+    /// <paramref name="rng"/> is injectable so tests can drive deterministic
+    /// outcomes. Pass <c>null</c> in live call sites to use the shared RNG.
+    /// </summary>
+    public async Task<IReadOnlyList<Item>> RollBossDropsAsync(
+        IEnumerable<string> defeatedMonsterIds,
+        Guid ownerId,
+        WorldId originWorld,
+        int currentInventoryCount,
+        int maxInventorySlots,
+        CancellationToken ct = default,
+        Random? rng = null)
+    {
+        var r = rng ?? Random.Shared;
+        var awarded = new List<Item>();
+        if (defeatedMonsterIds is null) return awarded;
+
+        foreach (var monsterId in defeatedMonsterIds)
+        {
+            if (string.IsNullOrWhiteSpace(monsterId)) continue;
+
+            var monster = _content.GetMonster(monsterId);
+            if (monster is null || !monster.IsBoss) continue;
+
+            var drops = _content.GetBossDropsFor(monsterId);
+            if (drops.Count == 0) continue;
+
+            foreach (var drop in drops)
+            {
+                if (r.NextDouble() >= drop.DropChance) continue;
+
+                // Resolve item metadata. Boss drops today are all Components
+                // (Wyrdforged Core, Starforged Ingot) — look up the canonical
+                // drop-pool entry for category/workmanship when available; fall
+                // back to Component @ W7 if the item is implicitly defined.
+                var meta = ResolveItemMetadata(drop.ItemName);
+                var work = Workmanship.Of(Math.Clamp(
+                    meta.MinWorkmanship + r.Next(Math.Max(1, meta.MaxWorkmanship - meta.MinWorkmanship + 1)),
+                    1, 10));
+
+                var item = Item.Create(
+                    drop.ItemName, meta.Description, meta.Category, work,
+                    originWorld, slot: EquipmentSlot.None);
+                item.SetOwner(ownerId);
+
+                // Inventory-full short-circuit: boss drops do not queue —
+                // drop the award and log. The caller already ran the normal
+                // loot deposit flow before reaching this path.
+                if (currentInventoryCount >= maxInventorySlots && !item.IsStackable)
+                {
+                    _logger.LogWarning(
+                        "Boss drop skipped (inventory full) for player {PlayerId}: {Monster} → {Item}",
+                        ownerId, monsterId, drop.ItemName);
+                    continue;
+                }
+
+                if (item.IsStackable)
+                {
+                    var existing = await _itemRepository.GetByOwnerAndNameAsync(
+                        ownerId, drop.ItemName, meta.Category, ct);
+                    if (existing is not null)
+                    {
+                        existing.AddQuantity(1);
+                        await _itemRepository.UpdateAsync(existing, ct);
+                        _logger.LogInformation(
+                            "Boss drop (stack) for player {PlayerId}: {Monster} → {Item} (now x{Qty})",
+                            ownerId, monsterId, drop.ItemName, existing.Quantity);
+                        awarded.Add(existing);
+                        continue;
+                    }
+                }
+
+                await _itemRepository.AddAsync(item, ct);
+                currentInventoryCount++;
+                _logger.LogInformation(
+                    "Boss drop for player {PlayerId}: {Monster} → {Item} W{Workmanship}",
+                    ownerId, monsterId, drop.ItemName, work.Value);
+                awarded.Add(item);
+            }
+        }
+
+        return awarded;
+    }
+
+    /// <summary>
+    /// Convenience overload that accepts defeated-enemy display names (as
+    /// carried on <c>Combatant.Name</c>) and resolves each to a monster id via
+    /// the content registry. Unknown names / non-boss names are skipped
+    /// silently. Used by the live combat path where the encounter's combatants
+    /// don't carry a monster id.
+    /// </summary>
+    public Task<IReadOnlyList<Item>> RollBossDropsByEnemyNamesAsync(
+        IEnumerable<string> defeatedEnemyNames,
+        Guid ownerId,
+        WorldId originWorld,
+        int currentInventoryCount,
+        int maxInventorySlots,
+        CancellationToken ct = default,
+        Random? rng = null)
+    {
+        var ids = new List<string>();
+        if (defeatedEnemyNames is not null)
+        {
+            foreach (var name in defeatedEnemyNames)
+            {
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                var match = _content.AllMonsters().FirstOrDefault(m =>
+                    string.Equals(m.Name, name, StringComparison.Ordinal));
+                if (match is not null && match.IsBoss)
+                    ids.Add(match.Id);
+            }
+        }
+        return RollBossDropsAsync(ids, ownerId, originWorld, currentInventoryCount, maxInventorySlots, ct, rng);
+    }
+
+    /// <summary>
+    /// Resolves item metadata (category, description, workmanship range) for a
+    /// boss-drop item name by scanning the loot-table drop pools. Unknown
+    /// items default to <see cref="ItemCategory.Component"/> at W7-W10 (the
+    /// top-tier material band — matches the Wyrdforged Core / Starforged
+    /// Ingot authoring).
+    /// </summary>
+    private (ItemCategory Category, string Description, int MinWorkmanship, int MaxWorkmanship) ResolveItemMetadata(string itemName)
+    {
+        foreach (var pool in _content.LootTables.DropPools)
+        {
+            foreach (var e in pool.Entries)
+            {
+                if (string.Equals(e.ItemName, itemName, StringComparison.OrdinalIgnoreCase))
+                    return (e.Category, string.IsNullOrWhiteSpace(e.Description) ? itemName : e.Description, Math.Max(1, e.MinWorkmanship), Math.Max(e.MinWorkmanship, e.MaxWorkmanship));
+            }
+        }
+        return (ItemCategory.Component, itemName, 7, 10);
+    }
+
+    /// <summary>
     /// Rolls a post-combat gold drop. Returns the amount credited (0 if no drop).
     /// Scales with zone danger level per content/trade-curves.json gold block.
     /// Does not persist — caller is responsible for calling <see cref="Player.AddGold"/>

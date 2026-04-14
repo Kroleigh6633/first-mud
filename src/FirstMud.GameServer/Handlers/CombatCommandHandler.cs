@@ -94,7 +94,7 @@ public class UseCombatAbilityCommandHandler(
         {
             await combatHelpers.AwardCombatXpAsync(cmd.PlayerId, updated, ct);
             await combatHelpers.SyncPlayerHpAfterCombatAsync(cmd.PlayerId, updated, ct);
-            await combatHelpers.TryRollLootAsync(cmd.PlayerId, updated.ZoneId, ct);
+            await combatHelpers.TryRollLootAsync(cmd.PlayerId, updated.ZoneId, ct, updated);
             await combatHelpers.TryCaptureCompanionAsync(cmd.PlayerId, updated, ct);
             await combatHelpers.UpdateCompanionUsageAsync(cmd.PlayerId, 10, ct);
 
