@@ -328,7 +328,10 @@ public sealed class ContentProvider : IContentProvider
             _progressionCurves.CompanionLayerThresholds,
             _progressionCurves.CompanionRubberBand.PlayerLevelWeight,
             _progressionCurves.CompanionRubberBand.PerGapBonus,
-            _progressionCurves.CompanionRubberBand.MaxMultiplier);
+            _progressionCurves.CompanionRubberBand.MaxMultiplier,
+            _progressionCurves.CraftingSkillScaling.BaseTolerance,
+            _progressionCurves.CraftingSkillScaling.TolerancePerSkillTier,
+            _progressionCurves.CraftingSkillScaling.MaxTolerance);
 
         // NPCs load AFTER zones + factions so cross-ref validation
         // (homeZoneId / factionId) can run against the authored registries.
@@ -763,7 +766,11 @@ public sealed class ContentProvider : IContentProvider
             new CompanionRubberBandCurve(
                 FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandPlayerLevelWeight,
                 FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandPerGapBonus,
-                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandMaxMultiplier));
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandMaxMultiplier),
+            new CraftingSkillScalingCurve(
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCraftingBaseTolerance,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCraftingTolerancePerSkillTier,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCraftingMaxTolerance));
 
     /// <summary>
     /// Loads <c>content/progression-curves.json</c> if present. The file is
@@ -846,16 +853,48 @@ public sealed class ContentProvider : IContentProvider
             rubberBand = new CompanionRubberBandCurve(rb.PlayerLevelWeight, rb.PerGapBonus, rb.MaxMultiplier);
         }
 
+        // Crafting-skill-scaling block — OPTIONAL. If absent, apply historical
+        // defaults so older partial-content fixtures keep working (task #133).
+        CraftingSkillScalingCurve craftingSkillScaling;
+        if (doc.CraftingSkillScaling is null)
+        {
+            craftingSkillScaling = new CraftingSkillScalingCurve(
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCraftingBaseTolerance,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCraftingTolerancePerSkillTier,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCraftingMaxTolerance);
+        }
+        else
+        {
+            var cs = doc.CraftingSkillScaling;
+            if (cs.BaseTolerance < 0 || cs.BaseTolerance > 1)
+                throw new InvalidDataException(
+                    $"{path}: craftingSkillScaling.baseTolerance must be in [0, 1] (got {cs.BaseTolerance}).");
+            if (cs.TolerancePerSkillTier < 0 || cs.TolerancePerSkillTier > 1)
+                throw new InvalidDataException(
+                    $"{path}: craftingSkillScaling.tolerancePerSkillTier must be in [0, 1] (got {cs.TolerancePerSkillTier}).");
+            if (cs.MaxTolerance < cs.BaseTolerance || cs.MaxTolerance > 1)
+                throw new InvalidDataException(
+                    $"{path}: craftingSkillScaling.maxTolerance must be in [baseTolerance, 1] (got {cs.MaxTolerance}).");
+            craftingSkillScaling = new CraftingSkillScalingCurve(cs.BaseTolerance, cs.TolerancePerSkillTier, cs.MaxTolerance);
+        }
+
         return new ProgressionCurvesDefinition(
             new WorkmanshipCurve(divisor),
             thresholds,
-            rubberBand);
+            rubberBand,
+            craftingSkillScaling);
     }
 
     private sealed record ProgressionCurvesFile(
         [property: JsonPropertyName("workmanship")] WorkmanshipRaw? Workmanship,
         [property: JsonPropertyName("companionLayerThresholds")] Dictionary<string, List<int>>? CompanionLayerThresholds,
-        [property: JsonPropertyName("companionRubberBand")] CompanionRubberBandRaw? CompanionRubberBand);
+        [property: JsonPropertyName("companionRubberBand")] CompanionRubberBandRaw? CompanionRubberBand,
+        [property: JsonPropertyName("craftingSkillScaling")] CraftingSkillScalingRaw? CraftingSkillScaling);
+
+    private sealed record CraftingSkillScalingRaw(
+        [property: JsonPropertyName("baseTolerance")]         double BaseTolerance,
+        [property: JsonPropertyName("tolerancePerSkillTier")] double TolerancePerSkillTier,
+        [property: JsonPropertyName("maxTolerance")]          double MaxTolerance);
 
     private sealed record WorkmanshipRaw(
         [property: JsonPropertyName("skillDivisor")] int SkillDivisor);

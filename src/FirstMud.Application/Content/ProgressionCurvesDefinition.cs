@@ -19,7 +19,18 @@ namespace FirstMud.Application.Content;
 public sealed record ProgressionCurvesDefinition(
     WorkmanshipCurve Workmanship,
     IReadOnlyDictionary<CompanionType, IReadOnlyList<int>> CompanionLayerThresholds,
-    CompanionRubberBandCurve CompanionRubberBand);
+    CompanionRubberBandCurve CompanionRubberBand,
+    CraftingSkillScalingCurve CraftingSkillScaling);
+
+/// <summary>
+/// Skill-scaled tolerance on <c>CraftingService</c>'s quantity check (task #133).
+/// Formula: <c>tolerance = clamp(baseTolerance + max(0, skillRatio - 1) * tolerancePerSkillTier, baseTolerance, maxTolerance)</c>
+/// where <c>skillRatio = playerSkill / max(1, requiredSkill)</c>.
+/// </summary>
+public sealed record CraftingSkillScalingCurve(
+    double BaseTolerance,
+    double TolerancePerSkillTier,
+    double MaxTolerance);
 
 /// <summary>
 /// Workmanship coefficients. <c>skillBonus = craftingSkill / SkillDivisor</c>.

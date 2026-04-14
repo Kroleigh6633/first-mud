@@ -29,6 +29,32 @@
         "items": { "type": "integer", "minimum": 0 }
       }
     },
+    "craftingSkillScaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Skill-scaled tolerance on CraftingService quantity check (task #133). tolerance = clamp(baseTolerance + max(0, skillRatio - 1) * tolerancePerSkillTier, baseTolerance, maxTolerance). Block is OPTIONAL — absent means defaults (0.05, 0.02, 0.20).",
+      "properties": {
+        "_note": { "type": "string" },
+        "baseTolerance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Baseline tolerance (fraction of seeded qty) at skill == requiredSkill. Historical default: 0.05."
+        },
+        "tolerancePerSkillTier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Additional tolerance per skill-tier above requirement (one 'tier' = 1.0 of skillRatio above 1.0). Historical default: 0.02."
+        },
+        "maxTolerance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Upper clamp on the tolerance. Historical default: 0.20."
+        }
+      }
+    },
     "companionRubberBand": {
       "type": "object",
       "additionalProperties": false,

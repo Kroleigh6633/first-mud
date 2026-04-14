@@ -86,7 +86,12 @@ public sealed class CraftingEvaluator
             displayed = Math.Max(1, displayed);
 
             // A reasonable player submits the displayed quantity (the UI's own hint).
-            bool match = CraftingService.QuantityMatches(displayed, seeded);
+            // Tolerance now scales with craftingSkill / recipeDifficulty (task #133):
+            // treat recipeDifficulty as the required-crafting-skill proxy so a
+            // high-skill crafter actually clears more cells than a low-skill one.
+            int craftingSkillAxis = axisValues.TryGetValue("craftingSkill", out var csk) ? csk : 1;
+            int requiredSkillAxis = axisValues.TryGetValue("recipeDifficulty", out var rdk) ? Math.Max(1, rdk) : 1;
+            bool match = CraftingService.QuantityMatches(displayed, seeded, craftingSkillAxis, requiredSkillAxis);
             if (s == 0) sampleMatched = match;
 
             var rng = new Random(unchecked(masterSeed * 1_000_003 + cellSalt * 97 + s * 13));
