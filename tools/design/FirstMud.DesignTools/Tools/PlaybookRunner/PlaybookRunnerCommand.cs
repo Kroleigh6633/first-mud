@@ -75,7 +75,7 @@ public static class PlaybookRunnerCommand
         {
             ConsolePretty.Warn($"{result.Divergences.Count} cell(s) diverged from expectation:");
             foreach (var c in result.Divergences)
-                ConsolePretty.Warn($"  {Describe(c.AxisValues)}  expected={c.ExpectedBand}  actual={c.ActualBand}  winRate={c.Summary.WinRate:P1}");
+                ConsolePretty.Warn($"  {Describe(c)}  expected={c.ExpectedBand}  actual={c.ActualBand}  winRate={c.Summary.WinRate:P1}");
         }
         else
         {
@@ -107,7 +107,8 @@ public static class PlaybookRunnerCommand
             rolls = result.Rolls,
             cells = result.Cells.Select(c => new
             {
-                axis = c.AxisValues,
+                axis = (object?)c.AxisDisplay ?? c.AxisValues,
+                axisInt = c.AxisValues,
                 winRate = c.Summary.WinRate,
                 avgRounds = c.Summary.AvgRounds,
                 avgHpPct = c.Summary.AvgPlayerHpPct,
@@ -115,7 +116,7 @@ public static class PlaybookRunnerCommand
                 expected = c.ExpectedBand,
                 divergent = c.Divergent,
             }),
-            divergences = result.Divergences.Select(c => new { axis = c.AxisValues, expected = c.ExpectedBand, actual = c.ActualBand, winRate = c.Summary.WinRate }),
+            divergences = result.Divergences.Select(c => new { axis = (object?)c.AxisDisplay ?? c.AxisValues, expected = c.ExpectedBand, actual = c.ActualBand, winRate = c.Summary.WinRate }),
         };
         var jsonPath = log.WriteJson(payload);
         var md = $"Playbook **{playbook.Id}** — {playbook.DisplayName}. " +
@@ -211,12 +212,24 @@ public static class PlaybookRunnerCommand
         if (result.Cells.Count == 0) return "(no cells)";
 
         var axisNames = result.Cells[0].AxisValues.Keys.ToArray();
-        sb.Append(string.Join(" | ", axisNames.Select(n => n.PadRight(10))));
+        // Column width tuned for zone-id strings (e.g. "aeldran-1-caervorn-highlands").
+        // Numeric axes still fit fine at 30 chars padding.
+        sb.Append(string.Join(" | ", axisNames.Select(n => n.PadRight(30))));
         sb.AppendLine(" | winRate | rounds | actual    | expected  | !");
 
         foreach (var c in result.Cells)
         {
-            foreach (var n in axisNames) sb.Append(c.AxisValues[n].ToString().PadRight(10) + " | ");
+            // Prefer AxisDisplay (carries original string form of string-valued
+            // axes) over AxisValues (ints, hashed for string axes). Keeps the
+            // table readable for flow playbooks like auto-quest-completion that
+            // axis over zone-id strings.
+            foreach (var n in axisNames)
+            {
+                var display = c.AxisDisplay is not null && c.AxisDisplay.TryGetValue(n, out var ds)
+                    ? ds
+                    : c.AxisValues[n].ToString();
+                sb.Append(display.PadRight(30) + " | ");
+            }
             sb.Append($"{c.Summary.WinRate,7:P1} | ");
             sb.Append($"{c.Summary.AvgRounds,6:F1} | ");
             sb.Append($"{c.ActualBand.PadRight(9)} | ");
@@ -228,6 +241,16 @@ public static class PlaybookRunnerCommand
 
     private static string Describe(IReadOnlyDictionary<string, int> axis)
         => "{" + string.Join(", ", axis.Select(kv => $"{kv.Key}={kv.Value}")) + "}";
+
+    private static string Describe(PlaybookEngine.CellResult c)
+    {
+        if (c.AxisDisplay is null) return Describe(c.AxisValues);
+        return "{" + string.Join(", ", c.AxisValues.Keys.Select(k =>
+        {
+            var v = c.AxisDisplay.TryGetValue(k, out var ds) ? ds : c.AxisValues[k].ToString();
+            return $"{k}={v}";
+        })) + "}";
+    }
 
     public static string CompareToPriorRun(string priorJsonPath, PlaybookEngine.PlaybookRunResult current)
     {
@@ -272,7 +295,15 @@ public static class PlaybookRunnerCommand
     {
         var parts = new List<string>();
         foreach (var prop in axis.EnumerateObject())
-            parts.Add($"{prop.Name}={prop.Value.GetInt32()}");
+        {
+            var v = prop.Value.ValueKind switch
+            {
+                JsonValueKind.Number => prop.Value.GetInt32().ToString(),
+                JsonValueKind.String => prop.Value.GetString() ?? "",
+                _ => prop.Value.ToString(),
+            };
+            parts.Add($"{prop.Name}={v}");
+        }
         parts.Sort(StringComparer.Ordinal);
         return string.Join(",", parts);
     }

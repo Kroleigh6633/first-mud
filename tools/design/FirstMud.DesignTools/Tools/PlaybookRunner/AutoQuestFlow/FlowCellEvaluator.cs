@@ -35,12 +35,14 @@ public sealed class FlowCellEvaluator
             // CellResult type; string-valued axes are hashed into the key but
             // their display value is carried on the summary narrative below.
             var intCombo = ComboToIntKeyed(combo);
+            var displayCombo = ComboToDisplay(combo);
             cells.Add(new PlaybookEngine.CellResult(
                 intCombo,
                 summary.AsEncounterSummary(),
                 ActualBand: summary.ActualLabel,
                 ExpectedBand: expected?.Label ?? "",
-                Divergent: divergent));
+                Divergent: divergent,
+                AxisDisplay: displayCombo));
         }
 
         var divergences = cells.Where(c => c.Divergent).ToList();
@@ -172,8 +174,32 @@ public sealed class FlowCellEvaluator
     private static IReadOnlyDictionary<string, int> ComboToIntKeyed(IReadOnlyDictionary<string, object> combo)
     {
         var d = new Dictionary<string, int>(combo.Count);
+        // For string-valued axes, use a DETERMINISTIC stable hash (FNV-1a) — NOT
+        // string.GetHashCode() which is randomized per-process in .NET 6+ and
+        // would make the "int key" change every run (Sweep #3 bug: numeric
+        // startZoneIds like 73978/92099/12814 in sim-reports were non-deterministic
+        // hashes of valid zone ids like "aeldran-1-caervorn-highlands"). The
+        // display value is carried separately on CellResult.AxisDisplay.
         foreach (var kv in combo)
-            d[kv.Key] = kv.Value is int i ? i : System.Math.Abs(kv.Value?.ToString()?.GetHashCode() ?? 0) % 100000;
+            d[kv.Key] = kv.Value is int i ? i : (int)(StableStringHash(kv.Value?.ToString() ?? "") % 100000u);
         return d;
+    }
+
+    private static IReadOnlyDictionary<string, string> ComboToDisplay(IReadOnlyDictionary<string, object> combo)
+    {
+        var d = new Dictionary<string, string>(combo.Count);
+        foreach (var kv in combo) d[kv.Key] = kv.Value?.ToString() ?? "";
+        return d;
+    }
+
+    // FNV-1a 32-bit, deterministic across processes.
+    private static uint StableStringHash(string s)
+    {
+        unchecked
+        {
+            uint hash = 2166136261u;
+            foreach (var c in s) { hash ^= c; hash *= 16777619u; }
+            return hash;
+        }
     }
 }

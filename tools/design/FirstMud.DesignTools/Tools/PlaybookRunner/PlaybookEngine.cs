@@ -36,7 +36,8 @@ public sealed class PlaybookEngine
         EncounterSim.EncounterSimCommand.Summary Summary,
         string ActualBand,
         string ExpectedBand,
-        bool Divergent);
+        bool Divergent,
+        IReadOnlyDictionary<string, string>? AxisDisplay = null);
 
     public sealed record PlaybookRunResult(
         string PlaybookId,
