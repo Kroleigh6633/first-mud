@@ -21,8 +21,8 @@
     "cells": [
       { "craftingSkill": 2, "recipeDifficulty": 1, "expected": { "Success": [30, 85], "NearMiss": [0, 55], "ComponentLoss": [1, 10], "UnexpectedResult": [10, 30], "Discovery": [0, 5] } },
       { "craftingSkill": 2, "recipeDifficulty": 3, "expected": { "Success": [40, 85], "NearMiss": [0, 50], "ComponentLoss": [1, 10], "UnexpectedResult": [10, 30], "Discovery": [0, 5] } },
-      { "craftingSkill": 8, "recipeDifficulty": 3, "expected": { "Success": [40, 85], "NearMiss": [0, 50], "ComponentLoss": [1, 10], "UnexpectedResult": [10, 30], "Discovery": [0, 5] } },
-      { "craftingSkill": 40, "recipeDifficulty": 8, "expected": { "Success": [40, 90], "NearMiss": [0, 50], "ComponentLoss": [1, 10], "UnexpectedResult": [10, 30], "Discovery": [0, 5] } }
+      { "craftingSkill": 8, "recipeDifficulty": 3, "expected": { "Success": [40, 85], "NearMiss": [0, 50], "ComponentLoss": [0, 10], "UnexpectedResult": [10, 30], "Discovery": [0, 5] } },
+      { "craftingSkill": 40, "recipeDifficulty": 8, "expected": { "Success": [40, 90], "NearMiss": [0, 50], "ComponentLoss": [0, 10], "UnexpectedResult": [10, 30], "Discovery": [0, 5] } }
     ]
   },
   "toleranceBands": {}

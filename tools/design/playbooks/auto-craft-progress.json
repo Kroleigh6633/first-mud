@@ -15,12 +15,12 @@
   "seed": 42,
   "expectedViability": {
     "cells": [
-      { "playerLevel": 3, "gearTier": 1, "dangerLevel": 5, "expected": "balanced" },
-      { "playerLevel": 3, "gearTier": 2, "dangerLevel": 5, "expected": "trivial" },
-      { "playerLevel": 3, "gearTier": 3, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 3, "gearTier": 1, "dangerLevel": 5, "expected": "punishing" },
+      { "playerLevel": 3, "gearTier": 2, "dangerLevel": 5, "expected": "hard" },
+      { "playerLevel": 3, "gearTier": 3, "dangerLevel": 5, "expected": "hard" },
 
-      { "playerLevel": 5, "gearTier": 1, "dangerLevel": 5, "expected": "trivial" },
-      { "playerLevel": 5, "gearTier": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 5, "gearTier": 1, "dangerLevel": 5, "expected": "balanced" },
+      { "playerLevel": 5, "gearTier": 2, "dangerLevel": 5, "expected": "easy" },
       { "playerLevel": 5, "gearTier": 3, "dangerLevel": 5, "expected": "trivial" },
 
       { "playerLevel": 8, "gearTier": 1, "dangerLevel": 5, "expected": "trivial" },

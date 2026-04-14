@@ -1,0 +1,127 @@
+{
+  "id": "chain6-ash-and-salt",
+  "title": "Ash and Salt",
+  "_designNote": "Ashen Reach chain. 6 beats, 4 terminals. Exercises typed addItem/removeItem for Ash-Salt Reagent and Obsidian Shard — mirrors the typed targetItemNames pattern used by DungeonMasterService for procgen quests. Zone: aeldran-6-ashen-reach (desert, danger 8). allowUnderflow=false; the chain owns all removeItem paths and gates them behind an item-count requires.",
+  "allowUnderflow": false,
+  "startState": {
+    "flags": ["ashen-reach.visited"],
+    "inventory": [],
+    "reputation": { "ashen": 0, "rider-compact": 0, "caervorn": 0 }
+  },
+  "root": "intro",
+  "beats": [
+    {
+      "id": "intro",
+      "description": "At the Kiln-Gate an ashen smith, Hazir, points to the dune line. 'The salt-ghosts are thicker this cycle. Bring me four Ash-Salt from their kills and a single Obsidian Shard from the black vent. I pay in rep and in a blade that cuts wyrd.'",
+      "choices": [
+        { "id": "accept", "text": "Accept Hazir's commission.", "next": "hunt",
+          "effects": [ { "type": "setFlag", "key": "ashsalt.accepted" } ] },
+        { "id": "refuse", "text": "Refuse — too hot, too far.",
+          "next": "end-refused",
+          "effects": [ { "type": "addReputation", "key": "ashen", "amount": -25 } ] }
+      ]
+    },
+    {
+      "id": "hunt",
+      "description": "Two approaches: pick off salt-ghosts at range where they're weakest, or go to the black vent first and draw them while you work.",
+      "requires": { "flags": ["ashsalt.accepted"] },
+      "choices": [
+        { "id": "pick-off",
+          "text": "Range-hunt. Safer, slower.",
+          "next": "gather",
+          "effects": [
+            { "type": "addItem", "key": "Ash-Salt", "amount": 4 },
+            { "type": "setFlag", "key": "ashsalt.peaceful" }
+          ] },
+        { "id": "vent-first",
+          "text": "Vent first, fight through.",
+          "next": "gather",
+          "effects": [
+            { "type": "addItem", "key": "Ash-Salt", "amount": 3 },
+            { "type": "addItem", "key": "Obsidian Shard", "amount": 1 },
+            { "type": "setFlag", "key": "ashsalt.aggressive" }
+          ] }
+      ]
+    },
+    {
+      "id": "gather",
+      "description": "The vent is sheathed in razor glass. The shards won't come easy.",
+      "choices": [
+        { "id": "mine-careful",
+          "text": "Chip at the vent. Take your time.",
+          "next": "deliver",
+          "requires": { "flags": ["ashsalt.peaceful"] },
+          "effects": [ { "type": "addItem", "key": "Obsidian Shard", "amount": 1 } ] },
+        { "id": "skip",
+          "text": "You already have the shard. Head back.",
+          "next": "deliver",
+          "requires": { "flags": ["ashsalt.aggressive"] } },
+        { "id": "mine-extra",
+          "text": "Take a second shard for yourself. Hazir won't know.",
+          "next": "deliver-cheated",
+          "requires": { "flags": ["ashsalt.peaceful"] },
+          "effects": [
+            { "type": "addItem", "key": "Obsidian Shard", "amount": 2 },
+            { "type": "setFlag", "key": "ashsalt.skimmed" }
+          ] }
+      ]
+    },
+    {
+      "id": "deliver",
+      "description": "Hazir counts the Ash-Salt, turns the shard in the light. 'Clean. Good.' He begins the forge ritual.",
+      "requires": {
+        "items": [
+          { "name": "Ash-Salt", "quantity": 3 },
+          { "name": "Obsidian Shard", "quantity": 1 }
+        ]
+      },
+      "choices": [
+        { "id": "hand-over",
+          "text": "Hand over the materials.",
+          "next": "end-clean",
+          "effects": [
+            { "type": "removeItem", "key": "Ash-Salt", "amount": 3 },
+            { "type": "removeItem", "key": "Obsidian Shard", "amount": 1 },
+            { "type": "addItem", "key": "Wyrdcut Blade", "amount": 1 },
+            { "type": "addReputation", "key": "ashen", "amount": 200 },
+            { "type": "addReputation", "key": "rider-compact", "amount": 25 }
+          ] }
+      ]
+    },
+    {
+      "id": "deliver-cheated",
+      "description": "Hazir counts, looks up. 'You skimmed. The vent always marks the skimmer — the second shard in your pack is already fouling.' He will still forge, but the blade carries the fault.",
+      "requires": { "flags": ["ashsalt.skimmed"] },
+      "choices": [
+        { "id": "own-it",
+          "text": "Admit the skim. Take the lesser blade.",
+          "next": "end-skimmed",
+          "effects": [
+            { "type": "removeItem", "key": "Ash-Salt", "amount": 3 },
+            { "type": "removeItem", "key": "Obsidian Shard", "amount": 2 },
+            { "type": "addItem", "key": "Flawed Wyrdcut Blade", "amount": 1 },
+            { "type": "addReputation", "key": "ashen", "amount": 75 }
+          ] },
+        { "id": "walk-off",
+          "text": "Walk off with the shards. Keep what you've got.",
+          "next": "end-walked",
+          "effects": [
+            { "type": "addReputation", "key": "ashen", "amount": -150 },
+            { "type": "addReputation", "key": "caervorn", "amount": -25 }
+          ] }
+      ]
+    },
+    { "id": "end-clean",
+      "description": "Hazir gifts the Wyrdcut Blade. Ashen Reach marks you as kiln-kin. Permanent +50 floor at Ashen.",
+      "terminal": true },
+    { "id": "end-skimmed",
+      "description": "The flawed blade still cuts wyrd — just less cleanly. Hazir watches you go without warmth.",
+      "terminal": true },
+    { "id": "end-walked",
+      "description": "You keep the shards. The Ashen Reach remembers. Doors close at the Kiln-Gate.",
+      "terminal": true },
+    { "id": "end-refused",
+      "description": "Hazir finds another hand. The chain closes; re-hook available next arc if Ashen rep recovers.",
+      "terminal": true }
+  ]
+}

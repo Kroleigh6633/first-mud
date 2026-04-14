@@ -1,46 +1,10 @@
-# Design Sim Log — 2026-04-14
+==========================================
+PLAYBOOK: nude-character
+==========================================
+=== playbook-runner: nude-character — Nude character viability ===
+Player only (no companions, no imbues, no gear proxy). Where does a bare character alone stop working? DESIGN INTENT (creative pass #7): at d=0 a timber-wolf is unscaled (hp 28) so any player >=1 should trivialise it in <3 rounds. A bare character 1v1 vs a single monster is a FAVORABLE matchup regardless of danger because the monster is alone and has no ally piling on. Where this playbook earns its keep is in the 'character outgrows gear-danger gap' cliff: pl-5 hits balance at d~4, hard at d~6, punishing at d~8. Higher-level bare characters keep clearing because 1v1 scaled-monster vs pl-12 strike-base favours the caster. This is acceptable: overworld threat comes from PACKS, not solo mobs (see `full-party` + future `pack` playbook).
+kind=combat  rolls/cell=200  seed=42  axes=[playerLevel:5, dangerLevel:5]
 
-## 02:11:26Z — playbook-runner — playbook auto-craft-progress
-
-Playbook **auto-craft-progress** — Auto-craft gear-tier progression. Cells=9, divergent=3. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-021126.json`
-
-```
-playerLevel | gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
-3          | 1          | 5          |   68.0% |    4.9 | balanced  | hard      | DIVERGE
-3          | 2          | 5          |   97.0% |    4.4 | trivial   | balanced  | DIVERGE
-3          | 3          | 5          |  100.0% |    3.7 | trivial   | easy      | DIVERGE
-5          | 1          | 5          |   95.0% |    4.4 | trivial   | trivial   | 
-5          | 2          | 5          |  100.0% |    3.8 | trivial   | trivial   | 
-5          | 3          | 5          |  100.0% |    3.3 | trivial   | trivial   | 
-8          | 1          | 5          |  100.0% |    3.6 | trivial   | trivial   | 
-8          | 2          | 5          |  100.0% |    3.2 | trivial   | trivial   | 
-8          | 3          | 5          |  100.0% |    2.9 | trivial   | trivial   | 
-
-```
-
-## 02:11:41Z — playbook-runner — playbook auto-craft-progress
-
-Playbook **auto-craft-progress** — Auto-craft gear-tier progression. Cells=9, divergent=0. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-021141.json`
-
-```
-playerLevel | gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
-3          | 1          | 5          |   68.0% |    4.9 | balanced  | balanced  | 
-3          | 2          | 5          |   96.0% |    4.2 | trivial   | trivial   | 
-3          | 3          | 5          |  100.0% |    3.7 | trivial   | trivial   | 
-5          | 1          | 5          |   98.0% |    4.3 | trivial   | trivial   | 
-5          | 2          | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-5          | 3          | 5          |  100.0% |    3.2 | trivial   | trivial   | 
-8          | 1          | 5          |  100.0% |    3.5 | trivial   | trivial   | 
-8          | 2          | 5          |  100.0% |    3.1 | trivial   | trivial   | 
-8          | 3          | 5          |  100.0% |    2.7 | trivial   | trivial   | 
-
-```
-
-## 03:31:54Z — playbook-runner — playbook nude-character
-
-Playbook **nude-character** — Nude character viability. Cells=25, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033154.json`
-
-```
 playerLevel | dangerLevel | winRate | rounds | actual    | expected  | !
 1          | 0          |  100.0% |    2.0 | trivial   | trivial   | 
 1          | 2          |  100.0% |    3.0 | trivial   | trivial   | 
@@ -68,47 +32,16 @@ playerLevel | dangerLevel | winRate | rounds | actual    | expected  | !
 12         | 6          |   99.5% |    4.5 | trivial   | trivial   | 
 12         | 8          |   96.5% |    5.5 | trivial   | trivial   | 
 
-```
 
-## 03:32:16Z — playbook-runner — playbook nude-character
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: gear-only
+==========================================
+=== playbook-runner: gear-only — Gear-only viability ===
+Player + tier-N gear, no companions, no imbues. When does gear alone carry? DESIGN INTENT (CP7 follow-up Fix #2): gear tier now applies DISTINCTLY from player level — +15% weapon BasePower per tier on Strike + mitigation proxy via +3 Agility per tier. Baseline pl=5 + gt=N stays low-HP-pool, so mid/high-danger monsters still win attrition wars even as gear dps climbs. Post-decoupling expectation: gt=1..5 at d=1-3 is trivial; d=5 walks from balanced→trivial as gear grows; d=7-9 stays hard/punishing without a party even at gt=5 (you need imbues or companions to close the gap). Sim runs 1v1 vs representative monster (timber-wolf / dire-bear / frost-giant by danger bucket).
+kind=combat  rolls/cell=200  seed=42  axes=[gearTier:5, dangerLevel:5]
 
-Playbook **nude-character** — Nude character viability. Cells=25, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033216.json`
-
-```
-playerLevel | dangerLevel | winRate | rounds | actual    | expected  | !
-1          | 0          |  100.0% |    2.0 | trivial   | trivial   | 
-1          | 2          |  100.0% |    3.0 | trivial   | trivial   | 
-1          | 4          |    1.0% |    3.6 | punishing | punishing | 
-1          | 6          |    0.0% |    2.6 | punishing | punishing | 
-1          | 8          |    0.0% |    2.3 | punishing | punishing | 
-3          | 0          |  100.0% |    1.3 | trivial   | trivial   | 
-3          | 2          |  100.0% |    2.2 | trivial   | trivial   | 
-3          | 4          |   37.0% |    4.8 | hard      | hard      | 
-3          | 6          |    0.5% |    3.7 | punishing | punishing | 
-3          | 8          |    0.0% |    3.2 | punishing | punishing | 
-5          | 0          |  100.0% |    1.1 | trivial   | trivial   | 
-5          | 2          |  100.0% |    2.0 | trivial   | trivial   | 
-5          | 4          |   92.0% |    4.5 | easy      | easy      | 
-5          | 6          |    9.0% |    4.8 | punishing | punishing | 
-5          | 8          |    0.5% |    4.2 | punishing | punishing | 
-8          | 0          |  100.0% |    1.1 | trivial   | trivial   | 
-8          | 2          |  100.0% |    1.4 | trivial   | trivial   | 
-8          | 4          |  100.0% |    3.5 | trivial   | trivial   | 
-8          | 6          |   78.5% |    5.7 | balanced  | balanced  | 
-8          | 8          |   39.0% |    5.7 | hard      | hard      | 
-12         | 0          |  100.0% |    1.1 | trivial   | trivial   | 
-12         | 2          |  100.0% |    1.1 | trivial   | trivial   | 
-12         | 4          |  100.0% |    2.8 | trivial   | trivial   | 
-12         | 6          |   99.5% |    4.5 | trivial   | trivial   | 
-12         | 8          |   96.5% |    5.5 | trivial   | trivial   | 
-
-```
-
-## 03:32:17Z — playbook-runner — playbook gear-only
-
-Playbook **gear-only** — Gear-only viability. Cells=25, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033217.json`
-
-```
 gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
 1          | 1          |  100.0% |    1.3 | trivial   | trivial   | 
 1          | 3          |   99.5% |    3.7 | trivial   | trivial   | 
@@ -136,13 +69,16 @@ gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
 5          | 7          |   62.0% |    5.1 | balanced  | balanced  | 
 5          | 9          |   28.5% |    5.0 | punishing | punishing | 
 
-```
 
-## 03:32:18Z — playbook-runner — playbook imbue-only
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: imbue-only
+==========================================
+=== playbook-runner: imbue-only — Imbue-only contribution ===
+Baseline gear tier 3, no companions, varying imbue level. DESIGN INTENT (CP7 Fix #2): imbues now apply DISTINCTLY from level — +20% magical ability BasePower per imbue level + flat +4 per imbue to every ability base. Because the auto-sim player prefers Strike (physical, weave-cost 0), imbue contribution is weaker than gear in this config but still shows a clean upward trend. Expected: low danger (d<=5) trivial regardless of imbue; d=7 moves hard→balanced as imbue climbs; d=9 stays punishing until multiple imbue levels stack. A pure magic-caster playbook (if added) would show a steeper imbue curve.
+kind=combat  rolls/cell=200  seed=42  axes=[imbueLevel:5, dangerLevel:4]
 
-Playbook **imbue-only** — Imbue-only contribution. Cells=20, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033218.json`
-
-```
 imbueLevel | dangerLevel | winRate | rounds | actual    | expected  | !
 0          | 3          |   99.5% |    3.1 | trivial   | trivial   | 
 0          | 5          |   98.0% |    3.9 | trivial   | trivial   | 
@@ -165,13 +101,16 @@ imbueLevel | dangerLevel | winRate | rounds | actual    | expected  | !
 4          | 7          |   53.0% |    4.4 | hard      | hard      | 
 4          | 9          |   29.0% |    4.5 | punishing | punishing | 
 
-```
 
-## 03:32:19Z — playbook-runner — playbook companion-contribution
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: companion-contribution
+==========================================
+=== playbook-runner: companion-contribution — Companion contribution ===
+Player (no gear/imbue proxy) + N companions at layer L. When do extra party slots keep a player alive that gear/level alone can't? DESIGN INTENT (creative pass #7): 0 companions at any layer is the solo-bare-character line (tracked by `nude-character` for pl coverage); 3 companions at any layer with pl=5 clears solo-monster content cleanly because party-scaling + extra bodies stacks multiplicatively vs a 1v1 target. This playbook documents the floor: even 3 companions at layer 1 should carry pl=5 through d9 vs a single scaled frost-giant. FUTURE WORK: pair with a `pack-viability` playbook to stress the same loadouts against 3-5 monster packs.
+kind=combat  rolls/cell=100  seed=42  axes=[companionCount:4, companionLayer:3, dangerLevel:3]
 
-Playbook **companion-contribution** — Companion contribution. Cells=36, divergent=0. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033219.json`
-
-```
 companionCount | companionLayer | dangerLevel | winRate | rounds | actual    | expected  | !
 0          | 1          | 3          |   98.0% |    4.0 | trivial   | trivial   | 
 0          | 1          | 6          |    7.0% |    4.8 | punishing | punishing | 
@@ -210,13 +149,16 @@ companionCount | companionLayer | dangerLevel | winRate | rounds | actual    | e
 3          | 5          | 6          |  100.0% |    2.5 | trivial   | trivial   | 
 3          | 5          | 9          |  100.0% |    3.5 | trivial   | trivial   | 
 
-```
 
-## 03:32:20Z — playbook-runner — playbook full-party
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: full-party
+==========================================
+=== playbook-runner: full-party — Full-party regression baseline ===
+Canonical mid-game loadout: playerLevel 8 + gearTier 3 proxy + imbueLevel 2 proxy + 3 companions at layer 3. Single axis: dangerLevel. DESIGN INTENT (creative pass #7): a player who has earned the mid-game stack IS supposed to dominate the overworld monster curve; 'hard' is reserved for end-game bosses and for content that exceeds the player's zone band (neither of which this sim represents — single monster cell, no boss flag). Post-rebalance + pass-7 tunes, the full stack sweeps d0-d10 in 1-3 rounds. Treat this playbook as a regression detector ('mid-game stack suddenly can't clear a mid-danger mob') rather than a balance target ('mid-game stack should struggle at mid-danger').
+kind=combat  rolls/cell=200  seed=42  axes=[dangerLevel:11]
 
-Playbook **full-party** — Full-party regression baseline. Cells=11, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033220.json`
-
-```
 dangerLevel | winRate | rounds | actual    | expected  | !
 0          |  100.0% |    1.0 | trivial   | trivial   | 
 1          |  100.0% |    1.0 | trivial   | trivial   | 
@@ -230,13 +172,16 @@ dangerLevel | winRate | rounds | actual    | expected  | !
 9          |  100.0% |    2.2 | trivial   | trivial   | 
 10         |  100.0% |    2.4 | trivial   | trivial   | 
 
-```
 
-## 03:32:21Z — playbook-runner — playbook pack-viability
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: pack-viability
+==========================================
+=== playbook-runner: pack-viability — Pack viability (party vs pack size) ===
+Mid-game holdouts (playerLevel 5, gearTier 3, imbueLevel 2, companionLayer 3) swept across partySize x packSize x dangerLevel. DESIGN INTENT (CP7 Fix #3): pack-viability is the first playbook that varies enemy pack size distinctly from dangerLevel, so we can observe the pack-cap / party-scaling interaction the way a real encounter would. Expected curve: when partySize >= packSize at the same dangerLevel, fights are balanced-to-trivial (the player side has position to focus-fire); when partySize + 2 < packSize (heavily outnumbered), mid-danger fights skew hard/punishing because the pack-cap can't help you if you show up solo. Standard 'fair-matched' cases (e.g. partySize=3 vs packSize=3 at danger=5) should land balanced/easy; asymmetric cases (partySize=1 vs packSize=4 at danger=5+) should land punishing.
+kind=combat  rolls/cell=120  seed=42  axes=[partySize:4, packSize:4, dangerLevel:3]
 
-Playbook **pack-viability** — Pack viability (party vs pack size). Cells=48, divergent=0. Seed=42, rolls/cell=120. JSON: `playbook-runner-20260414-033221.json`
-
-```
 partySize  | packSize   | dangerLevel | winRate | rounds | actual    | expected  | !
 1          | 1          | 3          |  100.0% |    2.8 | trivial   | trivial   | 
 1          | 1          | 5          |   98.3% |    3.4 | trivial   | trivial   | 
@@ -287,77 +232,12 @@ partySize  | packSize   | dangerLevel | winRate | rounds | actual    | expected 
 4          | 4          | 5          |  100.0% |    4.1 | trivial   | trivial   | 
 4          | 4          | 7          |   12.5% |    7.4 | punishing | punishing | 
 
-```
 
-## 03:32:21Z — playbook-runner — playbook capture-flow
-
-Playbook **capture-flow** — Capture flow regression. Cells=120, divergent=0. Seed=42, rolls/cell=8. JSON: `playbook-runner-20260414-033221.json`
-
-```
-playerPower | targetMonsterLayer | targetMonsterElement | winRate | rounds | actual    | expected  | !
-1          | 1          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 1          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 1          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 1          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 1          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 2          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 2          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 2          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 2          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 2          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 3          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 3          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 3          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 3          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 3          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 4          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 4          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 4          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 4          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 4          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 5          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 5          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 5          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 5          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 5          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 6          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 6          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 6          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 6          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-1          | 6          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 1          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 1          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 1          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 1          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 1          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 2          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 2          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 2          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 2          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 2          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 3          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 3          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 3          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 3          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 3          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 4          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 4          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 4          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 4          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 4          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 5          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 5          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 5          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 5          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 5          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 6          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 6          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 6          | 2          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 6          | 3          |   66.7% |    2.6 | broken    | (none)    | 
-5          | 6          | 4          |   66.7% |    2.6 | broken    | (none)    | 
-10         | 1          | 0          |   66.7% |    2.6 | broken    | (none)    | 
-10         | 1          | 1          |   66.7% |    2.6 | broken    | (none)    | 
-10         | 1          | 2          |   66.7% |    2.6 | broken    | (none)    | 
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: capture-flow
+==========================================
 10         | 1          | 3          |   66.7% |    2.6 | broken    | (none)    | 
 10         | 1          | 4          |   66.7% |    2.6 | broken    | (none)    | 
 10         | 2          | 0          |   66.7% |    2.6 | broken    | (none)    | 
@@ -416,13 +296,16 @@ playerPower | targetMonsterLayer | targetMonsterElement | winRate | rounds | act
 15         | 6          | 3          |   66.7% |    2.6 | broken    | (none)    | 
 15         | 6          | 4          |   66.7% |    2.6 | broken    | (none)    | 
 
-```
 
-## 03:32:22Z — playbook-runner — playbook crafting-success
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: crafting-success
+==========================================
+=== playbook-runner: crafting-success — Crafting outcome distribution ===
+Exposes the REAL outcome distribution of CraftingService.AttemptCraftAsync across skill/difficulty cells. Models a player who submits the UI-displayed (rounded-to-5) quantity — the common case when a user reads the recipe panel at face value. Outcomes: Success, UnexpectedResult (bonus), ComponentLoss (hard fail), NearMiss (soft fail, no loss), Discovery (rare variant unlock). Current math (v1): skill-check is a hard gate (below-required-skill is an instant NearMiss), once past gate the outcome depends ONLY on whether submitted qty is within ±5% of seeded-per-player qty. craftingSkill axis is preserved for future tuning and to verify the skill gate works as expected.
+kind=crafting  rolls/cell=500  seed=42  axes=[craftingSkill:8, recipeDifficulty:4]
 
-Playbook **crafting-success** (crafting) — cells=32 divergent=1. Seed=42 rolls/cell=500. JSON: `playbook-runner-20260414-033222.json`
-
-```
 craftingSkill | recipeDifficulty | Success | NearMiss | UnexpRes | CompLoss | Discov | match? | !
 1          | 1          |   57.1% |    21.5% |    17.9% |     1.0% |   2.5% |      Y | 
 1          | 3          |   45.2% |    27.3% |    23.8% |     2.3% |   1.5% |      N | 
@@ -457,13 +340,17 @@ craftingSkill | recipeDifficulty | Success | NearMiss | UnexpRes | CompLoss | Di
 40         | 5          |   53.5% |    22.3% |    19.6% |     2.3% |   2.3% |      Y | 
 40         | 8          |   54.0% |    22.7% |    19.6% |     1.0% |   2.7% |      Y | 
 
-```
 
-## 03:32:23Z — playbook-runner — playbook herb-supply
+  warn  1 cell(s) diverged from expected distribution:
+  warn    {craftingSkill=8, recipeDifficulty=3}  ComponentLoss=0.6% outside [1,10]
+EXIT=0
+==========================================
+PLAYBOOK: herb-supply
+==========================================
+=== playbook-runner: herb-supply — Herb supply by biome ===
+ECONOMY playbook. Measures tier-1, tier-2, and tier-3 herb acquisition rate per biome per playerHour. Tier-1 (Sage, Mint, Thornroot, Lavender) should drop abundantly everywhere. Tier-2 (Fire Moss / Sea Kelp / Nightshade / Sand Thistle / Bogweed) should appear meaningfully in their designated biome but be near-zero elsewhere. Tier-3 (Moonbloom / Starflower / Wyrd Blossom / Dragon's Breath) is scarce — 0/hr baseline because acquisition requires Greenhouse cultivation from rare seeds, not direct drops. Seeds (Moonbloom Seed from Thornwood forest, Starflower Seed from water/Fairgean, Wyrd Blossom Seed from wyrd sources, Dragon's Breath Seed from volcanic/mountain boss drops) should be scarce but non-zero in their biomes. This playbook is a design reference + regression target; the current PlaybookRunner does not execute economy kind, but herb-supply cells are validated by the HerbSupplyPlaybookTests unit test.
+kind=economy  rolls/cell=200  seed=42  axes=[biome:7, playerHours:1]
 
-Playbook **herb-supply** — Herb supply by biome. Cells=7, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033223.json`
-
-```
 biome      | playerHours | winRate | rounds | actual    | expected  | !
 1          | 1          |  100.0% |    1.1 | unknown   | (none)    | 
 2          | 1          |  100.0% |    1.1 | unknown   | (none)    | 
@@ -473,13 +360,28 @@ biome      | playerHours | winRate | rounds | actual    | expected  | !
 6          | 1          |  100.0% |    1.1 | unknown   | (none)    | 
 7          | 1          |  100.0% |    1.1 | unknown   | (none)    | 
 
-```
 
-## 03:32:24Z — playbook-runner — playbook trade-flow
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: gem-supply
+==========================================
+=== playbook-runner: gem-supply — Gem supply rate by tier / biome ===
+Measures per-hour acquisition of each gem tier across biomes for the 'balanced' playstyle. Tier-1 gems (Quartz, Obsidian) should be reliable — 5-10 per 40h. Tier-2 (Amethyst, Emerald, Topaz, Aquamarine) meaningful — 2-4 per 40h across all biomes combined. Tier-3 (Diamond, Black Pearl) scarce but present — 0-2 per 40h. If tier-3 never appears in a 40h sim that is a content bug; bump drop weights for the tier-3 entries in loot-tables.json biome-mountain / biome-desert / biome-water / biome-wyrd pools. NOTE: this playbook is an economy-sim spec, not a viability playbook — it is consumed by the gem-supply economy evaluator (follow-up). Today the file is a content contract that the economy-sim command can load; acceptance is via the content-layer test that verifies gems referenced here match the loot-tables entries.
+kind=economy  rolls/cell=5  seed=1337  axes=[gemTier:3, biome:7]
+  ERROR  System.IndexOutOfRangeException: Index was outside the bounds of the array.
+   at FirstMud.DesignTools.Tools.PlaybookRunner.PlaybookEngine.CartesianWithIndices(IReadOnlyList`1 axes)+MoveNext() in C:\claude\matt\personal\first-mud\first-mud\.claude\worktrees\agent-a1067938\tools\design\FirstMud.DesignTools\Tools\PlaybookRunner\PlaybookEngine.cs:line 250
+   at FirstMud.DesignTools.Tools.PlaybookRunner.PlaybookEngine.Execute(Playbook playbook, Nullable`1 seedOverride) in C:\claude\matt\personal\first-mud\first-mud\.claude\worktrees\agent-a1067938\tools\design\FirstMud.DesignTools\Tools\PlaybookRunner\PlaybookEngine.cs:line 56
+   at FirstMud.DesignTools.Tools.PlaybookRunner.PlaybookRunnerCommand.Run(String[] args) in C:\claude\matt\personal\first-mud\first-mud\.claude\worktrees\agent-a1067938\tools\design\FirstMud.DesignTools\Tools\PlaybookRunner\PlaybookRunnerCommand.cs:line 67
+   at FirstMud.DesignTools.Program.Main(String[] args) in C:\claude\matt\personal\first-mud\first-mud\.claude\worktrees\agent-a1067938\tools\design\FirstMud.DesignTools\Program.cs:line 35
+EXIT=0
+==========================================
+PLAYBOOK: trade-flow
+==========================================
+=== playbook-runner: trade-flow — Trade flow — gold in vs gold out per hour ===
+STAGE 1 SEED. Measures gold-in / gold-out per hour across playstyle and hours-played. Expected bands: balanced → net positive ~50g/hour; craft-heavy → net positive ~100g/hour; enchanting-focused → net near zero (buying reagents offsets selling). Currently descriptive only — the playbook runner infrastructure supports kind=combat and kind=crafting; an economy evaluator is stage-2 work. This file documents expected bands so that evaluator can be written against them.
+kind=economy  rolls/cell=1  seed=42  axes=[playstyle:3, playerHours:5]
 
-Playbook **trade-flow** — Trade flow — gold in vs gold out per hour. Cells=15, divergent=0. Seed=42, rolls/cell=1. JSON: `playbook-runner-20260414-033224.json`
-
-```
 playstyle  | playerHours | winRate | rounds | actual    | expected  | !
 1          | 1          |  100.0% |    1.0 | unknown   | (none)    | 
 1          | 5          |  100.0% |    1.0 | unknown   | (none)    | 
@@ -497,13 +399,21 @@ playstyle  | playerHours | winRate | rounds | actual    | expected  | !
 3          | 20         |  100.0% |    1.0 | unknown   | (none)    | 
 3          | 40         |  100.0% |    1.0 | unknown   | (none)    | 
 
-```
 
-## 03:32:25Z — playbook-runner — playbook forge-throughput
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: leather-flow
+==========================================
+  ERROR  Failed to load playbook: Playbook 'leather-flow' has no axes.
+EXIT=0
+==========================================
+PLAYBOOK: forge-throughput
+==========================================
+=== playbook-runner: forge-throughput — Forge auto-smelt throughput ===
+Measures Metal-units-per-tick a Forge processes as a function of companion layer and forge tier. Each 60-second tick, one Crafter companion assigned to a constructed Forge smelts `ForgeThroughput(layer, tier)` units of Metal. Units are rolled into specific ores (Iron/Copper/Tin/Silver/Mithril) via `RollForgeOre`. One tick = 60s, so tick-rate × 60 = per-hour rate.
+kind=economy-analytical  rolls/cell=200  seed=42  axes=[companionLayer:6, forgeTier:3]
 
-Playbook **forge-throughput** — Forge auto-smelt throughput. Cells=18, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033225.json`
-
-```
 companionLayer | forgeTier  | winRate | rounds | actual    | expected  | !
 1          | 1          |  100.0% |    1.1 | unknown   | (none)    | 
 1          | 2          |  100.0% |    1.1 | unknown   | (none)    | 
@@ -524,13 +434,21 @@ companionLayer | forgeTier  | winRate | rounds | actual    | expected  | !
 6          | 2          |  100.0% |    1.1 | unknown   | (none)    | 
 6          | 3          |  100.0% |    1.1 | unknown   | (none)    | 
 
-```
 
-## 03:32:27Z — playbook-runner — playbook auto-quest-completion
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: salvage-material-flow
+==========================================
+  ERROR  Failed to load playbook: Playbook 'salvage-material-flow' has no axes.
+EXIT=0
+==========================================
+PLAYBOOK: auto-quest-completion
+==========================================
+=== playbook-runner: auto-quest-completion — Auto-quest completion stress test ===
+Flow playbook that stress-tests the auto-quest runner (L key) by simulating the client loop (accept → navigate → interact → complete) against every quest in content/quests.json, per starting zone. Outcomes: completed | stalled-no-start-zone | stalled-no-monsters | stalled-no-item-source | stalled-unknown-item | timeout. This is DATA triage — it flags quests whose content graph is incomplete. Runtime engine/handler bugs (e.g. the client loop waits forever for a server event that never fires) are NOT detected here and need live repros.
+kind=flow  rolls/cell=1  seed=42  axes=[startZoneId:5, questPoolSize:3]
 
-Playbook **auto-quest-completion** — Auto-quest completion stress test. Cells=15, divergent=3. Seed=42, rolls/cell=1. JSON: `playbook-runner-20260414-033227.json`
-
-```
 startZoneId | questPoolSize | winRate | rounds | actual    | expected  | !
 73978      | 1          |    0.0% |    0.0 | blocked   | (none)    | 
 73978      | 3          |   66.7% |    2.6 | broken    | healthy   | DIVERGE
@@ -548,23 +466,32 @@ startZoneId | questPoolSize | winRate | rounds | actual    | expected  | !
 56755      | 3          |  100.0% |    2.6 | healthy   | healthy   | 
 56755      | 10         |   90.0% |    2.6 | rough     | (none)    | 
 
-```
 
-## 03:32:27Z — playbook-runner — playbook auto-progression-endgame
+  warn  3 cell(s) diverged from expectation:
+  warn    {startZoneId=73978, questPoolSize=3}  expected=healthy  actual=broken  winRate=66.7%
+  warn    {startZoneId=92099, questPoolSize=3}  expected=healthy  actual=broken  winRate=66.7%
+  warn    {startZoneId=12814, questPoolSize=3}  expected=healthy  actual=broken  winRate=66.7%
+EXIT=0
+==========================================
+PLAYBOOK: auto-progression-endgame
+==========================================
+=== playbook-runner: auto-progression-endgame — Auto-progression endgame benchmark (scaffold) ===
+BENCHMARK: fresh L1 character with no gear / no imbues / no companions drives AutoProgressionService until it reliably clears dangerLevel 10 at ≥50%. Measures time-to-target in simulated hours. IMPORTANT: sub-modes auto-craft and auto-imbue are not yet implemented (2026-04-13). Scaffolded AutoProgressionService returns 'sub-mode stub' for Gear/Imbue constraints, so every cell in this playbook is expected to be 'punishing' (≈0% win rate at d10 with an L1 naked character) until sub-modes land. Engine-compatibility: this playbook reuses the standard (playerLevel, dangerLevel) cell grid so PlaybookEngine runs it without changes; the 'benchmark' semantics (time-to-target, grace-window) are driven server-side by AutoProgressionService in live play, not by the cell grid itself. Initial expected bands are deliberately generous; creative agent tightens once sub-modes ship.
+kind=combat  rolls/cell=200  seed=42  axes=[dangerLevel:1]
 
-Playbook **auto-progression-endgame** — Auto-progression endgame benchmark (scaffold). Cells=1, divergent=0. Seed=42, rolls/cell=200. JSON: `playbook-runner-20260414-033227.json`
-
-```
 dangerLevel | winRate | rounds | actual    | expected  | !
 10         |    0.0% |    2.1 | punishing | punishing | 
 
-```
 
-## 03:32:28Z — playbook-runner — playbook auto-craft-progress
+  ok  All cells on-band.
+EXIT=0
+==========================================
+PLAYBOOK: auto-craft-progress
+==========================================
+=== playbook-runner: auto-craft-progress — Auto-craft gear-tier progression ===
+FLOW: measures whether AutoProgressionService's gear-axis dispatch (AutoCraftPlanner + AutoCraftExecutor) can drive a fresh character's gear tier upward within a balanced farming+crafting budget. Axes are (startingGearTier x playerLevel). Cells proxy the outcome via the standard combat sim — at each (gt,pl) cell, if auto-craft can *actually* pick a viable recipe and farm its ingredients, the combat win-rate against a representative monster at the player's level should match the tolerance band below. The proxy: starting gearTier 1 @ playerLevel 5 should reach gearTier 3 within ~30 simulated minutes (≈3 craft cycles at this scale). We encode the expected post-progression state (gearTier = starting+2) as the effective playerLevel bump — so cells where auto-craft is working read 'balanced' or 'easy'; cells where planning breaks down read 'hard' or 'punishing' (honest bug signal). Creative agent should revisit once live-play telemetry lands.
+kind=combat  rolls/cell=100  seed=42  axes=[playerLevel:3, gearTier:3, dangerLevel:1]
 
-Playbook **auto-craft-progress** — Auto-craft gear-tier progression. Cells=9, divergent=5. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033228.json`
-
-```
 playerLevel | gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
 3          | 1          | 5          |   29.0% |    4.3 | punishing | balanced  | DIVERGE
 3          | 2          | 5          |   43.0% |    4.4 | hard      | trivial   | DIVERGE
@@ -576,13 +503,21 @@ playerLevel | gearTier   | dangerLevel | winRate | rounds | actual    | expected
 8          | 2          | 5          |  100.0% |    3.3 | trivial   | trivial   | 
 8          | 3          | 5          |  100.0% |    3.0 | trivial   | trivial   | 
 
-```
 
-## 03:32:29Z — playbook-runner — playbook auto-imbue-coverage
+  warn  5 cell(s) diverged from expectation:
+  warn    {playerLevel=3, gearTier=1, dangerLevel=5}  expected=balanced  actual=punishing  winRate=29.0%
+  warn    {playerLevel=3, gearTier=2, dangerLevel=5}  expected=trivial  actual=hard  winRate=43.0%
+  warn    {playerLevel=3, gearTier=3, dangerLevel=5}  expected=trivial  actual=hard  winRate=58.0%
+  warn    {playerLevel=5, gearTier=1, dangerLevel=5}  expected=trivial  actual=balanced  winRate=77.0%
+  warn    {playerLevel=5, gearTier=2, dangerLevel=5}  expected=trivial  actual=easy  winRate=86.0%
+EXIT=0
+==========================================
+PLAYBOOK: auto-imbue-coverage
+==========================================
+=== playbook-runner: auto-imbue-coverage — Auto-imbue coverage progression ===
+FLOW: measures whether AutoProgressionService's imbue-axis dispatch (AutoImbuePlanner + AutoImbueExecutor) can drive party imbue coverage toward 1.0 within a balanced farming+imbuing budget. Axes are (startingImbueCoverage x playerLevel x dangerLevel). Cells proxy the outcome via the standard combat sim — at each cell, if auto-imbue can pick a viable reagent + open slot, the combat win-rate should match the tolerance band below. Proxy: starting coverage 0.25 @ level 5 should reach coverage ~0.75 within ~30 simulated minutes (3 imbue cycles). Bands are baseline; creative agent revisits once live telemetry lands.
+kind=combat  rolls/cell=100  seed=42  axes=[playerLevel:3, imbueCoveragePct:3, dangerLevel:1]
 
-Playbook **auto-imbue-coverage** — Auto-imbue coverage progression. Cells=9, divergent=6. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033229.json`
-
-```
 playerLevel | imbueCoveragePct | dangerLevel | winRate | rounds | actual    | expected  | !
 3          | 25         | 5          |   17.0% |    4.3 | punishing | balanced  | DIVERGE
 3          | 50         | 5          |   12.0% |    4.3 | punishing | balanced  | DIVERGE
@@ -594,235 +529,12 @@ playerLevel | imbueCoveragePct | dangerLevel | winRate | rounds | actual    | ex
 8          | 50         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
 8          | 75         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
 
-```
 
-## 03:35:18Z — playbook-runner — playbook crafting-success
-
-Playbook **crafting-success** (crafting) — cells=32 divergent=0. Seed=42 rolls/cell=500. JSON: `playbook-runner-20260414-033518.json`
-
-```
-craftingSkill | recipeDifficulty | Success | NearMiss | UnexpRes | CompLoss | Discov | match? | !
-1          | 1          |   50.0% |    24.2% |    21.7% |     0.8% |   3.3% |      Y | 
-1          | 3          |   51.2% |    25.2% |    19.4% |     2.3% |   1.9% |      N | 
-1          | 5          |   56.0% |    22.5% |    17.7% |     1.2% |   2.5% |      Y | 
-1          | 8          |   53.8% |    23.3% |    19.2% |     2.1% |   1.7% |      Y | 
-2          | 1          |   59.0% |    19.8% |    16.9% |     1.7% |   2.7% |      Y | 
-2          | 3          |   47.9% |    27.5% |    20.8% |     1.5% |   2.3% |      Y | 
-2          | 5          |   48.3% |    26.2% |    21.5% |     2.1% |   1.9% |      N | 
-2          | 8          |   54.0% |    22.3% |    19.8% |     2.3% |   1.7% |      N | 
-3          | 1          |   56.2% |    21.5% |    18.1% |     1.5% |   2.7% |      N | 
-3          | 3          |   56.7% |    22.3% |    17.3% |     2.3% |   1.5% |      Y | 
-3          | 5          |   45.0% |    27.9% |    23.5% |     2.1% |   1.5% |      Y | 
-3          | 8          |   53.1% |    21.5% |    21.7% |     2.3% |   1.5% |      Y | 
-5          | 1          |   48.5% |    26.0% |    22.1% |     1.7% |   1.7% |      Y | 
-5          | 3          |   54.0% |    23.1% |    18.5% |     3.1% |   1.2% |      N | 
-5          | 5          |   51.2% |    23.1% |    21.7% |     2.5% |   1.5% |      Y | 
-5          | 8          |   52.9% |    24.0% |    18.8% |     1.9% |   2.5% |      Y | 
-8          | 1          |   51.9% |    22.7% |    22.7% |     0.6% |   2.1% |      N | 
-8          | 3          |   62.3% |    16.2% |    17.7% |     1.2% |   2.5% |      Y | 
-8          | 5          |   46.2% |    25.4% |    23.3% |     1.7% |   3.3% |      N | 
-8          | 8          |   59.8% |    19.6% |    17.1% |     1.9% |   1.7% |      Y | 
-12         | 1          |   52.9% |    19.0% |    24.2% |     1.5% |   2.5% |      N | 
-12         | 3          |   55.6% |    21.7% |    19.8% |     1.2% |   1.7% |      Y | 
-12         | 5          |   48.5% |    24.6% |    22.3% |     1.9% |   2.7% |      Y | 
-12         | 8          |   58.1% |    21.2% |    18.5% |     1.0% |   1.0% |      Y | 
-20         | 1          |   59.4% |    21.0% |    15.6% |     1.9% |   2.1% |      Y | 
-20         | 3          |   50.2% |    24.8% |    19.8% |     2.5% |   2.7% |      Y | 
-20         | 5          |   48.1% |    25.2% |    23.8% |     2.3% |   0.6% |      N | 
-20         | 8          |   54.6% |    22.3% |    18.1% |     2.9% |   2.1% |      Y | 
-40         | 1          |   41.9% |    27.7% |    26.0% |     2.1% |   2.3% |      N | 
-40         | 3          |   58.3% |    17.9% |    20.4% |     1.2% |   2.1% |      Y | 
-40         | 5          |   49.6% |    25.4% |    21.2% |     1.5% |   2.3% |      Y | 
-40         | 8          |   53.3% |    23.1% |    19.2% |     2.3% |   2.1% |      N | 
-
-```
-
-## 03:35:19Z — playbook-runner — playbook auto-craft-progress
-
-Playbook **auto-craft-progress** — Auto-craft gear-tier progression. Cells=9, divergent=5. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033519.json`
-
-```
-playerLevel | gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
-3          | 1          | 5          |   29.0% |    4.3 | punishing | balanced  | DIVERGE
-3          | 2          | 5          |   43.0% |    4.4 | hard      | trivial   | DIVERGE
-3          | 3          | 5          |   58.0% |    4.2 | hard      | trivial   | DIVERGE
-5          | 1          | 5          |   77.0% |    4.6 | balanced  | trivial   | DIVERGE
-5          | 2          | 5          |   86.0% |    4.2 | easy      | trivial   | DIVERGE
-5          | 3          | 5          |   98.0% |    4.0 | trivial   | trivial   | 
-8          | 1          | 5          |  100.0% |    3.7 | trivial   | trivial   | 
-8          | 2          | 5          |  100.0% |    3.3 | trivial   | trivial   | 
-8          | 3          | 5          |  100.0% |    3.0 | trivial   | trivial   | 
-
-```
-
-## 03:35:20Z — playbook-runner — playbook auto-imbue-coverage
-
-Playbook **auto-imbue-coverage** — Auto-imbue coverage progression. Cells=9, divergent=6. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033520.json`
-
-```
-playerLevel | imbueCoveragePct | dangerLevel | winRate | rounds | actual    | expected  | !
-3          | 25         | 5          |   17.0% |    4.3 | punishing | balanced  | DIVERGE
-3          | 50         | 5          |   12.0% |    4.3 | punishing | balanced  | DIVERGE
-3          | 75         | 5          |   15.0% |    4.4 | punishing | easy      | DIVERGE
-5          | 25         | 5          |   63.0% |    4.9 | balanced  | easy      | DIVERGE
-5          | 50         | 5          |   58.0% |    4.8 | hard      | trivial   | DIVERGE
-5          | 75         | 5          |   73.0% |    5.0 | balanced  | trivial   | DIVERGE
-8          | 25         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-8          | 50         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-8          | 75         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-
-```
-
-## 03:36:30Z — playbook-runner — playbook crafting-success
-
-Playbook **crafting-success** (crafting) — cells=32 divergent=0. Seed=42 rolls/cell=500. JSON: `playbook-runner-20260414-033630.json`
-
-```
-craftingSkill | recipeDifficulty | Success | NearMiss | UnexpRes | CompLoss | Discov | match? | !
-1          | 1          |   47.5% |    25.4% |    23.8% |     0.8% |   2.5% |      Y | 
-1          | 3          |   54.0% |    20.0% |    22.3% |     1.9% |   1.9% |      N | 
-1          | 5          |   52.3% |    22.3% |    21.9% |     1.7% |   1.9% |      Y | 
-1          | 8          |   54.0% |    20.8% |    21.9% |     1.2% |   2.1% |      Y | 
-2          | 1          |   55.0% |    21.7% |    20.6% |     1.0% |   1.7% |      Y | 
-2          | 3          |   44.2% |    27.7% |    24.6% |     1.9% |   1.7% |      N | 
-2          | 5          |   53.8% |    21.7% |    20.2% |     1.7% |   2.7% |      N | 
-2          | 8          |   57.5% |    22.5% |    16.7% |     2.1% |   1.2% |      N | 
-3          | 1          |   58.5% |    19.0% |    19.0% |     0.8% |   2.7% |      Y | 
-3          | 3          |   53.3% |    22.7% |    21.0% |     1.0% |   1.9% |      Y | 
-3          | 5          |   48.8% |    27.1% |    20.8% |     2.5% |   0.8% |      Y | 
-3          | 8          |   52.1% |    25.8% |    18.8% |     1.2% |   2.1% |      Y | 
-5          | 1          |   41.5% |    26.0% |    28.3% |     2.1% |   2.1% |      N | 
-5          | 3          |   59.8% |    16.9% |    20.6% |     1.7% |   1.0% |      N | 
-5          | 5          |   51.2% |    24.0% |    21.5% |     1.7% |   1.7% |      Y | 
-5          | 8          |   57.3% |    19.6% |    20.2% |     1.9% |   1.0% |      Y | 
-8          | 1          |   54.0% |    22.3% |    20.0% |     1.9% |   1.9% |      N | 
-8          | 3          |   56.7% |    21.7% |    17.9% |     2.3% |   1.5% |      Y | 
-8          | 5          |   47.5% |    27.5% |    21.0% |     1.7% |   2.3% |      Y | 
-8          | 8          |   58.8% |    18.1% |    19.2% |     1.2% |   2.7% |      Y | 
-12         | 1          |   59.0% |    20.0% |    18.3% |     1.0% |   1.7% |      Y | 
-12         | 3          |   53.5% |    24.0% |    19.0% |     2.1% |   1.5% |      Y | 
-12         | 5          |   43.8% |    29.6% |    21.9% |     2.3% |   2.5% |      Y | 
-12         | 8          |   53.3% |    20.8% |    21.9% |     2.3% |   1.7% |      Y | 
-20         | 1          |   56.2% |    20.6% |    20.2% |     1.9% |   1.0% |      Y | 
-20         | 3          |   46.2% |    27.5% |    22.9% |     2.1% |   1.2% |      N | 
-20         | 5          |   50.4% |    22.7% |    24.2% |     1.0% |   1.7% |      N | 
-20         | 8          |   62.1% |    19.2% |    15.2% |     1.0% |   2.5% |      N | 
-40         | 1          |   48.3% |    24.2% |    22.9% |     2.7% |   1.9% |      N | 
-40         | 3          |   59.6% |    20.6% |    16.2% |     1.5% |   2.1% |      Y | 
-40         | 5          |   48.1% |    27.1% |    20.0% |     2.3% |   2.5% |      Y | 
-40         | 8          |   55.0% |    22.1% |    20.0% |     1.5% |   1.5% |      N | 
-
-```
-
-## 03:36:31Z — playbook-runner — playbook auto-craft-progress
-
-Playbook **auto-craft-progress** — Auto-craft gear-tier progression. Cells=9, divergent=0. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033631.json`
-
-```
-playerLevel | gearTier   | dangerLevel | winRate | rounds | actual    | expected  | !
-3          | 1          | 5          |   29.0% |    4.3 | punishing | punishing | 
-3          | 2          | 5          |   43.0% |    4.4 | hard      | hard      | 
-3          | 3          | 5          |   58.0% |    4.2 | hard      | hard      | 
-5          | 1          | 5          |   77.0% |    4.6 | balanced  | balanced  | 
-5          | 2          | 5          |   86.0% |    4.2 | easy      | easy      | 
-5          | 3          | 5          |   98.0% |    4.0 | trivial   | trivial   | 
-8          | 1          | 5          |  100.0% |    3.7 | trivial   | trivial   | 
-8          | 2          | 5          |  100.0% |    3.3 | trivial   | trivial   | 
-8          | 3          | 5          |  100.0% |    3.0 | trivial   | trivial   | 
-
-```
-
-## 03:36:32Z — playbook-runner — playbook auto-imbue-coverage
-
-Playbook **auto-imbue-coverage** — Auto-imbue coverage progression. Cells=9, divergent=0. Seed=42, rolls/cell=100. JSON: `playbook-runner-20260414-033632.json`
-
-```
-playerLevel | imbueCoveragePct | dangerLevel | winRate | rounds | actual    | expected  | !
-3          | 25         | 5          |   17.0% |    4.3 | punishing | punishing | 
-3          | 50         | 5          |   12.0% |    4.3 | punishing | punishing | 
-3          | 75         | 5          |   15.0% |    4.4 | punishing | punishing | 
-5          | 25         | 5          |   63.0% |    4.9 | balanced  | balanced  | 
-5          | 50         | 5          |   58.0% |    4.8 | hard      | hard      | 
-5          | 75         | 5          |   73.0% |    5.0 | balanced  | balanced  | 
-8          | 25         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-8          | 50         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-8          | 75         | 5          |  100.0% |    4.0 | trivial   | trivial   | 
-
-```
-
-## 03:36:41Z — progression-sim — progression-sim 24h
-
-seed=42, playstyles=[balanced]. Final: balanced: L4 d8. JSON: `progression-sim-20260414-033641.json`
-
-## 03:36:56Z — progression-sim — progression-sim 24h
-
-seed=42, playstyles=[balanced]. Final: balanced: L4 d8. JSON: `progression-sim-20260414-033656.json`
-
-## 03:37:16Z — progression-sim — progression-sim 40h
-
-seed=42, playstyles=[balanced,combat-heavy,craft-heavy,enchanting-focused]. Final: balanced: L5 d8 | combat-heavy: L5 d8 | craft-heavy: L4 d8 | enchanting-focused: L5 d8. JSON: `progression-sim-20260414-033716.json`
-
-## 03:37:30Z — progression-sim — progression-sim 40h
-
-seed=42, playstyles=[balanced,combat-heavy,craft-heavy,enchanting-focused]. Final: balanced: L5 d8 | combat-heavy: L5 d8 | craft-heavy: L4 d8 | enchanting-focused: L5 d8. JSON: `progression-sim-20260414-033730.json`
-
-## 03:42:05Z — scenario-player — Harken's Wolf Pelt Request
-
-**Quest:** `harken-wolf-pelts` — Harken's Wolf Pelt Request  
-**Outcome:** success  
-**Steps:** 4
-
-- **intro** — Harken explains he needs 3 wolf pelts before winter.
-  - choice: `accept` — Accept the quest.
-  - delta: flag+ harken.accepted
-- **hunt** — Track wolves through the Wytchwood at dusk.
-  - choice: `hunt-fair` — Hunt fairly.
-  - delta: item+ wolf-pelt x3
-- **return** — Deliver pelts to Harken.
-  - choice: `honest` — Hand over the pelts.
-  - delta: item- wolf-pelt x3
-  - delta: rep+ wytchwood +10
-- **end-good** — Harken nods with respect. Reputation with Wytchwood increases.
-  - terminal (success)
-
-
-## 03:42:16Z — scenario-player — Harken's Wolf Pelt Request
-
-**Quest:** `harken-wolf-pelts` — Harken's Wolf Pelt Request  
-**Outcome:** success  
-**Steps:** 4
-
-- **intro** — Harken explains he needs 3 wolf pelts before winter.
-  - choice: `accept` — Accept the quest.
-  - delta: flag+ harken.accepted
-- **hunt** — Track wolves through the Wytchwood at dusk.
-  - choice: `hunt-fair` — Hunt fairly.
-  - delta: item+ wolf-pelt x3
-- **return** — Deliver pelts to Harken.
-  - choice: `honest` — Hand over the pelts.
-  - delta: item- wolf-pelt x3
-  - delta: rep+ wytchwood +10
-- **end-good** — Harken nods with respect. Reputation with Wytchwood increases.
-  - terminal (success)
-
-
-## 03:42:16Z — scenario-player — Harken's Wolf Pelt Request
-
-**Quest:** `harken-wolf-pelts` — Harken's Wolf Pelt Request  
-**Outcome:** success  
-**Steps:** 4
-
-- **intro** — Harken explains he needs 3 wolf pelts before winter.
-  - choice: `accept` — Accept the quest.
-  - delta: flag+ harken.accepted
-- **hunt** — Track wolves through the Wytchwood at dusk.
-  - choice: `hunt-fair` — Hunt fairly.
-  - delta: item+ wolf-pelt x3
-- **return** — Deliver pelts to Harken.
-  - choice: `honest` — Hand over the pelts.
-  - delta: item- wolf-pelt x3
-  - delta: rep+ wytchwood +10
-- **end-good** — Harken nods with respect. Reputation with Wytchwood increases.
-  - terminal (success)
-
-
+  warn  6 cell(s) diverged from expectation:
+  warn    {playerLevel=3, imbueCoveragePct=25, dangerLevel=5}  expected=balanced  actual=punishing  winRate=17.0%
+  warn    {playerLevel=3, imbueCoveragePct=50, dangerLevel=5}  expected=balanced  actual=punishing  winRate=12.0%
+  warn    {playerLevel=3, imbueCoveragePct=75, dangerLevel=5}  expected=easy  actual=punishing  winRate=15.0%
+  warn    {playerLevel=5, imbueCoveragePct=25, dangerLevel=5}  expected=easy  actual=balanced  winRate=63.0%
+  warn    {playerLevel=5, imbueCoveragePct=50, dangerLevel=5}  expected=trivial  actual=hard  winRate=58.0%
+  warn    {playerLevel=5, imbueCoveragePct=75, dangerLevel=5}  expected=trivial  actual=balanced  winRate=73.0%
+EXIT=0
