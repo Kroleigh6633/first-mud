@@ -215,6 +215,61 @@ public static class AutoCraftPlanner
     }
 
     /// <summary>
+    /// Highest danger-level allowed as a "stretch" beyond the player's reliably-clearable
+    /// band. +1 lets the planner recommend mild reaches (practice); anything more and
+    /// we've seen auto-farm spin in zones the party can't survive (Task #114).
+    /// </summary>
+    public const int DangerStretchAllowance = 1;
+
+    /// <summary>
+    /// Reason string emitted when every candidate was filtered by the reachability
+    /// gate. Callers (AutoProgressionService) key off this to fall back to Farm at
+    /// a safe-tier zone so the player can level up first.
+    /// </summary>
+    public const string NoViableRecipeReason = "NoViableRecipe: all upgrade recipes require zones beyond reliably-clearable danger.";
+
+    /// <summary>
+    /// Compute the highest source-zone danger that <paramref name="recipe"/>'s ingredient
+    /// plan requires. Walks each ingredient's <see cref="IngredientSource"/>:
+    /// <list type="bullet">
+    /// <item><c>harvest</c> — looks up <see cref="ZoneDefinition.DangerLevel"/> via <paramref name="zoneDangerByName"/>.</item>
+    /// <item><c>loot</c> — approximates via the representative zone hint (same lookup).</item>
+    /// <item><c>smelt</c> — recurses into the sub-recipe's ingredients (takes max).</item>
+    /// </list>
+    /// Max across ingredients is "weakest-link" — one ingredient in a deadly zone
+    /// taints the whole recipe. If a zone hint isn't found in the lookup, treats it
+    /// as danger 1 (safest assumption — don't over-gate on missing content).
+    /// </summary>
+    public static int ComputeSourceZoneDanger(
+        RecipeDefinition recipe,
+        IReadOnlyDictionary<string, int> zoneDangerByName,
+        IReadOnlyDictionary<string, RecipeDefinition>? subRecipesById = null)
+    {
+        int maxDanger = 0;
+        foreach (var ing in recipe.Ingredients)
+        {
+            var src = ResolveSource(ing.Name);
+            int d;
+            if (src.Kind == "smelt" && src.SubRecipeId is not null && subRecipesById is not null &&
+                subRecipesById.TryGetValue(src.SubRecipeId, out var sub))
+            {
+                d = ComputeSourceZoneDanger(sub, zoneDangerByName, subRecipesById);
+            }
+            else if (src.ZoneHint is not null &&
+                     zoneDangerByName.TryGetValue(src.ZoneHint, out var zd))
+            {
+                d = zd;
+            }
+            else
+            {
+                d = 1; // unknown → assume safest.
+            }
+            if (d > maxDanger) maxDanger = d;
+        }
+        return maxDanger;
+    }
+
+    /// <summary>
     /// Main planning entry point. Returns the best-ranked recipe given current
     /// state, or a plan with <see cref="AutoCraftPlan.TargetRecipe"/> = null
     /// when no gear recipe makes sense (e.g. all equipment already beats every
@@ -226,6 +281,24 @@ public static class AutoCraftPlanner
         int playerCraftingSkill,
         IReadOnlyDictionary<EquipmentSlot, int> currentEquippedWorkmanship,
         IReadOnlyDictionary<string, int> stash)
+        => Plan(allRecipes, playerWorld, playerCraftingSkill, currentEquippedWorkmanship,
+            stash, playerReliableDanger: int.MaxValue, zoneDangerByName: null);
+
+    /// <summary>
+    /// Reachability-gated planning entry. Filters out recipes whose ingredient-plan
+    /// requires a zone with danger &gt; <paramref name="playerReliableDanger"/> +
+    /// <see cref="DangerStretchAllowance"/>. When every recipe is filtered, returns
+    /// a plan with <c>TargetRecipe = null</c> and <see cref="NoViableRecipeReason"/>
+    /// so the caller can fall back to Farm-at-safe-tier.
+    /// </summary>
+    public static AutoCraftPlan Plan(
+        IReadOnlyList<RecipeDefinition> allRecipes,
+        WorldId playerWorld,
+        int playerCraftingSkill,
+        IReadOnlyDictionary<EquipmentSlot, int> currentEquippedWorkmanship,
+        IReadOnlyDictionary<string, int> stash,
+        int playerReliableDanger,
+        IReadOnlyDictionary<string, int>? zoneDangerByName)
     {
         // 1. Filter to equipment recipes the player can see.
         var candidates = allRecipes
@@ -253,6 +326,31 @@ public static class AutoCraftPlanner
                 CraftableNow: false,
                 MissingIngredients: Array.Empty<IngredientPlanEntry>(),
                 Reason: "No upgrade-worthy recipes for this world at current gear tier.");
+        }
+
+        // Reachability filter (Task #114): reject recipes whose source zones are
+        // beyond playerReliableDanger + DangerStretchAllowance. Skipped when
+        // zoneDangerByName is null (back-compat path — tests that don't care).
+        if (zoneDangerByName is not null)
+        {
+            int maxAllowed = playerReliableDanger + DangerStretchAllowance;
+            var reachable = candidates
+                .Where(c => ComputeSourceZoneDanger(c.Recipe, zoneDangerByName) <= maxAllowed)
+                .ToList();
+
+            if (reachable.Count == 0)
+            {
+                return new AutoCraftPlan(
+                    TargetRecipe: null,
+                    TargetSlot: EquipmentSlot.None,
+                    ExpectedWorkmanship: 0,
+                    CurrentSlotWorkmanship: 0,
+                    Score: 0.0,
+                    CraftableNow: false,
+                    MissingIngredients: Array.Empty<IngredientPlanEntry>(),
+                    Reason: NoViableRecipeReason);
+            }
+            candidates = reachable;
         }
 
         // 2. Split into craftable-now (all ingredients in stash + skill met) vs not.

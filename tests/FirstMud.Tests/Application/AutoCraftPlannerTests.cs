@@ -191,6 +191,107 @@ public class AutoCraftPlannerTests
         plan.Reason.Should().Contain("No upgrade-worthy");
     }
 
+    // ─── Reachability filter (Task #114) ────────────────────────────────────
+
+    private static IReadOnlyDictionary<string, int> DefaultZoneDangers() =>
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Starting Road"]       = 1, // common-materials → loot
+            ["The Thornwood"]       = 3, // biome-forest
+            ["Portmere (Compact)"]  = 2, // biome-plains
+            ["Caervorn Highlands"]  = 8, // biome-mountain
+        };
+
+    [Fact]
+    public void Planner_rejects_recipe_with_source_zone_above_reliable_danger()
+    {
+        // Mithril Blade needs Mithril Ore from Caervorn Highlands (d8).
+        // Player reliably clears d3 → +1 stretch = 4, which < 8, so it must be filtered.
+        var mithril = Recipe("B", "Mithril Blade", ItemCategory.Weapon, 1, 7, 9,
+            ("Mithril Ore", 2));
+
+        var plan = AutoCraftPlanner.Plan(
+            new[] { mithril },
+            WorldId.Aeldran,
+            playerCraftingSkill: 1,
+            currentEquippedWorkmanship: new Dictionary<EquipmentSlot, int>(),
+            stash: new Dictionary<string, int>(),
+            playerReliableDanger: 3,
+            zoneDangerByName: DefaultZoneDangers());
+
+        plan.TargetRecipe.Should().BeNull();
+        plan.Reason.Should().Be(AutoCraftPlanner.NoViableRecipeReason);
+    }
+
+    [Fact]
+    public void Planner_allows_recipe_one_tier_above_reliable_danger()
+    {
+        // Beast Hide from The Thornwood (d3). Player reliably clears d2 → +1 stretch = 3, allowed.
+        var forest = Recipe("A", "Leather Vest", ItemCategory.Armor, 1, 2, 4,
+            ("Beast Hide", 2));
+
+        var plan = AutoCraftPlanner.Plan(
+            new[] { forest },
+            WorldId.Aeldran,
+            playerCraftingSkill: 1,
+            currentEquippedWorkmanship: new Dictionary<EquipmentSlot, int>(),
+            stash: new Dictionary<string, int>(),
+            playerReliableDanger: 2,
+            zoneDangerByName: DefaultZoneDangers());
+
+        plan.TargetRecipe.Should().NotBeNull();
+        plan.TargetRecipe!.RecipeId.Should().Be("A");
+    }
+
+    [Fact]
+    public void Planner_returns_NoViableRecipe_when_all_filtered()
+    {
+        var mithrilBlade  = Recipe("A", "Mithril Blade",    ItemCategory.Weapon, 1, 7, 9, ("Mithril Ore", 2));
+        var mithrilBoots  = Recipe("B", "Mithril Boots",    ItemCategory.Armor,  1, 6, 8, ("Mithril Ore", 3));
+        var mithrilGreaves= Recipe("C", "Mithril Greaves",  ItemCategory.Armor,  1, 6, 8, ("Diamond Shard", 2));
+
+        var plan = AutoCraftPlanner.Plan(
+            new[] { mithrilBlade, mithrilBoots, mithrilGreaves },
+            WorldId.Aeldran,
+            playerCraftingSkill: 1,
+            currentEquippedWorkmanship: new Dictionary<EquipmentSlot, int>(),
+            stash: new Dictionary<string, int>(),
+            playerReliableDanger: 1, // can barely clear starting road
+            zoneDangerByName: DefaultZoneDangers());
+
+        plan.TargetRecipe.Should().BeNull();
+        plan.Reason.Should().Be(AutoCraftPlanner.NoViableRecipeReason);
+    }
+
+    [Fact]
+    public void Planner_scoring_unchanged_for_in_range_recipes()
+    {
+        // All source zones within reach: reachability is a pre-filter and must
+        // not perturb ranking between the remaining candidates.
+        var cheap = Recipe("A", "Iron Sword",    ItemCategory.Weapon, 1, 2, 4, ("Iron Ore", 2));
+        var hefty = Recipe("B", "Thornwood Bow", ItemCategory.Weapon, 1, 5, 7, ("Wood", 2));
+
+        var gatedPlan = AutoCraftPlanner.Plan(
+            new[] { cheap, hefty },
+            WorldId.Aeldran,
+            playerCraftingSkill: 1,
+            currentEquippedWorkmanship: new Dictionary<EquipmentSlot, int>(),
+            stash: new Dictionary<string, int>(),
+            playerReliableDanger: 10, // plenty of headroom
+            zoneDangerByName: DefaultZoneDangers());
+        var ungatedPlan = AutoCraftPlanner.Plan(
+            new[] { cheap, hefty },
+            WorldId.Aeldran,
+            playerCraftingSkill: 1,
+            currentEquippedWorkmanship: new Dictionary<EquipmentSlot, int>(),
+            stash: new Dictionary<string, int>());
+
+        gatedPlan.TargetRecipe.Should().NotBeNull();
+        ungatedPlan.TargetRecipe.Should().NotBeNull();
+        gatedPlan.TargetRecipe!.RecipeId.Should().Be(ungatedPlan.TargetRecipe!.RecipeId);
+        gatedPlan.Score.Should().Be(ungatedPlan.Score);
+    }
+
     [Fact]
     public void Plan_filters_non_equipment_recipes()
     {
