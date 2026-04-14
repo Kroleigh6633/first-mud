@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a26da75b | ready-to-merge | content-layer-pilot@fcee847 | fix salvage to yield recipe ingredients (Stone Axe → Stone+Wood, not Iron Ore); rare + reagent suppression; content override table | - | src/FirstMud.Application/Services/SalvageService.cs, content/salvage-yields.json, tests/FirstMud.Tests/SalvageMaterialFlowTests.cs, tools/design/playbooks/salvage-material-flow.json | 2026-04-13 |
 <!-- agents add rows above this line -->
