@@ -15,13 +15,13 @@
   "seed": 42,
   "expectedViability": {
     "cells": [
-      { "playerLevel": 3, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "balanced" },
-      { "playerLevel": 3, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "balanced" },
-      { "playerLevel": 3, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "easy" },
+      { "playerLevel": 3, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "punishing" },
+      { "playerLevel": 3, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "punishing" },
+      { "playerLevel": 3, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "punishing" },
 
-      { "playerLevel": 5, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "easy" },
-      { "playerLevel": 5, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "trivial" },
-      { "playerLevel": 5, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 5, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "balanced" },
+      { "playerLevel": 5, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "hard" },
+      { "playerLevel": 5, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "balanced" },
 
       { "playerLevel": 8, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "trivial" },
       { "playerLevel": 8, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "trivial" },

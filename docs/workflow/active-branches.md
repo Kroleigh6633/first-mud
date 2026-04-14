@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a1067938 | ready-to-merge | 5157a76 | Creative sweep #3: playbook spec recalibrations + 2 new quest chains (Ashen Reach, Caervorn Highlands) + canon Q5-Q7 | - | tools/design/playbooks, tools/design/fixtures, docs/design | 2026-04-13 |
 <!-- agents add rows above this line -->

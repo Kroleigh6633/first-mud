@@ -1,0 +1,110 @@
+{
+  "id": "chain7-highland-post",
+  "title": "The Highland Post",
+  "_designNote": "Caervorn Highlands chain. 5 beats, 3 terminals. Short diplomatic chain exercising the requires.items gate and faction-balance. Zone: aeldran-1-caervorn-highlands (mountain, danger 4). allowUnderflow=false.",
+  "allowUnderflow": false,
+  "startState": {
+    "flags": ["caervorn-highlands.visited"],
+    "inventory": [],
+    "reputation": { "caervorn": 0, "rider-compact": 0, "thornwood": 0 }
+  },
+  "root": "intro",
+  "beats": [
+    {
+      "id": "intro",
+      "description": "At the Highland Post, Captain Brec Caervorn holds a sealed dispatch addressed to the Thornwood envoy. 'It's sensitive. I need it walked, not galloped. Take the scree path — the road's watched.'",
+      "choices": [
+        { "id": "accept",
+          "text": "Accept the walk.",
+          "next": "route",
+          "effects": [
+            { "type": "addItem", "key": "Caervorn Sealed Dispatch", "amount": 1 },
+            { "type": "setFlag", "key": "highland-post.accepted" }
+          ] },
+        { "id": "refuse",
+          "text": "Refuse — not a courier today.",
+          "next": "end-refused",
+          "effects": [ { "type": "addReputation", "key": "caervorn", "amount": -25 } ] }
+      ]
+    },
+    {
+      "id": "route",
+      "description": "The scree path is silent but slow. The road is fast but watched. A third option: sell the dispatch. The Compact factor at Gravenhold would pay.",
+      "requires": { "flags": ["highland-post.accepted"] },
+      "choices": [
+        { "id": "scree",
+          "text": "Take the scree path. Slow and clean.",
+          "next": "arrive",
+          "effects": [ { "type": "setFlag", "key": "route.scree" } ] },
+        { "id": "road",
+          "text": "Risk the road. You'll arrive before dusk.",
+          "next": "road-ambush" },
+        { "id": "sell",
+          "text": "Detour to Gravenhold. Sell the dispatch.",
+          "next": "end-sold",
+          "requires": { "items": [ { "name": "Caervorn Sealed Dispatch", "quantity": 1 } ] },
+          "effects": [
+            { "type": "removeItem", "key": "Caervorn Sealed Dispatch", "amount": 1 },
+            { "type": "addReputation", "key": "caervorn", "amount": -300 },
+            { "type": "addReputation", "key": "rider-compact", "amount": 100 }
+          ] }
+      ]
+    },
+    {
+      "id": "road-ambush",
+      "description": "Two riders in unmarked tabards. They want the dispatch. You can fight, parley, or hand it over.",
+      "choices": [
+        { "id": "fight",
+          "text": "Fight. You trust your blade.",
+          "next": "arrive",
+          "effects": [
+            { "type": "setFlag", "key": "route.road-fought" },
+            { "type": "addReputation", "key": "caervorn", "amount": 50 }
+          ] },
+        { "id": "parley",
+          "text": "Parley. Show the seal — remind them of the Compact.",
+          "next": "arrive",
+          "effects": [
+            { "type": "setFlag", "key": "route.road-parleyed" },
+            { "type": "addReputation", "key": "rider-compact", "amount": 25 }
+          ] },
+        { "id": "surrender",
+          "text": "Hand over the dispatch. Keep your skin.",
+          "next": "end-surrendered",
+          "requires": { "items": [ { "name": "Caervorn Sealed Dispatch", "quantity": 1 } ] },
+          "effects": [
+            { "type": "removeItem", "key": "Caervorn Sealed Dispatch", "amount": 1 },
+            { "type": "addReputation", "key": "caervorn", "amount": -150 }
+          ] }
+      ]
+    },
+    {
+      "id": "arrive",
+      "description": "The Thornwood envoy receives the dispatch at the forest edge. She thumbs the seal, nods once. 'Tell Brec the answer is yes — but only this cycle.'",
+      "requires": { "items": [ { "name": "Caervorn Sealed Dispatch", "quantity": 1 } ] },
+      "choices": [
+        { "id": "deliver",
+          "text": "Hand over the dispatch. Accept the reply.",
+          "next": "end-delivered",
+          "effects": [
+            { "type": "removeItem", "key": "Caervorn Sealed Dispatch", "amount": 1 },
+            { "type": "addItem", "key": "Thornwood Tally Token", "amount": 1 },
+            { "type": "addReputation", "key": "caervorn", "amount": 200 },
+            { "type": "addReputation", "key": "thornwood", "amount": 100 }
+          ] }
+      ]
+    },
+    { "id": "end-delivered",
+      "description": "Brec marks the ledger and pays out in coin and standing. Permanent +25 Caervorn floor.",
+      "terminal": true },
+    { "id": "end-surrendered",
+      "description": "You walk back empty-handed. The Highlands remember.",
+      "terminal": true },
+    { "id": "end-sold",
+      "description": "The Compact factor pays well. Caervorn never forgets a traitor-courier.",
+      "terminal": true },
+    { "id": "end-refused",
+      "description": "The chain closes before it begins. Brec finds another hand.",
+      "terminal": true }
+  ]
+}

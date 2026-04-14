@@ -441,3 +441,52 @@ Unmake / Leave). No machinery change.
   ship the day the escort-template blocklist is partially lifted, plus
   a fallback travel-montage implementation that runs today against
   existing `content/monsters.json` biome spawns.
+
+---
+
+## Pass #9 follow-up (creative sweep #3, 2026-04-13)
+
+### Q5 — Wyrdcut Blade: canonical status
+
+> The new Chain 6 (Ash and Salt) rewards a **Wyrdcut Blade**. Is this
+> a named unique, a tier, or a recipe-craftable item?
+
+**Ruling (conservative): Quest-reward unique, not craftable, not a tier.**
+
+The blade is a narrative item issued by Hazir at the Kiln-Gate at the
+end of chain6. Its name appears in no existing weapons table and should
+remain a one-per-character quest reward until the user rules otherwise.
+A "Flawed Wyrdcut Blade" variant drops in the chain's skimmed-terminal
+branch — same ruling.
+
+**If later promoted:** becomes the anchor item for an Ashen weapon tree.
+Until then, treat as narrative flavor; do not add to loot tables, shop
+inventories, or salvage yields.
+
+### Q6 — Caervorn courier rep ceiling
+
+> Chain 7 (Highland Post) grants +200 Caervorn on the clean terminal
+> plus a permanent +25 floor. Does this stack with RIDER_001's
+> +150 reward for the same faction?
+
+**Ruling (conservative): Stacks fully; no per-faction-per-arc cap yet.**
+
+Faction rep is additive by design today, and the chain gates are short
+enough that stacking +350 across two chains is not game-breaking at mid-
+tier. If the user adds a rep-bounds system later, the cap should apply
+uniformly across all chains rather than being retrofitted to chain 7
+specifically.
+
+### Q7 — Obsidian Shard reagent classification
+
+> Chain 6 requires an **Obsidian Shard** from the black vent. Is this
+> the same Obsidian Shard suppressed from salvage yields per
+> `salvage-material-flow.json`?
+
+**Ruling: Yes, same item. Chain 6 is the canonical acquisition path.**
+
+`salvage-material-flow.json` already lists Obsidian Shard as
+rare-suppressed — meaning salvage cannot produce it. Chain 6 and the
+Ashen Reach boss loot tables (already present) remain the only legal
+sources. No content change required; the suppression is working as
+designed and chain 6 exploits it intentionally.
