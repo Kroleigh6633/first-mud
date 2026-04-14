@@ -3,6 +3,7 @@ services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2025-latest
     container_name: firstmud-sqlserver
+    restart: unless-stopped
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in docker/.env — see docs/dev-setup.md}"
@@ -20,6 +21,7 @@ services:
   neo4j:
     image: neo4j:5-community
     container_name: firstmud-neo4j
+    restart: unless-stopped
     environment:
       NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in docker/.env — see docs/dev-setup.md}"
       NEO4J_PLUGINS: '["apoc"]'
@@ -40,6 +42,7 @@ services:
       context: ..
       dockerfile: src/FirstMud.GameServer/Dockerfile.dev
     container_name: firstmud-gameserver
+    restart: unless-stopped
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -75,6 +78,7 @@ services:
       context: ../src/FirstMud.Client
       dockerfile: Dockerfile.dev
     container_name: firstmud-client
+    restart: unless-stopped
     depends_on:
       - gameserver
     environment:
