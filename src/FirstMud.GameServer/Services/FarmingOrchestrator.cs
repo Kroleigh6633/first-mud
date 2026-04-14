@@ -1177,6 +1177,48 @@ public class FarmingOrchestrator(
                         }
                     }
 
+                    // --- BOSS DROPS (task #140) ---
+                    // Independent bonus-drop rolls for any defeated monster flagged
+                    // isBoss in content/monsters.json bossDrops[]. Runs AFTER the
+                    // standard loot path so bosses still get biome drops.
+                    {
+                        var defeatedNames = encounter.Combatants
+                            .Where(c => !c.IsPlayerSide && c.IsDefeated)
+                            .Select(c => c.Name)
+                            .ToList();
+                        if (defeatedNames.Count > 0 && lootPlayer is not null)
+                        {
+                            var currentItems2 = await itemRepo.GetByOwnerAsync(playerId, farmCt);
+                            var bossItems = await lootSvc.RollBossDropsByEnemyNamesAsync(
+                                defeatedNames, playerId, lootPlayer.Position.World,
+                                currentItems2.Count, lootPlayer.MaxInventorySlots, farmCt);
+                            foreach (var b in bossItems)
+                            {
+                                autoFarmService.RecordItem(playerId);
+                                session.ItemsFound = autoFarmService.GetSession(playerId)?.ItemsFound ?? session.ItemsFound;
+                                await hubContext.Clients
+                                    .Group(playerId.ToString())
+                                    .SendAsync("GameMessage", new
+                                    {
+                                        timestamp = DateTime.UtcNow.ToString("O"),
+                                        category = "loot-legendary",
+                                        text = $"[Auto-farm] The boss yields: {b.DisplayName} W{b.Workmanship.Value}!"
+                                    }, farmCt);
+                                await hubContext.Clients
+                                    .Group(playerId.ToString())
+                                    .SendAsync("LootDropped", new
+                                    {
+                                        b.Id,
+                                        Name = b.DisplayName,
+                                        b.Description,
+                                        Workmanship = b.Workmanship.Value,
+                                        Category = b.Category.ToString(),
+                                        Slot = b.Slot.ToString()
+                                    }, farmCt);
+                            }
+                        }
+                    }
+
                     // --- AUTO-COMPLETE QUESTS (kill / gather quests after each victory) ---
                     await using (var questCompScope = scopeFactory.CreateAsyncScope())
                     {
