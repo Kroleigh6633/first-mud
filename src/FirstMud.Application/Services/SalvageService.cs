@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -14,22 +17,43 @@ public class SalvageService
     private readonly IPlayerRepository _players;
     private readonly IItemRepository _items;
     private readonly ILogger<SalvageService> _logger;
+    private readonly IContentProvider? _content;
 
-    // Component names that match ResourceType enum values and standard salvage materials
-    private static readonly string[] WeaponMetalComponents = ["Iron Ore"];
-    private static readonly string[] WeaponWoodComponents  = ["Wood"];
-    private static readonly string[] ArmorLeatherComponents = ["Leather"];
-    private static readonly string[] ArmorMetalComponents  = ["Iron Ore"];
-    private static readonly string[] ConsumableComponents  = ["Stone", "Wood", "Iron Ore", "Leather", "Sand", "Sage"];
+    // Fallback components for legacy items / items with no matching recipe.
+    // Intentionally retained so that SalvageService remains usable without an
+    // IContentProvider (unit tests, edge cases).
+    private static readonly string[] ConsumableComponents = ["Stone", "Wood", "Iron Ore", "Leather", "Sand", "Sage"];
+
+    // Rare-component suppression list (case-insensitive name match on ingredients).
+    // These NEVER return from salvage — their ingredient slot collapses and, if
+    // that would leave zero yields, the hardcoded fallback is used instead.
+    // Rationale: enchanted/rare materials should not round-trip through salvage,
+    // otherwise crafting Mithril items becomes a free Mithril duplicator.
+    private static readonly HashSet<string> RareSuppressedMaterials = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Mithril Ore",
+        "Silver Ore",
+        "Ashwood",
+        "Spider Silk",
+        "Sea Scale",
+        "Coral Fragment"
+    };
+
+    // Lazy-loaded content override table (content/salvage-yields.json).
+    // Cached per-process; hot-reloaded only via explicit Reload (not currently wired).
+    private static readonly object _overrideLock = new();
+    private static Dictionary<string, IReadOnlyList<SalvageYieldOverride>>? _overridesCache;
 
     public SalvageService(
         IPlayerRepository players,
         IItemRepository items,
-        ILogger<SalvageService> logger)
+        ILogger<SalvageService> logger,
+        IContentProvider? content = null)
     {
         _players = players;
         _items = items;
         _logger = logger;
+        _content = content;
     }
 
     /// <summary>
@@ -85,7 +109,7 @@ public class SalvageService
         // SalvageSkill scales yield: every 10 skill points → +1 extra unit
         var skillBonus = player.SalvageSkill / 10;
 
-        var yields = BuildYields(item.Category, yieldBonus + skillBonus);
+        var yields = BuildYields(item, yieldBonus + skillBonus);
 
         // Recover imbue taper materials before deleting
         var recoveredTapers = await RecoverImbueResiduesAsync(player, item, ct);
@@ -246,7 +270,7 @@ public class SalvageService
         var workValue = item.Workmanship.Value;
         var yieldBonus = workValue / 3;
         var skillBonus  = player.SalvageSkill / 10;
-        var yields = BuildYields(item.Category, yieldBonus + skillBonus);
+        var yields = BuildYields(item, yieldBonus + skillBonus);
 
         foreach (var yield in yields)
         {
@@ -341,39 +365,221 @@ public class SalvageService
         _                                  => null
     };
 
-    private static IReadOnlyList<SalvageYield> BuildYields(ItemCategory category, int bonus)
+    /// <summary>
+    /// Resolves yields for a salvage attempt. Priority:
+    /// 1. content/salvage-yields.json override table (designer control)
+    /// 2. Recipe-derived from content/recipes.json (item name → recipe → ingredients)
+    /// 3. Hardcoded fallback by category (legacy items / items with no recipe)
+    ///
+    /// The <paramref name="bonus"/> is the combined workmanship+skill bonus and
+    /// is applied as an additive extra unit distributed across the yielded
+    /// materials (recipe-derived path) or clamped into the fallback formula.
+    /// </summary>
+    private IReadOnlyList<SalvageYield> BuildYields(Item item, int bonus)
     {
-        return category switch
+        // 1. Content override wins
+        var overrides = LoadOverrides(_content);
+        if (overrides.TryGetValue(item.Name, out var overrideLines) && overrideLines.Count > 0)
         {
-            ItemCategory.Weapon => BuildWeaponYields(bonus),
-            ItemCategory.Armor  => BuildArmorYields(bonus),
-            ItemCategory.Consumable => BuildConsumableYields(),
-            _ => [new SalvageYield("Iron Ore", 1)]
+            return overrideLines
+                .Select(l => new SalvageYield(l.Material, RollRange(l.MinQty, l.MaxQty)))
+                .ToList();
+        }
+
+        // 2. Recipe-derived
+        var recipe = FindRecipeForItem(item);
+        if (recipe is not null)
+        {
+            var recipeYields = BuildRecipeYields(recipe, item.Workmanship.Value, bonus);
+            if (recipeYields.Count > 0)
+                return recipeYields;
+            // All ingredients were rare-suppressed — fall through to hardcoded default.
+        }
+
+        // 3. Hardcoded fallback (legacy / drop items / fully-suppressed rare items)
+        return item.Category switch
+        {
+            ItemCategory.Weapon     => BuildFallbackWeaponYields(bonus),
+            ItemCategory.Armor      => BuildFallbackArmorYields(bonus),
+            ItemCategory.Consumable => BuildFallbackConsumableYields(),
+            _                       => new List<SalvageYield> { new("Iron Ore", 1) }
         };
     }
 
-    private static IReadOnlyList<SalvageYield> BuildWeaponYields(int bonus)
+    /// <summary>
+    /// Builds yields from a recipe's ingredient list. Each non-suppressed
+    /// Component ingredient recovers at a workmanship-scaled rate:
+    /// recoveryRate = 0.30 + (W-1) * 0.025 → W1=0.300 … W10=0.525.
+    /// Qty = max(1, floor(baseQuantity * recoveryRate)) plus the bonus split
+    /// across ingredients. Reagent ingredients and names in the rare-suppressed
+    /// list are dropped entirely.
+    /// </summary>
+    private static List<SalvageYield> BuildRecipeYields(RecipeDefinition recipe, int workmanship, int bonus)
     {
-        var metal  = Math.Clamp(2 + bonus, 2, 5);
-        var wood   = Math.Clamp(1 + bonus / 2, 1, 3);
-        return [new SalvageYield("Iron Ore", metal), new SalvageYield("Wood", wood)];
+        var recoveryRate = 0.30 + (Math.Clamp(workmanship, 1, 10) - 1) * 0.025;
+
+        var keepers = recipe.Ingredients
+            .Where(i => i.Category == ItemCategory.Component)
+            .Where(i => !RareSuppressedMaterials.Contains(i.Name))
+            .ToList();
+
+        if (keepers.Count == 0)
+            return new List<SalvageYield>();
+
+        var yields = new List<SalvageYield>(keepers.Count);
+        foreach (var ing in keepers)
+        {
+            var qty = Math.Max(1, (int)Math.Floor(ing.BaseQuantity * recoveryRate));
+            yields.Add(new SalvageYield(ing.Name, qty));
+        }
+
+        // Distribute the bonus across yields, round-robin, capping each line at baseQuantity.
+        if (bonus > 0)
+        {
+            for (int i = 0, added = 0; added < bonus; i = (i + 1) % yields.Count, added++)
+            {
+                var current = yields[i];
+                var cap = keepers[i].BaseQuantity;
+                if (current.Quantity >= cap) { continue; }
+                yields[i] = current with { Quantity = current.Quantity + 1 };
+            }
+        }
+
+        return yields;
     }
 
-    private static IReadOnlyList<SalvageYield> BuildArmorYields(int bonus)
+    /// <summary>
+    /// Name-match lookup: first recipe whose ResultItemName equals the item's
+    /// name (ordinal ignore-case). Returns null if no content provider is
+    /// available (unit-test path) or the item was not recipe-crafted.
+    /// </summary>
+    private RecipeDefinition? FindRecipeForItem(Item item)
+    {
+        if (_content is null) return null;
+        foreach (var r in _content.AllRecipes())
+        {
+            if (string.Equals(r.ResultItemName, item.Name, StringComparison.OrdinalIgnoreCase))
+                return r;
+        }
+        return null;
+    }
+
+    private static IReadOnlyList<SalvageYield> BuildFallbackWeaponYields(int bonus)
+    {
+        var metal = Math.Clamp(2 + bonus, 2, 5);
+        var wood  = Math.Clamp(1 + bonus / 2, 1, 3);
+        return new List<SalvageYield> { new("Iron Ore", metal), new("Wood", wood) };
+    }
+
+    private static IReadOnlyList<SalvageYield> BuildFallbackArmorYields(int bonus)
     {
         // Armor salvage is the dominant leather source — leather supply audit (2026-04-13)
-        // showed base-2 left a chronic -1/hour deficit in the balanced playstyle, so the
-        // base yield was bumped to 3 with a higher cap of 6 to match demand from armor
-        // recipes + Tannery construction. Iron yield unchanged.
+        // showed base-2 left a chronic -1/hour deficit, so base bumped to 3 clamp [3,6].
         var leather = Math.Clamp(3 + bonus, 3, 6);
         var metal   = Math.Clamp(1 + bonus / 2, 1, 3);
-        return [new SalvageYield("Leather", leather), new SalvageYield("Iron Ore", metal)];
+        return new List<SalvageYield> { new("Leather", leather), new("Iron Ore", metal) };
     }
 
-    private static IReadOnlyList<SalvageYield> BuildConsumableYields()
+    private static IReadOnlyList<SalvageYield> BuildFallbackConsumableYields()
     {
         var pick = ConsumableComponents[Random.Shared.Next(ConsumableComponents.Length)];
-        return [new SalvageYield(pick, 1)];
+        return new List<SalvageYield> { new(pick, 1) };
+    }
+
+    private static int RollRange(int min, int max)
+    {
+        if (max < min) max = min;
+        return min == max ? min : Random.Shared.Next(min, max + 1);
+    }
+
+    // ─── content/salvage-yields.json loader ─────────────────────────────────
+
+    private sealed record SalvageYieldOverride(string Material, int MinQty, int MaxQty);
+
+    private sealed class SalvageYieldsFile
+    {
+        [JsonPropertyName("overrides")]
+        public List<OverrideEntry>? Overrides { get; set; }
+    }
+
+    private sealed class OverrideEntry
+    {
+        [JsonPropertyName("itemName")] public string? ItemName { get; set; }
+        [JsonPropertyName("yields")] public List<OverrideYield>? Yields { get; set; }
+    }
+
+    private sealed class OverrideYield
+    {
+        [JsonPropertyName("material")] public string? Material { get; set; }
+        [JsonPropertyName("minQty")] public int MinQty { get; set; }
+        [JsonPropertyName("maxQty")] public int MaxQty { get; set; }
+    }
+
+    /// <summary>
+    /// Loads content/salvage-yields.json if present. Never throws — a missing
+    /// or malformed file returns an empty override table and falls through to
+    /// recipe-derived yields. Cached once per process.
+    /// </summary>
+    private static Dictionary<string, IReadOnlyList<SalvageYieldOverride>> LoadOverrides(IContentProvider? _)
+    {
+        if (_overridesCache is not null) return _overridesCache;
+        lock (_overrideLock)
+        {
+            if (_overridesCache is not null) return _overridesCache;
+
+            var empty = new Dictionary<string, IReadOnlyList<SalvageYieldOverride>>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var root = ContentRootResolver.Resolve();
+                var path = Path.Combine(root, "salvage-yields.json");
+                if (!File.Exists(path))
+                {
+                    _overridesCache = empty;
+                    return _overridesCache;
+                }
+
+                using var stream = File.OpenRead(path);
+                var doc = JsonSerializer.Deserialize<SalvageYieldsFile>(stream, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true,
+                });
+
+                var dict = new Dictionary<string, IReadOnlyList<SalvageYieldOverride>>(StringComparer.OrdinalIgnoreCase);
+                if (doc?.Overrides is not null)
+                {
+                    foreach (var entry in doc.Overrides)
+                    {
+                        if (string.IsNullOrWhiteSpace(entry.ItemName) || entry.Yields is null || entry.Yields.Count == 0)
+                            continue;
+                        var lines = entry.Yields
+                            .Where(y => !string.IsNullOrWhiteSpace(y.Material) && y.MinQty >= 0 && y.MaxQty >= y.MinQty)
+                            .Select(y => new SalvageYieldOverride(y.Material!, y.MinQty, y.MaxQty))
+                            .ToList();
+                        if (lines.Count > 0)
+                            dict[entry.ItemName] = lines;
+                    }
+                }
+                _overridesCache = dict;
+            }
+            catch
+            {
+                // Malformed override file — silently degrade. Recipe/fallback
+                // path still gives correct material yields.
+                _overridesCache = empty;
+            }
+            return _overridesCache;
+        }
+    }
+
+    /// <summary>
+    /// Test-only reset hook for the static override cache so content changes
+    /// in different test fixtures don't leak across runs.
+    /// </summary>
+    public static void ResetOverrideCacheForTests()
+    {
+        lock (_overrideLock) { _overridesCache = null; }
     }
 
     private static string BuildSuccessMessage(string itemName, IReadOnlyList<SalvageYield> yields)

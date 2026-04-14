@@ -1,0 +1,4 @@
+{
+  "$comment": "Designer override table for salvage yields. Keys match Item.Name exactly (case-insensitive). If an entry is present it WINS over the recipe-derived default. Use this for legacy items, boss drops, or cases where the recipe-derived math doesn't give the right feel. Format: { itemName: [ { material, minQty, maxQty } ] }. Leave entries empty during normal play — the recipe-derived path auto-scales.",
+  "overrides": []
+}

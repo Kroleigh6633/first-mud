@@ -1,0 +1,80 @@
+{
+  "id": "salvage-material-flow",
+  "displayName": "Salvage material net-flow (recipe-derived)",
+  "kind": "economy-analytical",
+  "description": "Tracks which materials are net-positive vs net-negative over a 40-hour mixed-salvage session AFTER the recipe-derived salvage fix (2026-04-13). Salvage now yields the item's recipe ingredients at a workmanship-scaled recoveryRate, with rare components (Mithril Ore, Silver Ore, Ashwood, Spider Silk, Sea Scale, Coral Fragment) and ALL Reagent ingredients fully suppressed. Rare/Reagent-only items fall back to the hardcoded weapon-yields-Iron-Ore / armor-yields-Leather defaults.",
+  "context": {
+    "bug": "Stone Axe salvaged into Iron Ore because SalvageService hardcoded weapon → Iron Ore regardless of recipe.",
+    "fix": "SalvageService.BuildYields now consults content/salvage-yields.json (override) → content/recipes.json (recipe-derived) → hardcoded category fallback.",
+    "recoveryRateFormula": "0.30 + (workmanship - 1) * 0.025, clamped to [0.300, 0.525]. Per ingredient qty = max(1, floor(baseQuantity * recoveryRate)); bonus from workmanship/skill distributes round-robin capped at baseQuantity.",
+    "rareSuppressed": ["Mithril Ore", "Silver Ore", "Ashwood", "Spider Silk", "Sea Scale", "Coral Fragment"],
+    "reagentSuppressed": "ALL Reagent-category ingredients (Dravenite Dust, Wyrd Shard, Sage, Diamond Shard, Void Essence, Phase Thread, Tear Fragment, Obsidian Shard, Moonbloom, Mint, Thornroot, Starflower, Wyrd Blossom, ...)"
+  },
+  "playstyle": {
+    "name": "mixed",
+    "hours": 40,
+    "killsPerHour": 30,
+    "salvagesPerHour": 8,
+    "salvageMix": {
+      "stoneAxe":       0.10,
+      "ironSword":      0.20,
+      "warPick":        0.10,
+      "thornwoodBow":   0.10,
+      "leatherArmor":   0.15,
+      "ironHelm":       0.10,
+      "ironGreaves":    0.10,
+      "mithrilItem":    0.05,
+      "unknownLegacy":  0.10
+    },
+    "avgWorkmanship": 4
+  },
+  "perItemYields": {
+    "stoneAxe_W4": {
+      "recipeIngredients": ["Stone x3", "Wood x1"],
+      "recoveryRate": 0.375,
+      "rawYield": ["Stone x1", "Wood x1"],
+      "afterBonus": ["Stone x2", "Wood x1"]
+    },
+    "ironSword_W4": {
+      "recipeIngredients": ["Iron Ore x3", "Wood x1"],
+      "rawYield": ["Iron Ore x1", "Wood x1"],
+      "afterBonus": ["Iron Ore x2", "Wood x1"]
+    },
+    "leatherArmor_W4": {
+      "recipeIngredients": ["Leather x4", "Sinew x1"],
+      "rawYield": ["Leather x1", "Sinew x1"],
+      "afterBonus": ["Leather x2", "Sinew x1"]
+    },
+    "mithrilSword_W8": {
+      "recipeIngredients": ["Mithril Ore x6 (SUPPRESSED)", "Diamond Shard x2 (SUPPRESSED-Reagent)"],
+      "rawYield": [],
+      "fallbackYield": ["Iron Ore x3", "Wood x1"],
+      "note": "Rare + Reagent suppression leaves zero recipe yields → hardcoded weapon fallback."
+    },
+    "unknownLegacyWeapon": {
+      "recipeIngredients": "(no recipe name match)",
+      "fallbackYield": ["Iron Ore x2-5", "Wood x1-3"]
+    }
+  },
+  "expectedNetFlowPerHour": {
+    "Stone":         { "supply": 1.6,  "demand": 0.0,  "net":  1.6,  "band": "healthy_surplus", "note": "Stone now recovered from Stone Axe salvage — new supply lane." },
+    "Wood":          { "supply": 6.0,  "demand": 3.0,  "net":  3.0,  "band": "healthy_surplus" },
+    "Iron Ore":      { "supply": 5.5,  "demand": 6.0,  "net": -0.5,  "band": "balanced" },
+    "Leather":       { "supply": 4.0,  "demand": 4.5,  "net": -0.5,  "band": "balanced",       "note": "Recipe-derived yields are LOWER than old hardcoded base-3 armor default. Monitor — may need override for high-volume Leather Armor salvage." },
+    "Sinew":         { "supply": 2.5,  "demand": 2.0,  "net":  0.5,  "band": "balanced" },
+    "Bone Fragment": { "supply": 0.5,  "demand": 1.5,  "net": -1.0,  "band": "chronic_deficit", "note": "Bone Fragment is a consumable input — salvage rarely surfaces it." },
+    "Mithril Ore":   { "supply": 0.0,  "demand": 0.3,  "net": -0.3,  "band": "by_design",       "note": "Suppressed — rare-material round-trip would trivialize Mithril." },
+    "Dravenite Dust":{ "supply": 0.0,  "demand": 1.0,  "net": -1.0,  "band": "by_design",       "note": "Reagent — salvage never returns it. Imbue-residue path still recovers tapers separately." }
+  },
+  "alertThresholds": {
+    "chronic_deficit": [-99, -2],
+    "balanced":        [-2, 2],
+    "healthy_surplus": [2, 10],
+    "flood":           [10, 99]
+  },
+  "notes": [
+    "If Leather drifts into chronic_deficit after 20h play, add a content override in content/salvage-yields.json for Leather Armor: { material: 'Leather', minQty: 3, maxQty: 5 } to restore the pre-fix yield.",
+    "Stone flow is a NEW supply lane — watch for Stone flooding once stone-using recipes (Steel Sword, future stone buildings) stabilize.",
+    "Imbue residues are a separate path (RecoverImbueResiduesAsync) and still yield taper reagents at skill-scaled rates; this playbook excludes that lane."
+  ]
+}
