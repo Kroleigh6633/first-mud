@@ -30,6 +30,7 @@ interface Props {
   availableQuests: QuestNode[];
   fetchAvailableQuests: () => void;
   zoneTiles: ZoneTile[];
+  zoneRumors: Record<string, string>;
   inventory: InventorySnapshot | null;
   combat: CombatUpdate | null;
   needsPlayerCreation: boolean;
@@ -260,6 +261,7 @@ export default function GameTerminal({
   availableQuests,
   fetchAvailableQuests,
   zoneTiles,
+  zoneRumors,
   inventory,
   combat,
   needsPlayerCreation,
@@ -1693,7 +1695,7 @@ export default function GameTerminal({
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <WorldMap worldState={worldState} zoneTiles={zoneTiles} wanderingNpcs={wanderingNpcs} questWaypoint={questWaypoint} homesteadBuildings={cityView?.buildings ?? []} />
+          <WorldMap worldState={worldState} zoneTiles={zoneTiles} zoneRumors={zoneRumors} wanderingNpcs={wanderingNpcs} questWaypoint={questWaypoint} homesteadBuildings={cityView?.buildings ?? []} />
         </div>
 
         {/* Status panel — collapsible */}

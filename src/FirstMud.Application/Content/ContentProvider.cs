@@ -85,6 +85,9 @@ public sealed class ContentProvider : IContentProvider
     private IReadOnlyList<ImbueRecipeDefinition> _imbueRecipes = Array.Empty<ImbueRecipeDefinition>();
     private Dictionary<string, ImbueRecipeDefinition> _imbueRecipesById = new(StringComparer.Ordinal);
 
+    private Dictionary<string, IReadOnlyList<string>> _zoneRumorsByZoneId =
+        new(StringComparer.Ordinal);
+
     private static readonly HashSet<string> ValidImbueRecipeEffects =
         new(StringComparer.Ordinal) { "imbue", "upgrade", "successBoost" };
 
@@ -259,6 +262,16 @@ public sealed class ContentProvider : IContentProvider
         string.IsNullOrEmpty(id) ? null
         : _imbueRecipesById.TryGetValue(id, out var def) ? def : null;
 
+    public IReadOnlyList<string> GetZoneRumors(string zoneId)
+    {
+        if (string.IsNullOrEmpty(zoneId)) return Array.Empty<string>();
+        return _zoneRumorsByZoneId.TryGetValue(zoneId, out var rumors)
+            ? rumors
+            : Array.Empty<string>();
+    }
+
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> AllZoneRumors() => _zoneRumorsByZoneId;
+
     public ImbueRecipeDefinition? MatchImbueRecipe(string reagentName, int craftingSkill)
     {
         if (string.IsNullOrWhiteSpace(reagentName))
@@ -345,6 +358,10 @@ public sealed class ContentProvider : IContentProvider
         // registry yet).
         _imbueRecipes = LoadImbueRecipes();
         _imbueRecipesById = _imbueRecipes.ToDictionary(r => r.Id, StringComparer.Ordinal);
+
+        // Zone rumors — optional ambient flavor for unexplored tiles. Cross-ref
+        // against the zone registry so typos in zoneId fail fast at startup.
+        _zoneRumorsByZoneId = LoadZoneRumors();
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
@@ -2891,6 +2908,79 @@ public sealed class ContentProvider : IContentProvider
         }
 
         return list;
+    }
+
+    private Dictionary<string, IReadOnlyList<string>> LoadZoneRumors()
+    {
+        var path = Path.Combine(_contentRoot, "zone-rumors.json");
+        if (!File.Exists(path))
+        {
+            _logger?.LogInformation(
+                "ContentProvider: no zone-rumors.json at {Path} — rumor pool will be empty.",
+                path);
+            return new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        }
+
+        using var stream = File.OpenRead(path);
+        ZoneRumorsFile? doc;
+        try
+        {
+            doc = JsonSerializer.Deserialize<ZoneRumorsFile>(stream, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"{path}: malformed JSON — {ex.Message}", ex);
+        }
+
+        if (doc is null)
+            throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Zones is null || doc.Zones.Count == 0)
+            throw new InvalidDataException($"{path}: no zones defined.");
+
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        var zoneIds = new HashSet<string>(_zonesById.Keys, StringComparer.Ordinal);
+
+        foreach (var raw in doc.Zones)
+        {
+            if (string.IsNullOrWhiteSpace(raw.ZoneId))
+                throw new InvalidDataException($"{path}: entry missing zoneId.");
+
+            if (result.ContainsKey(raw.ZoneId))
+                throw new InvalidDataException($"{path}: duplicate zoneId '{raw.ZoneId}'.");
+
+            if (zoneIds.Count > 0 && !zoneIds.Contains(raw.ZoneId))
+                throw new InvalidDataException(
+                    $"{path}: zoneId '{raw.ZoneId}' is not a known zone (cross-ref against zones.json).");
+
+            if (raw.Rumors is null || raw.Rumors.Count == 0)
+                throw new InvalidDataException(
+                    $"{path}: zone '{raw.ZoneId}' must declare at least one rumor.");
+
+            var rumors = new List<string>(raw.Rumors.Count);
+            foreach (var r in raw.Rumors)
+            {
+                if (string.IsNullOrWhiteSpace(r))
+                    throw new InvalidDataException(
+                        $"{path}: zone '{raw.ZoneId}' contains an empty rumor string.");
+                rumors.Add(r);
+            }
+
+            result[raw.ZoneId] = rumors;
+        }
+
+        return result;
+    }
+
+    private sealed class ZoneRumorsFile
+    {
+        [JsonPropertyName("zones")] public List<ZoneRumorsEntry>? Zones { get; set; }
+    }
+
+    private sealed class ZoneRumorsEntry
+    {
+        [JsonPropertyName("zoneId")] public string? ZoneId { get; set; }
+        [JsonPropertyName("rumors")] public List<string>? Rumors { get; set; }
     }
 
     private sealed class ImbueRecipesFile

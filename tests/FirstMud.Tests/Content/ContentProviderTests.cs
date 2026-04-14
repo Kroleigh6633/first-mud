@@ -2195,4 +2195,148 @@ public class ContentProviderTests
             dir.Delete(recursive: true);
         }
     }
+
+    // ─── Zone Rumors ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_zone_rumors_file_loads_pool_for_every_authored_zone()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var all = provider.AllZoneRumors();
+        all.Should().NotBeEmpty("zone-rumors.json ships with content");
+        // Creative pass #8 authored 3-5 rumors across 9 Aeldran zones.
+        all.Should().HaveCount(9);
+
+        foreach (var (zoneId, pool) in all)
+        {
+            pool.Should().NotBeEmpty($"zone '{zoneId}' must declare at least one rumor");
+            pool.Count.Should().BeInRange(3, 5, $"zone '{zoneId}' should author 3-5 rumors");
+            foreach (var rumor in pool)
+                rumor.Should().NotBeNullOrWhiteSpace();
+        }
+
+        // Spot-check a known entry end-to-end.
+        var thornwood = provider.GetZoneRumors("aeldran-2-thornwood");
+        thornwood.Should().NotBeEmpty();
+        thornwood.Any(r => r.Contains("Maerwyn", StringComparison.Ordinal)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Unknown_zone_returns_empty_rumor_pool()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        provider.GetZoneRumors("no-such-zone").Should().BeEmpty();
+        provider.GetZoneRumors("").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Missing_zone_rumors_file_falls_back_to_empty_pool()
+    {
+        // Clone the real content root, delete zone-rumors.json, reload.
+        var src = ContentRootResolver.Resolve();
+        var dir = Directory.CreateTempSubdirectory("fm-rumors-missing-");
+        try
+        {
+            CopyContentTree(src, dir.FullName);
+            var rumorsPath = Path.Combine(dir.FullName, "zone-rumors.json");
+            File.Delete(rumorsPath);
+
+            var provider = new ContentProvider(dir.FullName);
+            provider.AllZoneRumors().Should().BeEmpty();
+            provider.GetZoneRumors("aeldran-2-thornwood").Should().BeEmpty();
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Malformed_zone_rumors_file_throws_invalid_data()
+    {
+        var src = ContentRootResolver.Resolve();
+        var dir = Directory.CreateTempSubdirectory("fm-rumors-malformed-");
+        try
+        {
+            CopyContentTree(src, dir.FullName);
+            File.WriteAllText(
+                Path.Combine(dir.FullName, "zone-rumors.json"),
+                "{ not valid json ");
+
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*malformed JSON*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Zone_rumors_with_unknown_zone_id_throws_on_load()
+    {
+        var src = ContentRootResolver.Resolve();
+        var dir = Directory.CreateTempSubdirectory("fm-rumors-typo-");
+        try
+        {
+            CopyContentTree(src, dir.FullName);
+            File.WriteAllText(
+                Path.Combine(dir.FullName, "zone-rumors.json"),
+                """
+                { "zones": [
+                  { "zoneId": "not-a-real-zone", "rumors": ["placeholder"] }
+                ] }
+                """);
+
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*not-a-real-zone*not a known zone*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Zone_rumors_with_empty_pool_throws_on_load()
+    {
+        var src = ContentRootResolver.Resolve();
+        var dir = Directory.CreateTempSubdirectory("fm-rumors-empty-pool-");
+        try
+        {
+            CopyContentTree(src, dir.FullName);
+            File.WriteAllText(
+                Path.Combine(dir.FullName, "zone-rumors.json"),
+                """
+                { "zones": [
+                  { "zoneId": "aeldran-2-thornwood", "rumors": [] }
+                ] }
+                """);
+
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*must declare at least one rumor*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    private static void CopyContentTree(string src, string dst)
+    {
+        Directory.CreateDirectory(dst);
+        foreach (var file in Directory.GetFiles(src))
+        {
+            File.Copy(file, Path.Combine(dst, Path.GetFileName(file)), overwrite: true);
+        }
+        foreach (var sub in Directory.GetDirectories(src))
+        {
+            var name = Path.GetFileName(sub);
+            CopyContentTree(sub, Path.Combine(dst, name));
+        }
+    }
 }

@@ -13,6 +13,12 @@ export interface TileProfileData {
   zone: ZoneTile | null;
   /** Whether this tile has ever been within fog-of-war visibility */
   isKnown: boolean;
+  /**
+   * Ambient rumor surfaced when the tile is unexplored. Null for known tiles
+   * or zones with no authored pool. Loaded client-side from the server's
+   * ZoneRumors event and indexed by zone name.
+   */
+  rumor?: string | null;
 }
 
 interface Props {
@@ -97,7 +103,7 @@ export default function TileProfileCard({ anchorX, anchorY, data, onClose }: Pro
   if (left + CARD_W > vw - 8) left = Math.max(8, anchorX - CARD_W - 12);
   if (top  + CARD_H > vh - 8) top  = Math.max(8, anchorY - CARD_H - 12);
 
-  const { gx, gy, biome, zone, isKnown } = data;
+  const { gx, gy, biome, zone, isKnown, rumor } = data;
 
   return (
     <div
@@ -135,15 +141,23 @@ export default function TileProfileCard({ anchorX, anchorY, data, onClose }: Pro
         >[x]</button>
       </div>
 
-      <div style={{ marginBottom: 4 }}>
-        <span style={{ color: '#aa8866' }}>Biome:</span> {BIOME_LABEL[biome] ?? biome}
-      </div>
-
       {!isKnown ? (
+        // Unexplored: coords are visible (player can see them on the map),
+        // but biome, danger, resources, beasts, and flora are all withheld.
+        // A single whispered rumor for this zone (if the zone has authored
+        // rumor content) is all the hint the player gets.
         <div style={{ color: '#886644', fontStyle: 'italic', marginTop: 8 }}>
-          Unexplored territory — venture here to learn what dwells within.
+          {rumor
+            ? <>&mdash; whispers say, &lsquo;{rumor}&rsquo;</>
+            : <>Unexplored. Nothing stirs here that anyone&rsquo;s willing to speak of.</>}
         </div>
-      ) : zone ? (
+      ) : (
+        <div style={{ marginBottom: 4 }}>
+          <span style={{ color: '#aa8866' }}>Biome:</span> {BIOME_LABEL[biome] ?? biome}
+        </div>
+      )}
+
+      {isKnown && (zone ? (
         <>
           <div style={{ marginBottom: 4 }}>
             <span style={{ color: '#aa8866' }}>Zone:</span> {zone.name}
@@ -182,7 +196,7 @@ export default function TileProfileCard({ anchorX, anchorY, data, onClose }: Pro
             No zone at this tile.
           </div>
         </>
-      )}
+      ))}
 
       <div style={{ marginTop: 10, paddingTop: 6, borderTop: '1px solid #3a2c1a', color: '#886644', fontSize: 10 }}>
         Click elsewhere or press Esc to close.

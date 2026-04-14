@@ -7,6 +7,7 @@ import type {
   QuestCompleteResult,
   ZoneTile,
   ZoneView,
+  ZoneRumorsEvent,
   InventorySnapshot,
   CombatUpdate,
   StorageViewSnapshot,
@@ -70,6 +71,11 @@ export interface GameStateResult {
   availableQuests: QuestNode[];
   fetchAvailableQuests: () => void;
   zoneTiles: ZoneTile[];
+  /**
+   * Zone-name keyed rumor map. Populated on auth/zone-enter, consumed by the
+   * world-map tile profile card to whisper flavor on unexplored tiles.
+   */
+  zoneRumors: Record<string, string>;
   inventory: InventorySnapshot | null;
   combat: CombatUpdate | null;
   needsPlayerCreation: boolean;
@@ -104,6 +110,7 @@ export function useGameState(): GameStateResult {
   const [messages, setMessages] = useState<GameMessage[]>([]);
   const [availableQuests, setAvailableQuests] = useState<QuestNode[]>([]);
   const [zoneTiles, setZoneTiles] = useState<ZoneTile[]>([]);
+  const [zoneRumors, setZoneRumors] = useState<Record<string, string>>({});
   const [inventory, setInventory] = useState<InventorySnapshot | null>(null);
   const [combat, setCombat] = useState<CombatUpdate | null>(null);
   const [needsPlayerCreation, setNeedsPlayerCreation] = useState<boolean>(resolvedPlayerId === null);
@@ -383,6 +390,16 @@ export function useGameState(): GameStateResult {
         setZoneTiles(view.tiles ?? []);
       });
 
+      connection.on('ZoneRumors', (event: ZoneRumorsEvent) => {
+        const map: Record<string, string> = {};
+        for (const entry of event.rumors ?? []) {
+          if (entry && typeof entry.zoneName === 'string' && typeof entry.rumor === 'string') {
+            map[entry.zoneName] = entry.rumor;
+          }
+        }
+        setZoneRumors(map);
+      });
+
       connection.on('Inventory', (snapshot: InventorySnapshot & { equippedItems?: Record<string, string> }) => {
         setInventory(snapshot);
         setEquipment(prev => {
@@ -634,6 +651,7 @@ export function useGameState(): GameStateResult {
     availableQuests,
     fetchAvailableQuests,
     zoneTiles,
+    zoneRumors,
     inventory,
     combat,
     needsPlayerCreation,

@@ -9,6 +9,12 @@ interface Props {
   wanderingNpcs?: WanderingNpc[];
   questWaypoint?: QuestWaypoint | null;
   homesteadBuildings?: HomesteadBuilding[];
+  /**
+   * Zone-name → rumor map. Keys match `ZoneTile.name`. Supplied by
+   * useGameState from the server's `ZoneRumors` event. Used to flavor
+   * unexplored tiles in TileProfileCard.
+   */
+  zoneRumors?: Record<string, string>;
 }
 
 // ─── Tile dimensions ────────────────────────────────────────────────────────
@@ -1119,7 +1125,7 @@ const MINI_SIZE = 100;
 const MINI_DOT  = 3;
 const MINI_PAD  = 8;
 
-export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], questWaypoint = null, homesteadBuildings = [] }: Props) {
+export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], questWaypoint = null, homesteadBuildings = [], zoneRumors = {} }: Props) {
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -1176,11 +1182,13 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
   const wanderingNpcsRef      = useRef(wanderingNpcs);
   const questWaypointRef      = useRef(questWaypoint);
   const homesteadBuildingsRef = useRef(homesteadBuildings);
+  const zoneRumorsRef         = useRef(zoneRumors);
   worldStateRef.current         = worldState;
   zoneTilesRef.current          = zoneTiles;
   wanderingNpcsRef.current      = wanderingNpcs;
   questWaypointRef.current      = questWaypoint;
   homesteadBuildingsRef.current = homesteadBuildings;
+  zoneRumorsRef.current         = zoneRumors;
 
   // ─── Load visited tiles when player ID becomes available ──────────────────
   useEffect(() => {
@@ -1957,10 +1965,11 @@ export default function WorldMap({ worldState, zoneTiles, wanderingNpcs = [], qu
       const playerY = worldStateRef.current?.player?.y ?? 0;
       const dist = Math.sqrt((gx - playerX) ** 2 + (gy - playerY) ** 2);
       const isKnown = dist <= VIS_RADIUS || visitedRef.current.has(`${gx},${gy}`);
+      const rumor = zone && !isKnown ? (zoneRumorsRef.current[zone.name] ?? null) : null;
       setTileProfile({
         anchorX: e.clientX,
         anchorY: e.clientY,
-        data: { gx, gy, biome: biome.type, zone, isKnown },
+        data: { gx, gy, biome: biome.type, zone, isKnown, rumor },
       });
     }
   }, [getGridCoords]);
