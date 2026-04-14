@@ -18,6 +18,7 @@ public class HomesteadCompanionService
     private readonly IHomesteadRepository _homesteads;
     private readonly IHomesteadBuildingRepository _buildings;
     private readonly IItemRepository _items;
+    private readonly IPlayerRepository _players;
     private readonly IGameEventPublisher _events;
     private readonly ILogger<HomesteadCompanionService> _logger;
 
@@ -54,6 +55,7 @@ public class HomesteadCompanionService
         IHomesteadRepository homesteads,
         IHomesteadBuildingRepository buildings,
         IItemRepository items,
+        IPlayerRepository players,
         IGameEventPublisher events,
         ILogger<HomesteadCompanionService> logger)
     {
@@ -61,6 +63,7 @@ public class HomesteadCompanionService
         _homesteads = homesteads;
         _buildings = buildings;
         _items = items;
+        _players = players;
         _events = events;
         _logger = logger;
     }
@@ -86,6 +89,11 @@ public class HomesteadCompanionService
             var homestead = await _homesteads.GetByPlayerIdAsync(playerId, ct);
             if (homestead is null) continue;
 
+            // Rubber-banding (task #74): resolve player level once per owner
+            // so we can scale duty-tick usage by the same formula as combat.
+            var playerForDuty = await _players.GetByIdAsync(playerId, ct);
+            var playerLevelForDuty = playerForDuty?.Level ?? 1;
+
             foreach (var companion in group)
             {
                 if (!companion.AssignedDuty.HasValue || companion.AssignedDuty == HomesteadDuty.None)
@@ -102,8 +110,12 @@ public class HomesteadCompanionService
                         _ => null
                     };
 
-                    // Accumulate usage slowly (homestead duty counts at ~30% of combat rate)
-                    companion.RecordUsage(3);
+                    // Accumulate usage slowly (homestead duty counts at ~30% of combat rate).
+                    // Rubber-banding (task #74): scale by the player-level gap so
+                    // far-lagging companions catch up while on duty too.
+                    var dutyRubberBand = FirstMud.Domain.Configuration.ProgressionCurvesAccessor
+                        .RubberBandMultiplier(playerLevelForDuty, companion.CurrentLayer);
+                    companion.RecordUsage((int)Math.Round(3 * dutyRubberBand));
                     await _companions.UpdateAsync(companion, ct);
 
                     // Companion usage/layer progression changed — refresh Companion panel

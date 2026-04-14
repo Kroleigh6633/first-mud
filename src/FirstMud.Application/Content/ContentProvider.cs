@@ -312,7 +312,10 @@ public sealed class ContentProvider : IContentProvider
         _progressionCurves = LoadProgressionCurves();
         FirstMud.Domain.Configuration.ProgressionCurvesAccessor.Publish(
             _progressionCurves.Workmanship.SkillDivisor,
-            _progressionCurves.CompanionLayerThresholds);
+            _progressionCurves.CompanionLayerThresholds,
+            _progressionCurves.CompanionRubberBand.PlayerLevelWeight,
+            _progressionCurves.CompanionRubberBand.PerGapBonus,
+            _progressionCurves.CompanionRubberBand.MaxMultiplier);
 
         // NPCs load AFTER zones + factions so cross-ref validation
         // (homeZoneId / factionId) can run against the authored registries.
@@ -739,7 +742,11 @@ public sealed class ContentProvider : IContentProvider
     private static ProgressionCurvesDefinition DefaultProgressionCurves() =>
         new(
             new WorkmanshipCurve(SkillDivisor: FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultSkillDivisor),
-            FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCompanionLayerThresholds);
+            FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCompanionLayerThresholds,
+            new CompanionRubberBandCurve(
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandPlayerLevelWeight,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandPerGapBonus,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandMaxMultiplier));
 
     /// <summary>
     /// Loads <c>content/progression-curves.json</c> if present. The file is
@@ -797,17 +804,49 @@ public sealed class ContentProvider : IContentProvider
                     $"{path}: companionLayerThresholds is missing entry for CompanionType '{t}'.");
         }
 
+        // Rubber-band block — OPTIONAL. If absent, apply historical defaults so
+        // older partial-content fixtures keep working (task #74).
+        CompanionRubberBandCurve rubberBand;
+        if (doc.CompanionRubberBand is null)
+        {
+            rubberBand = new CompanionRubberBandCurve(
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandPlayerLevelWeight,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandPerGapBonus,
+                FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultRubberBandMaxMultiplier);
+        }
+        else
+        {
+            var rb = doc.CompanionRubberBand;
+            if (rb.PlayerLevelWeight < 1 || rb.PlayerLevelWeight > 20)
+                throw new InvalidDataException(
+                    $"{path}: companionRubberBand.playerLevelWeight must be in [1, 20] (got {rb.PlayerLevelWeight}).");
+            if (rb.PerGapBonus < 0 || rb.PerGapBonus > 2)
+                throw new InvalidDataException(
+                    $"{path}: companionRubberBand.perGapBonus must be in [0, 2] (got {rb.PerGapBonus}).");
+            if (rb.MaxMultiplier < 1 || rb.MaxMultiplier > 10)
+                throw new InvalidDataException(
+                    $"{path}: companionRubberBand.maxMultiplier must be in [1, 10] (got {rb.MaxMultiplier}).");
+            rubberBand = new CompanionRubberBandCurve(rb.PlayerLevelWeight, rb.PerGapBonus, rb.MaxMultiplier);
+        }
+
         return new ProgressionCurvesDefinition(
             new WorkmanshipCurve(divisor),
-            thresholds);
+            thresholds,
+            rubberBand);
     }
 
     private sealed record ProgressionCurvesFile(
         [property: JsonPropertyName("workmanship")] WorkmanshipRaw? Workmanship,
-        [property: JsonPropertyName("companionLayerThresholds")] Dictionary<string, List<int>>? CompanionLayerThresholds);
+        [property: JsonPropertyName("companionLayerThresholds")] Dictionary<string, List<int>>? CompanionLayerThresholds,
+        [property: JsonPropertyName("companionRubberBand")] CompanionRubberBandRaw? CompanionRubberBand);
 
     private sealed record WorkmanshipRaw(
         [property: JsonPropertyName("skillDivisor")] int SkillDivisor);
+
+    private sealed record CompanionRubberBandRaw(
+        [property: JsonPropertyName("playerLevelWeight")] int PlayerLevelWeight,
+        [property: JsonPropertyName("perGapBonus")]       double PerGapBonus,
+        [property: JsonPropertyName("maxMultiplier")]     double MaxMultiplier);
 
     private sealed record CombatCurvesFile(
         [property: JsonPropertyName("monsterScaling")] MonsterScalingRaw? MonsterScaling,

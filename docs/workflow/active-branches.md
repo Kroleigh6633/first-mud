@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a56f2798 | ready-to-merge | 5157a76 | Companion XP rubber-banding (task #74): lagging companions catch up faster when the player out-levels their effective bracket | - | content/progression-curves.json, src/FirstMud.Application/Content, src/FirstMud.Domain/Configuration, src/FirstMud.GameServer/Handlers/CombatHelpers.cs, src/FirstMud.Application/Services, tools/design/playbooks/companion-catchup.json, tests/FirstMud.Tests/Domain | 2026-04-13 |
 <!-- agents add rows above this line -->

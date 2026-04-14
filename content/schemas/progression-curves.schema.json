@@ -28,6 +28,32 @@
         "maxItems": 6,
         "items": { "type": "integer", "minimum": 0 }
       }
+    },
+    "companionRubberBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Companion XP catch-up scaling. mult = clamp(1 + max(0, playerLevel - layer*playerLevelWeight) * perGapBonus, 1.0, maxMultiplier). Block is OPTIONAL — absent means defaults (3, 0.15, 3.0) are used.",
+      "properties": {
+        "_note": { "type": "string" },
+        "playerLevelWeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "How many player levels 'equal' one companion layer for gap-measurement purposes. Historical default: 3."
+        },
+        "perGapBonus": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "XP-multiplier increment per unit of player-level gap. Historical default: 0.15."
+        },
+        "maxMultiplier": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Upper clamp on the rubber-band multiplier. Historical default: 3.0."
+        }
+      }
     }
   }
 }

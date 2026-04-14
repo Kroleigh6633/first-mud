@@ -315,9 +315,15 @@ public sealed class ProgressionSimulator
         var enc = svc.BuildEncounter(_archetype, state.PlayerLevel, party, new[] { template });
         var res = svc.Run(enc, dangerLevel: zone.DangerLevel);
 
-        // Award usage to active companions
+        // Award usage to active companions. Rubber-banding (task #74): scale
+        // by the player-level gap so lagging layers catch up in the sim the
+        // same way they do in the live game.
         foreach (var c in state.Companions.Take(3))
-            c.AddUsage(10);
+        {
+            var mult = FirstMud.Domain.Configuration.ProgressionCurvesAccessor
+                .RubberBandMultiplier(state.PlayerLevel, c.Layer);
+            c.AddUsage((int)Math.Round(10 * mult));
+        }
 
         if (res.Outcome == CombatSimulationService.Outcome.Victory)
         {
