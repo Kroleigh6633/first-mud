@@ -28,4 +28,5 @@ Columns:
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
 | worktree-agent-a1067938 | ready-to-merge | 5157a76 | Creative sweep #3: playbook spec recalibrations + 2 new quest chains (Ashen Reach, Caervorn Highlands) + canon Q5-Q7 | - | tools/design/playbooks, tools/design/fixtures, docs/design | 2026-04-13 |
+| worktree-agent-ad628dcd | ready-to-merge | 0e96878 | Fix ProgressionSimulator blindness — ProbeReliableDanger + DoCombat now build via CombatContext (gearTier, imbueLevel) + apply gear-boosted MaxHp; PickMonster boss-weighted 2x in biome+tier fallback; new probe-gear regression test | - | tools/design/FirstMud.DesignTools, tools/design/FirstMud.DesignTools.Tests | 2026-04-14 |
 <!-- agents add rows above this line -->

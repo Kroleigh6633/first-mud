@@ -91,6 +91,12 @@ public sealed class ProgressionSimulator
         /// <summary>slot → equipped workmanship.</summary>
         public Dictionary<string, int> EquippedGear { get; } = new();
 
+        /// <summary>slot → imbue level (0..6). Sim-proxy: bumped when
+        /// enchanting-mat supply allows. Feeds ProbeReliableDanger's
+        /// CombatContext.ImbueLevel so enchanting-focused playbooks score
+        /// their ability-power multiplier.</summary>
+        public Dictionary<string, int> Imbues { get; } = new();
+
         public List<CompanionState> Companions { get; } = new();
 
         public int TotalMaterialsEarned { get; set; }
@@ -312,7 +318,7 @@ public sealed class ProgressionSimulator
             .ToList();
 
         var svc = new CombatSimulationService(new Random(_rng.Next()), _content.CombatCurves.PartyScaling);
-        var enc = svc.BuildEncounter(_archetype, state.PlayerLevel, party, new[] { template });
+        var enc = BuildGearAwareEncounter(svc, state, party, new[] { template });
         var res = svc.Run(enc, dangerLevel: zone.DangerLevel);
 
         // Award usage to active companions. Rubber-banding (task #74): scale
@@ -437,6 +443,18 @@ public sealed class ProgressionSimulator
                 // Equipped gear gives +HP
                 state.PlayerMaxHp = 50 + state.EquippedGear.Values.Sum() * 3;
             }
+
+            // Sim-proxy imbue application: if enchanting-mat supply allows,
+            // spend one on a freshly equipped slot and bump its imbue level.
+            // Keeps enchanting-focused playbooks diverging from pure craft:
+            // their extra reagent drops translate into ImbueLevel which feeds
+            // CombatContext's +20%/level magical ability power.
+            var enchMat = EnchantingMats.FirstOrDefault(m => state.Materials.GetValueOrDefault(m) > 0);
+            if (enchMat != null && state.Imbues.GetValueOrDefault(slot) < 6)
+            {
+                ConsumeMaterial(state, enchMat, 1);
+                state.Imbues[slot] = state.Imbues.GetValueOrDefault(slot) + 1;
+            }
         }
         else
         {
@@ -556,17 +574,99 @@ public sealed class ProgressionSimulator
 
     private MonsterDefinition? PickMonster(ZoneDefinition zone)
     {
-        // Prefer explicit spawns; fall back to biome+tier-appropriate monsters.
+        // Prefer explicit zone-authored spawns — weighted sample by ZoneMonsterSpawn.Weight.
         if (zone.MonsterSpawns.Count > 0)
         {
-            var id = zone.MonsterSpawns[_rng.Next(zone.MonsterSpawns.Count)].MonsterId;
-            return _content.GetMonster(id);
+            int totalW = zone.MonsterSpawns.Sum(s => Math.Max(1, s.Weight));
+            int r = _rng.Next(totalW);
+            int acc = 0;
+            foreach (var s in zone.MonsterSpawns)
+            {
+                acc += Math.Max(1, s.Weight);
+                if (r < acc) return _content.GetMonster(s.MonsterId);
+            }
         }
-        // Tier = min(3, danger/3)
+        // Fallback: biome+tier pool with bosses weighted 2x (previously uniform
+        // meant frost-giant essentially never rolled → 0 Starforged Ingots in
+        // 60h craft-heavy runs).
         int tier = Math.Clamp(zone.DangerLevel / 3, 0, 3);
         var pool = _content.MonstersByBiomeAndTier(zone.Biome, tier);
         if (pool.Count == 0) pool = _content.MonstersByBiome(zone.Biome);
-        return pool.Count == 0 ? null : pool[_rng.Next(pool.Count)];
+        if (pool.Count == 0) return null;
+
+        int totalWeight = pool.Sum(m => m.IsBoss ? 2 : 1);
+        int rr = _rng.Next(totalWeight);
+        int aa = 0;
+        foreach (var m in pool)
+        {
+            aa += m.IsBoss ? 2 : 1;
+            if (rr < aa) return m;
+        }
+        return pool[^1];
+    }
+
+    /// <summary>
+    /// Builds an Encounter that reflects the player's equipped gear, imbues,
+    /// and HP bonus. Uses CombatSimulationService.BuildEncounter(CombatContext)
+    /// for the gear-tier / imbue-level damage + agility math, then rebuilds
+    /// the player combatant with the gear-boosted MaxHp so high-workmanship
+    /// equipment actually survives a d9+ pack (fixes "simulator blindness"
+    /// where craft-heavy playbooks lost to d9 despite legendary gear).
+    /// </summary>
+    private Encounter BuildGearAwareEncounter(
+        CombatSimulationService svc,
+        SimState state,
+        IReadOnlyList<CombatSimulationService.PartyMember> party,
+        IReadOnlyList<MonsterTemplate> enemies)
+    {
+        int topWork = state.EquippedGear.Count == 0 ? 0 : state.EquippedGear.Values.Max();
+        // gearTier: max workmanship → tier bucket (w0 = t0, w1-2 = t1, w3-4 = t2, …)
+        int gearTier = Math.Clamp((topWork + 1) / 2, 0, 6);
+
+        // Imbue coverage: fraction of equipped slots with imbues × average imbue level.
+        int slotCount = Math.Max(1, state.EquippedGear.Count);
+        int imbuedSlots = state.Imbues.Count(kv => kv.Value > 0);
+        double coverage = (double)imbuedSlots / slotCount;
+        int avgImbue = state.Imbues.Count == 0 ? 0 : (int)Math.Round(state.Imbues.Values.Average());
+        int imbueLevel = Math.Clamp((int)Math.Round(coverage * avgImbue), 0, 6);
+
+        var ctx = new CombatSimulationService.CombatContext(
+            state.PlayerLevel,
+            _archetype,
+            gearTier,
+            imbueLevel,
+            party,
+            enemies);
+        var enc = svc.BuildEncounter(ctx);
+
+        // Apply gear/level MaxHp bonus: live game adds +3 HP per workmanship
+        // point of equipped gear (see DoCraft). CombatContext's gear-tier does
+        // NOT scale HP — rebuild the player with the authored max so the probe
+        // reflects live survivability.
+        if (state.PlayerMaxHp > 50)
+        {
+            var oldPlayer = enc.Combatants.First(c => c.CombatantType == CombatantType.Player);
+            int baseHp = oldPlayer.MaxHp;
+            int bonusHp = Math.Max(0, state.PlayerMaxHp - 50);
+            int newMaxHp = baseHp + bonusHp;
+            var newPlayer = Combatant.Create(
+                oldPlayer.Name,
+                CombatantType.Player,
+                oldPlayer.SourceEntityId,
+                newMaxHp,
+                oldPlayer.Speed,
+                oldPlayer.Element,
+                isPlayerSide: true,
+                oldPlayer.Level,
+                oldPlayer.Abilities,
+                agility: oldPlayer.Agility);
+
+            var playerSide = new List<Combatant> { newPlayer };
+            playerSide.AddRange(enc.Combatants.Where(c => c.CombatantType == CombatantType.Companion));
+            var enemySide = enc.Combatants.Where(c => !c.IsPlayerSide).ToList();
+            enc = Encounter.Create(Guid.NewGuid(), Guid.NewGuid(), playerSide, enemySide);
+        }
+        return enc;
     }
 
     /// <summary>
@@ -606,7 +706,7 @@ public sealed class ProgressionSimulator
                     .Select(c => new CombatSimulationService.PartyMember(c.Type, c.Element, c.Layer, c.Level))
                     .ToList();
                 var svc = new CombatSimulationService(new Random(unchecked(_seed * 7919 + d * 31 + i)), _content.CombatCurves.PartyScaling);
-                var enc = svc.BuildEncounter(_archetype, state.PlayerLevel, party, pack);
+                var enc = BuildGearAwareEncounter(svc, state, party, pack);
                 var res = svc.Run(enc, dangerLevel: d);
                 if (res.Outcome == CombatSimulationService.Outcome.Victory) wins++;
             }

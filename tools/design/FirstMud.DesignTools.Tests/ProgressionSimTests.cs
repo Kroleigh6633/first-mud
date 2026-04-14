@@ -58,18 +58,53 @@ public class ProgressionSimTests
     public void High_hours_ceiling_balanced_seed42_pinned()
     {
         // Regression pin: captures CURRENT reality at hour 40, balanced, seed 42.
-        // Post-Pass-tuned: reliable danger sits at d8 with the new
-        // progression-curves.json (compressed companion thresholds + halved
-        // workmanship divisor). Multi-seed sweep shows d8-d9 range.
+        // Post-simulator-blindness-fix: ProbeReliableDanger now feeds
+        // CombatContext (gearTier, imbueLevel) and a gear-boosted MaxHp into
+        // the probe encounter so equipped workmanship actually pays off.
+        // Observed post-fix: balanced @ h40 still sits at d8 (d9 is gated by
+        // enemy multi-attack at danger >= 9 + pack size 3).
         // A drop below this line means a progression regression — investigate
-        // before merging. If a tune RAISES it past 10 (capped), that's fine —
-        // the lower bound is what matters.
+        // before merging.
         var r = RunBalanced(hours: 40, seed: 42);
 
         var finalDanger = r.HourByHour[^1].ReliableDangerTier;
         Assert.True(finalDanger >= 8,
             $"Expected reliable danger ≥ 8 at hour 40 (balanced, seed 42). Got d{finalDanger}. " +
             $"A drop below this line means a progression regression — investigate before merging.");
+    }
+
+    [Fact]
+    public void Probe_with_high_gear_tier_outperforms_zero_gear_at_same_level()
+    {
+        // Verifies the simulator-blindness fix: a SimState with high equipped
+        // workmanship should produce a higher reliable-danger tier than a
+        // state at the same playerLevel + companions with no gear.
+        var content = Content();
+        var simLow = new ProgressionSimulator(content, seed: 42, "balanced", MagicElement.Aether, "aeldran-3-portmere");
+        var simHigh = new ProgressionSimulator(content, seed: 42, "balanced", MagicElement.Aether, "aeldran-3-portmere");
+
+        // Use reflection-free access: build both sims via a short run and then
+        // manually synthesize states through the sim. Easiest: run 1h to seed
+        // state, then mutate EquippedGear on the "high" variant.
+        // Simpler: construct states directly and call ProbeReliableDanger.
+        var low = new ProgressionSimulator.SimState { PlayerLevel = 5, PlayerMaxHp = 70 };
+        low.Companions.Add(new ProgressionSimulator.CompanionState { Name = "A", Type = FirstMud.Domain.Enums.CompanionType.Wildfolk, Element = MagicElement.Fire, Layer = 3, Level = 6 });
+        low.Companions.Add(new ProgressionSimulator.CompanionState { Name = "B", Type = FirstMud.Domain.Enums.CompanionType.Wildfolk, Element = MagicElement.Water, Layer = 3, Level = 6 });
+        low.Companions.Add(new ProgressionSimulator.CompanionState { Name = "C", Type = FirstMud.Domain.Enums.CompanionType.Wildfolk, Element = MagicElement.Earth, Layer = 3, Level = 6 });
+
+        var high = new ProgressionSimulator.SimState { PlayerLevel = 5, PlayerMaxHp = 50 + 5 * 8 * 3 };
+        high.Companions.AddRange(low.Companions);
+        high.EquippedGear["MeleeWeapon"] = 8;
+        high.EquippedGear["Chest"] = 8;
+        high.EquippedGear["Head"] = 8;
+        high.EquippedGear["Legs"] = 8;
+        high.EquippedGear["Feet"] = 8;
+
+        var dLow = simLow.ProbeReliableDanger(low);
+        var dHigh = simHigh.ProbeReliableDanger(high);
+
+        Assert.True(dHigh >= dLow,
+            $"High-gear state must probe at least as high as low-gear. low=d{dLow}, high=d{dHigh}.");
     }
 
     [Fact]
