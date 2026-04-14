@@ -139,6 +139,24 @@ export interface ZoneView {
   tiles: ZoneTile[];
 }
 
+/**
+ * One whispered rumor per zone, picked server-side from the authored pool in
+ * content/zone-rumors.json. Deterministic per (zoneContentId, UTC dayIndex)
+ * so the flavor is stable within a play session but rotates overnight.
+ *
+ * Client indexes by `zoneName` because the world-map zone tiles carry `name`
+ * but not the content-layer string id.
+ */
+export interface ZoneRumorEntry {
+  zoneContentId: string;
+  zoneName: string;
+  rumor: string;
+}
+
+export interface ZoneRumorsEvent {
+  rumors: ZoneRumorEntry[];
+}
+
 export interface AppliedImbue {
   type: string;
   power: number;

@@ -27,5 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-a4ca782b | ready-to-merge | 5157a76 | Task #114: reachability filter in AutoCraftPlanner; thread playerReliableDanger through AutoProgressionService | - | src/FirstMud.Application/Services, tests/FirstMud.Tests/Application | 2026-04-13 |
+| worktree-agent-a5e097a3 | ready-to-merge | 5157a76 | wire zone rumors onto unexplored tiles (content loader + ZoneRumors event + TileProfileCard redesign) | - | content/schemas, src/FirstMud.Application/Content, src/FirstMud.GameServer/{Dtos,Handlers}, src/FirstMud.Client/src/{types,hooks,components}, tests/FirstMud.Tests/Content | 2026-04-13 |
 <!-- agents add rows above this line -->

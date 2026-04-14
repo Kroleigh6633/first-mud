@@ -207,6 +207,23 @@ public interface IContentProvider
     /// </summary>
     ImbueRecipeDefinition? MatchImbueRecipe(string reagentName, int craftingSkill);
 
+    // ─── Zone Rumors ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Ambient rumor strings for the zone identified by its content-layer
+    /// <c>zoneId</c> (the string key in zones.json, e.g.
+    /// <c>"aeldran-2-thornwood"</c>). Returns an empty list if the zone has no
+    /// authored rumors. Used to flavor unexplored tiles on the world map.
+    /// </summary>
+    IReadOnlyList<string> GetZoneRumors(string zoneId);
+
+    /// <summary>
+    /// All authored zone-rumor pools, keyed by the content-layer
+    /// <c>zoneId</c>. Optional file — empty dictionary when
+    /// <c>content/zone-rumors.json</c> is absent.
+    /// </summary>
+    IReadOnlyDictionary<string, IReadOnlyList<string>> AllZoneRumors();
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     // ─── Trade ───────────────────────────────────────────────────────────────
