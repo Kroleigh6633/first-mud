@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a4ca782b | ready-to-merge | 5157a76 | Task #114: reachability filter in AutoCraftPlanner; thread playerReliableDanger through AutoProgressionService | - | src/FirstMud.Application/Services, tests/FirstMud.Tests/Application | 2026-04-13 |
 <!-- agents add rows above this line -->

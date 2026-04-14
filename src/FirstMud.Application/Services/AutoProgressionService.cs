@@ -233,7 +233,28 @@ public class AutoProgressionService
         //    so the farm sub-mode picks up the slack for one cycle.
         if (binding == ProgressionAxis.Gear && _autoCraft is not null)
         {
-            var tick = await _autoCraft.TickAsync(playerId, ct);
+            var reliableDanger = await AssessReliableDangerAsync(player, activeCompanions, ct);
+            var tick = await _autoCraft.TickAsync(playerId, ct, reliableDanger);
+
+            // Task #114: planner reports NoViableRecipe when every upgrade needs a
+            // zone beyond reliably-clearable danger. Fall back to Farm at a safe-tier
+            // zone (Starting Road) so the party levels up before re-attempting.
+            if (!tick.DispatchedCraft && tick.Plan.TargetRecipe is null &&
+                tick.Plan.Reason == AutoCraftPlanner.NoViableRecipeReason)
+            {
+                return new ProgressionStep(
+                    Mode: ProgressionMode.Farm,
+                    BindingConstraint: binding,
+                    Reliability: reliability,
+                    DeficitScores: deficits,
+                    Reason: $"Gear needed but no reachable recipe (reliable-danger {reliableDanger}); farm safe-tier to level up.",
+                    NextCheckIn: TimeSpan.FromSeconds(60),
+                    DispatchedActual: true,
+                    FarmZoneHint: "Starting Road",
+                    CraftPlan: tick.Plan,
+                    CraftResult: tick);
+            }
+
             if (tick.DispatchedCraft)
             {
                 return new ProgressionStep(
@@ -370,6 +391,68 @@ public class AutoProgressionService
             if (result.Outcome == CombatSimulationService.Outcome.Victory) wins++;
         }
         return Task.FromResult((double)wins / rolls);
+    }
+
+    /// <summary>
+    /// Find the highest danger-level at which this party meets
+    /// <see cref="ProgressionTargets.RequiredReliability"/>. Returns 0 if the party
+    /// can't even clear d1 reliably. Uses a lightweight roll count (20) per band
+    /// because this is called every Gear tick; full confidence lives in
+    /// <see cref="AssessReliabilityAsync"/>. Task #114: threaded to the auto-craft
+    /// planner as a reachability gate.
+    /// </summary>
+    public virtual async Task<int> AssessReliableDangerAsync(
+        Player player,
+        IReadOnlyList<Companion> activeCompanions,
+        CancellationToken ct)
+    {
+        const int rolls = 20;
+        int maxBand = Math.Max(1, _targets.TargetDangerLevel);
+        int best = 0;
+
+        var partyMembers = activeCompanions
+            .Select(c => new CombatSimulationService.PartyMember(
+                c.Type, c.Element, c.CurrentLayer, c.Level))
+            .ToList();
+        var monsterDef = _content.GetMonster("frost-giant");
+        if (monsterDef is null) return 0;
+        var baseTemplate = new MonsterTemplate(
+            monsterDef.Name, monsterDef.Hp, monsterDef.Speed,
+            monsterDef.Level, monsterDef.Element, monsterDef.Abilities);
+
+        for (int danger = 1; danger <= maxBand; danger++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var scaled = MonsterScaling.Apply(
+                baseTemplate, danger,
+                _content.CombatCurves.MonsterScaling, isBoss: false);
+
+            int seed = unchecked(player.Id.GetHashCode() * 1_000_003 +
+                (int)(DateTimeOffset.UtcNow.Date.Ticks % int.MaxValue) + danger * 7919);
+            int wins = 0;
+            for (int i = 0; i < rolls; i++)
+            {
+                var rng = new Random(seed + i);
+                var svc = new CombatSimulationService(rng);
+                var enc = svc.BuildEncounter(
+                    player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement,
+                    Math.Max(1, player.Level),
+                    partyMembers,
+                    new[] { scaled });
+                var result = svc.Run(enc, maxRounds: 60, dangerLevel: danger);
+                if (result.Outcome == CombatSimulationService.Outcome.Victory) wins++;
+            }
+            double rate = (double)wins / rolls;
+            if (rate >= _targets.RequiredReliability)
+            {
+                best = danger;
+                continue;
+            }
+            // Once we fail a band, higher bands will only be harder — stop early.
+            break;
+        }
+        await Task.CompletedTask;
+        return best;
     }
 
     // ─── Binding constraint ─────────────────────────────────────────────────

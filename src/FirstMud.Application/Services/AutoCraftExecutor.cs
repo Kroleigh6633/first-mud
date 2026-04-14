@@ -50,9 +50,13 @@ public class AutoCraftExecutor
     /// <summary>
     /// Build a plan from live state without executing. Useful for the
     /// AutoProgressionService Gear dispatch when we only need the ingredient
-    /// plan to route auto-farm.
+    /// plan to route auto-farm. Optionally reachability-gated by
+    /// <paramref name="playerReliableDanger"/> (Task #114).
     /// </summary>
-    public async Task<AutoCraftPlan> PlanAsync(Guid playerId, CancellationToken ct)
+    public async Task<AutoCraftPlan> PlanAsync(
+        Guid playerId,
+        CancellationToken ct,
+        int? playerReliableDanger = null)
     {
         var player = await _players.GetByIdAsync(playerId, ct);
         if (player is null)
@@ -64,6 +68,21 @@ public class AutoCraftExecutor
         var stash = await BuildStashAsync(playerId, ct);
         var equippedWm = await BuildEquippedWorkmanshipAsync(player, ct);
 
+        if (playerReliableDanger is int prd)
+        {
+            var zoneDangers = _content.AllZones()
+                .GroupBy(z => z.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Max(z => z.DangerLevel), StringComparer.OrdinalIgnoreCase);
+            return AutoCraftPlanner.Plan(
+                _content.AllRecipes(),
+                player.Position.World,
+                player.CraftingSkill,
+                equippedWm,
+                stash,
+                playerReliableDanger: prd,
+                zoneDangerByName: zoneDangers);
+        }
+
         return AutoCraftPlanner.Plan(
             _content.AllRecipes(),
             player.Position.World,
@@ -74,11 +93,15 @@ public class AutoCraftExecutor
 
     /// <summary>
     /// Single auto-craft tick: plan → (craft + maybe equip) or return plan for
-    /// the caller to dispatch auto-farm against.
+    /// the caller to dispatch auto-farm against. When <paramref name="playerReliableDanger"/>
+    /// is supplied, unreachable recipes are gated out (Task #114).
     /// </summary>
-    public async Task<AutoCraftTickResult> TickAsync(Guid playerId, CancellationToken ct)
+    public async Task<AutoCraftTickResult> TickAsync(
+        Guid playerId,
+        CancellationToken ct,
+        int? playerReliableDanger = null)
     {
-        var plan = await PlanAsync(playerId, ct);
+        var plan = await PlanAsync(playerId, ct, playerReliableDanger);
         if (plan.TargetRecipe is null)
         {
             return new AutoCraftTickResult(false, null, plan, false, plan.Reason);
