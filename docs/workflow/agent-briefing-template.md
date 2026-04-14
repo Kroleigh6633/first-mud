@@ -41,7 +41,7 @@ on branch `worktree-agent-{{AGENT_ID}}`.
 
 Use this procedure to land a `ready-to-merge` branch in a **single commit** without a `chore(ledger)` follow-up (the workflow forbids `--amend`):
 
-1. Run `scripts/agent/ledger-lint.ps1`. Confirm the target branch is listed and its status is `ready-to-merge`. If not, stop and reconcile.
+1. **First action:** run `scripts/agent/ledger-lint.ps1 -VerifyCommits`. If it exits non-zero, list the offending rows and HALT — the orchestrator needs to respawn those authors. Do not attempt any merge until the ledger is clean. Confirm the target branch is listed and its status is `ready-to-merge`. If not, stop and reconcile.
 2. Flip its row to `status: merging` and commit that on the base branch.
 3. `git merge --no-commit --no-ff <branch>` — this stages the merge without committing. The incoming branch will re-add its own ledger row at this point.
 4. Use `Edit` on `docs/workflow/active-branches.md` to delete the re-added row.
@@ -50,6 +50,16 @@ Use this procedure to land a `ready-to-merge` branch in a **single commit** with
 7. `scripts/agent/ledger-lint.ps1 -ExpectEmpty` — post-merge verification. Fails loudly if the row survived.
 
 If step 7 fails, something went wrong with step 4; fix in a follow-up commit and investigate why the row wasn't caught in the merge.
+
+### Final-step checklist (MANDATORY before flipping to `ready-to-merge`)
+
+Before reporting "ready-to-merge":
+
+1. `git add -A && git commit -m "..."` on the worktree's branch.
+2. Verify `git log <trunk>..HEAD --oneline` returns YOUR commit (non-empty output).
+3. Only then flip the ledger row to `ready-to-merge`.
+
+An empty `ready-to-merge` row is a workflow-level failure (see README rule #8). If your branch has 0 commits ahead of trunk, DO NOT flip the row — report `blocked: no changes` or `superseded` instead.
 
 ### Report (under 200 words)
 
