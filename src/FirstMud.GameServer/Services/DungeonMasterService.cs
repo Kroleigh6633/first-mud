@@ -322,7 +322,7 @@ public class DungeonMasterService : BackgroundService
             var difficulty = _rng.Next(1, 6); // 1-5, never targets danger 9-10 zones
             var repReward  = 50 + difficulty * 90; // 140 – 500
 
-            var (title, description, outcomes) = BuildQuestContent(difficulty);
+            var (title, description, outcomes, targetItemNames) = BuildQuestContent(difficulty);
             var announcementText = BuildQuestAnnouncement(title, factionId.ToString(), repReward);
 
             _logger.LogDebug("DM Quest generated: {Id} '{Title}' for {Faction}", questId, title, factionId);
@@ -344,7 +344,8 @@ public class DungeonMasterService : BackgroundService
                         q.possibleOutcomes = $possibleOutcomes,
                         q.isWyrdQuest      = $isWyrdQuest,
                         q.isDmGenerated    = true,
-                        q.generatedAt      = $generatedAt
+                        q.generatedAt      = $generatedAt,
+                        q.targetItemNames  = $targetItemNames
                     """,
                     new
                     {
@@ -358,6 +359,7 @@ public class DungeonMasterService : BackgroundService
                         possibleOutcomes = outcomes,
                         isWyrdQuest      = false,
                         generatedAt      = DateTimeOffset.UtcNow.ToString("O"),
+                        targetItemNames,
                     });
             }, ct);
 
@@ -377,7 +379,8 @@ public class DungeonMasterService : BackgroundService
         }
     }
 
-    private (string Title, string Description, string[] Outcomes) BuildQuestContent(int difficulty)
+    internal (string Title, string Description, string[] Outcomes, string[] TargetItemNames)
+        BuildQuestContent(int difficulty)
     {
         var templateIndex = _rng.Next(QuestTitleTemplates.Length);
         var titleTemplate = QuestTitleTemplates[templateIndex];
@@ -390,8 +393,15 @@ public class DungeonMasterService : BackgroundService
         var item      = Pick(DialogueItems);
         var npcName   = BuildNpcName();
         var amount    = _rng.Next(3, 12);
-        var resource  = Pick(ResourceNames);
         var role      = Pick(NpcRoles);
+        var faction   = Pick(FactionNames);
+
+        // Resolve {resource} to a REAL item name the player can actually harvest in
+        // the chosen zone's biome (matches HarvestCommandHandler's tiered mapping).
+        // This replaces the old generic strings like "healing herbs"/"fungal spore"
+        // which never matched anything in the player's inventory.
+        var resource      = ResolveZoneResourceItem(zone);
+        var targetItems   = new List<string>();
 
         string title = titleTemplate
             .Replace("{adjective}",  adjective)
@@ -402,7 +412,8 @@ public class DungeonMasterService : BackgroundService
             .Replace("{npc_name}",   npcName)
             .Replace("{amount}",     amount.ToString())
             .Replace("{resource}",   resource)
-            .Replace("{role}",       role);
+            .Replace("{role}",       role)
+            .Replace("{faction}",    faction);
 
         string description = descTemplate
             .Replace("{adjective}",  adjective)
@@ -413,7 +424,18 @@ public class DungeonMasterService : BackgroundService
             .Replace("{npc_name}",   npcName)
             .Replace("{amount}",     amount.ToString())
             .Replace("{resource}",   resource)
-            .Replace("{role}",       role);
+            .Replace("{role}",       role)
+            .Replace("{faction}",    faction);
+
+        // Only attach typed target item names when the template actually
+        // references {resource} — otherwise the player would be asked to
+        // "retrieve the cursed relic" but judged on Sage inventory.
+        var questType = QuestAutoCompleteService.GetQuestType(title);
+        if ((questType == "gather" || questType == "deliver")
+            && titleTemplate.Contains("{resource}"))
+        {
+            targetItems.Add(resource);
+        }
 
         var successFlavors = new[]
         {
@@ -430,8 +452,53 @@ public class DungeonMasterService : BackgroundService
             Pick(failFlavors),
         };
 
-        return (title, description, outcomes);
+        return (title, description, outcomes, targetItems.ToArray());
     }
+
+    // -----------------------------------------------------------------------
+    // Biome → harvestable item resolver
+    // Mirrors HarvestCommandHandler's tiered mapping so that the item name in
+    // the quest title matches what the player actually obtains when they
+    // harvest in that biome. Always returns a real item name.
+    // -----------------------------------------------------------------------
+    internal static string ResolveZoneResourceItem(string zoneDisplayName)
+    {
+        var biome = GetBiomeForZone(zoneDisplayName);
+        // Pick a tier-1 (low-danger) item from the biome so low-level players can
+        // always satisfy the objective by harvesting in the target zone.
+        return biome switch
+        {
+            "mountain" => "Sage",            // mountain + Herbs tier-1
+            "forest"   => "Oak Wood",        // forest + Wood tier-1 (more common than herbs)
+            "plains"   => "Mint",            // plains + Herbs tier-2 (still low-danger)
+            "swamp"    => "Bogweed",         // swamp + Herbs tier-2
+            "water"    => "Sea Kelp",        // coastal
+            "desert"   => "Thornroot",       // desert + Herbs tier-1
+            "wyrd"     => "Wyrdstone",       // wyrd + Stone
+            _          => "Oak Wood",        // safe fallback
+        };
+    }
+
+    internal static string GetBiomeForZone(string zoneDisplayName) =>
+        zoneDisplayName switch
+        {
+            "the Caervorn Highlands" => "mountain",
+            "Ironspire Ridge"        => "mountain",
+            "Gravenhold"             => "mountain",
+            "the Thornwood"          => "forest",
+            "the Rootweave"          => "forest",
+            "Ashcross"               => "forest",
+            "Portmere"               => "plains",
+            "the Starting Road"      => "plains",
+            "Veldann"                => "plains",
+            "the Pale City"          => "plains",
+            "the Gravenmarsh"        => "swamp",
+            "the Drowned Coast"      => "water",
+            "the Tidegate"           => "water",
+            "the Ashen Reach"        => "desert",
+            "the Sundering Scar"     => "desert",
+            _                        => "plains",
+        };
 
     private FactionId PickFactionId()
     {
@@ -860,8 +927,8 @@ public class DungeonMasterService : BackgroundService
     [
         "Investigate the {adjective} {noun} near {zone}",
         "Defeat the {monster} terrorizing {zone}",
-        "Gather {amount} units of {resource} from {zone}",
-        "Retrieve the {adjective} {noun} from {zone}",
+        "Gather {amount} {resource} from {zone}",
+        "Harvest {amount} {resource} near {zone}",
         "Negotiate with the {monster} at {zone}",
         "Uncover the truth about {zone}",
         "Clear the {adjective} {noun} blocking the road through {zone}",
@@ -874,10 +941,10 @@ public class DungeonMasterService : BackgroundService
             "Investigate what the {noun} is and who left it there.",
         "A {monster} has been preying on travelers near {zone}. " +
             "The locals can't handle it. You've been asked to deal with it — permanently.",
-        "The {zone} region yields {resource} that isn't found elsewhere. Gather {amount} units. " +
+        "The {zone} region yields {resource} in quantity. Gather {amount} of it. " +
             "The area is not uncontested.",
-        "The {adjective} {noun} was reported missing from {zone} three days ago. " +
-            "Someone took it deliberately. Find it before it leaves the region.",
+        "{resource} grows thick near {zone} this season. Harvest {amount} and bring it back. " +
+            "The {faction} pays well for it — or would, if anyone dared go.",
         "The {monster} near {zone} haven't attacked in two days — unusual. " +
             "Find out why before the peace ends badly.",
         "Stories about {zone} don't match the maps. Someone is hiding something. " +

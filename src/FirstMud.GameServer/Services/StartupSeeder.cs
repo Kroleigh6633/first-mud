@@ -15,6 +15,7 @@ public class StartupSeeder(
     IQuestGraphRepository questGraph,
     LoreSeeder loreSeed,
     IContentProvider content,
+    Neo4jDriverWrapper neo4j,
     ILogger<StartupSeeder> logger)
 #pragma warning restore CS9113
 {
@@ -35,6 +36,72 @@ public class StartupSeeder(
         await SeedResourceNodesAsync(ct);
         await MigrateHutAssignmentsToHousingAsync(ct);
         await FixIdleCompanionsAsync(ct);
+        await PurgeStaleProcgenQuestsAsync(ct);
+    }
+
+    // -------------------------------------------------------------------------
+    // Purge stale procedurally-generated quests
+    // -------------------------------------------------------------------------
+    //
+    // Two classes of stale DM-generated quest exist in the Neo4j graph after
+    // the content-layer fixes landed:
+    //
+    //   1. Escort / deliver / protect quests from before the TEMPLATE_BLOCKLIST
+    //      (commit d9f3c96). These carrier flows have no pickup mechanic and
+    //      can never complete.
+    //
+    //   2. Gather quests whose title references a generic noun phrase
+    //      ("healing herbs", "fungal spore", "Thornwood resin") rather than a
+    //      real in-game item. The completion check regex-extracts the noun
+    //      and fails to match inventory.
+    //
+    // The safe, reliable fix is to detach every active DM-generated quest and
+    // delete it. The DungeonMasterService will regenerate fresh quests on its
+    // normal tick using the corrected templates + typed targetItemNames.
+    //
+    // Idempotent — a boot with no stale quests is a no-op.
+    private async Task PurgeStaleProcgenQuestsAsync(CancellationToken ct)
+    {
+        try
+        {
+            // Count first so we can log how many we're about to remove.
+            var purged = await neo4j.ExecuteReadAsync(async tx =>
+            {
+                var cursor = await tx.RunAsync(
+                    """
+                    MATCH (q:Quest {isDmGenerated: true})
+                    WHERE NOT ()-[:COMPLETED]->(q)
+                    RETURN count(q) AS purgedCount
+                    """);
+                await cursor.FetchAsync();
+                return (int)(long)cursor.Current["purgedCount"];
+            }, ct);
+
+            if (purged > 0)
+            {
+                await neo4j.ExecuteWriteAsync(async tx =>
+                {
+                    await tx.RunAsync(
+                        """
+                        MATCH (q:Quest {isDmGenerated: true})
+                        WHERE NOT ()-[:COMPLETED]->(q)
+                        DETACH DELETE q
+                        """);
+                }, ct);
+            }
+
+            if (purged > 0)
+            {
+                logger.LogInformation(
+                    "StartupSeeder: purged {Count} stale procgen quest(s) with pre-fix titles. " +
+                    "DungeonMasterService will regenerate fresh ones on its next quest tick.",
+                    purged);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "StartupSeeder: PurgeStaleProcgenQuestsAsync failed; continuing.");
+        }
     }
 
     // -------------------------------------------------------------------------

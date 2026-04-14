@@ -36,4 +36,14 @@ public record QuestNode(
     int ReputationReward,
     string[] PossibleOutcomes,
     bool IsWyrdQuest,
-    bool IsTaken);
+    bool IsTaken)
+{
+    /// <summary>
+    /// Optional typed list of item names the player must gather / deliver to
+    /// complete this quest. Procgen-generated quests populate this at generation
+    /// time so completion checks don't need to re-parse English from the title.
+    /// Empty for legacy quests and non-gather types; completion falls back to
+    /// description-keyword extraction in that case.
+    /// </summary>
+    public string[] TargetItemNames { get; init; } = [];
+}

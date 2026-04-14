@@ -32,7 +32,7 @@ public sealed class SeedingTests
         var loreSeeder = new LoreSeeder(driverWrapper, content);
         var logger = NullLogger<StartupSeeder>.Instance;
 
-        return new StartupSeeder(db, questRepo, loreSeeder, content, logger);
+        return new StartupSeeder(db, questRepo, loreSeeder, content, driverWrapper, logger);
     }
 
     [Fact]

@@ -108,6 +108,26 @@ public class QuestAutoCompleteService(
         IReadOnlyList<Domain.Entities.Item> items,
         string keyword) => FindMatchingItems(items, keyword);
 
+    /// <summary>
+    /// Deterministic exact-match path for typed target item names
+    /// (case-insensitive, trimmed). Used when procgen has attached the
+    /// <c>targetItemNames</c> field to a quest at generation time, so
+    /// completion never has to re-parse English.
+    /// </summary>
+    public static List<Domain.Entities.Item> FindMatchingItemsByNames(
+        IReadOnlyList<Domain.Entities.Item> items,
+        IReadOnlyList<string> targetNames)
+    {
+        if (items.Count == 0 || targetNames.Count == 0) return [];
+        var normalized = targetNames
+            .Select(n => (n ?? string.Empty).Trim())
+            .Where(n => n.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return items
+            .Where(i => normalized.Contains(i.Name.Trim()))
+            .ToList();
+    }
+
     private static List<Domain.Entities.Item> FindMatchingItems(
         IReadOnlyList<Domain.Entities.Item> items,
         string keyword)
@@ -181,12 +201,18 @@ public class QuestAutoCompleteService(
             case "gather":
             case "deliver":
             {
-                var keyword  = ExtractItemKeyword(quest.Description);
                 var required = ParseItemCount(quest.Description);
                 var items    = await itemRepository.GetByOwnerAsync(playerId, ct);
-                var matching = keyword is not null
-                    ? FindMatchingItems(items, keyword)
-                    : [];
+
+                // Prefer typed TargetItemNames (populated by procgen at quest
+                // generation time). Falls back to keyword extraction for legacy
+                // quests that predate the typed-target field.
+                var keyword  = ExtractItemKeyword(quest.Description);
+                var matching = quest.TargetItemNames.Length > 0
+                    ? FindMatchingItemsByNames(items, quest.TargetItemNames)
+                    : keyword is not null
+                        ? FindMatchingItems(items, keyword)
+                        : [];
                 var heldCount = matching.Sum(i => i.IsStackable ? i.Quantity : 1);
                 if (heldCount < required)
                 {
@@ -196,8 +222,11 @@ public class QuestAutoCompleteService(
                         .OrderByDescending(i => i.IsStackable ? i.Quantity : 1)
                         .Take(8)
                         .Select(i => i.IsStackable ? $"{i.Name} x{i.Quantity}" : i.Name);
-                    failReason = keyword is not null
-                        ? $"Need {required} '{keyword}' but found: {string.Join(", ", inventorySummary)}"
+                    var lookingFor = quest.TargetItemNames.Length > 0
+                        ? string.Join("/", quest.TargetItemNames)
+                        : keyword;
+                    failReason = lookingFor is not null
+                        ? $"Need {required} '{lookingFor}' but found: {string.Join(", ", inventorySummary)}"
                         : $"Only {heldCount}/{required} items held.";
                 }
                 break;
@@ -215,10 +244,13 @@ public class QuestAutoCompleteService(
             var keyword  = ExtractItemKeyword(quest.Description);
             var required = ParseItemCount(quest.Description);
 
-            if (keyword is not null)
+            var hasTyped = quest.TargetItemNames.Length > 0;
+            if (hasTyped || keyword is not null)
             {
                 var items    = await itemRepository.GetByOwnerAsync(playerId, ct);
-                var matching = FindMatchingItems(items, keyword);
+                var matching = hasTyped
+                    ? FindMatchingItemsByNames(items, quest.TargetItemNames)
+                    : FindMatchingItems(items, keyword!);
 
                 var toConsume = required;
                 foreach (var item in matching)
