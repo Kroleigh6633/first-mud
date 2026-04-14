@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a6dba5ba | ready-to-merge | fcee847 | fix Craft All aborting after 1 craft; precompute batch from stock, show `X of N` progress, 150ms throttle | - | src/FirstMud.Client/src/components/CraftingPanel.tsx | 2026-04-13 |
 <!-- agents add rows above this line -->
