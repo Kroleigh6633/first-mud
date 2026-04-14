@@ -81,7 +81,8 @@
         { "itemName": "Quartz",         "description": "A clear, six-sided crystal of quartz. A neutral enchantment substrate — the cheapest of true gems.",                 "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 3 },
         { "itemName": "Emerald",        "description": "A polished emerald with a deep green fire. A solidified weave-echo of earth; prized by Gravenhold armorers.",          "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
         { "itemName": "Diamond",        "description": "A flawless diamond. The rarest of gems — an unaligned weave-echo that resonates with any imbuing current.",            "category": "Reagent", "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 },
-        { "itemName": "Dragon's Breath Seed", "description": "A seared black seed scavenged from a slain volcanic beast. Plant in a Greenhouse to grow Dragon's Breath.", "category": "Reagent", "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 }
+        { "itemName": "Dragon's Breath Seed", "description": "A seared black seed scavenged from a slain volcanic beast. Plant in a Greenhouse to grow Dragon's Breath.", "category": "Reagent", "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Starforged Ingot", "description": "A silver-white ingot smelted from meteoric ore recovered deep in Caervorn crags. Top-tier crafting component.", "category": "Component", "minWorkmanship": 7, "maxWorkmanship": 10, "weight": 1 }
       ]
     },
     {
@@ -118,7 +119,8 @@
         { "itemName": "Thornroot",      "description": "Tier-1 herb whose root anchors against desert winds.",                     "category": "Reagent",   "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 2 },
         { "itemName": "Sand Thistle",   "description": "A tier-2 herb whose spined blossom concentrates desert sun into a potent reagent.", "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 5, "weight": 2 },
         { "itemName": "Fire Moss",      "description": "Scarlet moss found around volcanic scars. Tier-2 reagent for fire work.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 5, "weight": 1 },
-        { "itemName": "Dragon's Breath Seed", "description": "A seared black seed dropped by a desert volcanic beast. Plant in a Greenhouse.", "category": "Reagent", "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 }
+        { "itemName": "Dragon's Breath Seed", "description": "A seared black seed dropped by a desert volcanic beast. Plant in a Greenhouse.", "category": "Reagent", "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Wyrdforged Core", "description": "A Wyrd-tainted core cracked from the ribcage of an Ashen Reach apex drake. Top-tier crafting component.", "category": "Component", "minWorkmanship": 7, "maxWorkmanship": 10, "weight": 1 }
       ]
     },
     {
@@ -182,7 +184,8 @@
         { "itemName": "Black Pearl",   "description": "A lustrous black pearl, found only where the Maw touches water. Master-tier wyrd imbuing reagent.",                 "category": "Reagent",   "minWorkmanship": 7, "maxWorkmanship": 10, "weight": 1 },
         { "itemName": "Diamond",       "description": "A flawless diamond with a faint violet cast — Maw-kissed and universally compatible with imbuing currents.",         "category": "Reagent",   "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 },
         { "itemName": "Thornroot",     "description": "A tier-1 herb that survives even near Wyrd sources, its root slightly iridescent.", "category": "Reagent", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 2 },
-        { "itemName": "Wyrd Blossom Seed", "description": "A seed that hums faintly and shimmers at the edges of sight. Plant in a Greenhouse to cultivate Wyrd Blossom.", "category": "Reagent", "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 }
+        { "itemName": "Wyrd Blossom Seed", "description": "A seed that hums faintly and shimmers at the edges of sight. Plant in a Greenhouse to cultivate Wyrd Blossom.", "category": "Reagent", "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Wyrdforged Core", "description": "A dense, pulsing core harvested from an apex Wyrd-corrupted beast. Top-tier crafting component.", "category": "Component", "minWorkmanship": 7, "maxWorkmanship": 10, "weight": 1 }
       ]
     },
     {

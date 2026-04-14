@@ -1,0 +1,40 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "top-tier-materials-supply",
+  "displayName": "Top-tier legendary material supply rate by playstyle",
+  "description": "Measures per-hour acquisition of the two Tier-5 / 'legendary' crafting materials added in task #134 — Wyrdforged Core (apex Wyrd boss drop, Maw Borderlands + Ashen Reach pools, weight 1) and Starforged Ingot (Caervorn-deep + frost-giant boss drop, weight 1). Expected outcome: these materials are deliberately scarce — acquiring enough to fully kit out all 7 armor/weapon slots should take focus-farming, not incidental picks. Combat-heavy and balanced playstyles should still see 0.3-1.0 per hour at danger 8+; craft-heavy and enchanting-focused should see essentially zero. If a 40h balanced sim produces zero of either material it is a content bug — bump the weight on the offending loot-tables pool entry. NOTE: this playbook is an economy-sim spec (kind=economy). It is consumed by the economy evaluator; today the file is a content contract that the economy-sim command can load. Acceptance is via the content-layer test that verifies every itemName referenced here exists in loot-tables dropPools or monsters.json bossDrops.",
+  "kind": "economy",
+  "holdouts": {
+    "simHours": 40
+  },
+  "axes": [
+    { "name": "playstyle",   "values": ["balanced", "combat-heavy", "craft-heavy", "enchanting-focused"] },
+    { "name": "materialId",  "values": ["wyrdforged-core", "starforged-ingot"] }
+  ],
+  "rolls": 5,
+  "seed": 1337,
+  "expectedYield": {
+    "perRunHours": 40,
+    "bands": {
+      "balanced":           { "min": 8,  "max": 25 },
+      "combat-heavy":       { "min": 15, "max": 40 },
+      "craft-heavy":        { "min": 0,  "max": 4 },
+      "enchanting-focused": { "min": 0,  "max": 6 }
+    },
+    "materialSources": {
+      "comment": "Which loot/boss paths each material is produceable through.",
+      "wyrdforged-core":  ["biome-wyrd", "biome-desert", "bossDrop:ember-drake", "bossDrop:wyrd-abomination", "bossDrop:tear-in-the-weave"],
+      "starforged-ingot": ["biome-mountain", "bossDrop:frost-giant"]
+    },
+    "perHourExpectation": {
+      "combat-heavy":       "~1.0/hr at dangerLevel 8+ (dedicated boss-farming)",
+      "balanced":           "~0.5/hr at dangerLevel 8+",
+      "craft-heavy":        "<0.1/hr (must buy from other players or pivot)",
+      "enchanting-focused": "~0.2/hr (incidental from imbue-farming Maw runs)"
+    },
+    "alerts": {
+      "zeroBalanced40h":  "If balanced 40h produces zero of either material, double the weight on the offending biome pool entry (biome-wyrd / biome-mountain / biome-desert).",
+      "floodCombatHeavy": "If combat-heavy 40h exceeds 50 of a single material, recipes are trivially satisfiable — halve weight or require more per recipe."
+    }
+  }
+}

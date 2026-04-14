@@ -95,7 +95,7 @@
     { "id": "wyvern",               "name": "Wyvern",           "biome": "mountain", "tier": 2, "hp": 60, "speed": 8, "level": 3, "element": "Air",    "abilities": ["dive-attack", "wind-gust", "rock-throw"] },
     { "id": "rock-golem",           "name": "Rock Golem",       "biome": "mountain", "tier": 2, "hp": 80, "speed": 3, "level": 3, "element": "Earth",  "abilities": ["boulder-throw", "earth-shatter", "regenerate"] },
     { "id": "dragon-whelp",         "name": "Dragon Whelp",     "biome": "mountain", "tier": 3, "hp": 85, "speed": 7, "level": 4, "element": "Fire",   "abilities": ["breath-weapon", "dive-attack", "ember-sweep"] },
-    { "id": "frost-giant",          "name": "Frost Giant",      "biome": "mountain", "tier": 3, "hp": 90, "speed": 3, "level": 4, "element": "Water",  "abilities": ["frost-slam", "glacial-roar", "earth-shatter"] },
+    { "id": "frost-giant",          "name": "Frost Giant",      "biome": "mountain", "tier": 3, "hp": 90, "speed": 3, "level": 4, "element": "Water",  "abilities": ["frost-slam", "glacial-roar", "earth-shatter"], "isBoss": true },
 
     { "id": "timber-wolf",          "name": "Timber Wolf",      "biome": "forest",   "tier": 0, "hp": 28, "speed": 8, "level": 1, "element": "Earth",  "abilities": ["bite", "pounce"] },
     { "id": "wild-boar",            "name": "Wild Boar",        "biome": "forest",   "tier": 0, "hp": 32, "speed": 6, "level": 1, "element": "Earth",  "abilities": ["charge", "headbutt"] },
@@ -113,7 +113,7 @@
     { "id": "sand-wurm",            "name": "Sand Wurm",        "biome": "desert",   "tier": 2, "hp": 45, "speed": 4, "level": 3, "element": "Earth",  "abilities": ["burrow", "eruption", "bite"] },
     { "id": "ash-golem",            "name": "Ash Golem",        "biome": "desert",   "tier": 2, "hp": 50, "speed": 3, "level": 3, "element": "Fire",   "abilities": ["ash-surge", "ember-sweep", "regenerate"] },
     { "id": "phoenix-hatchling",    "name": "Phoenix Hatchling","biome": "desert",   "tier": 3, "hp": 30, "speed": 8, "level": 4, "element": "Fire",   "abilities": ["fire-lash", "ash-surge", "dive-attack"] },
-    { "id": "ember-drake",          "name": "Ember Drake",      "biome": "desert",   "tier": 3, "hp": 45, "speed": 7, "level": 4, "element": "Fire",   "abilities": ["fire-lash", "ash-surge", "claw"] },
+    { "id": "ember-drake",          "name": "Ember Drake",      "biome": "desert",   "tier": 3, "hp": 45, "speed": 7, "level": 4, "element": "Fire",   "abilities": ["fire-lash", "ash-surge", "claw"], "isBoss": true },
 
     { "id": "giant-crab",           "name": "Giant Crab",       "biome": "water",    "tier": 0, "hp": 26, "speed": 5, "level": 1, "element": "Water",  "abilities": ["pinch", "claw"] },
     { "id": "mud-skipper",          "name": "Mud Skipper",      "biome": "water",    "tier": 0, "hp": 22, "speed": 8, "level": 1, "element": "Water",  "abilities": ["water-jet", "bite"] },
@@ -148,7 +148,13 @@
     { "id": "wyrd-wraith",          "name": "Wyrd Wraith",      "biome": "wyrd",     "tier": 1, "hp": 30, "speed": 7, "level": 2, "element": "Aether", "abilities": ["wraith-touch", "null-field"] },
     { "id": "void-stalker",         "name": "Void Stalker",     "biome": "wyrd",     "tier": 2, "hp": 58, "speed": 7, "level": 3, "element": "Aether", "abilities": ["void-tear", "shadow-step", "null-field"] },
     { "id": "reality-shredder",     "name": "Reality Shredder", "biome": "wyrd",     "tier": 2, "hp": 55, "speed": 6, "level": 3, "element": "Aether", "abilities": ["reality-shred", "phase-strike", "void-pulse"] },
-    { "id": "wyrd-abomination",     "name": "Wyrd Abomination", "biome": "wyrd",     "tier": 3, "hp": 92, "speed": 5, "level": 4, "element": "Aether", "abilities": ["wyrd-burst", "reality-shred", "aether-drain"] },
-    { "id": "tear-in-the-weave",    "name": "Tear in the Weave","biome": "wyrd",     "tier": 3, "hp": 80, "speed": 6, "level": 4, "element": "Aether", "abilities": ["weave-rend", "void-pulse", "null-field"] }
+    { "id": "wyrd-abomination",     "name": "Wyrd Abomination", "biome": "wyrd",     "tier": 3, "hp": 92, "speed": 5, "level": 4, "element": "Aether", "abilities": ["wyrd-burst", "reality-shred", "aether-drain"], "isBoss": true },
+    { "id": "tear-in-the-weave",    "name": "Tear in the Weave","biome": "wyrd",     "tier": 3, "hp": 80, "speed": 6, "level": 4, "element": "Aether", "abilities": ["weave-rend", "void-pulse", "null-field"], "isBoss": true }
+  ],
+  "bossDrops": [
+    { "monsterId": "ember-drake",      "itemName": "Wyrdforged Core",  "dropChance": 0.25 },
+    { "monsterId": "frost-giant",      "itemName": "Starforged Ingot", "dropChance": 0.30 },
+    { "monsterId": "wyrd-abomination", "itemName": "Wyrdforged Core",  "dropChance": 0.35 },
+    { "monsterId": "tear-in-the-weave","itemName": "Wyrdforged Core",  "dropChance": 0.20 }
   ]
 }

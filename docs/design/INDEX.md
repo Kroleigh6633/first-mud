@@ -251,3 +251,56 @@ First cycle under the playbook-driven mandate. Balance sweep against the
    Either (a) land real gear stats in the combat sim, or (b) drop the
    baseline gearTier in `imbue-only` so imbue contribution is visible on
    a non-saturated player.
+
+## Pass #8 additions
+
+| Title | Status | Canon Files Touched (read-only) | Outstanding Questions |
+|---|---|---|---|
+| `content/recipes.json` (+8 legendary recipes) | ready | economy-and-crafting | Gate legendary recipes behind a new Grand Forge tier-3 building, or keep them at tier-1 Forge with skill-only gate? |
+| `content/loot-tables.json` (+Wyrdforged Core, +Starforged Ingot) | ready | economy-and-crafting | Weight 1 vs weight 2 — re-tune once economy-sim has been run against the new supply playbook. |
+| `content/monsters.json` (isBoss flags + bossDrops block) | ready | combat | LootService wiring for `bossDrops` is the remaining code-layer task — today the field is data-only. |
+| `content/schemas/monsters.schema.json` (isBoss / bossDrops) | ready | — | — |
+| `tools/design/playbooks/auto-progression-endgame.json` (updated) | ready | — | Needs AutoProgressionService sub-modes (#515-ish) before the 60h time-to-target can be measured for real. |
+| `tools/design/playbooks/economy/top-tier-materials-supply.json` | ready | economy-and-crafting | Bands are provisional — recalibrate after the first real economy-sim run. |
+
+### Pass #8 run log (2026-04-13, task #134)
+
+- Lifted macro-progression cap: 8 new Tier-5 recipes now cover every major
+  slot (weapon, offhand, head, chest, legs, hands, feet, accessory) at
+  `baseWorkmanshipMin=7 / baseWorkmanshipMax=10` and `requiredCraftingSkill`
+  110-120. Old cap had baseWorkmanshipMax topping out at 10 for only 4
+  items (Void Blade, Phase Bow, Tear Fragment Ring, Wyrd Armor); helm/
+  chest/legs/hands/feet peaked at 9.
+- Added 2 top-tier materials to loot-tables: **Wyrdforged Core** (biome-wyrd
+  + biome-desert, weight 1, mw 7-10) and **Starforged Ingot** (biome-mountain,
+  weight 1, mw 7-10). Both deliberately scarce.
+- Added `isBoss: true` to 4 apex monsters: `ember-drake`, `frost-giant`,
+  `wyrd-abomination`, `tear-in-the-weave`. Added top-level `bossDrops` block
+  mapping those monsters to forced-drop entries for the new materials
+  (dropChance 0.20-0.35). Schema extended to describe the new fields.
+- Updated `auto-progression-endgame.json`: `expected` band d10 moved from
+  "punishing" to "hard" and `timeToTarget` annotated (pre: unreachable,
+  post: ~60h target once sub-modes ship).
+- New playbook `tools/design/playbooks/economy/top-tier-materials-supply.json`
+  measures per-hour acquisition of Wyrdforged Core / Starforged Ingot across
+  playstyles. Expected bands: combat-heavy 15-40/40h, balanced 8-25/40h,
+  craft-heavy 0-4/40h.
+- Build 0/0. Tests: FirstMud.Tests 530 passed, FirstMud.IntegrationTests
+  16 passed, FirstMud.DesignTools.Tests 62 passed (608 total, 0 failures).
+
+### Pass #8 open questions for next cycle
+
+1. **Grand Forge building gate.** Should legendary recipes ALSO require a
+   new "Grand Forge" tier-3 upgrade of the existing Forge (ceremony gate in
+   addition to skill 110-120), or live on tier-1 Forge with skill-only
+   gating? **Proposed default:** tier-1 Forge only, skill gate stands alone —
+   adding a building tier is a systemic change that should be its own issue.
+   Flag for confirmation.
+2. **LootService `bossDrops` wiring.** The schema and data are in place,
+   but `LootService` doesn't yet read the `bossDrops` block. Task #100
+   previously flagged this. Needs a code-layer pass to roll these entries
+   per-kill when the slain monster id matches.
+3. **economy-sim command for the new playbook.** `top-tier-materials-supply.json`
+   is a content contract; the evaluator that consumes it does not yet exist
+   for non-gem playbooks. Wire it once `economy-sim` grows a generic
+   supply-rate mode.

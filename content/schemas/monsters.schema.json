@@ -50,7 +50,24 @@
             "type": "array",
             "minItems": 1,
             "items": { "type": "string", "description": "Reference to an ability id." }
+          },
+          "isBoss": {
+            "type": "boolean",
+            "description": "Marks an apex monster eligible for bossDrops. Boss status still defaults true at dangerLevel>=10 via MonsterFactory; this field lets a designer flag specific monster ids as always-boss."
           }
+        }
+      }
+    },
+    "bossDrops": {
+      "type": "array",
+      "description": "Per-monster forced drop entries. LootService rolls these in addition to the biome pool when the killed monster's id matches and the roll succeeds.",
+      "items": {
+        "type": "object",
+        "required": ["monsterId", "itemName", "dropChance"],
+        "properties": {
+          "monsterId": { "type": "string" },
+          "itemName": { "type": "string" },
+          "dropChance": { "type": "number", "minimum": 0, "maximum": 1 }
         }
       }
     }

@@ -1,8 +1,8 @@
 {
   "$schema": "../schemas/playbook.schema.json",
   "id": "auto-progression-endgame",
-  "displayName": "Auto-progression endgame benchmark (scaffold)",
-  "description": "BENCHMARK: fresh L1 character with no gear / no imbues / no companions drives AutoProgressionService until it reliably clears dangerLevel 10 at ≥50%. Measures time-to-target in simulated hours. IMPORTANT: sub-modes auto-craft and auto-imbue are not yet implemented (2026-04-13). Scaffolded AutoProgressionService returns 'sub-mode stub' for Gear/Imbue constraints, so every cell in this playbook is expected to be 'punishing' (≈0% win rate at d10 with an L1 naked character) until sub-modes land. Engine-compatibility: this playbook reuses the standard (playerLevel, dangerLevel) cell grid so PlaybookEngine runs it without changes; the 'benchmark' semantics (time-to-target, grace-window) are driven server-side by AutoProgressionService in live play, not by the cell grid itself. Initial expected bands are deliberately generous; creative agent tightens once sub-modes ship.",
+  "displayName": "Auto-progression endgame benchmark (d10 path open)",
+  "description": "BENCHMARK: fresh L1 character with no gear / no imbues / no companions drives AutoProgressionService until it reliably clears dangerLevel 10 at >=50%. Measures time-to-target in simulated hours. Post task #134, a legendary (min 7 / max 10) recipe path exists: Mithril Blade, Ardweld Cuirass, Starforged Crown/Greaves/Treads, Wyrdbound Buckler/Gauntlets, Wyrdforged Sigil. These gate on new top-tier materials (Wyrdforged Core, Starforged Ingot) that only drop from Ashen Reach / Maw Borderlands / Caervorn bosses and their biome pools at scarce weight. Expected baseline: a fresh L1 pursuing the endgame loop should reach reliable d10 clears within ~60h of simulated play (was 'never' before gear-ceiling lifted to baseWorkmanshipMax=10 across all slots). Sub-modes auto-craft and auto-imbue still stubbed as of 2026-04-13; cell-grid win-rate expectation remains in 'hard' band until sub-modes ship and the full loop runs end-to-end. Engine-compatibility: reuses the standard (playerLevel, dangerLevel) cell grid so PlaybookEngine runs it without changes; 'benchmark' semantics (time-to-target, grace-window) are driven server-side by AutoProgressionService in live play.",
   "holdouts": {
     "playerLevel": 1,
     "playerElement": "Aether",
@@ -18,7 +18,7 @@
   "seed": 42,
   "expectedViability": {
     "cells": [
-      { "dangerLevel": 10, "expected": "punishing" }
+      { "dangerLevel": 10, "expected": "hard" }
     ]
   },
   "toleranceBands": {
@@ -27,5 +27,11 @@
     "balanced":  [60, 85],
     "hard":      [30, 60],
     "punishing": [0, 30]
+  },
+  "timeToTarget": {
+    "simHours": 60,
+    "targetWinRatePercent": 50,
+    "preTaskStatus": "unreachable: no recipe existed with baseWorkmanshipMax=10 for chest/head/legs/hands/feet — progression capped around workmanship 8-9.",
+    "postTaskExpectation": "reachable within ~60h: legendary tier-5 recipes covering all major slots are now data-authored and gated on scarce boss-drop materials. Exact hour figure pending an AutoProgressionService sub-mode implementation pass."
   }
 }
