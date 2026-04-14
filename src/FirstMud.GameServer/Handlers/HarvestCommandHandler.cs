@@ -30,7 +30,10 @@ public class HarvestCommandHandler(
         var nearbyZone = ZoneProximity.FindNearby(zones, player.Position.X, player.Position.Y);
 
         if (nearbyZone is null)
+        {
+            await BroadcastHarvestFailedAsync(cmd.PlayerId, "no-resource", ct);
             return new CommandResult(false, "There is nothing to harvest here.");
+        }
 
         var nodes = await resourceNodeRepository.GetByZoneIdAsync(nearbyZone.Id, ct);
 
@@ -74,6 +77,7 @@ public class HarvestCommandHandler(
         if (!player.CanCarryMore(currentItems.Count))
         {
             await notificationService.SendMessageAsync(cmd.PlayerId, "system", "Your inventory is full!", ct);
+            await BroadcastHarvestFailedAsync(cmd.PlayerId, "inventory-full", ct);
             return new CommandResult(false, "Inventory full.");
         }
 
@@ -268,6 +272,20 @@ public class HarvestCommandHandler(
                     Required = required,
                 }, ct);
         }
+    }
+
+    /// <summary>
+    /// Broadcasts a structured <c>HarvestFailed</c> event so clients (notably the
+    /// auto-quest runner) can react to specific failure reasons without having
+    /// to parse English message text. Reasons are a closed set of string codes:
+    /// <c>"no-resource"</c> when the tile has no zone/biome to harvest from,
+    /// <c>"inventory-full"</c> when carry capacity is exceeded.
+    /// </summary>
+    private async Task BroadcastHarvestFailedAsync(Guid playerId, string reason, CancellationToken ct)
+    {
+        await hubContext.Clients
+            .Group(playerId.ToString())
+            .SendAsync("HarvestFailed", new { Reason = reason }, ct);
     }
 
     private static bool IsGatherQuest(string title) =>
