@@ -1,0 +1,91 @@
+{
+  "$schema": "./schemas/zone-rumors.schema.json",
+  "description": "Ambient rumor strings surfaced at inns, taverns, and campfires per zone. 3-5 per zone. Text-only content. No mechanical effects at this stage.",
+  "zones": [
+    {
+      "zoneId": "aeldran-1-caervorn-highlands",
+      "rumors": [
+        "They say Lord-Marshal Aldric hasn't slept indoors for a month. The Ironspire's upper windows burn all night.",
+        "A patrol out of Marchkeep came back two men short and wouldn't say from what. The captain confiscated their journals.",
+        "The Assayer at Marchkeep has started asking about brooches specifically. Not any brooch. Riders' brooches.",
+        "A shepherd on the high moor swears a standing stone moved to watch him pass. He sold his flock and took the road south the next morning."
+      ]
+    },
+    {
+      "zoneId": "aeldran-2-thornwood",
+      "rumors": [
+        "Auld Maerwyn's holt is a mile further from the road than it was last winter. The forest has opinions lately.",
+        "A coven apprentice went missing on the Verge. The Eldest isn't looking for her. That's the part that frightens the wardens.",
+        "Something drank the Singing Brook dry in three places. The water comes back at dawn but it doesn't sing anymore.",
+        "Widow Moss's cottage in Eastmile is packed up neat as a church. No struggle. Her kettle was still warm when the Rider found it.",
+        "A Caervorn patrol crossed the Verge line for the first time in living memory. They didn't find anything. That's not the same as nothing finding them."
+      ]
+    },
+    {
+      "zoneId": "aeldran-3-portmere",
+      "rumors": [
+        "The Compact's grain ledger is short for the third month running. Nobody's stealing it. It's just... not arriving.",
+        "Halven Orys hasn't been seen at his usual table at the Gilded Cup. His ward Thenna was there instead, dressed wrong, eating nothing.",
+        "A Golvari ambassador docked at night and nobody can find who signed his writ.",
+        "The dock-mages have started charging triple to bind cargo. They won't say why, only that 'things listen at the harbor now.'"
+      ]
+    },
+    {
+      "zoneId": "aeldran-4-gravenmarsh",
+      "rumors": [
+        "The Asker's Stone has started asking the same question of everyone who stands on it. Kesh won't say what the question is.",
+        "Orla of Reed-End went out with the Lost Expedition and didn't come back. Her brother writes her name in wet sand every morning.",
+        "A marsh-wight swarm moved against the causeway at dusk and turned back at the halfway lantern. Swarms don't turn back.",
+        "Commander Drest hasn't held open audience in three weeks. His lieutenants hold them instead. They wear his seal but not his voice.",
+        "Something was inside the Sunken Wain. It wasn't a body. The Gravenguard cordoned the site and won't confirm they cordoned it."
+      ]
+    },
+    {
+      "zoneId": "aeldran-5-drowned-coast",
+      "rumors": [
+        "The tides have started coming in at the wrong hour. The Fairgean surface more often now. They do not speak first.",
+        "A fishing boat out of the southern inlet brought back a net full of coins older than the Compact. The captain has not stopped weeping.",
+        "Something is singing under the cliffs at Black Gannet Point. The gulls have left.",
+        "A Rider with a Compact commission walked into the surf at Low Tide Cove three nights ago. He is still walking. The tide has not taken him."
+      ]
+    },
+    {
+      "zoneId": "aeldran-6-ashen-reach",
+      "rumors": [
+        "The ash-wind carried a bell-note last week. There are no bells in the Reach. There haven't been for two hundred years.",
+        "A Caervorn forward scout came out of the Reach with his hair gone white and a name on his tongue he wouldn't speak. The Assayer has him now.",
+        "The glass-dunes shifted east overnight. They don't shift. They've never shifted.",
+        "A Compact caravan paid a Rider triple rate to escort them into the Reach. Nobody has ever paid triple rate to go INTO the Reach.",
+        "Something is answering the old Ardweld naming-glyphs. Brother Velm will not say whose voice is answering."
+      ]
+    },
+    {
+      "zoneId": "aeldran-7-starting-road",
+      "rumors": [
+        "The Crow-Gibbet had a fresh body last Tuesday. Nobody in Eastmile recognized him. Nobody from the road did either.",
+        "Senna at the Bent Mare has a courier from Portmere who's taken a room indefinitely. He pays in Caervorn coin and he doesn't drink.",
+        "The Milepost at Eastmile hums louder than it used to. Brooches react to it at twenty paces now. It was ten last autumn.",
+        "A bandit crew worked Grieve's Ford for six years without a patrol catching them. They vanished in a single night. No bodies."
+      ]
+    },
+    {
+      "zoneId": "aeldran-8-gravenhold",
+      "rumors": [
+        "Lieutenant Varn has been signing orders in the Commander's name. The scribes noticed. The scribes won't say so twice.",
+        "The outer gate's third portcullis dropped on a merchant cart for no reason the wardens can name. The cart's owner is in the Dry Well now.",
+        "A Gravenguard oath-ring was found on the causeway. It belonged to a scout who's been dead four years.",
+        "The fortress bells rang at the wrong hour three nights running. Nobody will admit to ringing them."
+      ]
+    },
+    {
+      "zoneId": "aeldran-9-maw-borderlands",
+      "rumors": [
+        "The Maw widened a half-mile east. The surveyors re-drew the map and the map re-drew itself overnight.",
+        "A Wyrd-leak opened near the old watchtower and the tower's stones started speaking in Ardweld. Not reciting. Speaking.",
+        "A Rider went in with a commission and came back with someone else's memories. He answers to a name that isn't his now.",
+        "The Wildfolk at the Maw's edge have stopped manifesting to anyone but children. The children aren't telling adults what they're told.",
+        "Something on the far side of the Maw is building. The surveyors can hear the hammering on still nights. The Maw has no far side that anyone can reach."
+      ]
+    }
+  ]
+}
