@@ -82,6 +82,15 @@ public sealed class ContentProvider : IContentProvider
     private IReadOnlyList<VendorDefinition> _vendors = Array.Empty<VendorDefinition>();
     private Dictionary<string, VendorDefinition> _vendorsByNpcId = new(StringComparer.Ordinal);
 
+    private IReadOnlyList<ImbueRecipeDefinition> _imbueRecipes = Array.Empty<ImbueRecipeDefinition>();
+    private Dictionary<string, ImbueRecipeDefinition> _imbueRecipesById = new(StringComparer.Ordinal);
+
+    private static readonly HashSet<string> ValidImbueRecipeEffects =
+        new(StringComparer.Ordinal) { "imbue", "upgrade", "successBoost" };
+
+    private static readonly HashSet<string> ValidImbueTypeNames =
+        new(Enum.GetNames<ImbueType>(), StringComparer.Ordinal);
+
     private static readonly HashSet<string> ValidReputationTierNames =
         new(Enum.GetNames<ReputationTier>(), StringComparer.Ordinal);
 
@@ -244,6 +253,40 @@ public sealed class ContentProvider : IContentProvider
         string.IsNullOrEmpty(npcId) ? null
         : _vendorsByNpcId.TryGetValue(npcId, out var def) ? def : null;
 
+    public IReadOnlyList<ImbueRecipeDefinition> AllImbueRecipes() => _imbueRecipes;
+
+    public ImbueRecipeDefinition? GetImbueRecipe(string id) =>
+        string.IsNullOrEmpty(id) ? null
+        : _imbueRecipesById.TryGetValue(id, out var def) ? def : null;
+
+    public ImbueRecipeDefinition? MatchImbueRecipe(string reagentName, int craftingSkill)
+    {
+        if (string.IsNullOrWhiteSpace(reagentName))
+            return null;
+
+        var lower = reagentName.ToLowerInvariant();
+
+        // Candidates = recipes whose RequiredReagent appears in the reagent
+        // name (case-insensitive) and whose skill gate is satisfied. We match
+        // against the reagent string rather than an exact item-id lookup so
+        // that display names like "Raw Topaz" or "Polished Diamond" resolve
+        // without a brittle item-registry cross-ref.
+        ImbueRecipeDefinition? best = null;
+        foreach (var recipe in _imbueRecipes)
+        {
+            if (recipe.RequiredCraftingSkill > craftingSkill) continue;
+            if (string.IsNullOrEmpty(recipe.RequiredReagent)) continue;
+            if (!lower.Contains(recipe.RequiredReagent, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Prefer higher Power; ties break in file order (first wins, so
+            // only replace when strictly greater).
+            if (best is null || recipe.Power > best.Power)
+                best = recipe;
+        }
+        return best;
+    }
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -296,6 +339,12 @@ public sealed class ContentProvider : IContentProvider
         _tradeCurves = LoadTradeCurves();
         _vendors = LoadVendors();
         _vendorsByNpcId = _vendors.ToDictionary(v => v.NpcId, StringComparer.Ordinal);
+
+        // Imbue recipes — depends on loot-tables for reagent cross-refs (soft
+        // warn only; the gem-id universe isn't enumerated as a strict content
+        // registry yet).
+        _imbueRecipes = LoadImbueRecipes();
+        _imbueRecipesById = _imbueRecipes.ToDictionary(r => r.Id, StringComparer.Ordinal);
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
@@ -2732,5 +2781,145 @@ public sealed class ContentProvider : IContentProvider
         public string? Text { get; set; }
         public bool? Available { get; set; }
         public string? QuestId { get; set; }
+    }
+
+    // ─── Imbue recipes ──────────────────────────────────────────────────────
+
+    private IReadOnlyList<ImbueRecipeDefinition> LoadImbueRecipes()
+    {
+        var path = Path.Combine(_contentRoot, "imbue-recipes.json");
+        if (!File.Exists(path))
+        {
+            // imbue-recipes.json is OPTIONAL — many test harnesses construct a
+            // ContentProvider pointed at a stripped-down temp directory.
+            // When absent, the gem-imbue flow is simply disabled.
+            _logger?.LogInformation(
+                "ContentProvider: imbue-recipes.json not present at {Path}; gem-imbue flow disabled.",
+                path);
+            return Array.Empty<ImbueRecipeDefinition>();
+        }
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<ImbueRecipesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Recipes is null || doc.Recipes.Count == 0)
+            throw new InvalidDataException($"{path}: no recipes defined.");
+
+        // Gem id universe: authored under the "gems" node in the same file.
+        // We treat this as the authoritative reagent registry for gem-based
+        // imbues; recipe.gemId must reference a declared gem.
+        var knownGemIds = new HashSet<string>(
+            (doc.Gems ?? new List<ImbueGemRaw>()).Select(g => g.Id ?? "").Where(s => !string.IsNullOrEmpty(s)),
+            StringComparer.Ordinal);
+
+        // Soft cross-ref check: if loot-tables enumerate drop items, warn when
+        // a gem id isn't present anywhere in the drop pools. The universe
+        // isn't fully enumerated, so a miss is a warning, not a throw.
+        var knownDropItemNames = new HashSet<string>(
+            _lootTables.DropPools.SelectMany(p => p.Entries.Select(e => e.ItemName ?? "")),
+            StringComparer.OrdinalIgnoreCase);
+
+        var list = new List<ImbueRecipeDefinition>(doc.Recipes.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Recipes)
+        {
+            if (string.IsNullOrWhiteSpace(raw.Id))
+                throw new InvalidDataException($"{path}: imbue recipe missing id.");
+            if (!seenIds.Add(raw.Id))
+                throw new InvalidDataException($"{path}: duplicate imbue recipe id '{raw.Id}'.");
+            if (string.IsNullOrWhiteSpace(raw.GemId))
+                throw new InvalidDataException($"{path}: imbue recipe '{raw.Id}' missing gemId.");
+            if (knownGemIds.Count > 0 && !knownGemIds.Contains(raw.GemId))
+                throw new InvalidDataException(
+                    $"{path}: imbue recipe '{raw.Id}' references unknown gemId '{raw.GemId}'.");
+
+            var requiredReagent = raw.RequiredReagent;
+            if (string.IsNullOrWhiteSpace(requiredReagent))
+                requiredReagent = raw.GemId; // default: recipe is keyed by its gem
+
+            if (string.IsNullOrWhiteSpace(raw.Effect) || !ValidImbueRecipeEffects.Contains(raw.Effect))
+                throw new InvalidDataException(
+                    $"{path}: imbue recipe '{raw.Id}' has invalid effect '{raw.Effect}'. " +
+                    $"Must be one of: {string.Join(", ", ValidImbueRecipeEffects)}.");
+
+            if (string.IsNullOrWhiteSpace(raw.ImbueType) || !ValidImbueTypeNames.Contains(raw.ImbueType))
+                throw new InvalidDataException(
+                    $"{path}: imbue recipe '{raw.Id}' has invalid imbueType '{raw.ImbueType}'.");
+            var imbueType = Enum.Parse<ImbueType>(raw.ImbueType);
+
+            var requiredSkill = raw.RequiredCraftingSkill ?? 1;
+            if (requiredSkill < 1 || requiredSkill > 10)
+                throw new InvalidDataException(
+                    $"{path}: imbue recipe '{raw.Id}' requiredCraftingSkill {requiredSkill} out of range (1-10).");
+
+            var power = raw.Power;
+            if (power < 0f || power > 1f)
+                throw new InvalidDataException(
+                    $"{path}: imbue recipe '{raw.Id}' power {power} out of range (0..1).");
+            var variance = raw.Variance ?? 0f;
+            if (variance < 0f || variance > 1f)
+                throw new InvalidDataException(
+                    $"{path}: imbue recipe '{raw.Id}' variance {variance} out of range (0..1).");
+
+            // Soft warn: if loot-tables are populated and the gem id doesn't
+            // appear by name in any drop pool, log but don't throw. Item names
+            // in loot-tables are display names ("Raw Diamond"); we match by
+            // substring against the gem id.
+            if (_logger is not null &&
+                _lootTables.DropPools.Count > 0 &&
+                !knownDropItemNames.Any(n => n.Contains(raw.GemId!, StringComparison.OrdinalIgnoreCase)))
+            {
+                _logger.LogWarning(
+                    "imbue-recipes.json: gem id '{GemId}' (recipe '{RecipeId}') is not referenced by any drop pool in loot-tables.json. The recipe will be unreachable in-game until the gem drops somewhere.",
+                    raw.GemId, raw.Id);
+            }
+
+            list.Add(new ImbueRecipeDefinition(
+                Id: raw.Id!,
+                GemId: raw.GemId!,
+                RequiredReagent: requiredReagent!,
+                RequiredCraftingSkill: requiredSkill,
+                ImbueType: imbueType,
+                Effect: raw.Effect!,
+                Power: power,
+                Variance: variance,
+                SuccessBonus: raw.SuccessBonus ?? 0,
+                UpgradesExisting: raw.UpgradesExisting ?? false,
+                Description: raw.Description ?? ""));
+        }
+
+        return list;
+    }
+
+    private sealed class ImbueRecipesFile
+    {
+        [JsonPropertyName("gems")] public List<ImbueGemRaw>? Gems { get; set; }
+        [JsonPropertyName("recipes")] public List<ImbueRecipeRaw>? Recipes { get; set; }
+    }
+
+    private sealed class ImbueGemRaw
+    {
+        [JsonPropertyName("id")] public string? Id { get; set; }
+        [JsonPropertyName("displayName")] public string? DisplayName { get; set; }
+        [JsonPropertyName("tier")] public int? Tier { get; set; }
+        [JsonPropertyName("alignment")] public string? Alignment { get; set; }
+        [JsonPropertyName("rarity")] public string? Rarity { get; set; }
+    }
+
+    private sealed class ImbueRecipeRaw
+    {
+        [JsonPropertyName("id")] public string? Id { get; set; }
+        [JsonPropertyName("gemId")] public string? GemId { get; set; }
+        [JsonPropertyName("requiredReagent")] public string? RequiredReagent { get; set; }
+        [JsonPropertyName("requiredCraftingSkill")] public int? RequiredCraftingSkill { get; set; }
+        [JsonPropertyName("imbueType")] public string? ImbueType { get; set; }
+        [JsonPropertyName("effect")] public string? Effect { get; set; }
+        [JsonPropertyName("power")] public float Power { get; set; }
+        [JsonPropertyName("variance")] public float? Variance { get; set; }
+        [JsonPropertyName("successBonus")] public int? SuccessBonus { get; set; }
+        [JsonPropertyName("upgradesExisting")] public bool? UpgradesExisting { get; set; }
+        [JsonPropertyName("description")] public string? Description { get; set; }
     }
 }

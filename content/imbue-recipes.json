@@ -1,5 +1,5 @@
 {
-  "$comment": "Design-layer content catalog for gem-based imbue recipes. As of 2026-04-13 this file is NOT yet consumed by ImbueService — that service still resolves imbue type from taper name via ResolveImbueType(). Migration plan is documented in docs/content-configification-plan.md. This file is authoritative for gem → imbue mapping and will drive future gem-based imbuing when wired. Keep gem IDs in sync with items shipped in loot-tables.json dropPools.",
+  "$comment": "Design-layer content catalog for gem-based imbue recipes. Consumed by ContentProvider (LoadImbueRecipes) and used by ImbueWithGemCommandHandler for the gem-driven imbue path. Taper-based imbues remain in the legacy keyword flow (ImbueService.ResolveImbueType). Keep gem IDs in sync with items shipped in loot-tables.json dropPools.",
 
   "gems": [
     { "id": "quartz",      "displayName": "Quartz",      "tier": 1, "alignment": "neutral",     "rarity": "common",   "description": "Neutral enchantment substrate. Grants +1 to any imbue attempt's success chance." },
@@ -16,121 +16,163 @@
     {
       "id": "quartz-substrate",
       "gemId": "quartz",
+      "requiredReagent": "quartz",
+      "requiredCraftingSkill": 1,
       "imbueType": "None",
       "effect": "successBoost",
       "power": 0.0,
       "successBonus": 10,
+      "upgradesExisting": false,
       "description": "Using Quartz as a pre-imbuing substrate grants +10% success chance on the next imbuing attempt. Does not consume an imbue slot."
     },
     {
       "id": "obsidian-fire-budget",
       "gemId": "obsidian",
+      "requiredReagent": "obsidian",
+      "requiredCraftingSkill": 1,
       "imbueType": "Fire",
       "effect": "imbue",
       "power": 0.15,
+      "upgradesExisting": false,
       "description": "Obsidian carries a residual fire affinity — half the strength of a Fire Shaping Taper but much more plentiful."
     },
     {
       "id": "obsidian-earth-budget",
       "gemId": "obsidian",
+      "requiredReagent": "obsidian",
+      "requiredCraftingSkill": 1,
       "imbueType": "Earth",
       "effect": "imbue",
       "power": 0.15,
+      "upgradesExisting": false,
       "description": "Obsidian's volcanic stone-body anchors a modest Earth imbue at half strength."
     },
     {
       "id": "amethyst-wyrd",
       "gemId": "amethyst",
+      "requiredReagent": "amethyst",
+      "requiredCraftingSkill": 3,
       "imbueType": "Wyrd",
       "effect": "imbue",
       "power": 0.15,
+      "upgradesExisting": false,
       "description": "Amethyst resonates with wyrd/aether currents — standard-strength Wyrd imbue."
     },
     {
       "id": "emerald-earth",
       "gemId": "emerald",
+      "requiredReagent": "emerald",
+      "requiredCraftingSkill": 4,
       "imbueType": "Earth",
       "effect": "imbue",
       "power": 0.35,
+      "upgradesExisting": false,
       "description": "Emerald produces a potent Earth imbue, stronger than the baseline Earth Shaping Taper."
     },
     {
       "id": "topaz-fire",
       "gemId": "topaz",
+      "requiredReagent": "topaz",
+      "requiredCraftingSkill": 4,
       "imbueType": "Fire",
       "effect": "imbue",
       "power": 0.35,
+      "upgradesExisting": false,
       "description": "Topaz carries a sharp, aggressive fire resonance. Potent Fire imbue."
     },
     {
       "id": "topaz-air",
       "gemId": "topaz",
+      "requiredReagent": "topaz",
+      "requiredCraftingSkill": 4,
       "imbueType": "Air",
       "effect": "imbue",
       "power": 0.30,
+      "upgradesExisting": false,
       "description": "Topaz also channels an air-speed resonance — use the same gem to commit either a Fire OR Air imbue at craft time."
     },
     {
       "id": "aquamarine-water",
       "gemId": "aquamarine",
+      "requiredReagent": "aquamarine",
+      "requiredCraftingSkill": 4,
       "imbueType": "Water",
       "effect": "imbue",
       "power": 0.35,
+      "upgradesExisting": false,
       "description": "Aquamarine is the canonical Water imbue gem — heal-on-hit and weave-regen flavor."
     },
     {
       "id": "diamond-universal",
       "gemId": "diamond",
+      "requiredReagent": "diamond",
+      "requiredCraftingSkill": 5,
       "imbueType": "None",
       "effect": "upgrade",
       "power": 0.0,
+      "upgradesExisting": true,
       "description": "Diamond is consumed to upgrade an EXISTING imbue on an item by one power tier (doubles its power component). Works on any imbue type. Requires CraftingSkill >= 5."
     },
     {
       "id": "diamond-high-fire",
       "gemId": "diamond",
+      "requiredReagent": "diamond",
+      "requiredCraftingSkill": 8,
       "imbueType": "Fire",
       "effect": "imbue",
       "power": 0.50,
+      "upgradesExisting": false,
       "description": "Alternative use: Diamond can seed a high-tier Fire imbue directly (master-crafter only; CraftingSkill >= 8)."
     },
     {
       "id": "diamond-high-earth",
       "gemId": "diamond",
+      "requiredReagent": "diamond",
+      "requiredCraftingSkill": 8,
       "imbueType": "Earth",
       "effect": "imbue",
       "power": 0.50,
+      "upgradesExisting": false,
       "description": "Alternative use: Diamond high-tier Earth imbue (CraftingSkill >= 8)."
     },
     {
       "id": "diamond-high-water",
       "gemId": "diamond",
+      "requiredReagent": "diamond",
+      "requiredCraftingSkill": 8,
       "imbueType": "Water",
       "effect": "imbue",
       "power": 0.50,
+      "upgradesExisting": false,
       "description": "Alternative use: Diamond high-tier Water imbue (CraftingSkill >= 8)."
     },
     {
       "id": "diamond-high-air",
       "gemId": "diamond",
+      "requiredReagent": "diamond",
+      "requiredCraftingSkill": 8,
       "imbueType": "Air",
       "effect": "imbue",
       "power": 0.50,
+      "upgradesExisting": false,
       "description": "Alternative use: Diamond high-tier Air imbue (CraftingSkill >= 8)."
     },
     {
       "id": "black-pearl-master-wyrd",
       "gemId": "black-pearl",
+      "requiredReagent": "black-pearl",
+      "requiredCraftingSkill": 7,
       "imbueType": "Wyrd",
       "effect": "imbue",
       "power": 0.50,
       "variance": 0.30,
+      "upgradesExisting": false,
       "description": "Master-tier Wyrd imbue. High variance: actual power rolls between (power - variance) and (power + variance). The Maw does not give a clean edge."
     }
   ],
 
   "compatibility": {
-    "comment": "Which gem alignments are permitted for each imbue type. Consumed by future gem-based imbuing flow; today the flow is taper-name-driven.",
+    "comment": "Which gem alignments are permitted for each imbue type. Reserved for future validation; current gem-imbue flow resolves exclusively via recipe id.",
     "byImbueType": {
       "Fire":        ["fire-earth", "fire-air", "universal"],
       "Water":       ["water", "universal"],

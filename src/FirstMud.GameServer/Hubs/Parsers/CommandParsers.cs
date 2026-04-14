@@ -271,6 +271,17 @@ public sealed class ImbueCommandParser : ICommandParser
         => new ImbueCommand(playerId, payload.TryGetGuid("itemId"), payload.TryGetGuid("taperId"));
 }
 
+public sealed class ImbueWithGemCommandParser : ICommandParser
+{
+    public string CommandName => "imbuewithgem";
+    public IGameCommand? Parse(JsonElement payload, Guid playerId)
+        => new ImbueWithGemCommand(
+            playerId,
+            payload.TryGetGuid("itemId"),
+            payload.TryGetGuid("gemItemId"),
+            payload.TryGetString("recipeId") ?? string.Empty);
+}
+
 public sealed class AssignCompanionDutyCommandParser : ICommandParser
 {
     public string CommandName => "assigncompanionduty";

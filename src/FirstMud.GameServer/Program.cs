@@ -133,6 +133,7 @@ builder.Services.AddScoped<ICommandHandler<ViewCompanionsCommand>, ViewCompanion
 builder.Services.AddScoped<ICommandHandler<ActivateCompanionCommand>, ActivateCompanionCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<DeactivateCompanionCommand>, DeactivateCompanionCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<ImbueCommand>, ImbueCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<ImbueWithGemCommand>, ImbueWithGemCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<AssignCompanionDutyCommand>, AssignCompanionDutyCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<RecallCompanionCommand>, RecallCompanionCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<QueueSalvageCommand>, QueueSalvageCommandHandler>();
@@ -192,6 +193,7 @@ builder.Services.AddSingleton<ICommandParser, ViewCompanionsCommandParser>();
 builder.Services.AddSingleton<ICommandParser, ActivateCompanionCommandParser>();
 builder.Services.AddSingleton<ICommandParser, DeactivateCompanionCommandParser>();
 builder.Services.AddSingleton<ICommandParser, ImbueCommandParser>();
+builder.Services.AddSingleton<ICommandParser, ImbueWithGemCommandParser>();
 builder.Services.AddSingleton<ICommandParser, AssignCompanionDutyCommandParser>();
 builder.Services.AddSingleton<ICommandParser, RecallCompanionCommandParser>();
 builder.Services.AddSingleton<ICommandParser, QueueSalvageCommandParser>();

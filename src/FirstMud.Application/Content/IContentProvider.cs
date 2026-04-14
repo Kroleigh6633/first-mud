@@ -184,6 +184,29 @@ public interface IContentProvider
     /// <summary>Lookup an NPC by its stable id. Returns null if unknown.</summary>
     NpcDefinition? GetNpc(string id);
 
+    // ─── Imbue Recipes ───────────────────────────────────────────────────────
+
+    /// <summary>All imbue-recipe definitions authored in
+    /// content/imbue-recipes.json, in file order.</summary>
+    IReadOnlyList<ImbueRecipeDefinition> AllImbueRecipes();
+
+    /// <summary>
+    /// Returns the imbue recipe with the given <paramref name="id"/>, or null
+    /// if none. Accessor mirrors <see cref="GetRecipe"/> for symmetry.
+    /// </summary>
+    ImbueRecipeDefinition? GetImbueRecipe(string id);
+
+    /// <summary>
+    /// Resolves the best imbue recipe keyed off a reagent name + the player's
+    /// current crafting skill. Matches by <c>RequiredReagent</c> (case-insensitive
+    /// against the reagent's item name / tokens) AND
+    /// <c>RequiredCraftingSkill ≤ craftingSkill</c>. When multiple recipes match,
+    /// the one with the highest <c>Power</c> wins; ties break in file order.
+    /// Callers that need a specific recipe (e.g. topaz→Fire vs topaz→Air) must
+    /// pass an explicit id via <see cref="GetImbueRecipe"/>.
+    /// </summary>
+    ImbueRecipeDefinition? MatchImbueRecipe(string reagentName, int craftingSkill);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     // ─── Trade ───────────────────────────────────────────────────────────────
