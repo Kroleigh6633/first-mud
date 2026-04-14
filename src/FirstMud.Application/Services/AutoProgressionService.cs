@@ -29,7 +29,9 @@ public record ProgressionStep(
     bool DispatchedActual,
     string? FarmZoneHint = null,
     AutoCraftPlan? CraftPlan = null,
-    AutoCraftTickResult? CraftResult = null);
+    AutoCraftTickResult? CraftResult = null,
+    AutoImbuePlan? ImbuePlan = null,
+    AutoImbueTickResult? ImbueResult = null);
 
 public record AutoProgressionSession(
     Guid PlayerId,
@@ -107,6 +109,7 @@ public class AutoProgressionService
     private readonly IContentProvider _content;
     private readonly ProgressionTargets _targets;
     private readonly AutoCraftExecutor? _autoCraft;
+    private readonly AutoImbueExecutor? _autoImbue;
 
     public AutoProgressionService(
         AutoProgressionSessionStore sessions,
@@ -114,7 +117,7 @@ public class AutoProgressionService
         ICompanionRepository companions,
         IItemRepository items,
         IContentProvider content)
-        : this(sessions, players, companions, items, content, new ProgressionTargets(), null) { }
+        : this(sessions, players, companions, items, content, new ProgressionTargets(), null, null) { }
 
     public AutoProgressionService(
         AutoProgressionSessionStore sessions,
@@ -123,7 +126,18 @@ public class AutoProgressionService
         IItemRepository items,
         IContentProvider content,
         AutoCraftExecutor autoCraft)
-        : this(sessions, players, companions, items, content, new ProgressionTargets(), autoCraft) { }
+        : this(sessions, players, companions, items, content, new ProgressionTargets(), autoCraft, null) { }
+
+    // DI-preferred constructor: both executors. Registered by AddApplicationServices.
+    public AutoProgressionService(
+        AutoProgressionSessionStore sessions,
+        IPlayerRepository players,
+        ICompanionRepository companions,
+        IItemRepository items,
+        IContentProvider content,
+        AutoCraftExecutor autoCraft,
+        AutoImbueExecutor autoImbue)
+        : this(sessions, players, companions, items, content, new ProgressionTargets(), autoCraft, autoImbue) { }
 
     public AutoProgressionService(
         AutoProgressionSessionStore sessions,
@@ -132,7 +146,7 @@ public class AutoProgressionService
         IItemRepository items,
         IContentProvider content,
         ProgressionTargets targets)
-        : this(sessions, players, companions, items, content, targets, null) { }
+        : this(sessions, players, companions, items, content, targets, null, null) { }
 
     public AutoProgressionService(
         AutoProgressionSessionStore sessions,
@@ -142,6 +156,17 @@ public class AutoProgressionService
         IContentProvider content,
         ProgressionTargets targets,
         AutoCraftExecutor? autoCraft)
+        : this(sessions, players, companions, items, content, targets, autoCraft, null) { }
+
+    public AutoProgressionService(
+        AutoProgressionSessionStore sessions,
+        IPlayerRepository players,
+        ICompanionRepository companions,
+        IItemRepository items,
+        IContentProvider content,
+        ProgressionTargets targets,
+        AutoCraftExecutor? autoCraft,
+        AutoImbueExecutor? autoImbue)
     {
         _sessions = sessions;
         _players = players;
@@ -150,6 +175,7 @@ public class AutoProgressionService
         _content = content;
         _targets = targets;
         _autoCraft = autoCraft;
+        _autoImbue = autoImbue;
     }
 
     // ─── Session lifecycle (delegates to singleton store) ──────────────────
@@ -246,7 +272,48 @@ public class AutoProgressionService
             // No viable gear recipe at all — fall through to default mapping.
         }
 
-        // 4. Map axis → sub-mode. Imbue still stubbed; Companion/Player dispatch as before.
+        // 4. Imbue → dispatch to AutoImbueExecutor if wired. Symmetric with Gear.
+        if (binding == ProgressionAxis.Imbue && _autoImbue is not null)
+        {
+            var tick = await _autoImbue.TickAsync(playerId, ct);
+            if (tick.DispatchedImbue)
+            {
+                return new ProgressionStep(
+                    Mode: ProgressionMode.Imbue,
+                    BindingConstraint: binding,
+                    Reliability: reliability,
+                    DeficitScores: deficits,
+                    Reason: $"auto-imbue: {tick.Reason}",
+                    NextCheckIn: TimeSpan.FromSeconds(60),
+                    DispatchedActual: true,
+                    FarmZoneHint: null,
+                    ImbuePlan: tick.Plan,
+                    ImbueResult: tick);
+            }
+
+            // Not imbuable now — if we have missing reagents, dispatch Farm.
+            if (tick.Plan.TargetItemId is not null && tick.Plan.MissingReagents.Count > 0)
+            {
+                var first = tick.Plan.MissingReagents[0];
+                var zoneHint = first.Source.ZoneHint;
+                return new ProgressionStep(
+                    Mode: ProgressionMode.Farm,
+                    BindingConstraint: binding,
+                    Reliability: reliability,
+                    DeficitScores: deficits,
+                    Reason: $"Auto-imbue needs {first.Quantity}×{first.ItemName} from {zoneHint ?? "nearby zones"} to imbue {tick.Plan.TargetItemName}.",
+                    NextCheckIn: TimeSpan.FromSeconds(60),
+                    DispatchedActual: true,
+                    FarmZoneHint: zoneHint,
+                    ImbuePlan: tick.Plan,
+                    ImbueResult: tick);
+            }
+
+            // No viable imbue target at all — fall through to default mapping.
+        }
+
+        // 5. Map axis → sub-mode. Companion/Player dispatch as before; Imbue is stubbed
+        //    only when the auto-imbue executor isn't wired.
         var (mode, dispatched, reason) = MapAxisToSubMode(binding);
 
         return new ProgressionStep(

@@ -392,6 +392,9 @@ public class AutoProgressionTickHandler(IServiceScopeFactory scopeFactory, ILogg
             var notifier = scope.ServiceProvider.GetRequiredService<FirstMud.GameServer.Services.GameNotificationService>();
             var targets  = new FirstMud.Application.Services.ProgressionTargets();
             var playerRepo = scope.ServiceProvider.GetRequiredService<FirstMud.Domain.Interfaces.IPlayerRepository>();
+            // Eagerly resolve sub-mode executors — fails fast if DI registrations drift.
+            _ = scope.ServiceProvider.GetRequiredService<FirstMud.Application.Services.AutoCraftExecutor>();
+            _ = scope.ServiceProvider.GetRequiredService<FirstMud.Application.Services.AutoImbueExecutor>();
 
             var players = await playerRepo.GetActivePlayersAsync(ct);
             foreach (var player in players)
