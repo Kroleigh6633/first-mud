@@ -32,6 +32,7 @@ public static class ServiceExtensions
         services.AddScoped<ImbueService>();
         services.AddSingleton<AutoFarmService>();
         services.AddSingleton<AutoProgressionSessionStore>();
+        services.AddScoped<AutoCraftExecutor>();
         services.AddScoped<AutoProgressionService>();
         services.AddScoped<HomesteadCompanionService>();
         services.AddScoped<SmeltService>();

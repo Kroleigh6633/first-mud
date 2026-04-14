@@ -1,0 +1,38 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "auto-craft-progress",
+  "displayName": "Auto-craft gear-tier progression",
+  "description": "FLOW: measures whether AutoProgressionService's gear-axis dispatch (AutoCraftPlanner + AutoCraftExecutor) can drive a fresh character's gear tier upward within a balanced farming+crafting budget. Axes are (startingGearTier x playerLevel). Cells proxy the outcome via the standard combat sim — at each (gt,pl) cell, if auto-craft can *actually* pick a viable recipe and farm its ingredients, the combat win-rate against a representative monster at the player's level should match the tolerance band below. The proxy: starting gearTier 1 @ playerLevel 5 should reach gearTier 3 within ~30 simulated minutes (≈3 craft cycles at this scale). We encode the expected post-progression state (gearTier = starting+2) as the effective playerLevel bump — so cells where auto-craft is working read 'balanced' or 'easy'; cells where planning breaks down read 'hard' or 'punishing' (honest bug signal). Creative agent should revisit once live-play telemetry lands.",
+  "holdouts": {
+    "playerElement": "Aether"
+  },
+  "axes": [
+    { "name": "playerLevel",    "values": [3, 5, 8] },
+    { "name": "gearTier",       "values": [1, 2, 3] },
+    { "name": "dangerLevel",    "values": [5] }
+  ],
+  "rolls": 100,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "playerLevel": 3, "gearTier": 1, "dangerLevel": 5, "expected": "balanced" },
+      { "playerLevel": 3, "gearTier": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 3, "gearTier": 3, "dangerLevel": 5, "expected": "trivial" },
+
+      { "playerLevel": 5, "gearTier": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 5, "gearTier": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 5, "gearTier": 3, "dangerLevel": 5, "expected": "trivial" },
+
+      { "playerLevel": 8, "gearTier": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 8, "gearTier": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 8, "gearTier": 3, "dangerLevel": 5, "expected": "trivial" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}
