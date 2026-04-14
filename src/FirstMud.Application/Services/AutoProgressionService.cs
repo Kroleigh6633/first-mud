@@ -26,7 +26,10 @@ public record ProgressionStep(
     IReadOnlyDictionary<ProgressionAxis, double> DeficitScores,
     string Reason,
     TimeSpan NextCheckIn,
-    bool DispatchedActual);
+    bool DispatchedActual,
+    string? FarmZoneHint = null,
+    AutoCraftPlan? CraftPlan = null,
+    AutoCraftTickResult? CraftResult = null);
 
 public record AutoProgressionSession(
     Guid PlayerId,
@@ -103,6 +106,7 @@ public class AutoProgressionService
     private readonly IItemRepository _items;
     private readonly IContentProvider _content;
     private readonly ProgressionTargets _targets;
+    private readonly AutoCraftExecutor? _autoCraft;
 
     public AutoProgressionService(
         AutoProgressionSessionStore sessions,
@@ -110,7 +114,16 @@ public class AutoProgressionService
         ICompanionRepository companions,
         IItemRepository items,
         IContentProvider content)
-        : this(sessions, players, companions, items, content, new ProgressionTargets()) { }
+        : this(sessions, players, companions, items, content, new ProgressionTargets(), null) { }
+
+    public AutoProgressionService(
+        AutoProgressionSessionStore sessions,
+        IPlayerRepository players,
+        ICompanionRepository companions,
+        IItemRepository items,
+        IContentProvider content,
+        AutoCraftExecutor autoCraft)
+        : this(sessions, players, companions, items, content, new ProgressionTargets(), autoCraft) { }
 
     public AutoProgressionService(
         AutoProgressionSessionStore sessions,
@@ -119,6 +132,16 @@ public class AutoProgressionService
         IItemRepository items,
         IContentProvider content,
         ProgressionTargets targets)
+        : this(sessions, players, companions, items, content, targets, null) { }
+
+    public AutoProgressionService(
+        AutoProgressionSessionStore sessions,
+        IPlayerRepository players,
+        ICompanionRepository companions,
+        IItemRepository items,
+        IContentProvider content,
+        ProgressionTargets targets,
+        AutoCraftExecutor? autoCraft)
     {
         _sessions = sessions;
         _players = players;
@@ -126,6 +149,7 @@ public class AutoProgressionService
         _items = items;
         _content = content;
         _targets = targets;
+        _autoCraft = autoCraft;
     }
 
     // ─── Session lifecycle (delegates to singleton store) ──────────────────
@@ -177,8 +201,52 @@ public class AutoProgressionService
         // 2. Binding constraint.
         var (binding, deficits) = await ComputeBindingConstraintAsync(player, activeCompanions, ct);
 
-        // 3. Map axis → sub-mode. Craft + Imbue sub-modes don't exist yet →
-        //    dispatchedActual=false so the tick handler skips the action.
+        // 3. Gear → dispatch to AutoCraftExecutor if wired. When a craftable
+        //    recipe is ready, TickAsync crafts + auto-equips. When ingredients
+        //    are short, we fall through to Farm mode with the plan's zone hint
+        //    so the farm sub-mode picks up the slack for one cycle.
+        if (binding == ProgressionAxis.Gear && _autoCraft is not null)
+        {
+            var tick = await _autoCraft.TickAsync(playerId, ct);
+            if (tick.DispatchedCraft)
+            {
+                return new ProgressionStep(
+                    Mode: ProgressionMode.Craft,
+                    BindingConstraint: binding,
+                    Reliability: reliability,
+                    DeficitScores: deficits,
+                    Reason: $"auto-craft: {tick.Reason}" + (tick.DidEquip ? " (equipped)" : ""),
+                    NextCheckIn: TimeSpan.FromSeconds(60),
+                    DispatchedActual: true,
+                    FarmZoneHint: null,
+                    CraftPlan: tick.Plan,
+                    CraftResult: tick);
+            }
+
+            // Not craftable now — if we have a missing-ingredients plan, dispatch Farm
+            // targeted at the first missing ingredient's zone hint. Farm sub-mode
+            // exists today, so DispatchedActual=true.
+            if (tick.Plan.TargetRecipe is not null && tick.Plan.MissingIngredients.Count > 0)
+            {
+                var first = tick.Plan.MissingIngredients[0];
+                var zoneHint = first.Source.ZoneHint;
+                return new ProgressionStep(
+                    Mode: ProgressionMode.Farm,
+                    BindingConstraint: binding,
+                    Reliability: reliability,
+                    DeficitScores: deficits,
+                    Reason: $"Auto-craft needs {first.Quantity}×{first.ItemName} from {zoneHint ?? "nearby zones"} to build {tick.Plan.TargetRecipe.ResultItemName}.",
+                    NextCheckIn: TimeSpan.FromSeconds(60),
+                    DispatchedActual: true,
+                    FarmZoneHint: zoneHint,
+                    CraftPlan: tick.Plan,
+                    CraftResult: tick);
+            }
+
+            // No viable gear recipe at all — fall through to default mapping.
+        }
+
+        // 4. Map axis → sub-mode. Imbue still stubbed; Companion/Player dispatch as before.
         var (mode, dispatched, reason) = MapAxisToSubMode(binding);
 
         return new ProgressionStep(

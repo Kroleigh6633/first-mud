@@ -1,0 +1,157 @@
+{
+  "playbookId": "auto-craft-progress",
+  "displayName": "Auto-craft gear-tier progression",
+  "seed": 42,
+  "rolls": 100,
+  "cells": [
+    {
+      "axis": {
+        "playerLevel": 3,
+        "gearTier": 1,
+        "dangerLevel": 5
+      },
+      "winRate": 0.68,
+      "avgRounds": 4.92,
+      "avgHpPct": 0.3339892294946146,
+      "actual": "balanced",
+      "expected": "hard",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "gearTier": 2,
+        "dangerLevel": 5
+      },
+      "winRate": 0.97,
+      "avgRounds": 4.37,
+      "avgHpPct": 0.47991904370375055,
+      "actual": "trivial",
+      "expected": "balanced",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "gearTier": 3,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.66,
+      "avgHpPct": 0.7185326086956516,
+      "actual": "trivial",
+      "expected": "easy",
+      "divergent": true
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "gearTier": 1,
+        "dangerLevel": 5
+      },
+      "winRate": 0.95,
+      "avgRounds": 4.36,
+      "avgHpPct": 0.5403293509848239,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "gearTier": 2,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.79,
+      "avgHpPct": 0.7221739130434783,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 5,
+        "gearTier": 3,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.28,
+      "avgHpPct": 0.8494634146341461,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "gearTier": 1,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.56,
+      "avgHpPct": 0.7690206185567012,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "gearTier": 2,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 3.16,
+      "avgHpPct": 0.8746976744186048,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    },
+    {
+      "axis": {
+        "playerLevel": 8,
+        "gearTier": 3,
+        "dangerLevel": 5
+      },
+      "winRate": 1,
+      "avgRounds": 2.86,
+      "avgHpPct": 0.9274576271186438,
+      "actual": "trivial",
+      "expected": "trivial",
+      "divergent": false
+    }
+  ],
+  "divergences": [
+    {
+      "axis": {
+        "playerLevel": 3,
+        "gearTier": 1,
+        "dangerLevel": 5
+      },
+      "expected": "hard",
+      "actual": "balanced",
+      "winRate": 0.68
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "gearTier": 2,
+        "dangerLevel": 5
+      },
+      "expected": "balanced",
+      "actual": "trivial",
+      "winRate": 0.97
+    },
+    {
+      "axis": {
+        "playerLevel": 3,
+        "gearTier": 3,
+        "dangerLevel": 5
+      },
+      "expected": "easy",
+      "actual": "trivial",
+      "winRate": 1
+    }
+  ]
+}
