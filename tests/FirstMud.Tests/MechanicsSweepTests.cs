@@ -1,6 +1,7 @@
 using FirstMud.Application;
 using FirstMud.Application.Content;
 using FirstMud.Application.Services;
+using FirstMud.Domain.Configuration;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Interfaces;
@@ -20,6 +21,22 @@ namespace FirstMud.Tests;
 /// </summary>
 public class MechanicsSweepTests
 {
+    // Publish post-tune progression curves (matches content/progression-curves.json)
+    // so direct-construction tests see the same thresholds the live game uses.
+    static MechanicsSweepTests()
+    {
+        ProgressionCurvesAccessor.Publish(
+            skillDivisor: null,
+            companionLayerThresholds: new Dictionary<CompanionType, IReadOnlyList<int>>
+            {
+                [CompanionType.Wildfolk]         = new[] { 0, 100, 300, 700, 1400, 2800 },
+                [CompanionType.HiredHero]        = new[] { 0, 100, 350, 850, 1750, 3500 },
+                [CompanionType.CapturedMonster]  = new[] { 0,  75, 225, 600, 1250, 2500 },
+                [CompanionType.BoundShade]       = new[] { 0, 150, 450, 1050, 2100, 4200 },
+                [CompanionType.ArdweldConstruct] = new[] { 0, 250, 900, 2100, 4200, 8400 },
+            });
+    }
+
     // =========================================================================
     // 1. AUTO-EQUIP LOGIC
     // =========================================================================
@@ -264,12 +281,26 @@ public class MechanicsSweepTests
     [Fact]
     public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf4_MaxPack()
     {
-        // partySize=4, danger=10: maxEnemies = 4 + 10/3 = 4 + 3 = 7
+        // Merged cap (min of soft cap and small-party cap):
+        //   softCap       = partySize + danger/4 = 4 + 2 = 6
+        //   smallPartyCap = partySize + 1        = 5
+        //   maxEnemies    = min(6, 5)            = 5
         var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 4);
 
-        int maxEnemies = 4 + (10 / 3); // 7
+        int maxEnemies = 5; // small-party cap dominates
         pack.Count.Should().Be(maxEnemies,
-            $"party of 4 at danger 10 should produce exactly {maxEnemies} enemies");
+            $"party of 4 at danger 10 should produce exactly {maxEnemies} enemies (small-party cap)");
+    }
+
+    [Fact]
+    public void MonsterFactory_BuildMonsterPack_Danger10_PartyOf5_UsesLegacyScaling()
+    {
+        // partySize ≥ 5: soft-cap dominates — maxEnemies = partySize + dangerLevel/4 = 5 + 2 = 7.
+        var pack = CreateMonsterFactory().BuildMonsterPack(dangerLevel: 10, playerLevel: 1, biome: "plains", partySize: 5);
+
+        int maxEnemies = 5 + (10 / 4); // 7
+        pack.Count.Should().Be(maxEnemies,
+            $"party of 5 at danger 10 should produce exactly {maxEnemies} enemies (soft cap)");
     }
 
     [Fact]
@@ -345,15 +376,15 @@ public class MechanicsSweepTests
     public void Companion_Bond5_ReceivesNormalUsage()
     {
         // Bond 5 companion: 10 usage per combat
-        // CapturedMonster thresholds: [0, 150, 400, 900, 1800, 3600]
+        // CapturedMonster thresholds (post-tune): [0, 75, 225, 600, 1250, 2500]
         // TryAdvanceLayer only advances one layer per RecordUsage call, so we call repeatedly.
         var companion = Companion.Create(Guid.NewGuid(), "Veteran", CompanionType.CapturedMonster, MagicElement.Earth);
 
         // Advance through layers one threshold at a time
-        companion.RecordUsage(150);  // → layer 2
-        companion.RecordUsage(250);  // total 400 → layer 3
-        companion.RecordUsage(500);  // total 900 → layer 4
-        companion.RecordUsage(900);  // total 1800 → layer 5
+        companion.RecordUsage(75);   // → layer 2
+        companion.RecordUsage(150);  // total 225 → layer 3
+        companion.RecordUsage(375);  // total 600 → layer 4
+        companion.RecordUsage(650);  // total 1250 → layer 5
 
         companion.CurrentLayer.Should().BeGreaterThanOrEqualTo(5,
             "companion should reach layer 5 after crossing all intermediate thresholds");
@@ -694,27 +725,27 @@ public class MechanicsSweepTests
     [Fact]
     public void Companion_CapturedMonster_AdvancesLayers_WithUsage()
     {
-        // CapturedMonster thresholds: [0, 150, 400, 900, 1800, 3600]
-        // Layer 1 → 2 at 150 usage
+        // CapturedMonster thresholds (post-tune): [0, 75, 225, 600, 1250, 2500]
+        // Layer 1 → 2 at 75 usage
         var companion = Companion.Create(Guid.NewGuid(), "Wyrd Fox", CompanionType.CapturedMonster, MagicElement.Aether);
 
-        companion.RecordUsage(150);
+        companion.RecordUsage(75);
 
-        companion.CurrentLayer.Should().Be(2, "CapturedMonster reaches layer 2 at 150 usage");
+        companion.CurrentLayer.Should().Be(2, "CapturedMonster reaches layer 2 at 75 usage");
     }
 
     [Fact]
     public void Companion_MaxLayer6_NoFurtherAdvancement()
     {
-        // CapturedMonster thresholds: [0, 150, 400, 900, 1800, 3600]
+        // CapturedMonster thresholds (post-tune): [0, 75, 225, 600, 1250, 2500]
         // TryAdvanceLayer advances only one layer per call — step through each threshold.
         var companion = Companion.Create(Guid.NewGuid(), "Max Fox", CompanionType.CapturedMonster, MagicElement.Aether);
 
-        companion.RecordUsage(150);  // → layer 2 (threshold index 1 = 150)
-        companion.RecordUsage(250);  // total 400 → layer 3 (threshold 400)
-        companion.RecordUsage(500);  // total 900 → layer 4 (threshold 900)
-        companion.RecordUsage(900);  // total 1800 → layer 5 (threshold 1800)
-        companion.RecordUsage(1800); // total 3600 → layer 6 (threshold 3600)
+        companion.RecordUsage(75);   // → layer 2 (threshold index 1 = 75)
+        companion.RecordUsage(150);  // total 225 → layer 3 (threshold 225)
+        companion.RecordUsage(375);  // total 600 → layer 4 (threshold 600)
+        companion.RecordUsage(650);  // total 1250 → layer 5 (threshold 1250)
+        companion.RecordUsage(1250); // total 2500 → layer 6 (threshold 2500)
 
         companion.CurrentLayer.Should().Be(6, "companion should max out at layer 6");
 

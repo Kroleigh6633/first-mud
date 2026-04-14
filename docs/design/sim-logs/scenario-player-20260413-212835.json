@@ -1,0 +1,114 @@
+{
+  "QuestId": "chain5-wrong-tide",
+  "Title": "The Wrong Tide",
+  "Steps": [
+    {
+      "BeatId": "intro",
+      "Description": "At Kelpholm\u0027s Rider post, Postmaster Dann lays out the commission: \u0027Tide\u0027s three hours off, every third day. Find out why. Pilgrims say omen. I say something big is moving down there.\u0027",
+      "AvailableChoices": [
+        "accept: Accept the commission.",
+        "refuse: Refuse \u2014 not my arc."
+      ],
+      "ChosenChoiceId": "accept",
+      "ChosenChoiceText": "Accept the commission.",
+      "Deltas": [
+        "flag\u002B wrongtide.accepted"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "survey",
+      "Description": "Three obvious reads: ask the pilgrims, survey the tide mechanically, or force the issue and draw something up from the deep.",
+      "AvailableChoices": [
+        "talk-pilgrims: Seek out the bogmen pilgrims.",
+        "survey-tide: Measure the tide yourself.",
+        "spook-fairgean: Light a fire-signal at the shore. Force a surfacing."
+      ],
+      "ChosenChoiceId": "survey-tide",
+      "ChosenChoiceText": "Measure the tide yourself.",
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "tide-read",
+      "Description": "The off-cycle is mechanically regular: volume displacement suggests a large sub-surface reroute. Something is being built, not thrashed.",
+      "AvailableChoices": [
+        "measured-read: Record the measurements cleanly.",
+        "hand-wave: Eyeball it. Good enough."
+      ],
+      "ChosenChoiceId": "measured-read",
+      "ChosenChoiceText": "Record the measurements cleanly.",
+      "Deltas": [
+        "flag\u002B tide.measured"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "choose-approach",
+      "Description": "Time to close. Three routes remain.",
+      "AvailableChoices": [
+        "dive: Dive. Find the source.",
+        "commune-fairgean: Signal for a Fairgean parley \u2014 respectfully.",
+        "leave-and-report: Report what you have. Do not close."
+      ],
+      "ChosenChoiceId": "dive",
+      "ChosenChoiceText": "Dive. Find the source.",
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "confront-creature",
+      "Description": "Thirty feet down, a Tide-Eater \u2014 a Fairgean maintenance-beast \u2014 is rerouting a deep current as nest construction. It notices you.",
+      "AvailableChoices": [
+        "kill-beast: Kill it. Fast and loud.",
+        "spare-and-redirect: Redirect the current. Spare the beast."
+      ],
+      "ChosenChoiceId": "kill-beast",
+      "ChosenChoiceText": "Kill it. Fast and loud.",
+      "Deltas": [
+        "rep\u002B rider-compact \u002B250",
+        "rep\u002B fairgean -300",
+        "rep\u002B bogmen \u002B50",
+        "flag\u002B tide.restored"
+      ],
+      "RequirementWarnings": [],
+      "Terminal": false,
+      "Outcome": null
+    },
+    {
+      "BeatId": "end-killed-beast",
+      "Description": "The Tide-Eater dies loud. Tide is restored. A current you never saw goes slack, and something far down makes a noise that is not a song.",
+      "AvailableChoices": [],
+      "ChosenChoiceId": null,
+      "ChosenChoiceText": null,
+      "Deltas": [],
+      "RequirementWarnings": [],
+      "Terminal": true,
+      "Outcome": "success-violent"
+    }
+  ],
+  "FinalState": {
+    "flags": [
+      "drowned-coast.visited",
+      "tide.measured",
+      "tide.restored",
+      "wrongtide.accepted"
+    ],
+    "inventory": {},
+    "reputation": {
+      "bogmen": 50,
+      "fairgean": -300,
+      "rider-compact": 250
+    }
+  },
+  "FinalOutcome": "success-violent",
+  "Errors": []
+}

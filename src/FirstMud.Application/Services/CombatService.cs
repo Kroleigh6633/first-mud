@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Services;
@@ -10,13 +11,24 @@ namespace FirstMud.Application.Services;
 public class CombatService
 {
     private readonly ILogger<CombatService> _logger;
+    private readonly IContentProvider? _content;
     private readonly ConcurrentDictionary<Guid, Encounter> _activeEncounters = new();
     private readonly ConcurrentDictionary<Guid, int> _encounterDangerLevels = new();
 
-    public CombatService(ILogger<CombatService> logger)
+    public CombatService(ILogger<CombatService> logger, IContentProvider? content = null)
     {
         _logger = logger;
+        _content = content;
     }
+
+    /// <summary>
+    /// Party-scaling curve used to buff player + companion HP and ability
+    /// power to keep pace with the monster danger curve. Falls back to a
+    /// neutral (no-op) curve when no content provider was injected — that
+    /// path exists for unit tests that construct CombatService directly.
+    /// </summary>
+    private PartyScalingCurve PartyCurve =>
+        _content?.CombatCurves.PartyScaling ?? new PartyScalingCurve(0.0);
 
     /// <summary>
     /// Builds and stores a new Encounter from the player, their active companions, and enemy templates.
@@ -134,6 +146,16 @@ public class CombatService
 
         int combatAgility = player.Agility;
 
+        // Party scaling (Fix B): symmetric buff vs monster danger curve.
+        // avgLayer computed from active companions; solo parties still get
+        // the playerLevel tier.
+        var avgLayer = PartyScaling.AvgCompanionLayer(
+            activeCompanions.Select(c => c.CurrentLayer).ToList());
+        var partyFactor = PartyScaling.Factor(PartyCurve, player.Level, avgLayer);
+
+        combatMaxHp = (int)(combatMaxHp * partyFactor);
+        playerAbilities = PartyScaling.ScaleAbilities(playerAbilities, partyFactor);
+
         var playerCombatant = Combatant.Create(
             player.Name,
             CombatantType.Player,
@@ -159,6 +181,10 @@ public class CombatService
             var companionHp    = 50 + companion.Level * 10 + companion.CurrentLayer * 5;
             var companionSpeed = 6 + companion.Level;
 
+            // Fix B: apply party scaling to companion HP + ability power too.
+            companionHp = (int)(companionHp * partyFactor);
+            var scaledCompanionAbilities = PartyScaling.ScaleAbilities(companionAbilities, partyFactor);
+
             var companionCombatant = Combatant.Create(
                 companion.Name,
                 CombatantType.Companion,
@@ -168,7 +194,7 @@ public class CombatService
                 companion.Element,
                 isPlayerSide: true,
                 companion.Level,
-                companionAbilities,
+                scaledCompanionAbilities,
                 agility: companion.Level + 5);
 
             playerSide.Add(companionCombatant);

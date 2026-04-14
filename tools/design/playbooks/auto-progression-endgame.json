@@ -1,0 +1,31 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "auto-progression-endgame",
+  "displayName": "Auto-progression endgame benchmark (scaffold)",
+  "description": "BENCHMARK: fresh L1 character with no gear / no imbues / no companions drives AutoProgressionService until it reliably clears dangerLevel 10 at ≥50%. Measures time-to-target in simulated hours. IMPORTANT: sub-modes auto-craft and auto-imbue are not yet implemented (2026-04-13). Scaffolded AutoProgressionService returns 'sub-mode stub' for Gear/Imbue constraints, so every cell in this playbook is expected to be 'punishing' (≈0% win rate at d10 with an L1 naked character) until sub-modes land. Engine-compatibility: this playbook reuses the standard (playerLevel, dangerLevel) cell grid so PlaybookEngine runs it without changes; the 'benchmark' semantics (time-to-target, grace-window) are driven server-side by AutoProgressionService in live play, not by the cell grid itself. Initial expected bands are deliberately generous; creative agent tightens once sub-modes ship.",
+  "holdouts": {
+    "playerLevel": 1,
+    "playerElement": "Aether",
+    "gearTier": 0,
+    "imbueLevel": 0,
+    "companionCount": 0,
+    "companionLayer": 1
+  },
+  "axes": [
+    { "name": "dangerLevel", "values": [10] }
+  ],
+  "rolls": 200,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "dangerLevel": 10, "expected": "punishing" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

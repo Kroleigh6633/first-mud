@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "World Events",
+  "description": "Data-driven catalog of world-tick events for Aeldran. Runtime scheduling (tick cadence, priority arbitration, flag writes) lives in C#; this file is the authoring surface (identity, trigger, duration, effects, narrative flavour).",
+  "type": "object",
+  "required": ["events"],
+  "additionalProperties": false,
+  "properties": {
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/event" }
+    }
+  },
+  "definitions": {
+    "event": {
+      "type": "object",
+      "required": ["id", "displayName", "family", "priority", "description", "trigger", "duration", "effects"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "displayName": { "type": "string" },
+        "family": {
+          "type": "string",
+          "enum": ["economic", "political", "faction-long-arc", "encounter", "weather"]
+        },
+        "priority": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "description": { "type": "string" },
+        "trigger": { "$ref": "#/definitions/trigger" },
+        "duration": { "$ref": "#/definitions/duration" },
+        "effects": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/effect" }
+        },
+        "onExpire": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/effect" }
+        },
+        "factionTags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "zoneTags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "questTags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "worldStateFlag": { "type": "string" },
+        "oneTime": { "type": "boolean" }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "unconditional",
+            "gameTick",
+            "seasonalDay",
+            "lunarCycle",
+            "repThreshold",
+            "questCompleted",
+            "complex"
+          ]
+        },
+        "everyDays": { "type": "integer", "minimum": 1 },
+        "everyMinutes": { "type": "integer", "minimum": 1 },
+        "day": { "type": "integer", "minimum": 0 },
+        "factionId": { "type": "string" },
+        "minTier": { "type": "string" },
+        "min": { "type": "integer" },
+        "questId": { "type": "string" },
+        "outcome": { "type": "string" },
+        "prose": { "type": "string" }
+      }
+    },
+    "duration": {
+      "type": "object",
+      "properties": {
+        "days": { "type": "integer", "minimum": 1 },
+        "minutes": { "type": "integer", "minimum": 1 },
+        "permanent": { "type": "boolean" }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "zoneAmbient",
+            "npcAvailability",
+            "npcDialogueLine",
+            "shopPriceShift",
+            "shopStockShift",
+            "encounterRateShift",
+            "reputationDrift",
+            "spawnNode",
+            "unlockDialogue",
+            "setFlag"
+          ]
+        },
+        "zoneId": { "type": "string" },
+        "npcId": { "type": "string" },
+        "npcName": { "type": "string" },
+        "factionId": { "type": "string" },
+        "item": { "type": "string" },
+        "multiplier": { "type": "number" },
+        "delta": { "type": "integer" },
+        "flag": { "type": "string" },
+        "value": {},
+        "text": { "type": "string" },
+        "available": { "type": "boolean" },
+        "questId": { "type": "string" }
+      }
+    }
+  }
+}

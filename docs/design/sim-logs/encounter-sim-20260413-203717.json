@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "giant-centipede"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 8,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 474,
+    "Losses": 26,
+    "Timeouts": 0,
+    "WinRate": 0.948,
+    "LossRate": 0.052,
+    "AvgRounds": 4.352,
+    "AvgPlayerHpPct": 0.47960123610863503,
+    "MinPlayerHpPct": 0.028169014084507043,
+    "DmgMin": 0,
+    "DmgP25": 56,
+    "DmgMedian": 78,
+    "DmgP75": 102,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "easy"
+  }
+}

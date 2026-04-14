@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "stray-dog"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 2,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 1.852,
+    "AvgPlayerHpPct": 0.9509718309859156,
+    "MinPlayerHpPct": 0.5704225352112676,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 0,
+    "DmgP75": 14,
+    "DmgMax": 61,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

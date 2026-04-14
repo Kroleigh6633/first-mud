@@ -3,6 +3,8 @@ using FirstMud.Application.Content;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FirstMud.Tests.Content;
 
@@ -311,6 +313,8 @@ public class ContentProviderTests
         WriteValidBuildings(dir);
         WriteValidRecipes(dir);
         WriteValidLootTables(dir);
+        WriteValidZones(dir);
+        WriteValidQuests(dir);
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────
@@ -885,6 +889,18 @@ public class ContentProviderTests
         File.Copy(Path.Combine(realRoot, "factions.json"), Path.Combine(dir, "factions.json"));
     }
 
+    internal static void WriteValidQuests(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "quests.json"), Path.Combine(dir, "quests.json"));
+    }
+
+    internal static void WriteValidNpcs(string dir)
+    {
+        var realRoot = ContentRootResolver.Resolve();
+        File.Copy(Path.Combine(realRoot, "npcs.json"), Path.Combine(dir, "npcs.json"));
+    }
+
     /// <summary>
     /// Seed a temp content dir with all upstream-required content files so a
     /// negative test targeting a specific file can reach that file's validator.
@@ -899,6 +915,8 @@ public class ContentProviderTests
         if (!excludedSet.Contains("loot-tables")) WriteValidLootTables(dir);
         if (!excludedSet.Contains("zones")) WriteValidZones(dir);
         if (!excludedSet.Contains("factions")) WriteValidFactions(dir);
+        if (!excludedSet.Contains("quests")) WriteValidQuests(dir);
+        if (!excludedSet.Contains("npcs")) WriteValidNpcs(dir);
     }
 
     // ─── Zone definitions ─────────────────────────────────────────────────
@@ -1150,6 +1168,66 @@ public class ContentProviderTests
         }
     }
 
+    // ─── Quest definitions ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Happy path: the real content/quests.json loads, covers every quest
+    /// that used to live in the hardcoded LoreSeeder.BuildQuestSeedData
+    /// table, and round-trips representative entries exactly.
+    /// </summary>
+    [Fact]
+    public void Real_quests_file_reproduces_legacy_seed_definitions()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        provider.AllQuests().Should().HaveCount(13);
+
+        var rider001 = provider.GetQuest("RIDER_001");
+        rider001.Should().NotBeNull();
+        rider001!.Title.Should().Be("A Delivery Gone Wrong");
+        rider001.FactionId.Should().Be(FactionId.HouseCaervorn);
+        rider001.RequiredTier.Should().Be(ReputationTier.Unknown);
+        rider001.RequiredWorld.Should().Be(WorldId.Aeldran);
+        rider001.ReputationReward.Should().Be(150);
+        rider001.PossibleOutcomes.Should().ContainInOrder("reported", "concealed");
+        rider001.IsWyrdQuest.Should().BeFalse();
+
+        var ashen = provider.GetQuest("ASHEN_001");
+        ashen!.IsWyrdQuest.Should().BeTrue();
+        ashen.ReputationReward.Should().Be(0);
+
+        // 8 unlocks + 8 requires in the legacy seeder
+        provider.AllQuestEdges().Should().HaveCount(16);
+        provider.AllQuestEdges()
+            .Count(e => e.Kind == "unlocks").Should().Be(8);
+        provider.AllQuestEdges()
+            .Count(e => e.Kind == "requires").Should().Be(8);
+
+        provider.AllQuestEdges()
+            .Single(e => e.Kind == "unlocks" && e.FromQuestId == "RIDER_001" && e.ToQuestId == "RIDER_002a")
+            .Outcome.Should().Be("reported");
+
+        provider.GetQuest("NO_SUCH_QUEST").Should().BeNull();
+        provider.GetQuest("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Missing_quests_file_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "quests");
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<FileNotFoundException>()
+               .Which.FileName.Should().EndWith("quests.json");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void Missing_faction_enum_value_throws_on_load()
     {
@@ -1181,6 +1259,145 @@ public class ContentProviderTests
     }
 
     [Fact]
+    public void Duplicate_quest_id_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "DUPE", "title": "A", "description": "x",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false },
+            { "questId": "DUPE", "title": "B", "description": "y",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*duplicate questId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_faction_id_on_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "NoSuchFaction", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*invalid factionId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_starting_zone_on_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false,
+              "startingZoneId": "not-a-real-zone" }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Dangling_edge_to_unknown_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": [
+            { "kind": "requires", "from": "Q1", "to": "NOPE" }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*unknown 'to' questId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unlocks_edge_with_undeclared_outcome_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false },
+            { "questId": "Q2", "title": "T2", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false }
+          ],
+          "edges": [
+            { "kind": "unlocks", "from": "Q1", "to": "Q2", "outcome": "ghost_outcome" }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+                .WithMessage("*not in that quest's possibleOutcomes*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Invalid_hqZoneId_against_zones_file_throws_on_load()
     {
         var dir = Directory.CreateTempSubdirectory("fm-content-test-");
@@ -1197,6 +1414,38 @@ public class ContentProviderTests
             var act = () => new ContentProvider(dir.FullName);
             act.Should().Throw<InvalidDataException>()
                .WithMessage("*hqZoneId*is not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Orphan_node_in_quest_throws_on_load()
+    {
+        var dir = MakeContentDirWithQuests("""
+        {
+          "quests": [
+            { "questId": "Q1", "title": "T", "description": "d",
+              "factionId": "HouseCaervorn", "requiredTier": "Unknown",
+              "requiredWorld": "Aeldran", "reputationReward": 0,
+              "possibleOutcomes": ["completed"], "isWyrdQuest": false,
+              "nodes": [
+                { "nodeId": "start",   "type": "dialogue", "content": "hi" },
+                { "nodeId": "orphan",  "type": "dialogue", "content": "lost" }
+              ],
+              "internalEdges": [
+                { "from": "start", "to": "start" }
+              ] }
+          ],
+          "edges": []
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>().WithMessage("*orphan/unreachable node*");
         }
         finally
         {
@@ -1280,6 +1529,601 @@ public class ContentProviderTests
             var act = () => new ContentProvider(dir.FullName);
             act.Should().Throw<InvalidDataException>()
                .WithMessage("*at least one waypointZoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    private static DirectoryInfo MakeContentDirWithQuests(string questsJson)
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        WriteAllPrerequisitesExcept(dir.FullName);
+        File.WriteAllText(Path.Combine(dir.FullName, "quests.json"), questsJson);
+        return dir;
+    }
+
+    /// <summary>
+    /// Tightening assertion: every quest's factionId must resolve against the
+    /// authoritative factions.json (not just the FactionId enum). This guards
+    /// against a quest referencing an enum value that has been retired from
+    /// content/factions.json.
+    /// </summary>
+    [Fact]
+    public void Every_quest_factionId_is_present_in_factions_json()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        var authoredFactions = provider.AllFactions().Select(f => f.Id).ToHashSet();
+        foreach (var quest in provider.AllQuests())
+        {
+            authoredFactions.Should().Contain(quest.FactionId,
+                $"quest '{quest.QuestId}' references FactionId.{quest.FactionId} which must be authored in factions.json");
+        }
+    }
+
+    // ─── World Events ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tightening assertion: every world-event's referenced npcId must resolve
+    /// against the authoritative npcs.json. Guards against events drifting out
+    /// of sync with the NPC catalog after rename/retire.
+    /// </summary>
+    [Fact]
+    public void Every_world_event_npcId_is_present_in_npcs_json()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+        var authoredNpcIds = provider.AllNpcs().Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var evt in provider.AllEvents())
+        {
+            foreach (var effect in evt.Effects.Concat(evt.OnExpire))
+            {
+                if (!string.IsNullOrWhiteSpace(effect.NpcId))
+                {
+                    authoredNpcIds.Should().Contain(effect.NpcId,
+                        $"event '{evt.Id}' effect type '{effect.Type}' references npcId '{effect.NpcId}' which must be authored in npcs.json");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Happy path: the shipped world-events.json loads, 12 events are seeded
+    /// from world-events.md, and lookup by id works.
+    /// </summary>
+    [Fact]
+    public void Real_world_events_file_loads_all_authored_events()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var events = provider.AllEvents();
+        events.Should().HaveCount(12);
+        events.Select(e => e.Id).Should().OnlyHaveUniqueItems();
+
+        var redMarket = provider.GetEvent("red-market");
+        redMarket.Should().NotBeNull();
+        redMarket!.Family.Should().Be("economic");
+        redMarket.Trigger.Kind.Should().Be("complex");
+        redMarket.Duration.Days.Should().Be(6);
+        redMarket.Effects.Should().NotBeEmpty();
+
+        provider.GetEvent("ashen-silence-breaks")!.OneTime.Should().BeTrue();
+        provider.GetEvent("ashen-silence-breaks")!.Duration.Permanent.Should().BeTrue();
+
+        provider.GetEvent("no-such-event").Should().BeNull();
+        provider.GetEvent("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Unknown_zone_ref_in_event_effect_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-zone-evt",
+              "displayName": "Bad",
+              "family": "economic",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "zoneAmbient", "zoneId": "no-such-zone", "text": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*unknown zoneId 'no-such-zone'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_faction_tag_in_event_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-faction-evt",
+              "displayName": "Bad",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ],
+              "factionTags": ["NotAFaction"]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*factionTag 'NotAFaction'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_npc_ref_in_event_throws_on_load()
+    {
+        // After the NPC catalog merged into content/npcs.json, world-events
+        // validation now cross-checks npcId against the authored catalog so
+        // typos and rename-drift fail loudly.
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "permissive-npc",
+              "displayName": "x",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "npcDialogueLine", "npcId": "not-in-any-registry", "text": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*unknown npcId 'not-in-any-registry'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Unknown_quest_ref_in_event_trigger_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-quest-evt",
+              "displayName": "Bad",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "questCompleted", "questId": "NO_SUCH_QUEST" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*NO_SUCH_QUEST*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Duplicate_event_id_throws_on_load()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "dupe",
+              "displayName": "A",
+              "family": "economic",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            },
+            {
+              "id": "dupe",
+              "displayName": "B",
+              "family": "economic",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*duplicate event id 'dupe'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Missing_onExpire_for_transient_event_emits_warning()
+    {
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "missing-cleanup",
+              "displayName": "Missing Cleanup",
+              "family": "economic",
+              "priority": 1,
+              "description": "transient price shift with no restore",
+              "trigger": { "kind": "unconditional" },
+              "duration": { "days": 3 },
+              "effects": [ { "type": "shopPriceShift", "zoneId": "aeldran-7-starting-road", "item": "grain", "multiplier": 1.5 } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var logger = new CapturingLogger<ContentProvider>();
+            var provider = new ContentProvider(dir.FullName, logger);
+            provider.GetEvent("missing-cleanup").Should().NotBeNull();
+            logger.Warnings.Should().Contain(m => m.Contains("missing-cleanup") && m.Contains("onExpire"));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Invalid_trigger_shape_throws_on_load()
+    {
+        // repThreshold requires factionId + (minTier OR min); here we provide
+        // a bogus factionId.
+        var dir = MakeContentDirWithEvents("""
+        {
+          "events": [
+            {
+              "id": "bad-trigger",
+              "displayName": "Bad Trigger",
+              "family": "political",
+              "priority": 1,
+              "description": "x",
+              "trigger": { "kind": "repThreshold", "factionId": "NotAFaction", "min": 0 },
+              "duration": { "days": 1 },
+              "effects": [ { "type": "setFlag", "flag": "x" } ]
+            }
+          ]
+        }
+        """);
+        try
+        {
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*repThreshold*NotAFaction*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    private static DirectoryInfo MakeContentDirWithEvents(string eventsJson)
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-evt-test-");
+        WriteAllPrerequisitesExcept(dir.FullName);
+        File.WriteAllText(Path.Combine(dir.FullName, "world-events.json"), eventsJson);
+        return dir;
+    }
+
+    /// <summary>Records LogWarning calls in memory for assertion.</summary>
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Warnings { get; } = new();
+        IDisposable ILogger.BeginScope<TState>(TState state) => NullScope.Instance;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+                Warnings.Add(formatter(state, exception));
+        }
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+            public void Dispose() { }
+        }
+    }
+
+    // ─── Combat Curves ────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_combat_curves_file_loads_with_expected_coefficients()
+    {
+        // content/combat-curves.json pins the current scaling values.
+        // Live game's MonsterFactory + encounter-sim must agree on these.
+        // Pass #7 (2026-04-13, creative pass playbook sweep) re-tuned from
+        // the initial TPK-fix (hp 0.2 / power 0.15 / party 0.12) which
+        // over-corrected once gear/imbue proxies were stacked in playbook
+        // cells. hp/power restored partway, party-scaling cut hard. See
+        // docs/design/sim-reports/playbook-pass-1.md.
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var ms = provider.CombatCurves.MonsterScaling;
+        ms.HpPerDanger.Should().Be(0.40);
+        ms.PowerPerDanger.Should().Be(0.28);
+        ms.SpeedPerDanger.Should().Be(0.7);
+        ms.BossHpMultiplier.Should().Be(1.6);
+        ms.BossSpeedBonus.Should().Be(4);
+
+        var ps = provider.CombatCurves.PartyScaling;
+        ps.ScalingPerTier.Should().Be(0.03);
+    }
+
+    [Fact]
+    public void Out_of_range_combat_curve_coefficient_is_rejected()
+    {
+        // Author error guard: hpPerDanger of 99 would 100x monster HP at
+        // danger 1 — that's almost certainly a typo, not intent.
+        var realRoot = ContentRootResolver.Resolve();
+        var dir = Directory.CreateTempSubdirectory("fm-content-curves-test-");
+        try
+        {
+            // Mirror every required content file from the real root, then
+            // overwrite combat-curves.json with the bogus payload.
+            foreach (var file in Directory.EnumerateFiles(realRoot, "*.json"))
+                File.Copy(file, Path.Combine(dir.FullName, Path.GetFileName(file)));
+
+            File.WriteAllText(Path.Combine(dir.FullName, "combat-curves.json"), """
+            {
+              "monsterScaling": {
+                "hpPerDanger": 99,
+                "powerPerDanger": 0.3,
+                "speedPerDanger": 1.0,
+                "bossHpMultiplier": 2.0,
+                "bossSpeedBonus": 5
+              }
+            }
+            """);
+
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*hpPerDanger*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    // ─── NPCs ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Real_npcs_file_loads_and_round_trips_canonical_entries()
+    {
+        var provider = new ContentProvider(ContentRootResolver.Resolve());
+
+        var all = provider.AllNpcs();
+        all.Should().NotBeEmpty();
+        all.Select(n => n.Id).Should().OnlyHaveUniqueItems();
+
+        var maerwyn = provider.GetNpc("auld-maerwyn");
+        maerwyn.Should().NotBeNull();
+        maerwyn!.DisplayName.Should().Be("Auld Maerwyn");
+        maerwyn.FactionId.Should().Be(FirstMud.Domain.Enums.FactionId.ThornwoodCovens);
+        maerwyn.HomeZoneId.Should().Be("aeldran-2-thornwood");
+        maerwyn.Role.Should().Be(NpcRole.Questgiver);
+        maerwyn.VoiceTells.Should().HaveCountGreaterOrEqualTo(3);
+        maerwyn.VoiceTells.Should().HaveCountLessOrEqualTo(5);
+
+        // Unaffiliated NPCs retain a null factionId.
+        var senna = provider.GetNpc("senna-orrick");
+        senna.Should().NotBeNull();
+        senna!.FactionId.Should().BeNull();
+
+        provider.GetNpc("no-such-npc").Should().BeNull();
+        provider.GetNpc("").Should().BeNull();
+    }
+
+    [Fact]
+    public void Npc_missing_id_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "", "displayName": "Nameless", "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*npc missing id*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_unknown_factionId_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "ghost", "displayName": "Ghost", "factionId": "NotAFaction",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*invalid factionId 'NotAFaction'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_unknown_homeZoneId_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "ghost", "displayName": "Ghost",
+                  "homeZoneId": "no-such-zone",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*homeZoneId 'no-such-zone' is not a known zoneId*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_unknown_role_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "ghost", "displayName": "Ghost",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "wizard", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*invalid role 'wizard'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_duplicate_id_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "twin", "displayName": "Twin A",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["a","b","c"] },
+                { "id": "twin", "displayName": "Twin B",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "y",
+                  "voiceTells": ["d","e","f"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*duplicate npc id 'twin'*");
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Npc_too_few_voiceTells_throws_on_load()
+    {
+        var dir = Directory.CreateTempSubdirectory("fm-content-test-");
+        try
+        {
+            WriteAllPrerequisitesExcept(dir.FullName, "npcs");
+            File.WriteAllText(Path.Combine(dir.FullName, "npcs.json"), """
+            {
+              "npcs": [
+                { "id": "thin", "displayName": "Thin",
+                  "homeZoneId": "aeldran-1-caervorn-highlands",
+                  "role": "civilian", "shortDescription": "x",
+                  "voiceTells": ["only-one"] }
+              ]
+            }
+            """);
+            var act = () => new ContentProvider(dir.FullName);
+            act.Should().Throw<InvalidDataException>()
+               .WithMessage("*between 3 and 5 voiceTells*");
         }
         finally
         {

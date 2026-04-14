@@ -43,6 +43,49 @@ public class EncounterSimTests
     }
 
     [Fact]
+    public void Scaling_at_danger_zero_is_bit_identical_noop()
+    {
+        // Regression fence: encounter-sim with --danger-level 0 (omitted) MUST
+        // hand CombatSimulationService bit-identical templates so existing
+        // sim-log baselines remain reproducible.
+        var template = TemplateFor("timber-wolf");
+        var curve = MonsterScaling.DefaultCurve;
+
+        var scaled = MonsterScaling.Apply(template, dangerLevel: 0, curve, isBoss: false);
+
+        Assert.Same(template, scaled);
+        Assert.Equal(template.Hp,    scaled.Hp);
+        Assert.Equal(template.Speed, scaled.Speed);
+        Assert.Equal(template.Level, scaled.Level);
+        Assert.Equal(template.Abilities.Count, scaled.Abilities.Count);
+        for (int i = 0; i < template.Abilities.Count; i++)
+            Assert.Equal(template.Abilities[i].BasePower, scaled.Abilities[i].BasePower);
+    }
+
+    [Fact]
+    public void Scaled_run_at_danger_5_strictly_lowers_win_rate_vs_unscaled()
+    {
+        // Same seed/monster/party — only the danger-level scaling differs.
+        // At danger 5 HP becomes 3x and ability power 2.5x, so a fight that
+        // sits in a contested win-rate band unscaled MUST shed measurable
+        // win rate when scaled. We pick a t3 monster vs a low-level solo
+        // player so neither end pegs at 100%/0% (which would mask the delta).
+        var baseTemplate = TemplateFor("frost-giant");
+        var curve = MonsterScaling.DefaultCurve;
+        var scaledTemplate = MonsterScaling.Apply(baseTemplate, dangerLevel: 5, curve, isBoss: false);
+
+        var party = Array.Empty<CombatSimulationService.PartyMember>();
+
+        var unscaled = RunBatch(seed: 99, rolls: 400, playerLevel: 6, MagicElement.Fire, party,
+            new[] { baseTemplate });
+        var scaled   = RunBatch(seed: 99, rolls: 400, playerLevel: 6, MagicElement.Fire, party,
+            new[] { scaledTemplate });
+
+        Assert.True(scaled.WinRate < unscaled.WinRate,
+            $"Expected danger-5 scaling to strictly lower win rate. Unscaled={unscaled.WinRate:P1} Scaled={scaled.WinRate:P1}.");
+    }
+
+    [Fact]
     public void Same_seed_produces_identical_outcome_distribution()
     {
         var monsters = new[] { TemplateFor("timber-wolf"), TemplateFor("wild-boar") };
@@ -120,5 +163,82 @@ public class EncounterSimTests
         Assert.Equal("balanced",  MakeSummary(0.70).Difficulty);
         Assert.Equal("hard",      MakeSummary(0.45).Difficulty);
         Assert.Equal("punishing", MakeSummary(0.10).Difficulty);
+    }
+
+    // ─── TPK-fix sanity pin ─────────────────────────────────────────────────
+    //
+    // 2026-04-13: user TPK'd three times in a row at danger 5/6/7. Root cause
+    // was asymmetric scaling — monsters got +40% HP & +30% power per danger
+    // with no matching party buff. The fix (combat-curves.json halving + a
+    // new PartyScaling curve + pack-size cap softening in MonsterFactory)
+    // must keep the intended minimum: a typical level-5 party with 3 layer-2
+    // companions clears danger-5 zone content at ≥60% sim win-rate, and a
+    // typical level-8 party clears danger-7. If this test fails, someone
+    // either reverted the curves or changed combat math without re-tuning.
+
+    [Fact]
+    public void Sanity_level5_party_clears_danger5_at_60pct_or_better()
+    {
+        var partyCurve = Content().CombatCurves.PartyScaling;
+        var party = new List<CombatSimulationService.PartyMember>
+        {
+            new(CompanionType.Wildfolk, MagicElement.Fire,  2, 4),
+            new(CompanionType.Wildfolk, MagicElement.Earth, 2, 4),
+            new(CompanionType.Wildfolk, MagicElement.Air,   2, 4),
+        };
+
+        var scaled = new List<MonsterTemplate>
+        {
+            MonsterScaling.Apply(TemplateFor("stone-troll"), 5, Content().CombatCurves.MonsterScaling, isBoss: false),
+            MonsterScaling.Apply(TemplateFor("stone-troll"), 5, Content().CombatCurves.MonsterScaling, isBoss: false),
+            MonsterScaling.Apply(TemplateFor("stone-troll"), 5, Content().CombatCurves.MonsterScaling, isBoss: false),
+        };
+
+        int rolls = 300;
+        int wins = 0;
+        for (int i = 0; i < rolls; i++)
+        {
+            var rng = new Random(unchecked(17 * 1_000_003 + i));
+            var svc = new CombatSimulationService(rng, partyCurve);
+            var enc = svc.BuildEncounter(MagicElement.Aether, 5, party, scaled);
+            var res = svc.Run(enc, dangerLevel: 5);
+            if (res.Outcome == CombatSimulationService.Outcome.Victory) wins++;
+        }
+        double winRate = (double)wins / rolls;
+        Assert.True(winRate >= 0.60,
+            $"TPK regression pin: L5 + 3×layer-2 vs D5 3-pack must win ≥60%, got {winRate:P1}.");
+    }
+
+    [Fact]
+    public void Sanity_level8_party_clears_danger7_at_60pct_or_better()
+    {
+        var partyCurve = Content().CombatCurves.PartyScaling;
+        var party = new List<CombatSimulationService.PartyMember>
+        {
+            new(CompanionType.Wildfolk, MagicElement.Fire,  3, 6),
+            new(CompanionType.Wildfolk, MagicElement.Earth, 3, 6),
+            new(CompanionType.Wildfolk, MagicElement.Air,   3, 6),
+        };
+
+        var scaled = new List<MonsterTemplate>
+        {
+            MonsterScaling.Apply(TemplateFor("rogue-knight"),   7, Content().CombatCurves.MonsterScaling, isBoss: false),
+            MonsterScaling.Apply(TemplateFor("highway-bandit"), 7, Content().CombatCurves.MonsterScaling, isBoss: false),
+            MonsterScaling.Apply(TemplateFor("wild-horse"),     7, Content().CombatCurves.MonsterScaling, isBoss: false),
+        };
+
+        int rolls = 300;
+        int wins = 0;
+        for (int i = 0; i < rolls; i++)
+        {
+            var rng = new Random(unchecked(23 * 1_000_003 + i));
+            var svc = new CombatSimulationService(rng, partyCurve);
+            var enc = svc.BuildEncounter(MagicElement.Aether, 8, party, scaled);
+            var res = svc.Run(enc, dangerLevel: 7);
+            if (res.Outcome == CombatSimulationService.Outcome.Victory) wins++;
+        }
+        double winRate = (double)wins / rolls;
+        Assert.True(winRate >= 0.60,
+            $"TPK regression pin: L8 + 3×layer-3 vs D7 boss-pack must win ≥60%, got {winRate:P1}.");
     }
 }

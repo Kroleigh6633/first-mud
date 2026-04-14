@@ -127,6 +127,63 @@ public interface IContentProvider
     /// <summary>Lookup a faction by its enum id. Returns null if no definition exists.</summary>
     FactionDefinition? GetFaction(FactionId id);
 
+    // ─── Quests ──────────────────────────────────────────────────────────────
+
+    /// <summary>All quest definitions authored in content/quests.json,
+    /// in file order.</summary>
+    IReadOnlyList<QuestDefinition> AllQuests();
+
+    /// <summary>
+    /// Returns the quest definition with the given <c>questId</c>, or null
+    /// if no such quest is authored.
+    /// </summary>
+    QuestDefinition? GetQuest(string id);
+
+    /// <summary>All cross-quest edges (unlocks + requires) authored in
+    /// content/quests.json.</summary>
+    IReadOnlyList<QuestEdgeDefinition> AllQuestEdges();
+
+    // ─── World Events ────────────────────────────────────────────────────────
+
+    /// <summary>All world-event definitions authored in
+    /// content/world-events.json, in file order.</summary>
+    IReadOnlyList<WorldEventDefinition> AllEvents();
+
+    /// <summary>Lookup an event by its stable id. Returns null if unknown.</summary>
+    WorldEventDefinition? GetEvent(string id);
+
+    // ─── Combat Curves ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tunable combat scaling coefficients (monster danger-level multipliers,
+    /// boss bonuses). Loaded from <c>content/combat-curves.json</c>. Consumed
+    /// by both the live game's <c>MonsterFactory</c> and the design-time
+    /// <c>encounter-sim</c> tool — one source of truth.
+    /// </summary>
+    CombatCurvesDefinition CombatCurves { get; }
+
+    // ─── Progression Curves ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tunable progression scaling coefficients (workmanship skill divisor,
+    /// per-companion-type layer thresholds). Loaded from
+    /// <c>content/progression-curves.json</c>. The file is OPTIONAL — if it
+    /// is not present, the historical hardcoded constants are returned. When
+    /// loaded, the values are also published to
+    /// <c>FirstMud.Domain.Configuration.ProgressionCurvesAccessor</c> so
+    /// Domain types (<c>Companion</c>, <c>Workmanship</c>) can read them
+    /// without an upward project reference.
+    /// </summary>
+    ProgressionCurvesDefinition ProgressionCurves { get; }
+
+    // ─── NPCs ────────────────────────────────────────────────────────────────
+
+    /// <summary>All NPC definitions, in file order.</summary>
+    IReadOnlyList<NpcDefinition> AllNpcs();
+
+    /// <summary>Lookup an NPC by its stable id. Returns null if unknown.</summary>
+    NpcDefinition? GetNpc(string id);
+
     // ─── Maintenance ─────────────────────────────────────────────────────────
 
     /// <summary>Force a reload from disk — supports hot-reload in dev.</summary>

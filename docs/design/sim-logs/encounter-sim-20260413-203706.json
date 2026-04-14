@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "sea-serpent"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 5,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 343,
+    "Losses": 157,
+    "Timeouts": 0,
+    "WinRate": 0.686,
+    "LossRate": 0.314,
+    "AvgRounds": 4.732,
+    "AvgPlayerHpPct": 0.3780027101383815,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 0,
+    "DmgP25": 78,
+    "DmgMedian": 112,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "balanced"
+  }
+}

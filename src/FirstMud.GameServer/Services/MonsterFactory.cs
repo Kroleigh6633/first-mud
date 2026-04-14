@@ -37,12 +37,16 @@ public sealed class MonsterFactory
             _    => 3,
         };
 
-        // Pack size scales with party size + danger:
-        // danger 1-2:  party + 0  (fair fight)
-        // danger 3-5:  party + 1  (slightly outnumbered)
-        // danger 6-8:  party + 2  (outnumbered)
-        // danger 9-10: party + 3  (heavily outnumbered)
-        int maxEnemies = partySize + (dangerLevel / 3);
+        // Pack size = MIN of two caps (merged from a9c4d378 + a6d6f55c):
+        //   (1) softened general formula: partySize + dangerLevel/4       (from a6d6f55c — Fix C)
+        //   (2) small-party TPK cap:      partySize + 1 when partySize≤4  (from a9c4d378 — danger-6 TPK fix)
+        // The small-party cap dominates for party ≤ 4 up to roughly danger 12; the general
+        // formula dominates for larger parties. Taking the min gives us the stricter bound
+        // in every regime, which is what we want to avoid alpha-strike TPKs against mass-
+        // focused underleveled companions.
+        int softCap       = partySize + (dangerLevel / 4);
+        int smallPartyCap = partySize + 1;
+        int maxEnemies    = partySize <= 4 ? Math.Min(softCap, smallPartyCap) : softCap;
 
         int packSize = dangerLevel switch
         {
@@ -83,7 +87,7 @@ public sealed class MonsterFactory
     private static MonsterTemplate ToTemplate(MonsterDefinition def) =>
         new(def.Name, def.Hp, def.Speed, def.Level, def.Element, def.Abilities);
 
-    private static MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel, bool isBoss = false)
+    private MonsterTemplate ScaleMonster(MonsterTemplate template, int dangerLevel, int playerLevel, bool isBoss = false)
     {
         var variance = Random.Shared.Next(-1, 2); // -1, 0, or 1
         var monsterLevel = Math.Max(1, dangerLevel + variance);
@@ -91,32 +95,11 @@ public sealed class MonsterFactory
         if (playerLevel > dangerLevel * 2)
             monsterLevel = Math.Max(monsterLevel, playerLevel - 2);
 
-        // HP scales aggressively with danger: danger 10 = 5x base HP
-        double hpMultiplier = 1.0 + dangerLevel * 0.4;
-        int scaledHp = (int)(template.Hp * hpMultiplier);
+        // Curve-based HP / power / speed / boss scaling lives in the shared
+        // MonsterScaling helper so the design-tool encounter-sim runs use
+        // identical math (one source of truth via content/combat-curves.json).
+        var scaled = MonsterScaling.Apply(template, dangerLevel, _content.CombatCurves.MonsterScaling, isBoss);
 
-        // Speed scales with danger so high-danger monsters act first more often
-        int scaledSpeed = template.Speed + dangerLevel;
-
-        // Ability damage scales with danger: danger 10 = 4x base power
-        double powerMultiplier = 1.0 + dangerLevel * 0.3;
-        var scaledAbilities = template.Abilities
-            .Select(a => a with { BasePower = (int)(a.BasePower * powerMultiplier) })
-            .ToArray();
-
-        // Boss at danger 10: double HP and +5 speed on top of normal scaling
-        if (isBoss)
-        {
-            scaledHp   *= 2;
-            scaledSpeed += 5;
-        }
-
-        return template with
-        {
-            Level     = monsterLevel,
-            Hp        = scaledHp,
-            Speed     = scaledSpeed,
-            Abilities = scaledAbilities,
-        };
+        return scaled with { Level = monsterLevel };
     }
 }

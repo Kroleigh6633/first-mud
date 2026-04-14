@@ -30,9 +30,16 @@ public static class EncounterSimCommand
         var playerLvl  = Args.IntValue(args, "--player-level") ?? 5;
         var playerElem = ParseElement(Args.Value(args, "--player-element") ?? "Aether");
         int? seed      = Args.IntValue(args, "--seed");
+        var dangerLvl  = Args.IntValue(args, "--danger-level") ?? 0;
+
+        if (dangerLvl < 0 || dangerLvl > 10)
+        {
+            ConsolePretty.Error($"--danger-level must be in [0, 10] (got {dangerLvl}).");
+            return 1;
+        }
 
         ConsolePretty.Header(
-            $"encounter-sim: monsters=[{string.Join(", ", monsterIds)}] party=[{partyCsv}] rolls={rolls} pl={playerLvl}");
+            $"encounter-sim: monsters=[{string.Join(", ", monsterIds)}] party=[{partyCsv}] rolls={rolls} pl={playerLvl} danger={dangerLvl}");
 
         if (monsterIds.Count == 0)
         {
@@ -60,7 +67,21 @@ public static class EncounterSimCommand
                 ConsolePretty.Error($"Unknown monster id '{id}'.");
                 return 3;
             }
-            monsters.Add(new MonsterTemplate(def.Name, def.Hp, def.Speed, def.Level, def.Element, def.Abilities));
+            var template = new MonsterTemplate(def.Name, def.Hp, def.Speed, def.Level, def.Element, def.Abilities);
+            // Apply the same scaling MonsterFactory uses at runtime so sim
+            // results match what the live game spawns at this danger level.
+            // dangerLevel 0 is a no-op (Apply early-returns the input).
+            var scaled = MonsterScaling.Apply(template, dangerLvl, content.CombatCurves.MonsterScaling, isBoss: false);
+            monsters.Add(scaled);
+        }
+
+        if (dangerLvl == 0)
+        {
+            // Surface the warning the way the user asked: stderr, not the JSON
+            // log, so it's loud in the terminal but doesn't pollute artifacts.
+            Console.Error.WriteLine(
+                "Warning: running unscaled monster stats. Live game scales HP+power by zone danger. " +
+                "Use --danger-level N to match live.");
         }
 
         var party = ParseParty(partyCsv);
@@ -68,12 +89,13 @@ public static class EncounterSimCommand
         var masterSeed = seed ?? Random.Shared.Next();
         var results = new List<CombatSimulationService.SimulationResult>(rolls);
 
+        var partyCurve = content.CombatCurves.PartyScaling;
         for (int i = 0; i < rolls; i++)
         {
             var rng = new Random(unchecked(masterSeed * 1_000_003 + i));
-            var service = new CombatSimulationService(rng);
+            var service = new CombatSimulationService(rng, partyCurve);
             var encounter = service.BuildEncounter(playerElem, playerLvl, party, monsters);
-            results.Add(service.Run(encounter));
+            results.Add(service.Run(encounter, dangerLevel: dangerLvl));
         }
 
         var summary = Summarize(results);
@@ -81,6 +103,7 @@ public static class EncounterSimCommand
         ConsolePretty.Info("");
         ConsolePretty.Info($"Rolls           : {rolls}");
         ConsolePretty.Info($"Master seed     : {masterSeed}" + (seed is null ? " (derived)" : " (fixed)"));
+        ConsolePretty.Info($"Danger level    : {dangerLvl}" + (dangerLvl == 0 ? " (UNSCALED — see warning above)" : " (scaled)"));
         ConsolePretty.Good($"Wins            : {summary.Wins} ({summary.WinRate:P1})");
         ConsolePretty.Warn($"Losses          : {summary.Losses} ({summary.LossRate:P1})");
         ConsolePretty.Warn($"Timeouts        : {summary.Timeouts}");
@@ -101,10 +124,13 @@ public static class EncounterSimCommand
             playerElement = playerElem.ToString(),
             seed = masterSeed,
             seedFixed = seed.HasValue,
+            dangerLevel = dangerLvl,
+            scaled = dangerLvl > 0,
             summary
         });
         var mdBody = $"Monsters: `{string.Join(", ", monsterIds)}`. Party `{partyCsv}`. " +
-                     $"Rolls={rolls}, pl={playerLvl}, seed={masterSeed}{(seed is null ? "" : " (fixed)")}.\n\n" +
+                     $"Rolls={rolls}, pl={playerLvl}, danger={dangerLvl}{(dangerLvl == 0 ? " (UNSCALED)" : " (scaled)")}, " +
+                     $"seed={masterSeed}{(seed is null ? "" : " (fixed)")}.\n\n" +
                      $"- Win rate: **{summary.WinRate:P1}** → **{summary.Difficulty}**\n" +
                      $"- Avg rounds: {summary.AvgRounds:F1}\n" +
                      $"- Damage taken p25/med/p75: {summary.DmgP25}/{summary.DmgMedian}/{summary.DmgP75}\n" +

@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Npcs",
+  "description": "Authoring surface for named NPCs. Sourced from docs/design/npc-voices.md and npc-voices-batch2.md.",
+  "type": "object",
+  "required": ["npcs"],
+  "properties": {
+    "npcs": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/npc" },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "npc": {
+      "type": "object",
+      "required": ["id", "displayName", "homeZoneId", "role", "shortDescription", "voiceTells"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable kebab-case identifier; must be unique."
+        },
+        "displayName": { "type": "string", "minLength": 1 },
+        "factionId": {
+          "type": "string",
+          "description": "FactionId enum name (cross-ref to factions.json). Omit for unaffiliated NPCs.",
+          "enum": [
+            "HouseCaervorn",
+            "ThornwoodCovens",
+            "EmeraldCompact",
+            "Gravenguard",
+            "Fairgean",
+            "Golvari",
+            "AshenCourt"
+          ]
+        },
+        "homeZoneId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Cross-ref to zones.json zoneId — the NPC's primary location."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["questgiver", "shopkeeper", "civilian", "patrol", "landmark"]
+        },
+        "shortDescription": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Tooltip-length flavor (1-2 sentences)."
+        },
+        "voiceTells": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 3,
+          "maxItems": 5,
+          "description": "Distinctive behavioral tells, drawn verbatim from the npc-voices design docs."
+        },
+        "dialogueRootId": {
+          "type": "string",
+          "description": "Optional id of the root dialogue node (future dialogue-tree integration). At most one per NPC."
+        },
+        "startingReputation": {
+          "type": "integer",
+          "description": "Optional reputation offset applied when the player first contacts this NPC's faction."
+        }
+      }
+    }
+  }
+}

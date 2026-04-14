@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "cave-rat"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 1,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 1.14,
+    "AvgPlayerHpPct": 0.9951549295774651,
+    "MinPlayerHpPct": 0.8309859154929577,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 0,
+    "DmgP75": 0,
+    "DmgMax": 24,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

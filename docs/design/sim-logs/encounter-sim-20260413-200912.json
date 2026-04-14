@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "frost-giant"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 6,
+  "playerElement": "Fire",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 0,
+  "scaled": false,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 499,
+    "Losses": 1,
+    "Timeouts": 0,
+    "WinRate": 0.998,
+    "LossRate": 0.002,
+    "AvgRounds": 4.244,
+    "AvgPlayerHpPct": 0.6405559657326341,
+    "MinPlayerHpPct": 0.10526315789473684,
+    "DmgMin": 0,
+    "DmgP25": 34,
+    "DmgMedian": 65,
+    "DmgP75": 79,
+    "DmgMax": 171,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

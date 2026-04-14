@@ -360,7 +360,7 @@ public class CraftingService
             _ => 0
         };
 
-        var skillBonus = craftingSkill / 20;
+        var skillBonus = craftingSkill / FirstMud.Domain.Configuration.ProgressionCurvesAccessor.SkillDivisor;
         var raw = Math.Clamp(avgComponentWorkmanship + skillBonus + taperBonus, 1, 10);
         return Workmanship.Of(raw);
     }

@@ -1,3 +1,4 @@
+using FirstMud.Domain.Configuration;
 using FirstMud.Domain.Entities;
 using FirstMud.Domain.Enums;
 using FirstMud.Domain.Events;
@@ -7,6 +8,25 @@ namespace FirstMud.Tests.Domain;
 
 public class CompanionTests
 {
+    // The thresholds these tests assert against are the
+    // content/progression-curves.json values. ContentProvider publishes
+    // them at startup in the live game, but these unit tests don't spin
+    // ContentProvider up — so we publish the tuned values directly here.
+    static CompanionTests()
+    {
+        ProgressionCurvesAccessor.Publish(
+            skillDivisor: null,
+            companionLayerThresholds: new Dictionary<CompanionType, IReadOnlyList<int>>
+            {
+                [CompanionType.Wildfolk]         = new[] { 0, 100, 300, 700, 1400, 2800 },
+                [CompanionType.HiredHero]        = new[] { 0, 100, 350, 850, 1750, 3500 },
+                [CompanionType.CapturedMonster]  = new[] { 0,  75, 225, 600, 1250, 2500 },
+                [CompanionType.BoundShade]       = new[] { 0, 150, 450, 1050, 2100, 4200 },
+                [CompanionType.ArdweldConstruct] = new[] { 0, 250, 900, 2100, 4200, 8400 },
+            });
+    }
+
+
     private static Companion CreateWildfolk() =>
         Companion.Create(Guid.NewGuid(), "TestCompanion", CompanionType.Wildfolk, MagicElement.Fire);
 
@@ -61,11 +81,11 @@ public class CompanionTests
     [Fact]
     public void RecordUsage_AdvancesLayerWhenThresholdCrossed()
     {
-        // Wildfolk layer thresholds: [0, 200, 500, 1000, 2000, 4000]
-        // At layer 1, next threshold is index[1] = 200
+        // Wildfolk layer thresholds (post-tune): [0, 100, 300, 700, 1400, 2800]
+        // At layer 1, next threshold is index[1] = 100
         var companion = CreateWildfolk();
 
-        companion.RecordUsage(200);
+        companion.RecordUsage(100);
 
         companion.CurrentLayer.Should().Be(2);
     }
@@ -75,7 +95,7 @@ public class CompanionTests
     {
         var companion = CreateWildfolk();
 
-        companion.RecordUsage(200);
+        companion.RecordUsage(100);
 
         companion.DomainEvents.Should().ContainSingle(e => e is CompanionLayerUnlockedEvent);
         var evt = (CompanionLayerUnlockedEvent)companion.DomainEvents.First(e => e is CompanionLayerUnlockedEvent);
@@ -85,16 +105,16 @@ public class CompanionTests
     [Fact]
     public void RecordUsage_LayerDoesNotAdvancePast6()
     {
-        // CapturedMonster thresholds: [0, 150, 400, 900, 1800, 3600]
+        // CapturedMonster thresholds (post-tune): [0, 75, 225, 600, 1250, 2500]
         // TryAdvanceLayer only advances 1 layer per call, so we must call RecordUsage
-        // incrementally to advance through all thresholds: 150, 400, 900, 1800, 3600
+        // incrementally to advance through all thresholds: 75, 225, 600, 1250, 2500
         var companion = CreateCapturedMonster();
 
-        companion.RecordUsage(150);  // layer 1 -> 2
-        companion.RecordUsage(250);  // total 400, layer 2 -> 3
-        companion.RecordUsage(500);  // total 900, layer 3 -> 4
-        companion.RecordUsage(900);  // total 1800, layer 4 -> 5
-        companion.RecordUsage(1800); // total 3600, layer 5 -> 6
+        companion.RecordUsage(75);   // layer 1 -> 2  (total 75)
+        companion.RecordUsage(150);  // layer 2 -> 3  (total 225)
+        companion.RecordUsage(375);  // layer 3 -> 4  (total 600)
+        companion.RecordUsage(650);  // layer 4 -> 5  (total 1250)
+        companion.RecordUsage(1250); // layer 5 -> 6  (total 2500)
 
         companion.CurrentLayer.Should().Be(6);
 
@@ -143,7 +163,7 @@ public class CompanionTests
     {
         // Start at layer 2 by giving usage first
         var companion = CreateWildfolk();
-        companion.RecordUsage(200); // advance to layer 2
+        companion.RecordUsage(100); // advance to layer 2 (Wildfolk threshold[1] = 100)
         companion.ClearDomainEvents();
 
         // Now drift it down: 100 hours inactive * 0.5 = 50 drift
@@ -156,7 +176,7 @@ public class CompanionTests
     public void AccumulateDrift_RaisesCompanionLayerDriftedEvent_WhenLayerDrops()
     {
         var companion = CreateWildfolk();
-        companion.RecordUsage(200); // advance to layer 2
+        companion.RecordUsage(100); // advance to layer 2 (Wildfolk threshold[1] = 100)
         companion.ClearDomainEvents();
 
         companion.AccumulateDrift(100); // drift 50 points

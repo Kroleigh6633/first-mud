@@ -1,0 +1,9 @@
+{
+  "NpcId": "harken-vos",
+  "NodeCount": 17,
+  "ReachableCount": 17,
+  "Errors": [],
+  "Warnings": [
+    "Node \u0027greet\u0027 option \u0027You\u0027ve seen a lot of claims, clerk. Anything strange lately?\u0027 gated by gravenguard\u003E=1000 but best reachable rep here is 0. Ensure an off-tree path grants this reputation."
+  ]
+}

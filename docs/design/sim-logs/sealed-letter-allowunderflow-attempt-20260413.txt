@@ -1,0 +1,31 @@
+=== scenario-player: quest-sealed-letter.json ===
+Quest: sealed-letter — The Sealed Letter
+Kesh of Reed-End intercepts the player on the Gravenmarsh Causeway with a sealed letter for Commander Solan Drest, bypassing Lieutenant Varn. The chain ends when Brother Velm translates an Ardweld funerary glyph recovered from the Lost Expedition.
+Beats: 15, root: intro
+
+  > intro: On the Gravenmarsh Causeway, Kesh of Reed-End presses a sealed letter and a silver signet into the player's hand. 'Drest. Eyes only. Not Varn. Especially not Varn.'
+    [choice] accept: Take the letter and swear by the signet.
+    [choice] decline: Refuse. 'Find another Rider.'
+    chose -> accept
+    flag+ sealed.accepted
+    item+ sealed-letter x1
+    item+ silver-signet x1
+    rep+ gravenguard +150
+  > gate-arrival: At Gravenhold's outer gate, Lieutenant Varn intercepts. 'The Commander's schedule is tight. I'll take that.' His hand is already out.
+    [choice] hand-over: Hand the letter to Varn.
+    [choice] refuse-varn: Refuse. Push past.
+    chose -> hand-over
+    item- sealed-letter x1
+    flag+ varn.intercepted
+  > beat-2a-summons: A day later: Kesh is found face-down in the bog. 'Exposure,' the bogmen say. Drest summons the player. Calm. Asks what was in the letter the player never delivered.
+    [choice] confess: Confess. Varn took it. You didn't know.
+    [choice] lie-caught: Lie. Drest catches it (his intent-read assumed).
+    chose -> confess
+    rep+ gravenguard +100
+    flag+ varn.flagged
+  > end-confess: Drest nods once. 'You will be of use.' Varn is now a marked problem. Chain ends with Varn-treachery seed planted.
+  ok  terminal: partial-success-varn-seeded
+
+Final outcome: partial-success-varn-seeded
+json -> C:\claude\matt\personal\first-mud\first-mud\.claude\worktrees\agent-a31a7ab9\docs\design\sim-logs\scenario-player-20260413-204024.json
+md   -> C:\claude\matt\personal\first-mud\first-mud\.claude\worktrees\agent-a31a7ab9\docs\design\sim-logs\2026-04-13.md

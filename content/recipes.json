@@ -16,17 +16,17 @@
         { "category": "Component", "name": "Herbs", "baseQuantity": 3 },
         { "category": "Component", "name": "Bone Fragment", "baseQuantity": 1 }
       ] },
-    { "recipeId": "LEATHER_CAP_001", "name": "Leather Cap", "resultItemName": "Leather Cap", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+    { "recipeId": "LEATHER_CAP_001", "name": "Leather Cap", "resultItemName": "Leather Cap", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 5, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Leather", "baseQuantity": 2 },
         { "category": "Component", "name": "Sinew", "baseQuantity": 1 }
       ] },
-    { "recipeId": "LEATHER_BOOTS_001", "name": "Leather Boots", "resultItemName": "Leather Boots", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+    { "recipeId": "LEATHER_BOOTS_001", "name": "Leather Boots", "resultItemName": "Leather Boots", "resultCategory": "Armor", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 5, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Leather", "baseQuantity": 3 },
         { "category": "Component", "name": "Wood", "baseQuantity": 1 }
       ] },
-    { "recipeId": "STONE_AXE_001", "name": "Stone Axe", "resultItemName": "Stone Axe", "resultCategory": "Weapon", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+    { "recipeId": "STONE_AXE_001", "name": "Stone Axe", "resultItemName": "Stone Axe", "resultCategory": "Weapon", "requiredCraftingSkill": 1, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 5, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Stone", "baseQuantity": 3 },
         { "category": "Component", "name": "Wood", "baseQuantity": 1 }
@@ -45,12 +45,12 @@
         { "category": "Component", "name": "Iron Ore", "baseQuantity": 4 },
         { "category": "Component", "name": "Wood", "baseQuantity": 1 }
       ] },
-    { "recipeId": "LEATHER_LEGGINGS_001", "name": "Leather Leggings", "resultItemName": "Leather Leggings", "resultCategory": "Armor", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+    { "recipeId": "LEATHER_LEGGINGS_001", "name": "Leather Leggings", "resultItemName": "Leather Leggings", "resultCategory": "Armor", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 5, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Leather", "baseQuantity": 3 },
         { "category": "Component", "name": "Sinew", "baseQuantity": 1 }
       ] },
-    { "recipeId": "LEATHER_GLOVES_001", "name": "Leather Gloves", "resultItemName": "Leather Gloves", "resultCategory": "Armor", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+    { "recipeId": "LEATHER_GLOVES_001", "name": "Leather Gloves", "resultItemName": "Leather Gloves", "resultCategory": "Armor", "requiredCraftingSkill": 2, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 5, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Leather", "baseQuantity": 2 }
       ] },
@@ -68,22 +68,22 @@
         { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 },
         { "category": "Component", "name": "Leather", "baseQuantity": 1 }
       ] },
-    { "recipeId": "IRON_HELM_001", "name": "Iron Helm", "resultItemName": "Iron Helm", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+    { "recipeId": "IRON_HELM_001", "name": "Iron Helm", "resultItemName": "Iron Helm", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 8, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Iron Ore", "baseQuantity": 3 },
         { "category": "Component", "name": "Leather", "baseQuantity": 1 }
       ] },
-    { "recipeId": "IRON_GREAVES_001", "name": "Iron Greaves", "resultItemName": "Iron Greaves", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 7, "isDiscoverable": false,
+    { "recipeId": "IRON_GREAVES_001", "name": "Iron Greaves", "resultItemName": "Iron Greaves", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 8, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Iron Ore", "baseQuantity": 4 },
         { "category": "Component", "name": "Leather", "baseQuantity": 1 }
       ] },
-    { "recipeId": "IRON_VAMBRACES_001", "name": "Iron Vambraces", "resultItemName": "Iron Vambraces", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 6, "isDiscoverable": false,
+    { "recipeId": "IRON_VAMBRACES_001", "name": "Iron Vambraces", "resultItemName": "Iron Vambraces", "resultCategory": "Armor", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 4, "baseWorkmanshipMax": 8, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Iron Ore", "baseQuantity": 2 },
         { "category": "Component", "name": "Leather", "baseQuantity": 1 }
       ] },
-    { "recipeId": "BONE_RING_001", "name": "Bone Ring", "resultItemName": "Bone Ring", "resultCategory": "Accessory", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 1, "baseWorkmanshipMax": 4, "isDiscoverable": false,
+    { "recipeId": "BONE_RING_001", "name": "Bone Ring", "resultItemName": "Bone Ring", "resultCategory": "Accessory", "requiredCraftingSkill": 3, "requiredWorld": "Aeldran", "requiredTaperType": null, "baseWorkmanshipMin": 3, "baseWorkmanshipMax": 5, "isDiscoverable": false,
       "ingredients": [
         { "category": "Component", "name": "Bone Fragment", "baseQuantity": 3 }
       ] },

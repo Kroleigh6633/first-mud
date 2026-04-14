@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "kraken-spawn"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 5,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 186,
+    "Losses": 314,
+    "Timeouts": 0,
+    "WinRate": 0.372,
+    "LossRate": 0.628,
+    "AvgRounds": 4.224,
+    "AvgPlayerHpPct": 0.3456004846281993,
+    "MinPlayerHpPct": 0.007042253521126761,
+    "DmgMin": 0,
+    "DmgP25": 107,
+    "DmgMedian": 142,
+    "DmgP75": 142,
+    "DmgMax": 142,
+    "MvpName": null,
+    "Difficulty": "hard"
+  }
+}

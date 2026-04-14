@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "dire-bear"
+  ],
+  "party": "",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 0,
+  "scaled": false,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 2.03,
+    "AvgPlayerHpPct": 0.9153943661971817,
+    "MinPlayerHpPct": 0.528169014084507,
+    "DmgMin": 0,
+    "DmgP25": 0,
+    "DmgMedian": 17,
+    "DmgP75": 21,
+    "DmgMax": 67,
+    "MvpName": null,
+    "Difficulty": "trivial"
+  }
+}

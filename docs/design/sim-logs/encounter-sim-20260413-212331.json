@@ -1,0 +1,31 @@
+{
+  "monsters": [
+    "frost-giant"
+  ],
+  "party": "3:Fire,3:Water",
+  "rolls": 500,
+  "playerLevel": 5,
+  "playerElement": "Fire",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 7,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 495,
+    "Losses": 5,
+    "Timeouts": 0,
+    "WinRate": 0.99,
+    "LossRate": 0.01,
+    "AvgRounds": 3.996,
+    "AvgPlayerHpPct": 0.18969441247922258,
+    "MinPlayerHpPct": 0,
+    "DmgMin": 0,
+    "DmgP25": 91,
+    "DmgMedian": 158,
+    "DmgP75": 158,
+    "DmgMax": 158,
+    "MvpName": "Wildfolk-Water-L3",
+    "Difficulty": "trivial"
+  }
+}

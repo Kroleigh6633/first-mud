@@ -84,7 +84,7 @@
         { "itemName": "Thornwood Heartwood", "description": "Dense heartwood from a thornwood tree. Superior to common timber.",         "category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 },
         { "itemName": "Beast Leather",       "description": "Thick, supple leather stripped from a large forest creature.",              "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
         { "itemName": "Amber Resin",         "description": "Golden tree resin with mild magical adhesive properties.",                  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
-        { "itemName": "Moonbloom Petal",     "description": "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 1 },
+        { "itemName": "Moonbloom Petal",     "description": "A translucent petal from the night-blooming moonbloom flower. Potent reagent.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 3 },
         { "itemName": "Spider Silk",         "description": "Fine, strong thread spun by giant forest spiders. Used in light armor.",    "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Feather",             "description": "A large plume from a forest bird. Used in air-aligned crafting.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 }
       ]
@@ -97,7 +97,7 @@
         { "itemName": "Scorched Bone",  "description": "Bone bleached and hardened by desert heat. Still serviceable.",           "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
         { "itemName": "Cactus Fiber",   "description": "Coarse fiber stripped from desert cactus. Basic but plentiful.",          "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
         { "itemName": "Sulphur",        "description": "Yellow crystalline mineral found near volcanic vents. Used in elemental crafting.", "category": "Component", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
-        { "itemName": "Ashite Dust",    "description": "Fine grey powder imbued with residual magic from the Ardweld collapse.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 }
+        { "itemName": "Ashite Dust",    "description": "Fine grey powder imbued with residual magic from the Ardweld collapse.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 3 }
       ]
     },
     {
@@ -117,7 +117,7 @@
         { "itemName": "Bog Iron",         "description": "Iron ore smelted from swamp deposits. Crude but plentiful.",          "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 3, "weight": 1 },
         { "itemName": "Toad Venom",       "description": "A vial of milky toxin harvested from a marsh toad. Potent poison reagent.", "category": "Reagent", "minWorkmanship": 2, "maxWorkmanship": 4, "weight": 1 },
         { "itemName": "Peat Moss",        "description": "Dark, spongy peat harvested from the bog. Used as fuel and insulation.", "category": "Component", "minWorkmanship": 1, "maxWorkmanship": 2, "weight": 1 },
-        { "itemName": "Marsh Gas Crystal","description": "A fragile crystal formed around a pocket of volatile marsh gas.",       "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 1 },
+        { "itemName": "Marsh Gas Crystal","description": "A fragile crystal formed around a pocket of volatile marsh gas.",       "category": "Reagent",   "minWorkmanship": 4, "maxWorkmanship": 6, "weight": 3 },
         { "itemName": "Leech Extract",    "description": "A thick, dark fluid drained from marsh leeches. Prized by healers.",  "category": "Reagent",   "minWorkmanship": 2, "maxWorkmanship": 3, "weight": 1 }
       ]
     },
@@ -135,9 +135,9 @@
     {
       "id": "biome-wyrd",
       "entries": [
-        { "itemName": "Wyrd Shard",    "description": "A jagged shard of crystallised fate-energy. Handle with extreme care.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 8, "weight": 1 },
+        { "itemName": "Wyrd Shard",    "description": "A jagged shard of crystallised fate-energy. Handle with extreme care.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 8, "weight": 3 },
         { "itemName": "Void Essence",  "description": "A swirling mote of energy drawn from a tear in reality. Extremely rare.","category": "Reagent",   "minWorkmanship": 6, "maxWorkmanship": 9, "weight": 1 },
-        { "itemName": "Dravenite Dust","description": "Fine crystalline powder with latent magical resonance. Used in imbuing.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 1 },
+        { "itemName": "Dravenite Dust","description": "Fine crystalline powder with latent magical resonance. Used in imbuing.", "category": "Reagent", "minWorkmanship": 4, "maxWorkmanship": 7, "weight": 3 },
         { "itemName": "Tear Fragment", "description": "A sliver of broken reality. Hums faintly and distorts nearby shadows.",  "category": "Reagent",   "minWorkmanship": 5, "maxWorkmanship": 7, "weight": 1 },
         { "itemName": "Phase Thread",  "description": "A gossamer thread that phases between planes. Used to weave enchantments.","category": "Component", "minWorkmanship": 3, "maxWorkmanship": 5, "weight": 1 }
       ]
@@ -204,7 +204,7 @@
   ],
 
   "dropChance": {
-    "base": 40,
+    "base": 50,
     "perDangerLevel": 4,
     "autoFarmMultiplier": 0.60
   },

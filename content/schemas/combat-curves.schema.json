@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CombatCurves",
+  "description": "Tunable combat scaling coefficients applied at runtime by MonsterFactory and by the encounter-sim design tool. Single source of truth so design-time simulations match live-game scaling.",
+  "type": "object",
+  "required": ["monsterScaling"],
+  "properties": {
+    "partyScaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scalingPerTier"],
+      "properties": {
+        "scalingPerTier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Multiplier added to player-side HP + ability power per (playerLevel + avgCompanionLayer) tier. Final party factor = 1 + scalingPerTier * (playerLevel + avgCompanionLayer)."
+        }
+      }
+    },
+    "monsterScaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hpPerDanger",
+        "powerPerDanger",
+        "speedPerDanger",
+        "bossHpMultiplier",
+        "bossSpeedBonus"
+      ],
+      "properties": {
+        "hpPerDanger": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "HP multiplier added per danger-level point. Final HP = base * (1 + danger * hpPerDanger)."
+        },
+        "powerPerDanger": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Ability BasePower multiplier added per danger-level point. Final power = base * (1 + danger * powerPerDanger)."
+        },
+        "speedPerDanger": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Flat speed bonus added per danger-level point. Final speed = base + danger * speedPerDanger."
+        },
+        "bossHpMultiplier": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Multiplier applied to a boss-flagged monster's already-scaled HP (danger 10 primary)."
+        },
+        "bossSpeedBonus": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50,
+          "description": "Flat speed bonus added on top of normal scaling for boss-flagged monsters."
+        }
+      }
+    }
+  }
+}

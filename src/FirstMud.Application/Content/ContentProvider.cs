@@ -67,6 +67,24 @@ public sealed class ContentProvider : IContentProvider
     private Dictionary<(WorldId, int), ZoneDefinition> _zonesByWorldNumber = new();
     private IReadOnlyList<FactionDefinition> _factions = Array.Empty<FactionDefinition>();
     private Dictionary<FactionId, FactionDefinition> _factionsById = new();
+    private IReadOnlyList<QuestDefinition> _quests = Array.Empty<QuestDefinition>();
+    private Dictionary<string, QuestDefinition> _questsById = new(StringComparer.Ordinal);
+    private IReadOnlyList<QuestEdgeDefinition> _questEdges = Array.Empty<QuestEdgeDefinition>();
+    private CombatCurvesDefinition _combatCurves = DefaultCombatCurves();
+    private ProgressionCurvesDefinition _progressionCurves = DefaultProgressionCurves();
+    private IReadOnlyList<NpcDefinition> _npcs = Array.Empty<NpcDefinition>();
+    private Dictionary<string, NpcDefinition> _npcsById = new(StringComparer.Ordinal);
+    private IReadOnlyList<WorldEventDefinition> _events = Array.Empty<WorldEventDefinition>();
+    private Dictionary<string, WorldEventDefinition> _eventsById = new(StringComparer.Ordinal);
+
+    private static readonly HashSet<string> ValidReputationTierNames =
+        new(Enum.GetNames<ReputationTier>(), StringComparer.Ordinal);
+
+    private static readonly HashSet<string> ValidQuestEdgeKinds =
+        new(StringComparer.Ordinal) { "unlocks", "requires" };
+
+    private static readonly HashSet<string> ValidNpcRoleNames =
+        new(Enum.GetNames<NpcRole>(), StringComparer.OrdinalIgnoreCase);
 
     private static readonly HashSet<string> ValidBiomeNames = new(StringComparer.Ordinal)
     {
@@ -192,6 +210,28 @@ public sealed class ContentProvider : IContentProvider
     public FactionDefinition? GetFaction(FactionId id) =>
         _factionsById.TryGetValue(id, out var def) ? def : null;
 
+    public IReadOnlyList<QuestDefinition> AllQuests() => _quests;
+
+    public QuestDefinition? GetQuest(string id) =>
+        !string.IsNullOrEmpty(id) && _questsById.TryGetValue(id, out var def) ? def : null;
+
+    public IReadOnlyList<QuestEdgeDefinition> AllQuestEdges() => _questEdges;
+
+    public CombatCurvesDefinition CombatCurves => _combatCurves;
+
+    public ProgressionCurvesDefinition ProgressionCurves => _progressionCurves;
+
+    public IReadOnlyList<NpcDefinition> AllNpcs() => _npcs;
+
+    public NpcDefinition? GetNpc(string id) =>
+        string.IsNullOrEmpty(id) ? null
+        : _npcsById.TryGetValue(id, out var def) ? def : null;
+
+    public IReadOnlyList<WorldEventDefinition> AllEvents() => _events;
+
+    public WorldEventDefinition? GetEvent(string id) =>
+        !string.IsNullOrEmpty(id) && _eventsById.TryGetValue(id, out var def) ? def : null;
+
     public void Reload()
     {
         _consumables = LoadConsumables();
@@ -213,14 +253,38 @@ public sealed class ContentProvider : IContentProvider
         // waypointZoneIds) can run against the authored zones registry.
         _factions = LoadFactions();
         _factionsById = _factions.ToDictionary(f => f.Id);
+        _combatCurves = LoadCombatCurves();
+        _progressionCurves = LoadProgressionCurves();
+        FirstMud.Domain.Configuration.ProgressionCurvesAccessor.Publish(
+            _progressionCurves.Workmanship.SkillDivisor,
+            _progressionCurves.CompanionLayerThresholds);
+
+        // NPCs load AFTER zones + factions so cross-ref validation
+        // (homeZoneId / factionId) can run against the authored registries.
+        // Stack NPCs before quests/events so downstream cross-ref checks see
+        // the NPC name set.
+        _npcs = LoadNpcs();
+        _npcsById = _npcs.ToDictionary(n => n.Id, StringComparer.Ordinal);
+
+        // Quests load AFTER zones so startingZoneId cross-ref validation can
+        // run against the authored zones registry.
+        var (quests, edges) = LoadQuests();
+        _quests = quests;
+        _questsById = _quests.ToDictionary(q => q.QuestId, StringComparer.Ordinal);
+        _questEdges = edges;
+
+        // World-events load AFTER zones / factions / quests so cross-ref
+        // validation against those registries can run.
+        _events = LoadWorldEvents();
+        _eventsById = _events.ToDictionary(e => e.Id, StringComparer.Ordinal);
 
         // Publish the static accessor for the few legacy static call sites
         // (ZoneGridLayout / BiomeService) that cannot easily take DI.
         ContentAccessor.Publish(this);
 
         _logger?.LogInformation(
-            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions from {Root}",
-            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _contentRoot);
+            "ContentProvider loaded: {ConsumableCount} consumables, {BuildingCount} buildings, {RecipeCount} recipes, {MonsterCount} monsters, {PoolCount} drop pools, {MonsterDropCount} monster drops, {ZoneCount} zones, {FactionCount} factions, {NpcCount} npcs, {QuestCount} quests, {EdgeCount} quest edges, {EventCount} world events from {Root}",
+            _consumables.Count, _buildings.Count, _recipes.Count, _monsters.Count, _lootTables.DropPools.Count, _lootTables.MonsterDrops.Count, _zones.Count, _factions.Count, _npcs.Count, _quests.Count, _questEdges.Count, _events.Count, _contentRoot);
     }
 
     private IReadOnlyList<ZoneDefinition> LoadZones()
@@ -533,6 +597,164 @@ public sealed class ContentProvider : IContentProvider
         }
     }
 
+    // ─── Combat Curves ───────────────────────────────────────────────────────
+
+    private static CombatCurvesDefinition DefaultCombatCurves() =>
+        new(
+            new MonsterScalingCurve(
+                HpPerDanger:      0.20,
+                PowerPerDanger:   0.15,
+                SpeedPerDanger:   0.7,
+                BossHpMultiplier: 1.6,
+                BossSpeedBonus:   4),
+            new PartyScalingCurve(ScalingPerTier: 0.12));
+
+    /// <summary>
+    /// Loads <c>content/combat-curves.json</c> if present. The file is
+    /// optional — if absent, the historical hardcoded constants are used so
+    /// existing test fixtures and partial-content roots keep working. When
+    /// the file IS present, every field is required and must fall in a
+    /// sensible range (validated against <c>combat-curves.schema.json</c>).
+    /// </summary>
+    private CombatCurvesDefinition LoadCombatCurves()
+    {
+        var path = Path.Combine(_contentRoot, "combat-curves.json");
+        if (!File.Exists(path))
+            return DefaultCombatCurves();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<CombatCurvesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.MonsterScaling is null)
+            throw new InvalidDataException($"{path}: 'monsterScaling' block is required.");
+
+        var ms = doc.MonsterScaling;
+
+        ValidateRange(path, "hpPerDanger",      ms.HpPerDanger,      min: 0, max: 5);
+        ValidateRange(path, "powerPerDanger",   ms.PowerPerDanger,   min: 0, max: 5);
+        ValidateRange(path, "speedPerDanger",   ms.SpeedPerDanger,   min: 0, max: 10);
+        ValidateRange(path, "bossHpMultiplier", ms.BossHpMultiplier, min: 1, max: 10);
+        if (ms.BossSpeedBonus < 0 || ms.BossSpeedBonus > 50)
+            throw new InvalidDataException(
+                $"{path}: monsterScaling.bossSpeedBonus must be in [0, 50] (got {ms.BossSpeedBonus}).");
+
+        // Party scaling block is optional. Default to 0.12 so legacy files
+        // without the block still get the symmetric party buff that pairs
+        // with post-TPK-fix monster scaling.
+        double partyScalingPerTier = 0.12;
+        if (doc.PartyScaling is not null)
+        {
+            ValidateRange(path, "scalingPerTier", doc.PartyScaling.ScalingPerTier, min: 0, max: 1);
+            partyScalingPerTier = doc.PartyScaling.ScalingPerTier;
+        }
+
+        return new CombatCurvesDefinition(
+            new MonsterScalingCurve(
+                HpPerDanger:      ms.HpPerDanger,
+                PowerPerDanger:   ms.PowerPerDanger,
+                SpeedPerDanger:   ms.SpeedPerDanger,
+                BossHpMultiplier: ms.BossHpMultiplier,
+                BossSpeedBonus:   ms.BossSpeedBonus),
+            new PartyScalingCurve(partyScalingPerTier));
+    }
+
+    private static void ValidateRange(string path, string field, double value, double min, double max)
+    {
+        if (value < min || value > max)
+            throw new InvalidDataException(
+                $"{path}: monsterScaling.{field} must be in [{min}, {max}] (got {value}).");
+    }
+
+    // ─── Progression Curves ──────────────────────────────────────────────────
+
+    private static ProgressionCurvesDefinition DefaultProgressionCurves() =>
+        new(
+            new WorkmanshipCurve(SkillDivisor: FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultSkillDivisor),
+            FirstMud.Domain.Configuration.ProgressionCurvesAccessor.DefaultCompanionLayerThresholds);
+
+    /// <summary>
+    /// Loads <c>content/progression-curves.json</c> if present. The file is
+    /// optional — if absent, the historical hardcoded constants are used so
+    /// existing test fixtures and partial-content roots keep working. Mirrors
+    /// the <c>combat-curves.json</c> pattern.
+    /// </summary>
+    private ProgressionCurvesDefinition LoadProgressionCurves()
+    {
+        var path = Path.Combine(_contentRoot, "progression-curves.json");
+        if (!File.Exists(path))
+            return DefaultProgressionCurves();
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<ProgressionCurvesFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        // Workmanship — required when file exists.
+        if (doc.Workmanship is null)
+            throw new InvalidDataException($"{path}: 'workmanship' block is required.");
+        var divisor = doc.Workmanship.SkillDivisor;
+        if (divisor < 1 || divisor > 100)
+            throw new InvalidDataException(
+                $"{path}: workmanship.skillDivisor must be in [1, 100] (got {divisor}).");
+
+        // Companion layer thresholds — required, all 5 enum values must be present.
+        if (doc.CompanionLayerThresholds is null || doc.CompanionLayerThresholds.Count == 0)
+            throw new InvalidDataException(
+                $"{path}: 'companionLayerThresholds' must contain an entry per CompanionType.");
+
+        var thresholds = new Dictionary<CompanionType, IReadOnlyList<int>>();
+        foreach (var (typeName, arr) in doc.CompanionLayerThresholds)
+        {
+            if (!Enum.TryParse<CompanionType>(typeName, ignoreCase: false, out var type))
+                throw new InvalidDataException(
+                    $"{path}: companionLayerThresholds key '{typeName}' is not a valid CompanionType.");
+            if (arr is null || arr.Count != 6)
+                throw new InvalidDataException(
+                    $"{path}: companionLayerThresholds[{typeName}] must have exactly 6 entries (got {arr?.Count ?? 0}).");
+            for (int i = 0; i < arr.Count; i++)
+            {
+                if (arr[i] < 0)
+                    throw new InvalidDataException(
+                        $"{path}: companionLayerThresholds[{typeName}][{i}] must be >= 0 (got {arr[i]}).");
+                if (i > 0 && arr[i] < arr[i - 1])
+                    throw new InvalidDataException(
+                        $"{path}: companionLayerThresholds[{typeName}] must be non-decreasing.");
+            }
+            thresholds[type] = arr;
+        }
+        foreach (var t in Enum.GetValues<CompanionType>())
+        {
+            if (!thresholds.ContainsKey(t))
+                throw new InvalidDataException(
+                    $"{path}: companionLayerThresholds is missing entry for CompanionType '{t}'.");
+        }
+
+        return new ProgressionCurvesDefinition(
+            new WorkmanshipCurve(divisor),
+            thresholds);
+    }
+
+    private sealed record ProgressionCurvesFile(
+        [property: JsonPropertyName("workmanship")] WorkmanshipRaw? Workmanship,
+        [property: JsonPropertyName("companionLayerThresholds")] Dictionary<string, List<int>>? CompanionLayerThresholds);
+
+    private sealed record WorkmanshipRaw(
+        [property: JsonPropertyName("skillDivisor")] int SkillDivisor);
+
+    private sealed record CombatCurvesFile(
+        [property: JsonPropertyName("monsterScaling")] MonsterScalingRaw? MonsterScaling,
+        [property: JsonPropertyName("partyScaling")]   PartyScalingRaw?   PartyScaling);
+
+    private sealed record PartyScalingRaw(
+        [property: JsonPropertyName("scalingPerTier")] double ScalingPerTier);
+
+    private sealed record MonsterScalingRaw(
+        [property: JsonPropertyName("hpPerDanger")]      double HpPerDanger,
+        [property: JsonPropertyName("powerPerDanger")]   double PowerPerDanger,
+        [property: JsonPropertyName("speedPerDanger")]   double SpeedPerDanger,
+        [property: JsonPropertyName("bossHpMultiplier")] double BossHpMultiplier,
+        [property: JsonPropertyName("bossSpeedBonus")]   int    BossSpeedBonus);
+
     private sealed record FactionsFile(
         [property: JsonPropertyName("factions")] List<FactionRaw>? Factions);
 
@@ -551,6 +773,110 @@ public sealed class ContentProvider : IContentProvider
     private sealed record FactionWaypointRaw(
         [property: JsonPropertyName("x")] int X,
         [property: JsonPropertyName("y")] int Y);
+
+    private IReadOnlyList<NpcDefinition> LoadNpcs()
+    {
+        var path = Path.Combine(_contentRoot, "npcs.json");
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"Required content file not found: {path}", path);
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<NpcsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Npcs is null || doc.Npcs.Count == 0)
+            throw new InvalidDataException($"{path}: no npcs defined.");
+
+        var knownZoneIds = new HashSet<string>(_zones.Select(z => z.ZoneId), StringComparer.Ordinal);
+        var knownFactionIds = new HashSet<FactionId>(_factions.Select(f => f.Id));
+
+        var list = new List<NpcDefinition>(doc.Npcs.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Npcs)
+        {
+            if (string.IsNullOrWhiteSpace(raw.Id))
+                throw new InvalidDataException($"{path}: npc missing id.");
+            if (!seenIds.Add(raw.Id))
+                throw new InvalidDataException($"{path}: duplicate npc id '{raw.Id}'.");
+            if (string.IsNullOrWhiteSpace(raw.DisplayName))
+                throw new InvalidDataException($"{path}: npc '{raw.Id}' missing displayName.");
+            if (string.IsNullOrWhiteSpace(raw.HomeZoneId))
+                throw new InvalidDataException($"{path}: npc '{raw.Id}' missing homeZoneId.");
+            if (!knownZoneIds.Contains(raw.HomeZoneId))
+                throw new InvalidDataException(
+                    $"{path}: npc '{raw.Id}' homeZoneId '{raw.HomeZoneId}' is not a known zoneId.");
+            if (string.IsNullOrWhiteSpace(raw.Role) || !ValidNpcRoleNames.Contains(raw.Role))
+                throw new InvalidDataException(
+                    $"{path}: npc '{raw.Id}' has invalid role '{raw.Role}'. Must be one of: {string.Join(", ", Enum.GetNames<NpcRole>())}.");
+            var role = Enum.Parse<NpcRole>(raw.Role, ignoreCase: true);
+            if (string.IsNullOrWhiteSpace(raw.ShortDescription))
+                throw new InvalidDataException($"{path}: npc '{raw.Id}' missing shortDescription.");
+
+            FactionId? factionId = null;
+            if (!string.IsNullOrWhiteSpace(raw.FactionId))
+            {
+                if (!ValidFactionIdNames.Contains(raw.FactionId))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' has invalid factionId '{raw.FactionId}'.");
+                var fid = Enum.Parse<FactionId>(raw.FactionId);
+                if (!knownFactionIds.Contains(fid))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' factionId '{raw.FactionId}' is not present in factions.json.");
+                factionId = fid;
+            }
+
+            if (raw.VoiceTells is null || raw.VoiceTells.Count < 3 || raw.VoiceTells.Count > 5)
+                throw new InvalidDataException(
+                    $"{path}: npc '{raw.Id}' must declare between 3 and 5 voiceTells (got {raw.VoiceTells?.Count ?? 0}).");
+            foreach (var tell in raw.VoiceTells)
+            {
+                if (string.IsNullOrWhiteSpace(tell))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' has empty voiceTell entry.");
+            }
+
+            // dialogueRootId is optional; the schema constrains it to a single
+            // string so "at most one per NPC" is structurally enforced. We
+            // additionally trim/validate non-empty when present.
+            string? dialogueRoot = null;
+            if (raw.DialogueRootId is not null)
+            {
+                if (string.IsNullOrWhiteSpace(raw.DialogueRootId))
+                    throw new InvalidDataException(
+                        $"{path}: npc '{raw.Id}' has empty dialogueRootId.");
+                dialogueRoot = raw.DialogueRootId;
+            }
+
+            list.Add(new NpcDefinition(
+                Id: raw.Id,
+                DisplayName: raw.DisplayName,
+                FactionId: factionId,
+                HomeZoneId: raw.HomeZoneId,
+                Role: role,
+                ShortDescription: raw.ShortDescription,
+                VoiceTells: raw.VoiceTells.ToList(),
+                DialogueRootId: dialogueRoot,
+                StartingReputation: raw.StartingReputation));
+        }
+
+        return list;
+    }
+
+    private sealed record NpcsFile(
+        [property: JsonPropertyName("npcs")] List<NpcRaw>? Npcs);
+
+    private sealed record NpcRaw(
+        [property: JsonPropertyName("id")] string? Id,
+        [property: JsonPropertyName("displayName")] string? DisplayName,
+        [property: JsonPropertyName("factionId")] string? FactionId,
+        [property: JsonPropertyName("homeZoneId")] string? HomeZoneId,
+        [property: JsonPropertyName("role")] string? Role,
+        [property: JsonPropertyName("shortDescription")] string? ShortDescription,
+        [property: JsonPropertyName("voiceTells")] List<string>? VoiceTells,
+        [property: JsonPropertyName("dialogueRootId")] string? DialogueRootId,
+        [property: JsonPropertyName("startingReputation")] int? StartingReputation);
 
     private IReadOnlyList<RecipeDefinition> LoadRecipes()
     {
@@ -1409,5 +1735,697 @@ public sealed class ContentProvider : IContentProvider
     {
         public string MonsterId { get; set; } = "";
         public int Weight { get; set; }
+    }
+
+    // ─── Quest loader ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Loads content/quests.json and validates it. Validation is strict:
+    /// unique quest ids, node ids unique within a quest, every edge refers
+    /// to valid quest ids, faction + world + tier enums parse, optional
+    /// startingZoneId resolves against zones.json, at least one possibleOutcome,
+    /// and no unreachable intra-quest nodes. Item-name references in rewards
+    /// are tolerated (warned only) since the item catalog is not yet in JSON.
+    /// </summary>
+    private (IReadOnlyList<QuestDefinition> Quests, IReadOnlyList<QuestEdgeDefinition> Edges) LoadQuests()
+    {
+        var path = Path.Combine(_contentRoot, "quests.json");
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"Required content file not found: {path}", path);
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<QuestsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Quests is null || doc.Quests.Count == 0)
+            throw new InvalidDataException($"{path}: no quests defined.");
+
+        var zoneIds = new HashSet<string>(_zonesById.Keys, StringComparer.Ordinal);
+        // Optional faction cross-ref — if factions.json was loaded in a future
+        // merge, validate against it; otherwise fall back to the enum names.
+        // Today we always validate against the enum (factions.json is in a
+        // parallel migration).
+
+        var defs = new List<QuestDefinition>(doc.Quests.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Quests)
+        {
+            if (string.IsNullOrWhiteSpace(raw.QuestId))
+                throw new InvalidDataException($"{path}: quest missing questId.");
+            if (!seenIds.Add(raw.QuestId))
+                throw new InvalidDataException($"{path}: duplicate questId '{raw.QuestId}'.");
+
+            if (string.IsNullOrWhiteSpace(raw.Title))
+                throw new InvalidDataException($"{path}: quest '{raw.QuestId}' missing title.");
+            if (string.IsNullOrWhiteSpace(raw.Description))
+                throw new InvalidDataException($"{path}: quest '{raw.QuestId}' missing description.");
+
+            // Prefer the loaded factions.json name set (authoritative) when present;
+            // fall back to the FactionId enum names if factions haven't loaded yet.
+            var factionNameSet = _factions.Count > 0
+                ? new HashSet<string>(_factions.Select(f => f.Id.ToString()), StringComparer.Ordinal)
+                : ValidFactionIdNames;
+            if (string.IsNullOrWhiteSpace(raw.FactionId) || !factionNameSet.Contains(raw.FactionId))
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' has invalid factionId '{raw.FactionId}'.");
+            var faction = Enum.Parse<FactionId>(raw.FactionId);
+
+            if (string.IsNullOrWhiteSpace(raw.RequiredTier) || !ValidReputationTierNames.Contains(raw.RequiredTier))
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' has invalid requiredTier '{raw.RequiredTier}'.");
+            var tier = Enum.Parse<ReputationTier>(raw.RequiredTier);
+
+            if (string.IsNullOrWhiteSpace(raw.RequiredWorld) || !ValidWorldIdNames.Contains(raw.RequiredWorld))
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' has invalid requiredWorld '{raw.RequiredWorld}'.");
+            var world = Enum.Parse<WorldId>(raw.RequiredWorld);
+
+            if (raw.ReputationReward < 0)
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' reputationReward must be >= 0.");
+
+            if (raw.PossibleOutcomes is null || raw.PossibleOutcomes.Count == 0)
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' must declare at least one possibleOutcome.");
+
+            foreach (var outcome in raw.PossibleOutcomes)
+            {
+                if (string.IsNullOrWhiteSpace(outcome))
+                    throw new InvalidDataException(
+                        $"{path}: quest '{raw.QuestId}' has empty possibleOutcome entry.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(raw.StartingZoneId) &&
+                zoneIds.Count > 0 &&
+                !zoneIds.Contains(raw.StartingZoneId))
+            {
+                throw new InvalidDataException(
+                    $"{path}: quest '{raw.QuestId}' startingZoneId '{raw.StartingZoneId}' is not a known zoneId.");
+            }
+
+            // Nodes: optional. If present, ids unique within the quest.
+            var nodes = new List<QuestNodeDefinition>();
+            var seenNodeIds = new HashSet<string>(StringComparer.Ordinal);
+            if (raw.Nodes is not null)
+            {
+                foreach (var n in raw.Nodes)
+                {
+                    if (string.IsNullOrWhiteSpace(n.NodeId))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' has node with empty nodeId.");
+                    if (!seenNodeIds.Add(n.NodeId))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' has duplicate nodeId '{n.NodeId}'.");
+                    if (string.IsNullOrWhiteSpace(n.Type))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' node '{n.NodeId}' missing type.");
+
+                    nodes.Add(new QuestNodeDefinition(
+                        n.NodeId, n.Type,
+                        n.Content ?? "",
+                        n.RequiredFlags ?? new List<string>()));
+                }
+            }
+
+            // Internal edges: optional. If present, every endpoint must be
+            // a declared node id within THIS quest. Flags orphan nodes too.
+            var internalEdges = new List<QuestEdgeDefinition>();
+            if (raw.InternalEdges is not null)
+            {
+                foreach (var e in raw.InternalEdges)
+                {
+                    if (string.IsNullOrWhiteSpace(e.From) || !seenNodeIds.Contains(e.From))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' internal edge has unknown 'from' nodeId '{e.From}'.");
+                    if (string.IsNullOrWhiteSpace(e.To) || !seenNodeIds.Contains(e.To))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' internal edge has unknown 'to' nodeId '{e.To}'.");
+                    internalEdges.Add(new QuestEdgeDefinition(
+                        Kind: "internal",
+                        FromQuestId: e.From,
+                        ToQuestId: e.To,
+                        Outcome: string.IsNullOrWhiteSpace(e.Outcome) ? null : e.Outcome));
+                }
+
+                // Orphan node check: every declared node must be reachable from
+                // the first node OR be the first node itself. Since the corpus
+                // is flat (no nodes), this only activates for quests that opt
+                // into the node list.
+                if (nodes.Count > 0)
+                {
+                    var reachable = new HashSet<string>(StringComparer.Ordinal) { nodes[0].NodeId };
+                    bool changed;
+                    do
+                    {
+                        changed = false;
+                        foreach (var e in internalEdges)
+                        {
+                            if (reachable.Contains(e.FromQuestId) && reachable.Add(e.ToQuestId))
+                                changed = true;
+                        }
+                    } while (changed);
+
+                    foreach (var n in nodes)
+                    {
+                        if (!reachable.Contains(n.NodeId))
+                            throw new InvalidDataException(
+                                $"{path}: quest '{raw.QuestId}' has orphan/unreachable node '{n.NodeId}'.");
+                    }
+                }
+            }
+
+            // Rewards: forgiving. Validate structural shape only — item-name
+            // cross-ref is warned, not thrown, per migration spec.
+            var rewards = new List<QuestRewardDefinition>();
+            if (raw.Rewards is not null)
+            {
+                foreach (var r in raw.Rewards)
+                {
+                    if (string.IsNullOrWhiteSpace(r.Kind))
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' has reward with missing kind.");
+                    if (r.Quantity < 0)
+                        throw new InvalidDataException(
+                            $"{path}: quest '{raw.QuestId}' reward quantity must be >= 0.");
+                    rewards.Add(new QuestRewardDefinition(
+                        r.Kind,
+                        string.IsNullOrWhiteSpace(r.ItemName) ? null : r.ItemName,
+                        r.Quantity));
+                }
+            }
+
+            defs.Add(new QuestDefinition(
+                QuestId: raw.QuestId,
+                Title: raw.Title,
+                Description: raw.Description,
+                FactionId: faction,
+                RequiredTier: tier,
+                RequiredWorld: world,
+                ReputationReward: raw.ReputationReward,
+                PossibleOutcomes: raw.PossibleOutcomes.ToList(),
+                IsWyrdQuest: raw.IsWyrdQuest,
+                StartingZoneId: string.IsNullOrWhiteSpace(raw.StartingZoneId) ? null : raw.StartingZoneId,
+                Prerequisites: raw.Prerequisites is null
+                    ? Array.Empty<string>()
+                    : raw.Prerequisites.ToList(),
+                Rewards: rewards,
+                Nodes: nodes,
+                InternalEdges: internalEdges));
+        }
+
+        // Second pass: prerequisites must reference declared quest ids.
+        foreach (var q in defs)
+        {
+            foreach (var p in q.Prerequisites)
+            {
+                if (!seenIds.Contains(p))
+                    throw new InvalidDataException(
+                        $"{path}: quest '{q.QuestId}' lists unknown prerequisite questId '{p}'.");
+            }
+        }
+
+        // Cross-quest edges.
+        var edges = new List<QuestEdgeDefinition>();
+        if (doc.Edges is not null)
+        {
+            var edgeSeen = new HashSet<(string kind, string from, string to, string? outcome)>();
+            foreach (var e in doc.Edges)
+            {
+                if (string.IsNullOrWhiteSpace(e.Kind) || !ValidQuestEdgeKinds.Contains(e.Kind))
+                    throw new InvalidDataException(
+                        $"{path}: edge has invalid kind '{e.Kind}' (expected 'unlocks' or 'requires').");
+
+                if (string.IsNullOrWhiteSpace(e.From) || !seenIds.Contains(e.From))
+                    throw new InvalidDataException(
+                        $"{path}: edge references unknown 'from' questId '{e.From}'.");
+                if (string.IsNullOrWhiteSpace(e.To) || !seenIds.Contains(e.To))
+                    throw new InvalidDataException(
+                        $"{path}: edge references unknown 'to' questId '{e.To}'.");
+
+                string? outcome = string.IsNullOrWhiteSpace(e.Outcome) ? null : e.Outcome;
+
+                if (string.Equals(e.Kind, "unlocks", StringComparison.Ordinal))
+                {
+                    if (outcome is null)
+                        throw new InvalidDataException(
+                            $"{path}: 'unlocks' edge from '{e.From}' to '{e.To}' requires an outcome.");
+
+                    // Outcome must be declared by the source quest.
+                    var fromDef = defs.Single(q => q.QuestId == e.From);
+                    if (!fromDef.PossibleOutcomes.Contains(outcome, StringComparer.Ordinal))
+                        throw new InvalidDataException(
+                            $"{path}: 'unlocks' edge from '{e.From}' uses outcome '{outcome}' " +
+                            $"which is not in that quest's possibleOutcomes.");
+                }
+
+                var key = (e.Kind, e.From, e.To, outcome);
+                if (!edgeSeen.Add(key))
+                    throw new InvalidDataException(
+                        $"{path}: duplicate edge {e.Kind} {e.From} -> {e.To} (outcome={outcome ?? "<none>"}).");
+
+                edges.Add(new QuestEdgeDefinition(
+                    Kind: e.Kind,
+                    FromQuestId: e.From,
+                    ToQuestId: e.To,
+                    Outcome: outcome));
+            }
+        }
+
+        return (defs, edges);
+    }
+
+    private sealed class QuestsFile
+    {
+        public List<RawQuest>? Quests { get; set; }
+        public List<RawQuestEdge>? Edges { get; set; }
+    }
+
+    private sealed class RawQuest
+    {
+        public string QuestId { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string FactionId { get; set; } = "";
+        public string RequiredTier { get; set; } = "";
+        public string RequiredWorld { get; set; } = "";
+        public int ReputationReward { get; set; }
+        public List<string>? PossibleOutcomes { get; set; }
+        public bool IsWyrdQuest { get; set; }
+        public string? StartingZoneId { get; set; }
+        public List<string>? Prerequisites { get; set; }
+        public List<RawQuestReward>? Rewards { get; set; }
+        public List<RawQuestNode>? Nodes { get; set; }
+        public List<RawQuestInternalEdge>? InternalEdges { get; set; }
+    }
+
+    private sealed class RawQuestReward
+    {
+        public string Kind { get; set; } = "";
+        public string? ItemName { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    private sealed class RawQuestNode
+    {
+        public string NodeId { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string? Content { get; set; }
+        public List<string>? RequiredFlags { get; set; }
+    }
+
+    private sealed class RawQuestInternalEdge
+    {
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        public string? Outcome { get; set; }
+    }
+
+    private sealed class RawQuestEdge
+    {
+        public string Kind { get; set; } = "";
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        public string? Outcome { get; set; }
+    }
+
+    // ─── World-event loader ──────────────────────────────────────────────────
+
+    private static readonly HashSet<string> ValidEventFamilies =
+        new(StringComparer.Ordinal)
+        { "economic", "political", "faction-long-arc", "encounter", "weather" };
+
+    private static readonly HashSet<string> ValidEventTriggerKinds =
+        new(StringComparer.Ordinal)
+        { "unconditional", "gameTick", "seasonalDay", "lunarCycle",
+          "repThreshold", "questCompleted", "complex" };
+
+    private static readonly HashSet<string> ValidWorldEventEffectTypes =
+        new(StringComparer.Ordinal)
+        {
+            "zoneAmbient", "npcAvailability", "npcDialogueLine",
+            "shopPriceShift", "shopStockShift", "encounterRateShift",
+            "reputationDrift", "spawnNode", "unlockDialogue", "setFlag",
+        };
+
+    /// <summary>
+    /// Effect types whose runtime application mutates durable world state and
+    /// therefore REQUIRE a matching <c>onExpire</c> inverse to restore the
+    /// baseline when the event ends. A symmetric-cleanup warning fires if a
+    /// transient (non-permanent, non-oneTime) event applies one of these
+    /// without an inverse on expire.
+    /// </summary>
+    private static readonly HashSet<string> EffectTypesRequiringCleanup =
+        new(StringComparer.Ordinal)
+        {
+            "zoneAmbient", "npcAvailability", "shopPriceShift",
+            "shopStockShift", "encounterRateShift",
+        };
+
+    /// <summary>
+    /// Loads content/world-events.json and validates it. Validation is
+    /// strict-enough-to-catch-typos:
+    /// unique event ids, trigger.kind + shape consistency, effects[] non-empty
+    /// and every type known, cross-ref every zoneId / factionId / questId /
+    /// npcId against the authored registries, onExpire[] presence check warned
+    /// (not thrown) when transient effects have no inverse.
+    /// </summary>
+    private IReadOnlyList<WorldEventDefinition> LoadWorldEvents()
+    {
+        var path = Path.Combine(_contentRoot, "world-events.json");
+        if (!File.Exists(path))
+        {
+            // Optional file: earlier bases on the migration chain don't ship it.
+            _logger?.LogInformation("ContentProvider: no world-events.json at {Path} — event catalog will be empty.", path);
+            return Array.Empty<WorldEventDefinition>();
+        }
+
+        using var stream = File.OpenRead(path);
+        var doc = JsonSerializer.Deserialize<WorldEventsFile>(stream, JsonOptions)
+                  ?? throw new InvalidDataException($"{path}: empty or unreadable.");
+
+        if (doc.Events is null || doc.Events.Count == 0)
+            throw new InvalidDataException($"{path}: no events defined.");
+
+        var zoneIds = new HashSet<string>(_zonesById.Keys, StringComparer.Ordinal);
+        var questIds = new HashSet<string>(_questsById.Keys, StringComparer.Ordinal);
+
+        var list = new List<WorldEventDefinition>(doc.Events.Count);
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var raw in doc.Events)
+        {
+            if (string.IsNullOrWhiteSpace(raw.Id))
+                throw new InvalidDataException($"{path}: event missing id.");
+            if (!seenIds.Add(raw.Id))
+                throw new InvalidDataException($"{path}: duplicate event id '{raw.Id}'.");
+
+            if (string.IsNullOrWhiteSpace(raw.DisplayName))
+                throw new InvalidDataException($"{path}: event '{raw.Id}' missing displayName.");
+            if (string.IsNullOrWhiteSpace(raw.Description))
+                throw new InvalidDataException($"{path}: event '{raw.Id}' missing description.");
+
+            if (string.IsNullOrWhiteSpace(raw.Family) || !ValidEventFamilies.Contains(raw.Family))
+                throw new InvalidDataException(
+                    $"{path}: event '{raw.Id}' has invalid family '{raw.Family}'.");
+
+            if (raw.Priority < 1 || raw.Priority > 5)
+                throw new InvalidDataException(
+                    $"{path}: event '{raw.Id}' priority must be 1..5 (got {raw.Priority}).");
+
+            var trigger = ValidateTrigger(raw.Trigger, raw.Id, path, questIds);
+            var duration = ValidateDuration(raw.Duration, raw.Id, path);
+
+            if (raw.Effects is null || raw.Effects.Count == 0)
+                throw new InvalidDataException(
+                    $"{path}: event '{raw.Id}' must declare at least one effect.");
+
+            var effects = raw.Effects
+                .Select(e => ValidateEffect(e, raw.Id, "effects", path, zoneIds))
+                .ToList();
+            var onExpire = (raw.OnExpire ?? new List<RawWorldEventEffect>())
+                .Select(e => ValidateEffect(e, raw.Id, "onExpire", path, zoneIds))
+                .ToList();
+
+            // Symmetric-cleanup warning (not a throw): transient events that
+            // apply a cleanup-requiring effect type but ship no onExpire entry
+            // are almost certainly missing their inverse. Permanent / oneTime
+            // events are exempt — their whole point is to change the world.
+            var isPermanent = duration.Permanent;
+            var isOneTime = raw.OneTime;
+            if (!isPermanent && !isOneTime)
+            {
+                var needsCleanup = effects.Any(e => EffectTypesRequiringCleanup.Contains(e.Type));
+                if (needsCleanup && onExpire.Count == 0)
+                {
+                    _logger?.LogWarning(
+                        "world-events.json: event '{EventId}' applies a cleanup-requiring effect but declares no onExpire inverse.",
+                        raw.Id);
+                }
+            }
+
+            // Faction tag cross-ref
+            var factionTags = new List<FactionId>();
+            if (raw.FactionTags is not null)
+            {
+                foreach (var ft in raw.FactionTags)
+                {
+                    if (string.IsNullOrWhiteSpace(ft) || !ValidFactionIdNames.Contains(ft))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' factionTag '{ft}' is not a valid FactionId.");
+                    factionTags.Add(Enum.Parse<FactionId>(ft));
+                }
+            }
+
+            // Zone tag cross-ref
+            var zoneTags = new List<string>();
+            if (raw.ZoneTags is not null)
+            {
+                foreach (var zt in raw.ZoneTags)
+                {
+                    if (string.IsNullOrWhiteSpace(zt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' has empty zoneTag entry.");
+                    if (zoneIds.Count > 0 && !zoneIds.Contains(zt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' zoneTag '{zt}' is not a known zoneId.");
+                    zoneTags.Add(zt);
+                }
+            }
+
+            // Quest tag cross-ref
+            var questTags = new List<string>();
+            if (raw.QuestTags is not null)
+            {
+                foreach (var qt in raw.QuestTags)
+                {
+                    if (string.IsNullOrWhiteSpace(qt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' has empty questTag entry.");
+                    if (questIds.Count > 0 && !questIds.Contains(qt))
+                        throw new InvalidDataException(
+                            $"{path}: event '{raw.Id}' questTag '{qt}' is not a known questId.");
+                    questTags.Add(qt);
+                }
+            }
+
+            list.Add(new WorldEventDefinition(
+                Id: raw.Id,
+                DisplayName: raw.DisplayName,
+                Family: raw.Family,
+                Priority: raw.Priority,
+                Description: raw.Description,
+                Trigger: trigger,
+                Duration: duration,
+                Effects: effects,
+                OnExpire: onExpire,
+                FactionTags: factionTags,
+                ZoneTags: zoneTags,
+                QuestTags: questTags,
+                WorldStateFlag: string.IsNullOrWhiteSpace(raw.WorldStateFlag) ? null : raw.WorldStateFlag,
+                OneTime: raw.OneTime));
+        }
+
+        return list;
+    }
+
+    private WorldEventTrigger ValidateTrigger(RawWorldEventTrigger? raw, string eventId, string path, HashSet<string> questIds)
+    {
+        if (raw is null)
+            throw new InvalidDataException($"{path}: event '{eventId}' missing trigger.");
+
+        if (string.IsNullOrWhiteSpace(raw.Kind) || !ValidEventTriggerKinds.Contains(raw.Kind))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' has invalid trigger.kind '{raw.Kind}'.");
+
+        FactionId? faction = null;
+        ReputationTier? tier = null;
+
+        switch (raw.Kind)
+        {
+            case "gameTick":
+            case "lunarCycle":
+                if ((raw.EveryDays is null || raw.EveryDays <= 0) &&
+                    (raw.EveryMinutes is null || raw.EveryMinutes <= 0))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='{raw.Kind}' requires everyDays or everyMinutes > 0.");
+                break;
+            case "seasonalDay":
+                if (raw.Day is null || raw.Day < 0)
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='seasonalDay' requires day >= 0.");
+                break;
+            case "repThreshold":
+                if (string.IsNullOrWhiteSpace(raw.FactionId) || !ValidFactionIdNames.Contains(raw.FactionId))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='repThreshold' has invalid factionId '{raw.FactionId}'.");
+                faction = Enum.Parse<FactionId>(raw.FactionId);
+                if (!string.IsNullOrWhiteSpace(raw.MinTier))
+                {
+                    if (!ValidReputationTierNames.Contains(raw.MinTier))
+                        throw new InvalidDataException(
+                            $"{path}: event '{eventId}' trigger.kind='repThreshold' has invalid minTier '{raw.MinTier}'.");
+                    tier = Enum.Parse<ReputationTier>(raw.MinTier);
+                }
+                if (tier is null && raw.Min is null)
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='repThreshold' requires minTier or min.");
+                break;
+            case "questCompleted":
+                if (string.IsNullOrWhiteSpace(raw.QuestId))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.kind='questCompleted' requires questId.");
+                if (questIds.Count > 0 && !questIds.Contains(raw.QuestId))
+                    throw new InvalidDataException(
+                        $"{path}: event '{eventId}' trigger.questId '{raw.QuestId}' is not a known questId.");
+                break;
+            case "unconditional":
+            case "complex":
+                // No structural requirement beyond kind. Prose is expected but
+                // not enforced — keeps authoring friction low.
+                break;
+        }
+
+        return new WorldEventTrigger(
+            Kind: raw.Kind,
+            EveryDays: raw.EveryDays,
+            EveryMinutes: raw.EveryMinutes,
+            Day: raw.Day,
+            FactionId: faction,
+            MinTier: tier,
+            Min: raw.Min,
+            QuestId: string.IsNullOrWhiteSpace(raw.QuestId) ? null : raw.QuestId,
+            Outcome: string.IsNullOrWhiteSpace(raw.Outcome) ? null : raw.Outcome,
+            Prose: string.IsNullOrWhiteSpace(raw.Prose) ? null : raw.Prose);
+    }
+
+    private static WorldEventDuration ValidateDuration(RawWorldEventDuration? raw, string eventId, string path)
+    {
+        if (raw is null)
+            throw new InvalidDataException($"{path}: event '{eventId}' missing duration.");
+
+        var setCount = (raw.Days is not null ? 1 : 0)
+                     + (raw.Minutes is not null ? 1 : 0)
+                     + (raw.Permanent ? 1 : 0);
+        if (setCount == 0)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration must set exactly one of days/minutes/permanent.");
+        if (setCount > 1)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration must set only one of days/minutes/permanent.");
+
+        if (raw.Days is not null && raw.Days <= 0)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration.days must be > 0.");
+        if (raw.Minutes is not null && raw.Minutes <= 0)
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' duration.minutes must be > 0.");
+
+        return new WorldEventDuration(raw.Days, raw.Minutes, raw.Permanent);
+    }
+
+    private WorldEventEffect ValidateEffect(RawWorldEventEffect raw, string eventId, string section, string path, HashSet<string> zoneIds)
+    {
+        if (string.IsNullOrWhiteSpace(raw.Type) || !ValidWorldEventEffectTypes.Contains(raw.Type))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} has invalid effect type '{raw.Type}'.");
+
+        if (!string.IsNullOrWhiteSpace(raw.ZoneId) && zoneIds.Count > 0 && !zoneIds.Contains(raw.ZoneId))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} references unknown zoneId '{raw.ZoneId}'.");
+
+        FactionId? faction = null;
+        if (!string.IsNullOrWhiteSpace(raw.FactionId))
+        {
+            if (!ValidFactionIdNames.Contains(raw.FactionId))
+                throw new InvalidDataException(
+                    $"{path}: event '{eventId}' {section} references invalid factionId '{raw.FactionId}'.");
+            faction = Enum.Parse<FactionId>(raw.FactionId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(raw.QuestId) && _questsById.Count > 0 && !_questsById.ContainsKey(raw.QuestId))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} references unknown questId '{raw.QuestId}'.");
+
+        if (!string.IsNullOrWhiteSpace(raw.NpcId) && _npcsById.Count > 0 && !_npcsById.ContainsKey(raw.NpcId))
+            throw new InvalidDataException(
+                $"{path}: event '{eventId}' {section} references unknown npcId '{raw.NpcId}'.");
+
+        return new WorldEventEffect(
+            Type: raw.Type,
+            ZoneId: string.IsNullOrWhiteSpace(raw.ZoneId) ? null : raw.ZoneId,
+            NpcId: string.IsNullOrWhiteSpace(raw.NpcId) ? null : raw.NpcId,
+            NpcName: string.IsNullOrWhiteSpace(raw.NpcName) ? null : raw.NpcName,
+            FactionId: faction,
+            Item: string.IsNullOrWhiteSpace(raw.Item) ? null : raw.Item,
+            Multiplier: raw.Multiplier,
+            Delta: raw.Delta,
+            Flag: string.IsNullOrWhiteSpace(raw.Flag) ? null : raw.Flag,
+            Value: raw.Value?.ToString(),
+            Text: string.IsNullOrWhiteSpace(raw.Text) ? null : raw.Text,
+            Available: raw.Available,
+            QuestId: string.IsNullOrWhiteSpace(raw.QuestId) ? null : raw.QuestId);
+    }
+
+    private sealed class WorldEventsFile
+    {
+        public List<RawWorldEvent>? Events { get; set; }
+    }
+
+    private sealed class RawWorldEvent
+    {
+        public string Id { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string Family { get; set; } = "";
+        public int Priority { get; set; }
+        public string Description { get; set; } = "";
+        public RawWorldEventTrigger? Trigger { get; set; }
+        public RawWorldEventDuration? Duration { get; set; }
+        public List<RawWorldEventEffect>? Effects { get; set; }
+        public List<RawWorldEventEffect>? OnExpire { get; set; }
+        public List<string>? FactionTags { get; set; }
+        public List<string>? ZoneTags { get; set; }
+        public List<string>? QuestTags { get; set; }
+        public string? WorldStateFlag { get; set; }
+        public bool OneTime { get; set; }
+    }
+
+    private sealed class RawWorldEventTrigger
+    {
+        public string Kind { get; set; } = "";
+        public int? EveryDays { get; set; }
+        public int? EveryMinutes { get; set; }
+        public int? Day { get; set; }
+        public string? FactionId { get; set; }
+        public string? MinTier { get; set; }
+        public int? Min { get; set; }
+        public string? QuestId { get; set; }
+        public string? Outcome { get; set; }
+        public string? Prose { get; set; }
+    }
+
+    private sealed class RawWorldEventDuration
+    {
+        public int? Days { get; set; }
+        public int? Minutes { get; set; }
+        public bool Permanent { get; set; }
+    }
+
+    private sealed class RawWorldEventEffect
+    {
+        public string Type { get; set; } = "";
+        public string? ZoneId { get; set; }
+        public string? NpcId { get; set; }
+        public string? NpcName { get; set; }
+        public string? FactionId { get; set; }
+        public string? Item { get; set; }
+        public double? Multiplier { get; set; }
+        public int? Delta { get; set; }
+        public string? Flag { get; set; }
+        public object? Value { get; set; }
+        public string? Text { get; set; }
+        public bool? Available { get; set; }
+        public string? QuestId { get; set; }
     }
 }

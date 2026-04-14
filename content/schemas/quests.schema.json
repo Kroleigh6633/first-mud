@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Quests",
+  "description": "Data-driven quest-graph definitions for first-mud. Loaded by ContentProvider at startup and upserted into Neo4j by LoreSeeder.",
+  "type": "object",
+  "required": ["quests", "edges"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "quests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "questId", "title", "description", "factionId",
+          "requiredTier", "requiredWorld", "reputationReward",
+          "possibleOutcomes", "isWyrdQuest"
+        ],
+        "properties": {
+          "questId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "factionId": { "type": "string" },
+          "requiredTier": { "type": "string" },
+          "requiredWorld": { "type": "string" },
+          "reputationReward": { "type": "integer", "minimum": 0 },
+          "possibleOutcomes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "isWyrdQuest": { "type": "boolean" },
+          "startingZoneId": { "type": ["string", "null"] },
+          "prerequisites": { "type": "array", "items": { "type": "string" } },
+          "rewards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": { "type": "string" },
+                "itemName": { "type": ["string", "null"] },
+                "quantity": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["nodeId", "type"],
+              "properties": {
+                "nodeId": { "type": "string", "minLength": 1 },
+                "type": { "type": "string" },
+                "content": { "type": "string" },
+                "requiredFlags": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          },
+          "internalEdges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["from", "to"],
+              "properties": {
+                "from": { "type": "string" },
+                "to": { "type": "string" },
+                "outcome": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "from", "to"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["unlocks", "requires"] },
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "outcome": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

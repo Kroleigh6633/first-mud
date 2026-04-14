@@ -165,15 +165,19 @@ public class MoveCommandHandler(
             return;
         }
 
-        // Survivability gate: if total enemy HP exceeds 5× party HP, the fight is
-        // unwinnable at this stage — skip the encounter entirely.
+        // Survivability gate: if total enemy HP exceeds 3× party HP, the fight is
+        // (almost certainly) unwinnable at this stage — skip the encounter entirely.
+        //
+        // NOTE: monsters.Sum(m => m.Hp) already reflects MonsterFactory.ScaleMonster
+        // post-scaling HP (danger + isBoss). Previously this value was multiplied
+        // again by (1 + danger*0.4), which double-counted scaling and therefore
+        // only fired in extreme cases — contributing to the danger-6 TPK.
         int totalEnemyHp = monsters.Sum(m => m.Hp);
-        totalEnemyHp = (int)(totalEnemyHp * (1.0 + dangerLevel * 0.4));
         // Use player HP as the party HP baseline; companions don't expose a CurrentHp
         // field, so scale by party size as a rough proxy.
         int partyHp = player.CurrentHp * partySize;
 
-        if (totalEnemyHp > partyHp * 5)
+        if (totalEnemyHp > partyHp * 3)
         {
             await notificationService.SendMessageAsync(
                 playerId,
@@ -181,6 +185,33 @@ public class MoveCommandHandler(
                 $"Your party senses overwhelming danger and avoids the encounter. (Danger {dangerLevel})",
                 ct);
             return;
+        }
+
+        // Pre-combat difficulty estimate via deterministic sim. If the party's
+        // estimated win rate is dire, warn loudly and skip the encounter so the
+        // player isn't dropped into an unwinnable fight with no agency.
+        //
+        // Threshold: < 20% estimated win rate = auto-avoid; the player will see
+        // the warning and can reposition / swap companions before re-engaging.
+        // Between 20% and 40% = proceed but surface a "punishing" warning.
+        var preCombatWinRate = EstimateWinRate(player, activeCompanions, monsters);
+        if (preCombatWinRate < 0.20)
+        {
+            await notificationService.SendMessageAsync(
+                playerId,
+                "system",
+                $"Your party hesitates — this encounter looks unwinnable (est. {preCombatWinRate:P0} win rate). You back away. (Danger {dangerLevel})",
+                ct);
+            return;
+        }
+
+        if (preCombatWinRate < 0.40)
+        {
+            await notificationService.SendMessageAsync(
+                playerId,
+                "combat",
+                $"Warning: this encounter looks punishing (est. {preCombatWinRate:P0} win rate). Consider fleeing early. (Danger {dangerLevel})",
+                ct);
         }
 
         var encounter = await combatService.StartEncounterAsync(
@@ -257,5 +288,36 @@ public class MoveCommandHandler(
                     Slot = lootResult.Item.Slot.ToString(),
                 }, ct);
         }
+    }
+
+    /// <summary>
+    /// Quick Monte-Carlo estimate of the party's win chance against the spawned
+    /// pack, using the deterministic <see cref="CombatSimulationService"/>. Used
+    /// as a pre-combat UX gate: if the estimate is dire, we warn the player and
+    /// skip the fight so they don't get TPK'd with no agency.
+    ///
+    /// Kept small (32 rolls) to keep per-move latency under ~30ms.
+    /// </summary>
+    private static double EstimateWinRate(
+        Player player,
+        IReadOnlyList<Companion> activeCompanions,
+        IReadOnlyList<FirstMud.Application.MonsterTemplate> monsters)
+    {
+        const int rolls = 32;
+        var element = player.PrimaryElement == default ? FirstMud.Domain.Enums.MagicElement.Aether : player.PrimaryElement;
+        var party = activeCompanions
+            .Select(c => new CombatSimulationService.PartyMember(c.Type, c.Element, c.CurrentLayer, c.Level))
+            .ToList();
+
+        int wins = 0;
+        for (int i = 0; i < rolls; i++)
+        {
+            var rng = new Random(unchecked(player.Id.GetHashCode() * 1_000_003 + i));
+            var sim = new CombatSimulationService(rng);
+            var enc = sim.BuildEncounter(element, player.Level, party, monsters);
+            var result = sim.Run(enc, maxRounds: 40);
+            if (result.Outcome == CombatSimulationService.Outcome.Victory) wins++;
+        }
+        return (double)wins / rolls;
     }
 }

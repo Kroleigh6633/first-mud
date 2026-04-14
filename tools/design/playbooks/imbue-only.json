@@ -1,0 +1,52 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "imbue-only",
+  "displayName": "Imbue-only contribution",
+  "description": "Baseline gear tier 3, no companions, varying imbue level (proxy: +1 effective level per imbue). DESIGN INTENT (creative pass #7): with gearTier=3 baseline (effective pl ~11), the overworld danger curve is already cleared by gear alone; imbues are a marginal buff against the top end. This playbook should flag REGRESSIONS (imbue 0 at d9 suddenly falling off a cliff) rather than prescribe a steep viability curve. In its current form most cells are trivial because the proxy stack (pl 5 + gt 3 = pl 11) already exceeds danger; a more informative variant will pull gearTier baseline down once 'balanced expectation' can be expressed in proxy-free form.",
+  "holdouts": {
+    "playerLevel": 5,
+    "playerElement": "Aether",
+    "gearTier": 3
+  },
+  "axes": [
+    { "name": "imbueLevel",  "values": [0, 1, 2, 3, 4] },
+    { "name": "dangerLevel", "values": [3, 5, 7, 9] }
+  ],
+  "rolls": 200,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "imbueLevel": 0, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 0, "dangerLevel": 5, "expected": "trivial" },
+      { "imbueLevel": 0, "dangerLevel": 7, "expected": "trivial" },
+      { "imbueLevel": 0, "dangerLevel": 9, "expected": "balanced" },
+
+      { "imbueLevel": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 1, "dangerLevel": 5, "expected": "trivial" },
+      { "imbueLevel": 1, "dangerLevel": 7, "expected": "trivial" },
+      { "imbueLevel": 1, "dangerLevel": 9, "expected": "easy" },
+
+      { "imbueLevel": 2, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 2, "dangerLevel": 5, "expected": "trivial" },
+      { "imbueLevel": 2, "dangerLevel": 7, "expected": "trivial" },
+      { "imbueLevel": 2, "dangerLevel": 9, "expected": "trivial" },
+
+      { "imbueLevel": 3, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 3, "dangerLevel": 5, "expected": "trivial" },
+      { "imbueLevel": 3, "dangerLevel": 7, "expected": "trivial" },
+      { "imbueLevel": 3, "dangerLevel": 9, "expected": "trivial" },
+
+      { "imbueLevel": 4, "dangerLevel": 3, "expected": "trivial" },
+      { "imbueLevel": 4, "dangerLevel": 5, "expected": "trivial" },
+      { "imbueLevel": 4, "dangerLevel": 7, "expected": "trivial" },
+      { "imbueLevel": 4, "dangerLevel": 9, "expected": "trivial" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

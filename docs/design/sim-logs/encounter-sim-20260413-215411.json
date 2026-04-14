@@ -1,0 +1,34 @@
+{
+  "monsters": [
+    "fire-lizard",
+    "fire-lizard",
+    "giant-centipede",
+    "giant-centipede"
+  ],
+  "party": "1:Earth,1:Water,1:Air",
+  "rolls": 500,
+  "playerLevel": 16,
+  "playerElement": "Aether",
+  "seed": 42,
+  "seedFixed": true,
+  "dangerLevel": 6,
+  "scaled": true,
+  "summary": {
+    "Rolls": 500,
+    "Wins": 500,
+    "Losses": 0,
+    "Timeouts": 0,
+    "WinRate": 1,
+    "LossRate": 0,
+    "AvgRounds": 4.588,
+    "AvgPlayerHpPct": 0.8409961089494159,
+    "MinPlayerHpPct": 0.377431906614786,
+    "DmgMin": 0,
+    "DmgP25": 22,
+    "DmgMedian": 33,
+    "DmgP75": 58,
+    "DmgMax": 160,
+    "MvpName": "Wildfolk-Water-L1",
+    "Difficulty": "trivial"
+  }
+}

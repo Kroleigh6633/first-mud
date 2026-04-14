@@ -1,0 +1,207 @@
+{
+  "$schema": "./schemas/npcs.schema.json",
+  "npcs": [
+    {
+      "id": "senna-orrick",
+      "displayName": "Senna Orrick",
+      "homeZoneId": "aeldran-7-starting-road",
+      "role": "civilian",
+      "shortDescription": "Innkeeper of the Bent Mare on the Starting Road; twice-widowed, reads the road's moods aloud as weather.",
+      "voiceTells": [
+        "Counts coins twice, visibly, without apology.",
+        "Refers to her two dead husbands by season, never by name (\"my autumn man,\" \"the one who went in spring\").",
+        "Believes, privately, that the road itself has moods, and she reads them aloud as weather reports."
+      ]
+    },
+    {
+      "id": "auld-maerwyn",
+      "displayName": "Auld Maerwyn",
+      "factionId": "ThornwoodCovens",
+      "homeZoneId": "aeldran-2-thornwood",
+      "role": "questgiver",
+      "shortDescription": "Hedge-witch of the Holt; senior coven elder under the grandmotherly act, her cat Mabon is a Coven member in all but name.",
+      "voiceTells": [
+        "Cooking metaphors for everything — a dangerous Working is \"overseasoned,\" a weak apprentice is \"underproofed,\" a corpse is \"past its best.\"",
+        "Addresses her cat, Mabon, as if he is a senior member of the Coven. He may be.",
+        "Never sits with her back to a window. Claims it's the draught."
+      ]
+    },
+    {
+      "id": "solan-drest",
+      "displayName": "Commander Solan Drest",
+      "factionId": "Gravenguard",
+      "homeZoneId": "aeldran-8-gravenhold",
+      "role": "questgiver",
+      "shortDescription": "Commander of the Gravenguard at Gravenhold; has not slept a full night since the Expedition.",
+      "voiceTells": [
+        "Re-arranges objects on his desk while listening — always by size, never by function.",
+        "Uses the word \"catalogue\" where another commander would say \"list\" or \"remember.\"",
+        "Has not slept a full night since the Expedition; acknowledges this only if the player names it directly, and then without resentment."
+      ]
+    },
+    {
+      "id": "bryn-hollemar",
+      "displayName": "Captain Bryn Hollemar",
+      "factionId": "HouseCaervorn",
+      "homeZoneId": "aeldran-1-caervorn-highlands",
+      "role": "patrol",
+      "shortDescription": "Caervorn garrison captain at Marchkeep; quotes the obscure strategist Ven Kel and keeps a private duty log.",
+      "voiceTells": [
+        "Always returns salutes, even to civilians, even to children — a tic from an old injury.",
+        "Quotes an obscure Caervorn strategist, Ven Kel, in paraphrase, and is quietly pleased when someone recognizes the source.",
+        "Keeps a second, private duty log. Does not share it. Has never been asked about it."
+      ]
+    },
+    {
+      "id": "harken-vos",
+      "displayName": "Harken Vos",
+      "homeZoneId": "aeldran-4-gravenmarsh",
+      "role": "questgiver",
+      "shortDescription": "Half-blind bounty clerk wandering the Gravenmarsh Causeway; corrects grammar mid-threat and quietly downgrades mis-blamed bounties.",
+      "voiceTells": [
+        "Corrects grammar mid-threat, mid-combat, mid-anything — not maliciously, compulsively.",
+        "Writes with his left hand, holding the parchment up to his working eye; both hands tremble, only one admits it.",
+        "Secretly, and against bounty-clerk protocol, downgrades the threat level of bounties he considers \"mis-blamed\" (wrong person, wrong crime). Has never been caught."
+      ]
+    },
+    {
+      "id": "rhianne-moss",
+      "displayName": "Rhianne Moss",
+      "factionId": "ThornwoodCovens",
+      "homeZoneId": "aeldran-2-thornwood",
+      "role": "questgiver",
+      "shortDescription": "Thornwood apprentice at the Rootweave; speaks in numbers and does not know her own Weave capacity.",
+      "voiceTells": [
+        "Speaks in numbers — uses exact counts where others would say \"a few\" or \"many.\" It's how she studies.",
+        "Wipes her hands on her sleeves whenever she's about to lie. Has never noticed she does this. Her mother noticed years ago.",
+        "Genuinely does not know her own Weave capacity — she's never stopped pushing long enough to find it. This will kill her if uncorrected."
+      ]
+    },
+    {
+      "id": "jena-pell",
+      "displayName": "Jena Pell",
+      "factionId": "EmeraldCompact",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "questgiver",
+      "shortDescription": "Junior Compact Factor in Portmere; numbers things under stress and keeps her left shoe slightly loose.",
+      "voiceTells": [
+        "Speaks in enumerated lists (\"One… two… three…\") even under stress — especially under stress.",
+        "Carries a cloth-wrapped counting abacus everywhere; produces it when thinking, never when actually counting.",
+        "Her left shoe is always slightly looser than her right — habit from fleeing one place as a child and keeping the option open."
+      ]
+    },
+    {
+      "id": "merin-pell",
+      "displayName": "Merin Pell",
+      "factionId": "EmeraldCompact",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "civilian",
+      "shortDescription": "Warehouse-keeper at the Compact safehouse, Jena's cousin; \"guested,\" not held, and writing in pencil because they will not give him ink.",
+      "voiceTells": [
+        "Writes every word spoken to him on the back of his own hand, then rubs it off before the guards see.",
+        "Laughs once, softly, at each new cruelty; then is silent.",
+        "Quotes his father (\"my father said\") whenever he is about to refuse something. His father is dead."
+      ]
+    },
+    {
+      "id": "kheth-vel-muir",
+      "displayName": "Kheth-vel-Muir",
+      "factionId": "Golvari",
+      "homeZoneId": "aeldran-8-gravenhold",
+      "role": "questgiver",
+      "shortDescription": "Golvari ambassador kept six months in stone quarters at Gravenhold; counts in sevens and reads mortar lines like text.",
+      "voiceTells": [
+        "Reads surface architecture by running one finger along mortar lines — always at a consistent height (his own, not the human eye level).",
+        "Counts in multiples of seven in his own head; if asked how long something has been, answers in sevens (\"seven days, seven weeks…\").",
+        "Never eats surface food in front of humans; accepts it, pockets it, returns it later courteously unopened."
+      ]
+    },
+    {
+      "id": "thenna-orys",
+      "displayName": "Thenna Orys",
+      "homeZoneId": "aeldran-2-thornwood",
+      "role": "civilian",
+      "shortDescription": "Halven Orys's seventeen-year-old ward; has dreams of a city of light that pronounces her name exactly the way her dead mother did.",
+      "voiceTells": [
+        "Pauses mid-sentence to listen to something the player cannot hear — recovers smoothly, never apologizes for it.",
+        "Speaks her own name wrong on purpose about half the time (\"Thenna,\" \"Tenna,\" \"Thenna again\") as if checking which one is hers today.",
+        "Draws spirals on any dusty surface with her index finger while talking. If pointed out, she scrubs it with her sleeve — always counter-clockwise."
+      ]
+    },
+    {
+      "id": "old-ren",
+      "displayName": "Old Ren",
+      "factionId": "EmeraldCompact",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "civilian",
+      "shortDescription": "Portmere dockworker, twelve years on Warehouse #3 under three quiet Compact contracts; calls the slab inside \"the guest.\"",
+      "voiceTells": [
+        "Chews tobacco he is no longer allowed to chew by a doctor he no longer visits; spits over his left shoulder before every firm statement.",
+        "Calls the slab \"the guest\" and refuses to say \"stone\" while in the warehouse.",
+        "Writes nothing down, ever, including his own name on a receipt."
+      ]
+    },
+    {
+      "id": "brother-velm",
+      "displayName": "Brother Velm",
+      "homeZoneId": "aeldran-2-thornwood",
+      "role": "civilian",
+      "shortDescription": "A lay brother who keeps a dream-journal and reports omens to anyone who'll listen; unreliable as a witness, uncannily accurate as a weather-vane.",
+      "voiceTells": [
+        "Opens every conversation with last night's dream, whether asked or not.",
+        "Sniffs the air twice before answering a direct question.",
+        "Refuses to sit on wooden benches — says the wood \"remembers too much.\""
+      ]
+    },
+    {
+      "id": "maren",
+      "displayName": "Maren",
+      "homeZoneId": "aeldran-7-starting-road",
+      "role": "shopkeeper",
+      "shortDescription": "A travelling tinker who reappears on the road only during the Red Market days, trading oddments for oddments.",
+      "voiceTells": [
+        "Never gives a straight price — always proposes a trade.",
+        "Carries a sealed tin she never opens in front of customers.",
+        "Laughs once, short, then falls silent, every time a deal closes."
+      ]
+    },
+    {
+      "id": "halven-orys",
+      "displayName": "Halven Orys",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "civilian",
+      "shortDescription": "Older brother to Thenna Orys; a dockside reckoner whose generosity is always calibrated to a worry he won't name.",
+      "voiceTells": [
+        "Pays for rounds when something is weighing on him — the more rounds, the bigger the worry.",
+        "Sets his cup down with deliberate care, then adjusts its position twice.",
+        "Mentions his sister Thenna only obliquely, never by name in public."
+      ]
+    },
+    {
+      "id": "compact-factor",
+      "displayName": "Compact Factor",
+      "factionId": "EmeraldCompact",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "civilian",
+      "shortDescription": "A faceless junior factor of the Emerald Compact who delivers polite, deniable warnings on behalf of senior signatories.",
+      "voiceTells": [
+        "Speaks only in the plural (\"we'll want,\" \"we note\"), never in the first person singular.",
+        "Always refers to the next ledger line, never the current one.",
+        "Leaves a green-ink tally mark on any door he has visited officially."
+      ]
+    },
+    {
+      "id": "lirya-vane",
+      "displayName": "Senior Factor Lirya Vane",
+      "factionId": "EmeraldCompact",
+      "homeZoneId": "aeldran-3-portmere",
+      "role": "questgiver",
+      "shortDescription": "Senior Factor of the Portmere Council; signs every document twice, in black and green, and never sits in the same chair twice in one meeting.",
+      "voiceTells": [
+        "Signs her name twice on every document — once in black ink, once in green, on the same line; the green is her private mark.",
+        "Keeps a bowl of unshelled almonds on her desk and shells one for every five minutes of conversation; pushes the shells into a small neat pile she never sweeps away.",
+        "Never sits in the same chair twice in one meeting — stands, walks, returns to a different chair at each pause."
+      ]
+    }
+  ]
+}
