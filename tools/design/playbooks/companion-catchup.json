@@ -1,0 +1,33 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "companion-catchup",
+  "displayName": "Companion rubber-band catch-up",
+  "description": "Stress-test the companion XP rubber-band (task #74). Axes cross starting companion layer with the player-level gap authored via the player-level holdout. Measures effective 'hours to layer 3' via the CombatSim proxy — a lagging layer-1 companion paired with a high-level player should converge noticeably faster than the `companion-contribution` baseline (where rubberBand=1.0 throughout). DESIGN INTENT: a player who returns to low-tier content with a fresh companion catches them up in minutes, not hours; a player and companion who levelled together feel no change. Holdout `playerElement=Aether` + `aeldran-3-portmere` matches the `companion-contribution` playbook for apples-to-apples comparison.",
+  "holdouts": {
+    "playerElement": "Aether",
+    "zoneId": "aeldran-3-portmere"
+  },
+  "axes": [
+    { "name": "playerLevel",     "values": [1, 6, 12, 18, 30] },
+    { "name": "companionLayer",  "values": [1, 2, 3] },
+    { "name": "dangerLevel",     "values": [3, 6, 9] }
+  ],
+  "rolls": 100,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "playerLevel": 1,  "companionLayer": 1, "dangerLevel": 3, "expected": "punishing" },
+      { "playerLevel": 6,  "companionLayer": 1, "dangerLevel": 3, "expected": "trivial" },
+      { "playerLevel": 12, "companionLayer": 1, "dangerLevel": 6, "expected": "trivial" },
+      { "playerLevel": 12, "companionLayer": 1, "dangerLevel": 9, "expected": "easy" },
+      { "playerLevel": 30, "companionLayer": 1, "dangerLevel": 9, "expected": "trivial" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}

@@ -616,6 +616,13 @@ public class CombatHelpers(
                 _ => 10   // Bond 6 MAX: standard (but won't level further)
             };
 
+            // Rubber-banding (task #74): companions catch up faster when the
+            // player out-levels their effective bracket. Multiplier clamps to
+            // ProgressionCurvesAccessor.RubberBandMaxMultiplier (default 3×).
+            var rubberBand = FirstMud.Domain.Configuration.ProgressionCurvesAccessor
+                .RubberBandMultiplier(player.Level, companion.CurrentLayer);
+            scaledUsage = (int)Math.Round(scaledUsage * rubberBand);
+
             var layerBefore = companion.CurrentLayer;
             companion.RecordUsage(scaledUsage);
             await companionRepository.UpdateAsync(companion, ct);

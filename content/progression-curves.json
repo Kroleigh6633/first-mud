@@ -10,5 +10,11 @@
     "CapturedMonster":  [0,  75, 225, 600, 1250, 2500],
     "BoundShade":       [0, 150, 450, 1050, 2100, 4200],
     "ArdweldConstruct": [0, 250, 900, 2100, 4200, 8400]
+  },
+  "companionRubberBand": {
+    "_note": "Companion XP catch-up scaling. When a companion's effective 'expected level' (layer × playerLevelWeight) trails the player's level, usage points are multiplied by 1 + gap*perGapBonus (clamped to maxMultiplier). Near-matching companions see ~1.0 (no bonus); far-lagging layer-1 companions at L30 get the 3× cap. Formula: mult = clamp(1 + max(0, playerLevel - layer*playerLevelWeight) * perGapBonus, 1.0, maxMultiplier).",
+    "playerLevelWeight": 3,
+    "perGapBonus": 0.15,
+    "maxMultiplier": 3.0
   }
 }

@@ -21,7 +21,18 @@ public class CompanionService
         if (companion is null)
             throw new InvalidOperationException($"Companion {companionId} not found.");
 
-        companion.RecordUsage(usagePoints);
+        // Rubber-banding (task #74): look up the companion's owner to apply
+        // level-gap catch-up. If the owner record has gone missing (stale data,
+        // ghost companion) we skip the bonus and record raw usage — the live
+        // combat path uses player.Level directly and is the canonical entry
+        // point; this service is mainly test/admin surface.
+        var owner = await _players.GetByIdAsync(companion.OwnerId, ct);
+        var mult = owner is null
+            ? 1.0
+            : FirstMud.Domain.Configuration.ProgressionCurvesAccessor
+                .RubberBandMultiplier(owner.Level, companion.CurrentLayer);
+
+        companion.RecordUsage((int)Math.Round(usagePoints * mult));
         await _companions.UpdateAsync(companion, ct);
     }
 
