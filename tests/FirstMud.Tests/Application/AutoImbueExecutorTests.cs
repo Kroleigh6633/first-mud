@@ -84,6 +84,9 @@ public class AutoImbueExecutorTests
     public async Task TickAsync_dispatches_imbue_when_reagent_and_target_present()
     {
         var player = Player.Create("Tester", 42);
+        // Pin PrimaryElement to Fire so the planner's imbue-type selection is deterministic
+        // (Player.Create randomises PrimaryElement otherwise; the test's Fire taper must match).
+        player.RevealMagicAffinity(MagicElement.Fire, MagicPolarity.Shaping);
         // Equipped sword (not the imbue target — we imbue an unequipped copy).
         var equippedSword = Item.Create("Iron Sword", "", ItemCategory.Weapon,
             Workmanship.Of(4), WorldId.Aeldran, slot: EquipmentSlot.MeleeWeapon);

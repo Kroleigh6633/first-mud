@@ -86,7 +86,7 @@ public class AutoImbueExecutor
         return AutoImbuePlanner.Plan(
             snapshots,
             weaponElement,
-            player.PrimaryElement == default ? MagicElement.Aether : player.PrimaryElement,
+            player.PrimaryElement,
             player.CraftingSkill,
             stash,
             _content.AllImbueRecipes());
