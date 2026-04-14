@@ -27,5 +27,4 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-ae972a44 | ready-to-merge | e0d9072 | music stopped: defensive AudioContext.resume() on biome change | - | src/FirstMud.Client/src/hooks/useAudio.ts | 2026-04-13 |
 <!-- agents add rows above this line -->
