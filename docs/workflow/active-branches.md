@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-a88eb567 | ready-to-merge | fcee8472 | fulfilling-phase stall = no-progress window (90s) + per-quest 5min cooldown + progress milestone logs | - | src/FirstMud.Client/src/components/GameTerminal.tsx | 2026-04-13 |
 <!-- agents add rows above this line -->

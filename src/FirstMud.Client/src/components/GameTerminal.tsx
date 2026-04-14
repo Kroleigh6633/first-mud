@@ -362,7 +362,28 @@ export default function GameTerminal({
   const autoQuestPhaseRef = useRef<'idle' | 'accept' | 'navigate' | 'fulfilling' | 'interact'>('idle');
   // Tick counter while in 'fulfilling' — used as a safety stall-out cap so the
   // runner can't get wedged harvesting forever in a tile with no yield.
+  // NOTE: this is a *no-progress* window, not a total-quest cap. The counter
+  // is reset every time QuestHarvestProgress/QuestKillProgress shows forward
+  // movement. See `lastProgressSnapshotRef` + reset logic in the fulfilling
+  // block below.
   const fulfillTicksRef = useRef(0);
+  // Snapshot of the last observed (gathered, kills) for the current quest, so
+  // we can detect progress tick-over-tick and reset the stall counter.
+  const lastProgressSnapshotRef = useRef<{ questId: string | null; gathered: number; kills: number }>({
+    questId: null,
+    gathered: 0,
+    kills: 0,
+  });
+  // Milestones already logged for the current quest (e.g. "1/10", "3/10", …)
+  // so we emit a single progress-observed line per milestone and don't spam.
+  const loggedProgressMilestonesRef = useRef<Set<string>>(new Set());
+  // Quest-accept cooldown: questId -> epoch-ms until which this quest must not
+  // be re-accepted (applied when a quest is skipped for stall, so the runner
+  // doesn't immediately re-select it from the available pool and loop).
+  // 5-minute window is long enough for zone/inventory state to materially
+  // change (new drops, new kills elsewhere) without locking the quest out
+  // permanently. See filter in the ordering block below.
+  const questAcceptCooldownRef = useRef<Map<string, number>>(new Map());
   // Throttle for harvest commands sent from the fulfilling phase (server caps
   // at ~1/s; we aim for ~800 ms between sends as spec'd in the briefing).
   const lastHarvestAtRef = useRef(0);
@@ -914,8 +935,19 @@ export default function GameTerminal({
     // block cannot be satisfied by current player state. A quest already
     // accepted (isTaken) is kept regardless — the server already blessed
     // it and backing out mid-chain is worse than attempting completion.
+    // Prune expired cooldown entries so the map doesn't grow unbounded.
+    const nowMs = Date.now();
+    for (const [qid, until] of questAcceptCooldownRef.current) {
+      if (until <= nowMs) questAcceptCooldownRef.current.delete(qid);
+    }
     const eligible = quests.filter(
-      q => q.isTaken || isQuestEligible(q, inventoryRef.current, completedQuestIdsRef.current),
+      q => {
+        // Respect stall cooldown (applies even to isTaken — we just stalled
+        // on it, forcing another accept right away would reproduce the loop).
+        const cdUntil = questAcceptCooldownRef.current.get(q.questId);
+        if (cdUntil && cdUntil > nowMs) return false;
+        return q.isTaken || isQuestEligible(q, inventoryRef.current, completedQuestIdsRef.current);
+      },
     );
     const ordered = [...eligible].sort((a, b) => {
       if (a.isTaken && !b.isTaken) return -1;
@@ -1277,23 +1309,66 @@ export default function GameTerminal({
       // Runs at the waypoint until server progress events show the
       // objective is satisfied, then transitions to 'interact'.
       if (phase === 'fulfilling') {
-        fulfillTicksRef.current += 1;
-
         const objType = classifyQuestObjective(nextQuest.title);
         const progress = questProgressRef.current[nextQuest.questId];
         const requiredFromTitle = parseRequiredCountFromQuestText(
           nextQuest.title, nextQuest.description,
         );
 
-        // Stall-out cap: 300 ms × 200 = 60 s max in fulfilling before we
-        // give up and mark the quest skipped. Prevents wedged runners.
-        if (fulfillTicksRef.current > 200) {
-          console.warn(`[autoquest fulfilling] Stall timeout on "${nextQuest.title}" — skipping`);
+        // ── No-progress stall semantics ─────────────────────────────────
+        // We count ticks SINCE the last observed progress, not total ticks
+        // in the phase. Progress = gathered++ or kills++ on the quest's
+        // QuestProgress snapshot. A legitimate 10-herb gather across 5
+        // tiles can easily exceed 60s of walking+harvesting while steadily
+        // advancing — the old total-cap abandoned those quests mid-flight.
+        const snap = lastProgressSnapshotRef.current;
+        const curGathered = progress?.gathered ?? 0;
+        const curKills = progress?.kills ?? 0;
+        if (snap.questId !== nextQuest.questId) {
+          // New quest — reset snapshot + milestones + no-progress counter.
+          lastProgressSnapshotRef.current = {
+            questId: nextQuest.questId, gathered: curGathered, kills: curKills,
+          };
+          loggedProgressMilestonesRef.current = new Set();
+          fulfillTicksRef.current = 0;
+        } else if (curGathered > snap.gathered || curKills > snap.kills) {
+          // Progress observed — reset the no-progress window.
+          fulfillTicksRef.current = 0;
+          // Emit a single progress-observed line per new milestone so the
+          // user can see the quest is advancing.
+          const req = progress?.required ?? requiredFromTitle;
+          const cur = objType === 'kill' ? curKills : curGathered;
+          const milestoneKey = `${nextQuest.questId}:${cur}`;
+          if (!loggedProgressMilestonesRef.current.has(milestoneKey)) {
+            loggedProgressMilestonesRef.current.add(milestoneKey);
+            console.log(`[autoquest fulfilling] progress ${cur}/${req} on "${nextQuest.title}"`);
+            wrappedAppendMessage({
+              timestamp: new Date().toISOString(),
+              category: 'quest',
+              text: `${nextQuest.title}: ${cur}/${req}`,
+            });
+          }
+          lastProgressSnapshotRef.current = {
+            questId: nextQuest.questId, gathered: curGathered, kills: curKills,
+          };
+        } else {
+          fulfillTicksRef.current += 1;
+        }
+
+        // No-progress stall cap: 300 ms × 300 = 90 s with zero progress
+        // before we give up. 60s was too tight for multi-tile gather
+        // quests that legitimately need time to walk between harvest
+        // points; 90s is generous but bounded.
+        if (fulfillTicksRef.current > 300) {
+          console.warn(`[autoquest fulfilling] Stall timeout on "${nextQuest.title}" — skipping (no progress 90s)`);
           autoQuestSkippedIndicesRef.current.add(autoQuestIndexRef.current);
+          // 5-minute quest-accept cooldown so the runner doesn't immediately
+          // re-select this quest from the available pool and stall again.
+          questAcceptCooldownRef.current.set(nextQuest.questId, Date.now() + 5 * 60 * 1000);
           wrappedAppendMessage({
             timestamp: new Date().toISOString(),
             category: 'warning',
-            text: `Quest '${nextQuest.title}' objective not met after 60s — skipping.`,
+            text: `AUTO-QUEST (STALLED) — no progress on ${nextQuest.title}`,
           });
           autoQuestPhaseRef.current = 'idle';
           if (autoQuestIntervalRef.current !== null) {
