@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-ae900f7b | in-progress | 5157a76 | audio diagnostic logs + bootstrap user-gesture AudioContext resume | - | src/FirstMud.Client/src/audio, src/FirstMud.Client/src/hooks/useAudio.ts, src/FirstMud.Client/src/main.tsx | 2026-04-13 |
 <!-- agents add rows above this line -->

@@ -20,6 +20,7 @@ export class AudioEngine {
 
   private constructor() {
     this.ctx = new AudioContext();
+    console.log('[audio] engine-ctor', { state: this.ctx.state });
     this.masterGain = this.ctx.createGain();
     this.musicGain  = this.ctx.createGain();
     this.sfxGain    = this.ctx.createGain();
@@ -40,9 +41,11 @@ export class AudioEngine {
 
   /** Call this on the first user interaction to un-suspend the context. */
   async resume(): Promise<void> {
+    console.log('[audio] resume called, state-before=', this.ctx.state);
     if (this.ctx.state === 'suspended') {
       await this.ctx.resume();
     }
+    console.log('[audio] resume done, state-after=', this.ctx.state);
   }
 
   get musicBus(): GainNode { return this.musicGain; }
