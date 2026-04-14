@@ -27,5 +27,4 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
-| worktree-agent-a79dc624 | ready-to-merge | content-layer-pilot | harden ledger with -VerifyCommits flag + Rule #8 + template reminders | - | scripts/agent/ledger-lint.ps1, docs/workflow/README.md, docs/workflow/agent-briefing-template.md | 2026-04-13 |
 <!-- agents add rows above this line -->
