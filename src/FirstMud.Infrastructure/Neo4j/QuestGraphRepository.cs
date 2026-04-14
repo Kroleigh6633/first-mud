@@ -352,6 +352,18 @@ public sealed class QuestGraphRepository : IQuestGraphRepository
         var possibleOutcomesRaw = node["possibleOutcomes"].As<List<object>>();
         var possibleOutcomes = possibleOutcomesRaw.Select(o => o.ToString()!).ToArray();
 
+        // Read optional typed target item names (populated by procgen fix)
+        var targetItemNames = Array.Empty<string>();
+        if (node.Properties.TryGetValue("targetItemNames", out var rawTargets) && rawTargets is not null)
+        {
+            if (rawTargets is IEnumerable<object> list)
+            {
+                targetItemNames = list.Select(o => o?.ToString() ?? string.Empty)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToArray();
+            }
+        }
+
         return new QuestNode(
             QuestId: node["questId"].As<string>(),
             Title: node["title"].As<string>(),
@@ -362,6 +374,9 @@ public sealed class QuestGraphRepository : IQuestGraphRepository
             ReputationReward: node["reputationReward"].As<int>(),
             PossibleOutcomes: possibleOutcomes,
             IsWyrdQuest: node["isWyrdQuest"].As<bool>(),
-            IsTaken: isTaken);
+            IsTaken: isTaken)
+        {
+            TargetItemNames = targetItemNames,
+        };
     }
 }
