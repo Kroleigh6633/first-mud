@@ -199,8 +199,13 @@ export default function CraftingPanel({
   // Craft All state
   const [craftAllActive, setCraftAllActive] = useState(false);
   const [craftAllCount, setCraftAllCount] = useState(0);
+  const [craftAllTarget, setCraftAllTarget] = useState(0);
   const craftAllRef = useRef(false); // mutable flag to cancel the loop
   const craftAllCountRef = useRef(0);
+  const craftAllTargetRef = useRef(0);
+
+  // Throttle between crafts (ms) — gives the player readable feedback in the log
+  const CRAFT_ALL_THROTTLE_MS = 150;
 
   // Auto-salvage option for Craft All
   const [autoSalvageGrind, setAutoSalvageGrind] = useState(false);
@@ -244,35 +249,34 @@ export default function CraftingPanel({
       onSalvage(lastCraftResult.itemId);
     }
 
-    // If Craft All is running, continue or stop
+    // If Craft All is running, count the attempt and schedule the next one.
+    // All five server outcomes (Success, UnexpectedResult, ComponentLoss, NearMiss,
+    // Discovery) are legal per-craft results — NONE of them should abort the batch.
+    // The loop stops only when:
+    //   • the user cancels (craftAllRef.current = false)
+    //   • the precomputed batch target is reached
+    //   • the server explicitly reported insufficient materials via the
+    //     "Not enough materials" message (outcome NearMiss + itemId null is ambiguous,
+    //      so we rely on the target count computed up-front from stock instead)
     if (craftAllRef.current) {
-      // UnexpectedResult produces an item — count it as a success and keep going
-      const didSucceed =
-        lastCraftResult.outcome === 'Success' ||
-        lastCraftResult.outcome === 'Discovery' ||
-        lastCraftResult.outcome === 'UnexpectedResult';
-      const materialsFailed = lastCraftResult.outcome === 'NearMiss';
+      craftAllCountRef.current += 1;
+      setCraftAllCount(craftAllCountRef.current);
 
-      if (materialsFailed) {
-        // Stop — likely ran out of materials
+      if (craftAllCountRef.current >= craftAllTargetRef.current) {
+        // Batch complete
         craftAllRef.current = false;
         setCraftAllActive(false);
-        setStatusMsg(`Craft All stopped: materials exhausted after ${craftAllCountRef.current} craft(s).`);
-        setStatusColor('#ffaa00');
+        setStatusMsg(`Craft All complete: ${craftAllCountRef.current} craft(s) attempted.`);
+        setStatusColor('#44cc66');
         return;
       }
 
-      if (didSucceed) {
-        craftAllCountRef.current += 1;
-        setCraftAllCount(craftAllCountRef.current);
-      }
-
-      // Schedule next craft (brief pause for UX)
+      // Schedule next craft with a throttle so outcomes are readable in the log
       setTimeout(() => {
         if (craftAllRef.current) {
           triggerTimedCraft(true);
         }
-      }, 400);
+      }, CRAFT_ALL_THROTTLE_MS);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastCraftResult]);
@@ -372,12 +376,38 @@ export default function CraftingPanel({
     triggerTimedCraft(false);
   }
 
+  /**
+   * Compute how many crafts the player can afford based on current ingredient stock
+   * (inventory + homestead storage). Limited by the ingredient with the smallest
+   * floor(available / needed). Returns 0 when any ingredient is already below recipe
+   * requirements (shouldn't happen — canCraft() guards against that).
+   */
+  function computeMaxBatchSize(): number {
+    if (!selectedRecipe) return 0;
+    let maxBatch = Number.POSITIVE_INFINITY;
+    for (const ing of selectedRecipe.ingredients) {
+      const total = (ing.invCount ?? 0) + (ing.storageCount ?? 0);
+      const need = Math.max(1, ing.baseQuantity);
+      const batches = Math.floor(total / need);
+      if (batches < maxBatch) maxBatch = batches;
+    }
+    return Number.isFinite(maxBatch) ? Math.max(0, maxBatch) : 0;
+  }
+
   function handleCraftAll() {
     if (!canCraft()) return;
+    const target = computeMaxBatchSize();
+    if (target <= 0) {
+      setStatusMsg('Not enough materials for any craft.');
+      setStatusColor('#ff4444');
+      return;
+    }
     craftAllRef.current = true;
     craftAllCountRef.current = 0;
+    craftAllTargetRef.current = target;
     setCraftAllActive(true);
     setCraftAllCount(0);
+    setCraftAllTarget(target);
     setStatusMsg(null);
     triggerTimedCraft(true);
   }
@@ -387,7 +417,7 @@ export default function CraftingPanel({
     setCraftAllActive(false);
     setCrafting(false);
     setCraftProgress(0);
-    setStatusMsg(`Craft All cancelled after ${craftAllCountRef.current} craft(s).`);
+    setStatusMsg(`Craft All cancelled after ${craftAllCountRef.current} of ${craftAllTargetRef.current} craft(s).`);
     setStatusColor('#ffaa00');
   }
 
@@ -604,14 +634,14 @@ export default function CraftingPanel({
                 {crafting && renderProgressBar(
                   craftProgress,
                   craftAllActive
-                    ? `Crafting ${selectedRecipe.resultItemName}... ${craftAllCountRef.current + 1}`
+                    ? `Crafting ${craftAllCountRef.current + 1} of ${craftAllTarget}: ${selectedRecipe.resultItemName}...`
                     : `Crafting ${selectedRecipe.name}...`,
                 )}
 
                 {/* Craft All running progress */}
                 {craftAllActive && !crafting && (
                   <div style={{ marginTop: '8px', fontSize: '12px', color: '#44cc66' }}>
-                    Crafted {craftAllCount}× {selectedRecipe.resultItemName} — waiting for result...
+                    Crafted {craftAllCount} of {craftAllTarget} × {selectedRecipe.resultItemName}...
                   </div>
                 )}
 
