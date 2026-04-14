@@ -90,6 +90,15 @@ export function useAudio(
     const targetKey = resolveBiomeKey(biomeType, inCombat, atHomestead);
     if (targetKey === currentBiomeKey.current) return;
 
+    // Defensive: if the AudioContext got suspended (tab backgrounded, autoplay
+    // gesture expired, OS policy), kick it back awake before scheduling new
+    // sources — otherwise oscillators start on a dormant context and no sound
+    // reaches speakers. Idempotent when already running.
+    const engine = AudioEngine.getInstance();
+    if (engine.ctx.state === 'suspended') {
+      void engine.resume();
+    }
+
     // Fade out old track
     if (currentHandle.current) {
       const oldHandle = currentHandle.current;
