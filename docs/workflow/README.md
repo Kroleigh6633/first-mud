@@ -42,6 +42,8 @@ This folder holds the process rules for multi-agent work on first-mud. It exists
 
    An orchestrator writing a merge briefing must run `scripts/agent/ledger-lint.ps1` against base first; it may list branches whose HEAD-ledger row is `in-progress` only if the briefing explicitly states the branch has self-flipped on its tip, in which case the merge agent proceeds on the briefing and deletes the row on merge.
 
+8. **No empty ready-to-merge.** A row may only be marked `ready-to-merge` when `git log content-layer-pilot..<branch-name>` returns at least one commit. Merge agents MUST run `scripts/agent/ledger-lint.ps1 -VerifyCommits` as their first pre-flight step and refuse to process rows that fail the check. The `-VerifyCommits` flag also errors on rows whose branch is missing from `git branch -a`, and warns on `in-progress` rows older than 24h.
+
 ## Scripts
 
 See `scripts/agent/README.md` for `check-hmr.ps1`, `ledger-lint.ps1`, `worktree-health.ps1`.

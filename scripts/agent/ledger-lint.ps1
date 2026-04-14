@@ -6,7 +6,9 @@
 param(
     [string]$Path = 'docs/workflow/active-branches.md',
     [int]$StaleDays = 1,
-    [switch]$ExpectEmpty
+    [switch]$ExpectEmpty,
+    [switch]$VerifyCommits,
+    [string]$Trunk = 'content-layer-pilot'
 )
 
 if (-not (Test-Path $Path)) {
@@ -72,6 +74,46 @@ for ($i = 0; $i -lt $rows.Count; $i++) {
     }
     elseif ($status -notmatch '^(in-progress|ready-to-merge|merging|blocked:|superseded)') {
         $errors += "row $branch : unknown status '$status'"
+    }
+
+    if ($VerifyCommits) {
+        # Branch existence check
+        $branchList = git branch -a --format='%(refname:short)' 2>$null
+        $remoteForm = "remotes/origin/$branch"
+        $branchExists = $false
+        foreach ($b in $branchList) {
+            $bt = $b.Trim()
+            if ($bt -eq $branch -or $bt -eq "origin/$branch" -or $bt -eq $remoteForm) {
+                $branchExists = $true; break
+            }
+        }
+        if (-not $branchExists) {
+            $errors += "row $branch : branch does not exist in 'git branch -a'"
+        }
+        else {
+            # Commit-ahead check
+            $range = "$Trunk..$branch"
+            $commitOut = git log $range --oneline 2>$null
+            $commitCount = 0
+            if ($commitOut) {
+                $commitCount = (@($commitOut) | Where-Object { $_ -ne '' }).Count
+            }
+            if ($status -eq 'ready-to-merge' -and $commitCount -eq 0) {
+                $errors += "row $branch : 0 commits ahead of trunk ($Trunk) — empty ready-to-merge"
+            }
+        }
+
+        # Extra stale check for in-progress > 24h regardless of StaleDays (requested: warn)
+        if ($parsed -and $status -eq 'in-progress') {
+            $ageHoursX = ($today - $parsed).TotalHours
+            if ($ageHoursX -gt 24) {
+                # Only add if not already present from the main stale check
+                $already = $warnings | Where-Object { $_ -match "^row $([regex]::Escape($branch)) : stale in-progress" }
+                if (-not $already) {
+                    $warnings += "row $branch : stale in-progress ($([int]$ageHoursX)h old, >24h)"
+                }
+            }
+        }
     }
 
     $validCount++
