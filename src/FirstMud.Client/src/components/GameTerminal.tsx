@@ -483,7 +483,13 @@ export default function GameTerminal({
     { keys: ['e', 'E'], description: 'harvest', handler: () => commands.harvest() },
 
     { keys: ['f', 'F'], description: 'auto-farm toggle / open picker', handler: () => {
-      if (autoFarmRef.current?.active) {
+      // Check BOTH the ref and the live state to defend against any desync
+      // between the banner's visibility and the ref-snapshot (e.g. a stale
+      // ref after a rapid state change, or a server-side session that the
+      // client hasn't been told about yet). If either source says auto-farm
+      // is active, treat F as a stop.
+      const active = autoFarmRef.current?.active === true || autoFarmStatus?.active === true;
+      if (active) {
         commands.autoFarm();
       } else {
         setShowAutoFarmPicker(true);
@@ -601,6 +607,10 @@ export default function GameTerminal({
     { keys: ['Escape'], description: 'close panels / cancel', handler: () => {
       setAutoNavigating(false);
       setAutoQuestActive(false);
+      // Stop auto-farm on Escape as well — same semantics as F when active.
+      if (autoFarmRef.current?.active === true || autoFarmStatus?.active === true) {
+        commands.autoFarm();
+      }
       setShowHelp(false);
       setShowQuestLog(false);
       setShowInventory(false);
