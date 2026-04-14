@@ -625,7 +625,12 @@ export default function GameTerminal({
       // confirm will replace the running farm with user-tuned settings and
       // flip ownership to 'user'. If [F] is pressed and the user already
       // owns the farm (manual session), toggle it off normally.
-      if (autoFarmRef.current?.active && autoFarmOwnerRef.current === 'user') {
+      //
+      // Desync defense: check BOTH the ref and the live state so a stale ref
+      // after a rapid state change (or a server-side session the client
+      // hasn't been told about yet) still registers as active.
+      const active = autoFarmRef.current?.active === true || autoFarmStatus?.active === true;
+      if (active && autoFarmOwnerRef.current === 'user') {
         commands.autoFarm();
         autoFarmOwnerRef.current = null;
       } else {
@@ -774,6 +779,10 @@ export default function GameTerminal({
       setAutoQuestStoppedReason(null);
       setAutoQuestActive(false);
       autoQuestPhaseResetRef.current = 'idle';
+      // Stop auto-farm on Escape as well — same semantics as F when active.
+      if (autoFarmRef.current?.active === true || autoFarmStatus?.active === true) {
+        commands.autoFarm();
+      }
       setShowHelp(false);
       setShowQuestLog(false);
       setShowInventory(false);

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using FirstMud.Application.Services;
 using FirstMud.Engine.Tick;
 using FirstMud.GameServer.Commands;
 using FirstMud.GameServer.Services;
@@ -14,17 +15,20 @@ public class GameHub : Hub
     private readonly WorldStateService _worldStateService;
     private readonly IPlayerRepository _playerRepository;
     private readonly GameServerCommandFactory _commandFactory;
+    private readonly AutoFarmService _autoFarmService;
 
     public GameHub(
         GameLoopService gameLoop,
         WorldStateService worldStateService,
         IPlayerRepository playerRepository,
-        GameServerCommandFactory commandFactory)
+        GameServerCommandFactory commandFactory,
+        AutoFarmService autoFarmService)
     {
         _gameLoop = gameLoop;
         _worldStateService = worldStateService;
         _playerRepository = playerRepository;
         _commandFactory = commandFactory;
+        _autoFarmService = autoFarmService;
     }
 
     public override async Task OnConnectedAsync()
@@ -58,6 +62,25 @@ public class GameHub : Hub
         catch (InvalidOperationException ex)
         {
             await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+
+        // Rehydrate auto-farm status if a session is still active server-side.
+        // Without this, a reconnecting client would see the banner missing
+        // while the server still considers auto-farm running, and F-presses
+        // would fall through to the picker instead of stopping the loop.
+        var activeSession = _autoFarmService.GetSession(playerId);
+        if (activeSession is not null)
+        {
+            await Clients.Caller.SendAsync("AutoFarmStatus", new
+            {
+                active    = true,
+                state     = activeSession.FarmState,
+                kills     = activeSession.Kills,
+                items     = activeSession.ItemsFound,
+                salvaged  = activeSession.ItemsAutoSalvaged,
+                deposited = activeSession.ItemsDeposited,
+                quests    = activeSession.QuestsCompleted,
+            }, Context.ConnectionAborted);
         }
 
         // Immediately seed the client with available quests, current zone view, equipment, and companion roster
