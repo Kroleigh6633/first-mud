@@ -60,6 +60,7 @@ export function useAudio(
       if (initialisedRef.current) return;
       initialisedRef.current = true;
       const engine = AudioEngine.getInstance();
+      console.log('[audio] init', { biomeType, inCombat, atHomestead });
       await engine.resume();
       setInitialised(true);
     };
@@ -88,6 +89,8 @@ export function useAudio(
     if (!initialised) return;
 
     const targetKey = resolveBiomeKey(biomeType, inCombat, atHomestead);
+    const _engineDbg = AudioEngine.getInstance();
+    console.log('[audio] biome-change', { targetKey, currentKey: currentBiomeKey.current, ctxState: _engineDbg.ctx.state });
     if (targetKey === currentBiomeKey.current) return;
 
     // Defensive: if the AudioContext got suspended (tab backgrounded, autoplay

@@ -697,6 +697,7 @@ export function resolveBiomeKey(
 
 export function startBiomeMusic(key: BiomeKey): BiomeMusicHandle {
   const engine = AudioEngine.getInstance();
+  console.log('[audio] schedule-oscillator', { key, ctxState: engine.ctx.state, musicVol: engine.getMusicVolume(), muted: engine.isMuted() });
 
   switch (key) {
     case 'forest':
