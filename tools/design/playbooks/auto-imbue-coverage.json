@@ -1,0 +1,38 @@
+{
+  "$schema": "../schemas/playbook.schema.json",
+  "id": "auto-imbue-coverage",
+  "displayName": "Auto-imbue coverage progression",
+  "description": "FLOW: measures whether AutoProgressionService's imbue-axis dispatch (AutoImbuePlanner + AutoImbueExecutor) can drive party imbue coverage toward 1.0 within a balanced farming+imbuing budget. Axes are (startingImbueCoverage x playerLevel x dangerLevel). Cells proxy the outcome via the standard combat sim — at each cell, if auto-imbue can pick a viable reagent + open slot, the combat win-rate should match the tolerance band below. Proxy: starting coverage 0.25 @ level 5 should reach coverage ~0.75 within ~30 simulated minutes (3 imbue cycles). Bands are baseline; creative agent revisits once live telemetry lands.",
+  "holdouts": {
+    "playerElement": "Aether"
+  },
+  "axes": [
+    { "name": "playerLevel",       "values": [3, 5, 8] },
+    { "name": "imbueCoveragePct",  "values": [25, 50, 75] },
+    { "name": "dangerLevel",       "values": [5] }
+  ],
+  "rolls": 100,
+  "seed": 42,
+  "expectedViability": {
+    "cells": [
+      { "playerLevel": 3, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "balanced" },
+      { "playerLevel": 3, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "balanced" },
+      { "playerLevel": 3, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "easy" },
+
+      { "playerLevel": 5, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "easy" },
+      { "playerLevel": 5, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 5, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "trivial" },
+
+      { "playerLevel": 8, "imbueCoveragePct": 25, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 8, "imbueCoveragePct": 50, "dangerLevel": 5, "expected": "trivial" },
+      { "playerLevel": 8, "imbueCoveragePct": 75, "dangerLevel": 5, "expected": "trivial" }
+    ]
+  },
+  "toleranceBands": {
+    "trivial":   [95, 100],
+    "easy":      [85, 95],
+    "balanced":  [60, 85],
+    "hard":      [30, 60],
+    "punishing": [0, 30]
+  }
+}
