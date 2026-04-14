@@ -81,6 +81,7 @@ export interface GameCommands {
   unequip: (payload: { slot: string }) => void;
   useConsumable: (payload: { itemId: string }) => void;
   imbue: (payload: { itemId: string; taperId: string }) => void;
+  imbueWithGem: (payload: { itemId: string; gemItemId: string; recipeId: string }) => void;
   lockItem: (payload: { itemId: string }) => void;
 
   // Salvage
@@ -167,6 +168,7 @@ export function useGameCommands(sendCommand: SendCommandFn): GameCommands {
     unequip: (p) => sendCommand('unequip', p),
     useConsumable: (p) => sendCommand('useconsumable', p),
     imbue: (p) => sendCommand('imbue', p),
+    imbueWithGem: (p) => sendCommand('imbuewithgem', p),
     lockItem: (p) => sendCommand('lockitem', p),
 
     salvage: (p) => sendCommand('salvage', p),

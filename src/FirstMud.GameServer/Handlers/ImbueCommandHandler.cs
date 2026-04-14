@@ -1,3 +1,18 @@
+// ─────────────────────────────────────────────────────────────────────────
+// Legacy taper imbue path (keyword-driven).
+//
+// This handler drives ImbueService.ImbueAsync, which resolves the imbue type
+// from the taper's display name (ResolveImbueType) using substring matches
+// like "fire shaping", "wyrd taper", etc. Taper recipes are NOT content-
+// driven and NOT validated against content/imbue-recipes.json.
+//
+// The NEW gem-based imbue flow lives in ImbueWithGemCommandHandler and uses
+// IContentProvider + explicit recipe ids. The two flows are intentionally
+// split: tapers are keyword-matched consumables, gems are structured content
+// with per-recipe skill gates and upgrade semantics. Preserving this split
+// avoids entangling the legacy taper catalog migration with the gem work.
+// ─────────────────────────────────────────────────────────────────────────
+
 using FirstMud.Application.Services;
 using FirstMud.Domain.Interfaces;
 using FirstMud.GameServer.Commands;

@@ -27,4 +27,5 @@ Columns:
 
 | branch | status | base | summary | supersedes | files | updated |
 |---|---|---|---|---|---|---|
+| worktree-agent-aea45715 | ready-to-merge | 049fcb0 | Wire content/imbue-recipes.json into IContentProvider + new ImbueWithGemCommand gem-imbue path (taper path preserved) | - | content/imbue-recipes.json, src/FirstMud.Application/Content, src/FirstMud.GameServer (ImbueWithGemCommandHandler + parser + DI), src/FirstMud.Client/src/hooks/useGameCommands.ts, tests/FirstMud.Tests/{Content,Handlers} | 2026-04-13 |
 <!-- agents add rows above this line -->
